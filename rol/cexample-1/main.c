@@ -24,8 +24,8 @@ int main( int argc, char* argv[] ) {
 	rol_data_set_t searchResultsDs = rol_ds_search_exact(
 		ds,
      	"passengers-results.txt", // results file
-     	"(RAW_TEXT CONTAINS \"lle\")", //query
-     	0, //surrounding width
+     	"(RAW_TEXT CONTAINS \"night\" )", //query
+     	10, //surrounding width
      	"\n", // delimeter string
      	NULL, // index results file
      	NULL // precentage callback
