@@ -13,9 +13,13 @@ type RolDS struct {
 	cStrings []*C.char
 }
 
+func freeCString(str *C.char) {
+	C.free(unsafe.Pointer(str))
+}
+
 func freeAllCStrings(cStrings []*C.char) {
-	for p := range cStrings {
-		C.free(unsafe.Pointer(p))
+	for _, p := range cStrings {
+		freeCString(p)
 	}
 }
 
@@ -29,7 +33,7 @@ func (ds *RolDS) freeAllCStrings() {
 	freeAllCStrings(ds.cStrings)
 }
 
-func rolDSFromCds(cds C.rol_data_set_t) {
+func rolDSFromCds(cds C.rol_data_set_t) *RolDS {
 	ds := new(RolDS)
 	ds.cds = cds
 	return ds
@@ -49,8 +53,13 @@ func RolDSCreateNodes(nodesCount uint8) *RolDS {
 
 func (ds *RolDS) AddFile(name string) bool {
 	var cFilename *C.char = C.CString(name)
-	ds.registerCString(cFilename)
-	return bool(C.rol_ds_add_file(cFilename))
+	result := bool(C.rol_ds_add_file(ds.cds, cFilename))
+	if result {
+		ds.registerCString(cFilename)
+	} else {
+		freeCString(cFilename)
+	}
+	return result
 }
 
 func (ds *RolDS) Delete() { //TODO: https://golang.org/pkg/runtime/#SetFinalizer
@@ -65,7 +74,7 @@ func (ds *RolDS) SearchExact(
 	indexResultsFile *string,
 ) *RolDS {
 	var (
-		cResultsFile      *C.char = C.CString(resultFile)
+		cResultsFile      *C.char = C.CString(resultsFile)
 		cQuery            *C.char = C.CString(query)
 		cDelimeter        *C.char = C.CString(delimeter)
 		cIndexResultsFile *C.char = nil
