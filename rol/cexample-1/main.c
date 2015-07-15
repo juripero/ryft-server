@@ -31,11 +31,13 @@ int main( int argc, char* argv[] ) {
      	NULL // precentage callback
     );
 
-    if (rol_ds_has_error_occurred(search_results)) {
+    if (rol_ds_has_error_occurred(searchResultsDs)) {
 		printf("Error occurred during search operation");
 	}
 
 	rol_ds_delete(&ds);
 	rol_ds_delete(&searchResultsDs);
 
-	return 0
+	return 0;
+
+}
