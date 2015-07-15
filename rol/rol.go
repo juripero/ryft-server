@@ -81,7 +81,7 @@ func (ds *RolDS) SearchExact(
 	)
 
 	if indexResultsFile != nil {
-		cIndexResultsFile = C.CString(indexResultsFile)
+		cIndexResultsFile = C.CString(*indexResultsFile)
 	}
 
 	defer freeAllCStrings([]*C.char{cResultsFile, cQuery, cDelimeter, cIndexResultsFile})
