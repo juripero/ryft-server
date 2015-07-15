@@ -1,13 +1,33 @@
 package rol
 
-type RolDS struct{}
+/*
+#cgo LDFLAGS: -L../ajtcl -lajtcl
+#include <libryftone.h>
+*/
+import "C"
 
-func RolDSCreate() *RolDS                      {}
-func RolDSCreateNodes(nodesCount uint8) *RolDS {}
+type RolDS struct {
+	cds C.rol_data_set_t
+}
 
-func (ds *RolDS) AddFile(name string) bool {}
+func RolDSCreate() *RolDS {
+	ds := new(RolDS)
+	ds.cds = C.rol_ds_create()
+	return ds
+}
 
-func (ds *RolDS) Delete() {} // https://golang.org/pkg/runtime/#SetFinalizer
+func RolDSCreateNodes(nodesCount uint8) *RolDS {
+	ds := new(RolDS)
+	ds.cds = C.rol_ds_create_with_nodes(nodesCount)
+	return ds
+}
+
+func (ds *RolDS) AddFile(name string) bool {
+	return false
+}
+
+func (ds *RolDS) Delete() { // https://golang.org/pkg/runtime/#SetFinalizer
+}
 
 func (ds *RolDS) SearchExact(
 	resultsFile, query string,
@@ -15,6 +35,7 @@ func (ds *RolDS) SearchExact(
 	delimeter, indexResultsFile string,
 	percentageCallback func() uint8,
 ) *RolDS {
+	return nil
 }
 
 func (ds *RolDS) SearchFuzzyHamming(
@@ -24,7 +45,7 @@ func (ds *RolDS) SearchFuzzyHamming(
 	delimeter, indexResultsFile string,
 	percentageCallback func() uint8,
 ) *RolDS {
-
+	return nil
 }
 
 func (ds *RolDS) TermFrequencyRawtext(
@@ -32,7 +53,7 @@ func (ds *RolDS) TermFrequencyRawtext(
 	caseSensitive bool,
 	percentageCallback func() uint8,
 ) *RolDS {
-
+	return nil
 }
 
 func (ds *RolDS) TermFrequencyRecord(
@@ -41,7 +62,7 @@ func (ds *RolDS) TermFrequencyRecord(
 	keyFieldName string,
 	percentageCallback func() uint8,
 ) *RolDS {
-
+	return nil
 }
 
 func (ds *RolDS) TermFrequencyField(
@@ -50,5 +71,5 @@ func (ds *RolDS) TermFrequencyField(
 	keyFieldName, fieldName string,
 	percentageCallback func() uint8,
 ) *RolDS {
-
+	return nil
 }
