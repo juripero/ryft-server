@@ -32,7 +32,8 @@ int main( int argc, char* argv[] ) {
     );
 
     if (rol_ds_has_error_occurred(searchResultsDs)) {
-		printf("Error occurred during search operation");
+		printf("Error occurred during search operation.\n");
+		printf("Error string:%s\n", rol_ds_get_error_string(searchResultsDs));
 	}
 
 	rol_ds_delete(&ds);
