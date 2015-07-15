@@ -8,6 +8,14 @@ package rol
 import "C"
 import "unsafe"
 
+type Error struct {
+	s string
+}
+
+func (e *Error) Error() string {
+	return e.s
+}
+
 type RolDS struct {
 	cds      C.rol_data_set_t
 	cStrings []*C.char
@@ -135,4 +143,13 @@ func (ds *RolDS) TermFrequencyField(
 	percentageCallback func() uint8,
 ) *RolDS {
 	return nil
+}
+
+func (ds *RolDS) HasErrorOccured() *Error {
+	if C.rol_ds_has_error_occurred(ds.cds) {
+		var cErrorText *C.char = C.rol_ds_get_error_string(ds.cds)
+		return &Error{C.GoString(cErrorText)}
+	} else {
+		return nil
+	}
 }
