@@ -18,7 +18,7 @@ func RolDSCreate() *RolDS {
 
 func RolDSCreateNodes(nodesCount uint8) *RolDS {
 	ds := new(RolDS)
-	ds.cds = C.rol_ds_create_with_nodes(nodesCount)
+	ds.cds = C.rol_ds_create_with_nodes(C.uint8_t(nodesCount))
 	return ds
 }
 
