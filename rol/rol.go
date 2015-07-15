@@ -1,7 +1,7 @@
 package rol
 
 /*
-#cgo LDFLAGS: -L../ajtcl -lajtcl
+#cgo LDFLAGS: -lryftone
 #include <libryftone.h>
 */
 import "C"
