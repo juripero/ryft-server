@@ -10,16 +10,16 @@ import "unsafe"
 
 type RolDS struct {
 	cds      C.rol_data_set_t
-	cStrings []*C.Char
+	cStrings []*C.char
 }
 
-func freeAllCStrings(cStrings []*C.Char) {
+func freeAllCStrings(cStrings []*C.char) {
 	for p := range cStrings {
 		C.free(unsafe.Pointer(p))
 	}
 }
 
-func (ds *RolDS) registerCString(cString *C.Char) {
+func (ds *RolDS) registerCString(cString *C.char) {
 	if cString != nil {
 		ds.cStrings = append(ds.cStrings, cString)
 	}
@@ -65,17 +65,17 @@ func (ds *RolDS) SearchExact(
 	indexResultsFile *string,
 ) *RolDS {
 	var (
-		cResultsFile      *C.Char = C.CString(resultFile)
-		cQuery            *C.Char = C.CString(query)
-		cDelimeter        *C.Char = C.CString(delimeter)
-		cIndexResultsFile *C.Char = nil
+		cResultsFile      *C.char = C.CString(resultFile)
+		cQuery            *C.char = C.CString(query)
+		cDelimeter        *C.char = C.CString(delimeter)
+		cIndexResultsFile *C.char = nil
 	)
 
 	if indexResultsFile != nil {
 		cIndexResultsFile = C.CString(indexResultsFile)
 	}
 
-	defer freeAllCStrings([]*C.Char{cResultsFile, cQuery, cDelimeter, cIndexResultsFile})
+	defer freeAllCStrings([]*C.char{cResultsFile, cQuery, cDelimeter, cIndexResultsFile})
 
 	var newCds C.rol_data_set_t = C.rol_ds_search_exact(
 		ds.cds,
