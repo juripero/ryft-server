@@ -1,0 +1,3 @@
+#!/bin/bash
+
+gcc -o cexample-1 main.c -lryftone
