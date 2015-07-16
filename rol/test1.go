@@ -33,12 +33,12 @@ func TestSearchingNightInPassengers(t *testing.T) {
 	defer results.Close()
 
 	log.Println("SEARCH RESULTS:")
-	if err := io.Copy(results, os.Stdin); err != nil {
+	if _, err := io.Copy(results, os.Stdin); err != nil {
 		panic(err)
 	}
 }
 
-func resultsFilename(filename string) {
+func resultsFilename(filename string) string {
 	return filename + "results.txt"
 }
 
