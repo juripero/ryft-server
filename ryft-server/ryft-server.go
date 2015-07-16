@@ -26,7 +26,7 @@ func main() {
 	})
 
 	r.GET("/search-fail", func(c *gin.Context) {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal server error", "status": http.StatusInternalServerError})
 	})
 
 	r.Run(":8765")
