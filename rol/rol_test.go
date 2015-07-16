@@ -39,7 +39,7 @@ func TestSearchingNightInPassengers(t *testing.T) {
 }
 
 func resultsFilename(filename string) string {
-	return filename + "results.txt"
+	return filepath.Join("rol-results", filename+"-results.txt")
 }
 
 const passengersDatatbase = `Name,DoB,Phone,Notes
