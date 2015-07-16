@@ -17,7 +17,9 @@ func TestSearchingNightInPassengers(t *testing.T) {
 		panic(filename + " can not be added")
 	}
 
-	resultDs := ds.SearchExact(resultsFilename(filename), "(RAW_TEXT CONTAINS \"night\" )", 10, "\n", nil)
+	idxFilename := indexFilename(filename)
+	resFilename := resultsFilename(filename)
+	resultDs := ds.SearchExact(resFilename, "(RAW_TEXT CONTAINS \"night\" )", 10, "\n", &idxFilename)
 
 	if err := resultDs.HasErrorOccured(); err != nil {
 		log.Printf("Srange error: %s\n", err.Error())
@@ -26,7 +28,7 @@ func TestSearchingNightInPassengers(t *testing.T) {
 	resultDs.Delete()
 	ds.Delete()
 
-	results, err := os.Open(filepath.Join("/ryftone", resultsFilename(filename)))
+	results, err := os.Open(filepath.Join("/ryftone", resFilename))
 	if err != nil {
 		panic(err)
 	}
@@ -36,10 +38,26 @@ func TestSearchingNightInPassengers(t *testing.T) {
 	if _, err := io.Copy(os.Stdout, results); err != nil {
 		panic(err)
 	}
+
+	index, err := os.Open(filepath.Join("/ryftone", idxFilename))
+	if err != nil {
+		panic(err)
+	}
+	defer index.Close()
+
+	log.Printfln()
+	log.Printfln("INDEX RESULTS:")
+	if _, err := io.Copy(os.Stdout, index); err != nil {
+		panic(err)
+	}
 }
 
 func resultsFilename(filename string) string {
 	return filepath.Join("rol-results", filename+"-results.txt")
+}
+
+func indexFilename(filename string) string {
+	return filepath.Join("rol-results", filename+"-index.txt")
 }
 
 const passengersDatatbase = `Name,DoB,Phone,Notes
