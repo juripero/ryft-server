@@ -10,7 +10,7 @@ import (
 )
 
 func TestSearchingNightInPassengers(t *testing.T) {
-	filename := makePassengersFile()
+	filename := filepath.Base(makePassengersFile())
 
 	ds := RolDSCreate()
 	if ok := ds.AddFile(filename); !ok {
@@ -56,13 +56,18 @@ T,01-12-1989,310-555-9876,This guy goes by the name 'T'. No more. No less.
 DJ,04-25-1985,310-555-3425,I wonder if DJ is just this guy's name or his profession?
 `
 
-func makePassengersFile() (filename string) {
+func makePassengersFile() (file string) {
 	f, err := ioutil.TempFile("/ryftone", "go-passengers-")
 	if err != nil {
 		panic(err)
 	}
 
-	ioutil.WriteFile(filepath.Join("/ryftone", f.Name()), []byte(passengersDatatbase), os.ModeAppend)
+	_, err = f.WriteString(passengersDatatbase)
+	if err != nil {
+		panic(err)
+	}
+
+	f.Close()
 
 	return f.Name()
 }
