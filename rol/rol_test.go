@@ -45,8 +45,8 @@ func TestSearchingNightInPassengers(t *testing.T) {
 	}
 	defer index.Close()
 
-	log.Printfln()
-	log.Printfln("INDEX RESULTS:")
+	log.Println()
+	log.Println("INDEX RESULTS:")
 	if _, err := io.Copy(os.Stdout, index); err != nil {
 		panic(err)
 	}
