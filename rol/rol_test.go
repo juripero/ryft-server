@@ -33,7 +33,7 @@ func TestSearchingNightInPassengers(t *testing.T) {
 	defer results.Close()
 
 	log.Println("SEARCH RESULTS:")
-	if _, err := io.Copy(results, os.Stdin); err != nil {
+	if _, err := io.Copy(results, os.Stdout); err != nil {
 		panic(err)
 	}
 }
