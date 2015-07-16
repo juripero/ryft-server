@@ -26,7 +26,7 @@ func TestSearchingNightInPassengers(t *testing.T) {
 	resultDs.Delete()
 	ds.Delete()
 
-	results, err := os.Open(filepath.Join("/ryfton", resultsFilename(filename)))
+	results, err := os.Open(filepath.Join("/ryftone", resultsFilename(filename)))
 	if err != nil {
 		panic(err)
 	}
