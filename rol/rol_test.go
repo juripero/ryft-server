@@ -19,7 +19,7 @@ func TestSearchingNightInPassengers(t *testing.T) {
 
 	idxFilename := indexFilename(filename)
 	resFilename := resultsFilename(filename)
-	resultDs := ds.SearchExact(resFilename, "(RAW_TEXT CONTAINS \"night\" )", 1024, "\n", &idxFilename)
+	resultDs := ds.SearchExact(resFilename, "(RAW_TEXT CONTAINS \"night\" )", 0 /* "\n" */, "", &idxFilename)
 
 	if err := resultDs.HasErrorOccured(); err != nil {
 		log.Printf("Srange error: %s\n", err.Error())
