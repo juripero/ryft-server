@@ -8,14 +8,6 @@ package rol
 import "C"
 import "unsafe"
 
-type Error struct {
-	s string
-}
-
-func (e *Error) Error() string {
-	return e.s
-}
-
 type RolDS struct {
 	cds      C.rol_data_set_t
 	cStrings []*C.char
