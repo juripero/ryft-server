@@ -34,7 +34,11 @@ func main() {
 		c.Writer.Header()["Content-Type"] = []string{binding.MIMEJSON}
 		c.Stream(func(w io.Writer) bool {
 			w.Write([]byte("["))
+			firstIteration := true
 			for i := 0; i <= 100; i++ {
+				if !firstIteration {
+					w.Write([]byte(","))
+				}
 
 				record := gin.H{"number": i}
 				bytes, err := json.Marshal(record)
@@ -43,11 +47,12 @@ func main() {
 				}
 
 				w.Write(bytes)
-				w.Write([]byte(","))
+
+				firstIteration = false
 			}
 
 			w.Write([]byte("]"))
-			return true
+			return false
 		})
 
 	})
