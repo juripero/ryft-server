@@ -101,7 +101,7 @@ func main() {
 			panic(addingFilesErr)
 		}
 
-		var idxFile, resFile os.File
+		var idxFile, resFile *os.File
 		var searchErr error
 
 	waitingForResults:
@@ -118,23 +118,25 @@ func main() {
 					if os.IsNotExist(err) {
 						continue
 					}
-					panic(&ServerError(http.StatusInternalServerError, err.Error()))
+					panic(&ServerError{http.StatusInternalServerError, err.Error()})
 				}
 
 				if resFile, err = os.Open(PathInRyftoneForResultDir(names.ResultFile)); err != nil {
 					if os.IsNotExist(err) {
 						continue
 					}
-					panic(&ServerError(http.StatusInternalServerError, err.Error()))
+					panic(&ServerError{http.StatusInternalServerError, err.Error()})
 				}
 				break waitingForResults
 			}
 		}
 
-		//TODO: stream
-		w.Write([]byte("["))
-		StreamJsonContentOfArray(resFile, idxFile, w)
-		w.Write([]byte("]"))
+		c.Stream(func(w io.Writer) bool {
+			w.Write([]byte("["))
+			StreamJsonContentOfArray(resFile, idxFile, w)
+			w.Write([]byte("]"))
+			return false
+		})
 	})
 
 	if err := os.RemoveAll(ResultsDirPath()); err != nil {
