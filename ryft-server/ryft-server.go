@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -44,7 +43,7 @@ func main() {
 				}
 
 				w.Write(bytes)
-				w.Write(",")
+				w.Write([]byte(","))
 			}
 
 			w.Write([]byte("]"))
@@ -55,7 +54,7 @@ func main() {
 
 	r.GET("/search/test-fail", func(c *gin.Context) {
 		defer deferRecover(c)
-		panic(&ServerError{http.StatusInternalServerError, fmt.Errorf("Test error")})
+		panic(&ServerError{http.StatusInternalServerError, "Test error"})
 	})
 
 	r.GET("/search/exact", func(c *gin.Context) {
@@ -78,18 +77,18 @@ func main() {
 			for _, f := range s.ExtractedFiles {
 				ok := ds.AddFile(f)
 				if !ok {
-					addingFiles <- &ServerError(http.StatusNotFound, fmt.Sprintf("Could not add file `%s`", f))
+					addingFilesErrChan <- &ServerError{http.StatusNotFound, "Could not add file " + f}
 				}
 			}
-			addingFiles <- nil
+			addingFilesErrChan <- nil
 
 			idxFile := PathInRyftoneForResultDir(names.IdxFile)
-			resultsDs := ds.SearchExact(PathInRyftoneForResultDir(names.ResultFile), s.Query, s.Surrounding, "", &idx)
+			resultsDs := ds.SearchExact(PathInRyftoneForResultDir(names.ResultFile), s.Query, s.Surrounding, "", &idxFile)
 			defer resultsDs.Delete()
 
-			if resultsDs.HasErrorOccured(); err != nil {
-				if !rol.IsStrangeError(err) {
-					searchingErrChan <- &ServerError(http.StatusInternalServerError, err.Error())
+			if err := resultsDs.HasErrorOccured(); err != nil {
+				if !err.IsStrangeError() {
+					searchingErrChan <- &ServerError{http.StatusInternalServerError, err.Error()}
 				}
 			}
 
