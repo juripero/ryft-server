@@ -18,7 +18,7 @@ func (err *ServerError) Error() string {
 
 func deferRecover(c *gin.Context) {
 	if r := recover(); r != nil {
-		if err, ok := r.(ServerError); ok {
+		if err, ok := r.(*ServerError); ok {
 			c.IndentedJSON(err.Status, gin.H{"message": err.Message, "status": err.Status})
 			return
 		}
