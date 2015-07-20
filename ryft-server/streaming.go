@@ -50,13 +50,13 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 		filename := fields[0]
 
 		var offset uint64
-		if offset, err = strconv.ParseInt(fields[1], 10, 64); err != nil {
+		if offset, err = strconv.ParseUint(fields[1], 10, 64); err != nil {
 			log.Printf("Parse int error: %s", err.Error())
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
 		var length uint16
-		if length, err = strconv.ParseInt(fields[2], 10, 16); err != nil {
+		if length, err = strconv.ParseUint(fields[2], 10, 16); err != nil {
 			log.Printf("Parse int error: %s", err.Error())
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
@@ -73,7 +73,7 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 
 		if isFuzzy {
 			var fuzziness uint8
-			if fuzziness, err = strconv.ParseInt(fields[3], 10, 8); err != nil {
+			if fuzziness, err = strconv.ParseUint(fields[3], 10, 8); err != nil {
 				log.Printf("Parse int error: %s", err.Error())
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
