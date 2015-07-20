@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -68,8 +69,8 @@ func main() {
 
 		names := GetNewNames()
 
-		addingFiles := make(chan error)
-		searchProblem := make(chan error)
+		addingFilesErrChan := make(chan error)
+		searchingErrChan := make(chan error)
 		go func() {
 			ds := rol.RolDSCreate()
 			defer ds.Delete()
@@ -84,22 +85,34 @@ func main() {
 
 			idxFile := PathInRyftoneForResultDir(names.IdxFile)
 			resultsDs := ds.SearchExact(PathInRyftoneForResultDir(names.ResultFile), s.Query, s.Surrounding, "", &idx)
+			defer resultsDs.Delete()
+
+			if resultsDs.HasErrorOccured(); err != nil {
+				if !rol.IsStrangeError(err) {
+					searchingErrChan <- &ServerError(http.StatusInternalServerError, err.Error())
+				}
+			}
+
+			searchingErrChan <- nil
 
 		}()
 
-		addingFilesErr := <-addingFiles
+		addingFilesErr := <-addingFilesErrChan
 		if addingFilesErr != nil {
 			panic(addingFilesErr)
 		}
 
 		var idxFile, resFile os.File
-		var openErr error
+		var searchErr error
 
 	waitingForResults:
 		for {
 			select {
-			case openErr := <-searchProblem:
-				panic(openErr)
+			case searchErr := <-searchingErrChan:
+				if searchErr != nil {
+					panic(searchErr)
+				}
+				break waitingForResults
 			default:
 				var err error
 				if idxFile, err = os.Open(PathInRyftoneForResultDir(names.IdxFile)); err != nil {
@@ -119,10 +132,21 @@ func main() {
 			}
 		}
 
+		//TODO: stream
+		w.Write([]byte("["))
+		StreamJsonContentOfArray(resFile, idxFile, w)
+		w.Write([]byte("]"))
 	})
 
-	// remove directory Res directory
-	// create a direcotry ResDirectory
+	if err := os.RemoveAll(ResultsDirPath()); err != nil {
+		log.Printf("Could not delete %s with error %s", ResultsDirPath(), err.Error())
+		os.Exit(1)
+	}
+
+	if err := os.MkdirAll(ResultsDirPath(), 0777); err != nil {
+		log.Printf("Could not create directory %s with error %s", ResultsDirPath(), err.Error())
+		os.Exit(1)
+	}
 
 	StartNamesGenerator()
 
