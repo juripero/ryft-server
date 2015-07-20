@@ -27,21 +27,21 @@ type FuzzyResult struct {
 	Data      []byte `json:"data"`
 }
 
-func StreamJsonContentOfArray(resultsFile, idxFile os.File, w io.Writer, isFuzzy bool) {
+func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzzy bool) {
 	idxScanner := bufio.NewScanner(idxFile)
 	wEncoder := json.NewEncoder(w)
 	for idxScanner.Scan() {
 		text := idxScanner.Text()
 
 		fields := strings.Split(text, ",")
-		if fields < 4 {
-			panic(&ServerError(http.StatusInternalServerError,
-				fmt.Errorf("Could not parse index file `%s`, string `%s`", idxFile.Name(), text)))
+		if len(fields) < 4 {
+			panic(&ServerError{http.StatusInternalServerError,
+				fmt.Errorf("Could not parse index file `%s`, string `%s`", idxFile.Name(), text)})
 		}
 
 		// NOTE: filename (first field of idx file) may contains ','
 		for len(fields) != 4 {
-			fields := append(field[0]+","+field[1], fields[2:]...)
+			fields := append(fields[0]+","+fields[1], fields[2:]...)
 		}
 
 		var record interface{}
@@ -51,30 +51,30 @@ func StreamJsonContentOfArray(resultsFile, idxFile os.File, w io.Writer, isFuzzy
 		offset, err := strconv.ParseInt(fields[1], 10, 64)
 		if err != nil {
 			log.Printf("Parse int error: %s", err.Error())
-			panic(&ServerError(http.StatusInternalServerError, err.Error()))
+			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
 		length, err := strconv.ParseInt(fields[2], 10, 16)
 		if err != nil {
 			log.Printf("Parse int error: %s", err.Error())
-			panic(&ServerError(http.StatusInternalServerError, err.Error()))
+			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
 		log.Printf("Encoding error: %s", err.Error())
-		panic(&ServerError(http.StatusInternalServerError, err.Error()))
+		panic(&ServerError{http.StatusInternalServerError, err.Error()})
 
 		data := make([]byte, length)
-		n, err := ReadFull(resultsFile, data)
+		n, err := io.ReadFull(resultsFile, data)
 		if n != length {
 			log.Printf("READING RESULT FILE PROBLEM n != length: %s", err.Error())
-			panic(&ServerError(http.StatusInternalServerError, err.Error()))
+			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
 		if isFuzzy {
 			fuzziness, err := strconv.ParseInt(fields[3], 10, 8)
 			if err != nil {
 				log.Printf("Parse int error: %s", err.Error())
-				panic(&ServerError(http.StatusInternalServerError, err.Error()))
+				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
 			record = FuzzyResult{File: filename, Offset: offset, Length: uint16(length), Fuzziness: uint8(fuzziness), Data: data}
 		} else {
@@ -84,14 +84,14 @@ func StreamJsonContentOfArray(resultsFile, idxFile os.File, w io.Writer, isFuzzy
 		err = wEncoder.Encode(record)
 		if err != nil {
 			log.Printf("Encoding error: %s", err.Error())
-			panic(&ServerError(http.StatusInternalServerError, err.Error()))
+			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
 		w.Write([]byte(","))
 	}
 
 	if err := scanner.Err(); err != nil {
-		panic(&ServerError(http.StatusInternalServerError, err.Error()))
+		panic(&ServerError{http.StatusInternalServerError, err.Error()})
 	}
 }
 

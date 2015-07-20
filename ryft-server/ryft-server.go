@@ -133,7 +133,7 @@ func main() {
 
 		c.Stream(func(w io.Writer) bool {
 			w.Write([]byte("["))
-			StreamJsonContentOfArray(resFile, idxFile, w)
+			StreamJsonContentOfArray(resFile, idxFile, w, false)
 			w.Write([]byte("]"))
 			return false
 		})
