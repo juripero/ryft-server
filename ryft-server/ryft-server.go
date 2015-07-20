@@ -102,7 +102,6 @@ func main() {
 		}
 
 		var idxFile, resFile *os.File
-		var searchErr error
 
 	waitingForResults:
 		for {

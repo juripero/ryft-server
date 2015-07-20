@@ -42,7 +42,7 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 
 		// NOTE: filename (first field of idx file) may contains ','
 		for len(fields) != 4 {
-			fields := append([]string{fields[0] + "," + fields[1]}, fields[2:]...)
+			fields = append([]string{fields[0] + "," + fields[1]}, fields[2:]...)
 		}
 
 		var record interface{}
