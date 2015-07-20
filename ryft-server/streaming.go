@@ -31,31 +31,32 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 	idxScanner := bufio.NewScanner(idxFile)
 	wEncoder := json.NewEncoder(w)
 	for idxScanner.Scan() {
+		var err error
 		text := idxScanner.Text()
 
 		fields := strings.Split(text, ",")
 		if len(fields) < 4 {
 			panic(&ServerError{http.StatusInternalServerError,
-				fmt.Errorf("Could not parse index file `%s`, string `%s`", idxFile.Name(), text)})
+				fmt.Sprintf("Could not parse index file `%s`, string `%s`", idxFile.Name(), text)})
 		}
 
 		// NOTE: filename (first field of idx file) may contains ','
 		for len(fields) != 4 {
-			fields := append(fields[0]+","+fields[1], fields[2:]...)
+			fields := append([]string{fields[0] + "," + fields[1]}, fields[2:]...)
 		}
 
 		var record interface{}
 
 		filename := fields[0]
 
-		offset, err := strconv.ParseInt(fields[1], 10, 64)
-		if err != nil {
+		var offset uint64
+		if offset, err = strconv.ParseInt(fields[1], 10, 64); err != nil {
 			log.Printf("Parse int error: %s", err.Error())
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
-		length, err := strconv.ParseInt(fields[2], 10, 16)
-		if err != nil {
+		var length uint16
+		if length, err = strconv.ParseInt(fields[2], 10, 16); err != nil {
 			log.Printf("Parse int error: %s", err.Error())
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
@@ -65,14 +66,14 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 
 		data := make([]byte, length)
 		n, err := io.ReadFull(resultsFile, data)
-		if n != length {
+		if n != int(length) {
 			log.Printf("READING RESULT FILE PROBLEM n != length: %s", err.Error())
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
 		if isFuzzy {
-			fuzziness, err := strconv.ParseInt(fields[3], 10, 8)
-			if err != nil {
+			var fuzziness uint8
+			if fuzziness, err = strconv.ParseInt(fields[3], 10, 8); err != nil {
 				log.Printf("Parse int error: %s", err.Error())
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
@@ -90,7 +91,7 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 		w.Write([]byte(","))
 	}
 
-	if err := scanner.Err(); err != nil {
+	if err := idxScanner.Err(); err != nil {
 		panic(&ServerError{http.StatusInternalServerError, err.Error()})
 	}
 }
