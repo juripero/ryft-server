@@ -19,7 +19,7 @@ func StartNamesGenerator() {
 		var s string
 		for {
 			for i := uint64(0); i <= ^uint64(0); i++ {
-				s = strconv.Itoa(i)
+				s = strconv.FormatUint(i, 10)
 				namesChan <- Names{"result-" + s + ".bin", "idx-" + s}
 			}
 		}
@@ -35,9 +35,9 @@ func ResultsDirName() string {
 }
 
 func ResultsDirPath(filenames ...string) string {
-	return filepath.Join(RyftoneMountPoint, ResultsDirName(), filenames...)
+	return filepath.Join(append([]string{RyftoneMountPoint, ResultsDirName()}, filenames...))
 }
 
 func PathInRyftoneForResultDir(filenames ...string) string {
-	return filepath.Join(ResultsDirName(), filename...)
+	return filepath.Join(append([]string{ResultsDirName()}, filenames...))
 }
