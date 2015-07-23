@@ -109,38 +109,44 @@ func main() {
 		log.Println("Start search listening")
 
 		var idxFile, resFile *os.File
+		var searchErr error = nil
+		var searchErrReady bool = false
 
 		for {
-			select {
-			case searchErr := <-searchingErrChan:
-				if searchErr != nil {
-					log.Printf("Error in search channel: %s", searchErr)
-					panic(searchErr)
-				} else {
-					log.Println("SearchErr==nil, but files is not created for this time.")
+			if !searchErrReady {
+				select {
+				case searchErr = <-searchingErrChan:
+					searchErrReady = true
+					if searchErr != nil {
+						log.Printf("Error in search channel: %s", searchErr)
+						panic(searchErr)
+					} else {
+						log.Println("SearchErr==nil, but files is not created for this time.")
+					}
+
+				default:
+					log.Println("No information about searching status. Continue...")
 				}
-			default:
-				log.Println("No information about searching status. Continue...")
 			}
 
 			var err error
-			if idxFile, err = os.Open(PathInRyftoneForResultDir(names.IdxFile)); err != nil {
+			if idxFile, err = os.Open(ResultsDirPath(names.IdxFile)); err != nil {
 				if os.IsNotExist(err) {
-					log.Printf("Index %s do not exists. Continue...", PathInRyftoneForResultDir(names.IdxFile))
+					log.Printf("Index %s do not exists. Continue...", ResultsDirPath(names.IdxFile))
 					continue
 				}
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
-			log.Printf("Index %s has been opened.", PathInRyftoneForResultDir(names.IdxFile))
+			log.Printf("Index %s has been opened.", ResultsDirPath(names.IdxFile))
 
-			if resFile, err = os.Open(PathInRyftoneForResultDir(names.ResultFile)); err != nil {
+			if resFile, err = os.Open(ResultsDirPath(names.ResultFile)); err != nil {
 				if os.IsNotExist(err) {
-					log.Printf("Results %s do not exists. Continue...", PathInRyftoneForResultDir(names.ResultFile))
+					log.Printf("Results %s do not exists. Continue...", ResultsDirPath(names.ResultFile))
 					continue
 				}
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
-			log.Println("Results %s has been opened.", PathInRyftoneForResultDir(names.ResultFile))
+			log.Println("Results %s has been opened.", ResultsDirPath(names.ResultFile))
 		}
 
 		idxFile.Close()
