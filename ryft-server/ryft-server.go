@@ -125,7 +125,7 @@ func main() {
 					}
 
 				default:
-					log.Println("No information about searching status. Continue...")
+					//log.Println("No information about searching status. Continue...")
 				}
 			}
 
@@ -134,7 +134,7 @@ func main() {
 			if idxFile == nil {
 				if idxFile, err = os.Open(ResultsDirPath(names.IdxFile)); err != nil {
 					if os.IsNotExist(err) {
-						log.Printf("Index %s do not exists. Continue...", ResultsDirPath(names.IdxFile))
+						//log.Printf("Index %s do not exists. Continue...", ResultsDirPath(names.IdxFile))
 						continue
 					}
 					panic(&ServerError{http.StatusInternalServerError, err.Error()})
@@ -145,7 +145,7 @@ func main() {
 			if resFile == nil {
 				if resFile, err = os.Open(ResultsDirPath(names.ResultFile)); err != nil {
 					if os.IsNotExist(err) {
-						log.Printf("Results %s do not exists. Continue...", ResultsDirPath(names.ResultFile))
+						//log.Printf("Results %s do not exists. Continue...", ResultsDirPath(names.ResultFile))
 						continue
 					}
 					panic(&ServerError{http.StatusInternalServerError, err.Error()})
@@ -167,17 +167,18 @@ func main() {
 			}()
 		}
 
+		// c.Stream(func(w io.Writer) bool {
+		// 	w.Write([]byte("["))
+		// 	StreamJsonContentOfArray(resFile, idxFile, w, false)
+		// 	w.Write([]byte("]"))
+		// 	return false
+		// })
+
 		idxFile.Close()
 		resFile.Close()
 		c.IndentedJSON(http.StatusOK, gin.H{"completion": "ok"})
 		log.Println("Processing request complete")
 
-		// 	c.Stream(func(w io.Writer) bool {
-		// 		w.Write([]byte("["))
-		// 		StreamJsonContentOfArray(resFile, idxFile, w, false)
-		// 		w.Write([]byte("]"))
-		// 		return false
-		// 	})
 	})
 
 	if err := os.RemoveAll(ResultsDirPath()); err != nil {
@@ -191,6 +192,7 @@ func main() {
 	}
 
 	StartNamesGenerator()
+	log.SetFlags(log.Ltime)
 
 	r.Run(":8765")
 }
