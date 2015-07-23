@@ -141,7 +141,7 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 func linesScan(r io.Reader, linesChan chan string) {
 	for {
 		var line string
-		n, err := fmt.Fscanln(r, &line)
+		n, _ := fmt.Fscanln(r, &line)
 		if n == 1 {
 			linesChan <- line
 			continue
