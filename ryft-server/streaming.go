@@ -122,10 +122,9 @@ func readDataBlock(r io.Reader, length uint16) (result []byte) {
 		data := make([]byte, length-total)
 		n, err := r.Read(data)
 		result = append(result, data...)
-		total = total + n
+		total = total + uint16(n)
 	}
 	return
-
 }
 
 /* Index file line format:
