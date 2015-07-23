@@ -74,7 +74,7 @@ func main() {
 		names := GetNewNames()
 
 		addingFilesErrChan := make(chan error)
-		// searchingErrChan := make(chan error)
+		searchingErrChan := make(chan error)
 		go func() {
 			ds := rol.RolDSCreate()
 			defer ds.Delete()
