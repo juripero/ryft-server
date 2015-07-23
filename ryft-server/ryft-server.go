@@ -158,8 +158,6 @@ func main() {
 			break
 		}
 
-		c.IndentedJSON(http.StatusOK, gin.H{"completion": "ok"})
-
 		c.Stream(func(w io.Writer) bool {
 			//StreamJsonContentOfArray(resFile, idxFile, w, false)
 			StreamJson(resFile, idxFile, w, searchingErrChan)
@@ -168,6 +166,8 @@ func main() {
 
 		idxFile.Close()
 		resFile.Close()
+
+		c.IndentedJSON(http.StatusOK, gin.H{"completion": "ok"})
 
 		log.Println("Processing request complete")
 
