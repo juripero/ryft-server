@@ -124,7 +124,7 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 		for {
 			select {
 			case c := <-completion:
-				linesScan(idxScanner, idxLines, completion)
+				linesScan(idxScanner, idxLines)
 				close(idxLines)
 				return
 			default:
@@ -139,12 +139,12 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 
 }
 
-func linesScan(scanner bufio.Scanner, linesChan chan string) {
+func linesScan(scanner *bufio.Scanner, linesChan chan string) {
 	for scanner.Scan() {
 		linesChan <- scanner.Text()
 	}
 
-	if err := idxScanner.Err(); err != nil {
+	if err := scanner.Err(); err != nil {
 		log.Fatalf("lineScan: %s", err.Error())
 	}
 }
