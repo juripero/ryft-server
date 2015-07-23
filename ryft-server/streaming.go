@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -59,23 +61,23 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 
 // func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzzy bool) {
 // 	idxScanner := bufio.NewScanner(idxFile)
-// 	wEncoder := json.NewEncoder(w)
+// wEncoder := json.NewEncoder(w)
 
 // 	log.Println("+ IDXFILE:", idxFile)
 // 	log.Println("+ IDXSCANNER:", idxScanner)
 // 	log.Println("+ W:", w)
 // 	log.Println("+ WENCODER:", wEncoder)
 
-// 	w.Write([]byte("["))
-// 	defer w.Write([]byte("]"))
+// w.Write([]byte("["))
+// defer w.Write([]byte("]"))
 
 // 	firstIteration := true
 // 	log.Println("+ STARTING IDX ITERATIONS")
 // 	for idxScanner.Scan() {
 // 		log.Println("+ START NEW IDX ITERATION")
-// 		if !firstIteration {
-// 			w.Write([]byte(","))
-// 		}
+// if !firstIteration {
+// 	w.Write([]byte(","))
+// }
 
 // 		var err error
 // 		log.Println("+ BEGIN IDX RECORD")
@@ -135,13 +137,13 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 // 			record = ExactResult{File: filename, Offset: offset, Length: uint16(length), Data: data}
 // 		}
 
-// 		err = wEncoder.Encode(record)
-// 		if err != nil {
-// 			log.Printf("Encoding error: %s", err.Error())
-// 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
-// 		}
+// err = wEncoder.Encode(record)
+// if err != nil {
+// 	log.Printf("Encoding error: %s", err.Error())
+// 	panic(&ServerError{http.StatusInternalServerError, err.Error()})
+// }
 
-// 		firstIteration = false
+// firstIteration = false
 
 // 		log.Println("+ END NEW IDX ITERATION")
 // 	}
@@ -153,15 +155,12 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 // }
 
 func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan error) {
-	//idxLines := make(chan string, 64)
+	wEncoder := json.NewEncoder(w)
 	idxRecords := make(chan IdxRecord, 64)
 	go func() {
-		//idxScanner := bufio.NewScanner(idxFile)
 		for {
 			select {
 			case <-completion:
-				// linesScan(idxFile, idxLines)
-				// close(idxLines)
 				recordsScan(idxFile, idxRecords)
 				return
 			default:
@@ -170,22 +169,23 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 		}
 	}()
 
-	// for line := range idxLines {
-	// 	log.Printf("+ SCAN-LINE:%s", line)
-	// }
-	for r := range idxRecords {
-		log.Printf("+ RECORD %+v", r)
-	}
-}
+	w.Write([]byte("["))
+	defer w.Write([]byte("]"))
 
-func linesScan(r io.Reader, linesChan chan string) {
-	for {
-		var line string
-		n, _ := fmt.Fscanln(r, &line)
-		if n == 0 {
-			break
+	var err error
+	firstIteration := true
+	for r := range idxRecords {
+		if !firstIteration {
+			w.Write([]byte(","))
 		}
-		linesChan <- line
+
+		err = wEncoder.Encode(record)
+		if err != nil {
+			log.Printf("Encoding error: %s", err.Error())
+			panic(&ServerError{http.StatusInternalServerError, err.Error()})
+		}
+
+		firstIteration = false
 	}
 }
 
@@ -203,6 +203,17 @@ func recordsScan(r io.Reader, recordsChan chan IdxRecord) {
 		}
 
 		recordsChan <- r
+	}
+}
+
+func linesScan(r io.Reader, linesChan chan string) {
+	for {
+		var line string
+		n, _ := fmt.Fscanln(r, &line)
+		if n == 0 {
+			break
+		}
+		linesChan <- line
 	}
 }
 
