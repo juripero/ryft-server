@@ -117,8 +117,8 @@ func linesScan(r io.Reader, linesChan chan string) {
 }
 
 func readDataBlock(r io.Reader, length uint16) (result []byte) {
-	total := 0
-	for total == length {
+	var total uint16 = 0
+	for total < length {
 		data := make([]byte, length-total)
 		n, err := r.Read(data)
 		result = append(result, data...)
