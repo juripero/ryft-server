@@ -123,7 +123,7 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 		idxScanner := bufio.NewScanner(idxFile)
 		for {
 			select {
-			case c := <-completion:
+			case <-completion:
 				linesScan(idxScanner, idxLines)
 				close(idxLines)
 				return
