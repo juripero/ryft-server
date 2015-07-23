@@ -167,12 +167,12 @@ func main() {
 			}()
 		}
 
-		// c.Stream(func(w io.Writer) bool {
-		// 	w.Write([]byte("["))
-		// 	StreamJsonContentOfArray(resFile, idxFile, w, false)
-		// 	w.Write([]byte("]"))
-		// 	return false
-		// })
+		c.Stream(func(w io.Writer) bool {
+			w.Write([]byte("["))
+			StreamJsonContentOfArray(resFile, idxFile, w, false)
+			w.Write([]byte("]"))
+			return false
+		})
 
 		idxFile.Close()
 		resFile.Close()

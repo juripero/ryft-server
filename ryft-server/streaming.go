@@ -30,9 +30,20 @@ type FuzzyResult struct {
 func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzzy bool) {
 	idxScanner := bufio.NewScanner(idxFile)
 	wEncoder := json.NewEncoder(w)
+
+	w.Write([]byte("["))
+	defer w.Write([]byte("]"))
+
+	firstIteration := true
 	for idxScanner.Scan() {
+		if !firstIteration {
+			w.Write([]byte(","))
+		}
+
 		var err error
+		log.Println("+ BEGIN IDX RECORD")
 		text := idxScanner.Text()
+		log.Println("+ END IDX RECORD:", text)
 
 		fields := strings.Split(text, ",")
 		if len(fields) < 4 {
@@ -61,11 +72,16 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
-		log.Printf("Encoding error: %s", err.Error())
-		panic(&ServerError{http.StatusInternalServerError, err.Error()})
+		log.Printf("+ IDX PARSED: %s, %d, %d", filename, offset, length)
 
 		data := make([]byte, length)
 		n, err := io.ReadFull(resultsFile, data)
+
+		// logging
+		if err != nil {
+			log.Printf("+ RES DATA:%s", string(data))
+		}
+
 		if n != int(length) {
 			log.Printf("READING RESULT FILE PROBLEM n != length: %s", err.Error())
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
@@ -88,7 +104,7 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
 		}
 
-		w.Write([]byte(","))
+		firstIteration = false
 	}
 
 	if err := idxScanner.Err(); err != nil {
