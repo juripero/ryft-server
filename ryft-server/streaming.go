@@ -11,13 +11,6 @@ import (
 	"strings"
 )
 
-// type ExactResult struct {
-// 	File   string `json:"file"`
-// 	Offset uint64 `json:"offset"`
-// 	Length uint16 `json:"length"`
-// 	Data   []byte `json:"data"`
-// }
-
 type IdxRecord struct {
 	File      string `json:"file"`
 	Offset    uint64 `json:"offset"`
@@ -58,101 +51,6 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 
 	return
 }
-
-// func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzzy bool) {
-// 	idxScanner := bufio.NewScanner(idxFile)
-// wEncoder := json.NewEncoder(w)
-
-// 	log.Println("+ IDXFILE:", idxFile)
-// 	log.Println("+ IDXSCANNER:", idxScanner)
-// 	log.Println("+ W:", w)
-// 	log.Println("+ WENCODER:", wEncoder)
-
-// w.Write([]byte("["))
-// defer w.Write([]byte("]"))
-
-// 	firstIteration := true
-// 	log.Println("+ STARTING IDX ITERATIONS")
-// 	for idxScanner.Scan() {
-// 		log.Println("+ START NEW IDX ITERATION")
-// if !firstIteration {
-// 	w.Write([]byte(","))
-// }
-
-// 		var err error
-// 		log.Println("+ BEGIN IDX RECORD")
-// 		text := idxScanner.Text()
-// 		log.Println("+ END IDX RECORD:", text)
-
-// fields := strings.Split(text, ",")
-// if len(fields) < 4 {
-// 	panic(&ServerError{http.StatusInternalServerError,
-// 		fmt.Sprintf("Could not parse index file `%s`, string `%s`", idxFile.Name(), text)})
-// }
-
-// // NOTE: filename (first field of idx file) may contains ','
-// for len(fields) != 4 {
-// 	fields = append([]string{fields[0] + "," + fields[1]}, fields[2:]...)
-// }
-
-// 		var record interface{}
-
-// filename := fields[0]
-
-// var offset uint64
-// if offset, err = strconv.ParseUint(fields[1], 10, 64); err != nil {
-// 	log.Printf("Parse int error: %s", err.Error())
-// 	panic(&ServerError{http.StatusInternalServerError, err.Error()})
-// }
-
-// var length uint64
-// if length, err = strconv.ParseUint(fields[2], 10, 16); err != nil {
-// 	log.Printf("Parse int error: %s", err.Error())
-// 	panic(&ServerError{http.StatusInternalServerError, err.Error()})
-// }
-
-// log.Printf("+ IDX PARSED: %s, %d, %d", filename, offset, length)
-
-// 		data := make([]byte, length)
-// 		n, err := io.ReadFull(resultsFile, data)
-
-// 		// logging
-// 		if err != nil {
-// 			log.Printf("+ RES DATA:%s", string(data))
-// 		}
-
-// 		if n != int(length) {
-// 			log.Printf("READING RESULT FILE PROBLEM n != length: %s", err.Error())
-// 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
-// 		}
-
-// 		if isFuzzy {
-// var fuzziness uint64
-// if fuzziness, err = strconv.ParseUint(fields[3], 10, 8); err != nil {
-// 	log.Printf("Parse int error: %s", err.Error())
-// 	panic(&ServerError{http.StatusInternalServerError, err.Error()})
-// }
-// 			record = FuzzyResult{File: filename, Offset: offset, Length: uint16(length), Fuzziness: uint8(fuzziness), Data: data}
-// 		} else {
-// 			record = ExactResult{File: filename, Offset: offset, Length: uint16(length), Data: data}
-// 		}
-
-// err = wEncoder.Encode(record)
-// if err != nil {
-// 	log.Printf("Encoding error: %s", err.Error())
-// 	panic(&ServerError{http.StatusInternalServerError, err.Error()})
-// }
-
-// firstIteration = false
-
-// 		log.Println("+ END NEW IDX ITERATION")
-// 	}
-// 	log.Println("+ END IDX ITERATIONS")
-
-// 	if err := idxScanner.Err(); err != nil {
-// 		panic(&ServerError{http.StatusInternalServerError, err.Error()})
-// 	}
-// }
 
 func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan error) {
 	wEncoder := json.NewEncoder(w)
@@ -216,6 +114,18 @@ func linesScan(r io.Reader, linesChan chan string) {
 		}
 		linesChan <- line
 	}
+}
+
+func readDataBlock(r io.Reader, length uint16) (result []byte) {
+	total := 0
+	for total == length {
+		data := make([]byte, length-total)
+		n, err := r.Read(data)
+		result = append(result, data...)
+		total = total + n
+	}
+	return
+
 }
 
 /* Index file line format:
