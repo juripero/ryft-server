@@ -150,10 +150,21 @@ func main() {
 					}
 					panic(&ServerError{http.StatusInternalServerError, err.Error()})
 				}
-				log.Println("Results %s has been opened.", ResultsDirPath(names.ResultFile))
+				log.Printf("Results %s has been opened.", ResultsDirPath(names.ResultFile))
 			}
 
+			log.Println("ALL FILES HAS BEEN COMPLETE OPENING")
+
 			break
+		}
+
+		//Test routine:
+		if !searchErrReady {
+			go func() {
+				log.Println("--> CONC-WAITING FOR SEARCH COMPLETION")
+				<-searchingErrChan
+				log.Println("--> SEARCH COMPLETION")
+			}()
 		}
 
 		idxFile.Close()
