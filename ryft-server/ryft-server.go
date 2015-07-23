@@ -158,17 +158,9 @@ func main() {
 			break
 		}
 
-		//Test routine:
-		if !searchErrReady {
-			go func() {
-				log.Println("--> CONC-WAITING FOR SEARCH COMPLETION")
-				<-searchingErrChan
-				log.Println("--> SEARCH COMPLETION")
-			}()
-		}
-
 		c.Stream(func(w io.Writer) bool {
-			StreamJsonContentOfArray(resFile, idxFile, w, false)
+			//StreamJsonContentOfArray(resFile, idxFile, w, false)
+			StreamJson(resFile, idxFile, w, searchingErrChan)
 			return false
 		})
 
