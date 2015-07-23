@@ -107,39 +107,46 @@ func main() {
 		}
 
 		log.Println("Start search listening")
+
+		var idxFile, resFile *os.File
+
+		for {
+			select {
+			case searchErr := <-searchingErrChan:
+				if searchErr != nil {
+					log.Printf("Error in search channel: %s", searchErr)
+					panic(searchErr)
+				} else {
+					log.Println("SearchErr==nil, but files is not created for this time.")
+				}
+			default:
+				log.Println("No information about searching status. Continue...")
+			}
+
+			var err error
+			if idxFile, err = os.Open(PathInRyftoneForResultDir(names.IdxFile)); err != nil {
+				if os.IsNotExist(err) {
+					log.Println("Index %s do not exists. Continue...", PathInRyftoneForResultDir(names.IdxFile))
+					continue
+				}
+				panic(&ServerError{http.StatusInternalServerError, err.Error()})
+			}
+			log.Println("Index %s has been opened.", PathInRyftoneForResultDir(names.IdxFile))
+
+			if resFile, err = os.Open(PathInRyftoneForResultDir(names.ResultFile)); err != nil {
+				if os.IsNotExist(err) {
+					log.Println("Results %s do not exists. Continue...", PathInRyftoneForResultDir(names.ResultFile))
+					continue
+				}
+				panic(&ServerError{http.StatusInternalServerError, err.Error()})
+			}
+			log.Println("Results %s has been opened.", PathInRyftoneForResultDir(names.ResultFile))
+		}
+
+		idxFile.Close()
+		resFile.Close()
 		c.IndentedJSON(http.StatusOK, gin.H{"completion": "ok"})
-
-		<-searchingErrChan
-		log.Println("Stop search listening")
-
-		// 	var idxFile, resFile *os.File
-
-		// waitingForResults:
-		// 	for {
-		// 		select {
-		// 		case searchErr := <-searchingErrChan:
-		// 			if searchErr != nil {
-		// 				panic(searchErr)
-		// 			}
-		// 			break waitingForResults
-		// 		default:
-		// 			var err error
-		// 			if idxFile, err = os.Open(PathInRyftoneForResultDir(names.IdxFile)); err != nil {
-		// 				if os.IsNotExist(err) {
-		// 					continue
-		// 				}
-		// 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
-		// 			}
-
-		// 			if resFile, err = os.Open(PathInRyftoneForResultDir(names.ResultFile)); err != nil {
-		// 				if os.IsNotExist(err) {
-		// 					continue
-		// 				}
-		// 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
-		// 			}
-		// 			break waitingForResults
-		// 		}
-		// 	}
+		log.Println("Processing request complete")
 
 		// 	c.Stream(func(w io.Writer) bool {
 		// 		w.Write([]byte("["))
@@ -170,5 +177,6 @@ https://golang.org/src/net/http/status.go -- statuses
 
 /* Ready fro requests
 http://localhost:8765/search/exact?query=%28%20RAW_TEXT%20CONTAINS%20%22night%22%20%29&files=passengers.txt&surrounding=10
+http://192.168.56.103:8765/search/exact?query=( RAW_TEXT CONTAINS "night" )&files=passengers.txt&surrounding=10
 
 */
