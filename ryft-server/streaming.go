@@ -142,10 +142,10 @@ func linesScan(r io.Reader, linesChan chan string) {
 	for {
 		var line string
 		n, _ := fmt.Fscanln(r, &line)
-		if n == 1 {
-			linesChan <- line
-			continue
+		if n == 0 {
+			break
 		}
+		linesChan <- line
 	}
 }
 
