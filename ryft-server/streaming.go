@@ -31,6 +31,11 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 	idxScanner := bufio.NewScanner(idxFile)
 	wEncoder := json.NewEncoder(w)
 
+	log.Println("+ IDXFILE:", idxFile)
+	log.Println("+ IDXSCANNER:", idxScanner)
+	log.Println("+ W:", w)
+	log.Println("+ WENCODER:", wEncoder)
+
 	w.Write([]byte("["))
 	defer w.Write([]byte("]"))
 
