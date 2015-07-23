@@ -126,16 +126,16 @@ func main() {
 			var err error
 			if idxFile, err = os.Open(PathInRyftoneForResultDir(names.IdxFile)); err != nil {
 				if os.IsNotExist(err) {
-					log.Println("Index %s do not exists. Continue...", PathInRyftoneForResultDir(names.IdxFile))
+					log.Printf("Index %s do not exists. Continue...", PathInRyftoneForResultDir(names.IdxFile))
 					continue
 				}
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
-			log.Println("Index %s has been opened.", PathInRyftoneForResultDir(names.IdxFile))
+			log.Printf("Index %s has been opened.", PathInRyftoneForResultDir(names.IdxFile))
 
 			if resFile, err = os.Open(PathInRyftoneForResultDir(names.ResultFile)); err != nil {
 				if os.IsNotExist(err) {
-					log.Println("Results %s do not exists. Continue...", PathInRyftoneForResultDir(names.ResultFile))
+					log.Printf("Results %s do not exists. Continue...", PathInRyftoneForResultDir(names.ResultFile))
 					continue
 				}
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})

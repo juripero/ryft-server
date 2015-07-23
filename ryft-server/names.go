@@ -20,7 +20,7 @@ func StartNamesGenerator() {
 		for {
 			for i := uint64(0); i <= ^uint64(0); i++ {
 				s = strconv.FormatUint(i, 10)
-				namesChan <- Names{"result-" + s + ".bin", "idx-" + s}
+				namesChan <- Names{"result-" + s + ".bin", "idx-" + s + ".txt"}
 			}
 		}
 	}()
