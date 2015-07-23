@@ -140,6 +140,7 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 }
 
 func linesScan(scanner *bufio.Scanner, linesChan chan string) {
+	log.Println("+ line scan")
 	for scanner.Scan() {
 		linesChan <- scanner.Text()
 	}
