@@ -78,6 +78,8 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 			w.Write([]byte(","))
 		}
 
+		r.Data = readDataBlock(resultsFile, r.Length)
+
 		err = wEncoder.Encode(r)
 		if err != nil {
 			log.Printf("Encoding error: %s", err.Error())
