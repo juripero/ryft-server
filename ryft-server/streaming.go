@@ -120,7 +120,7 @@ func readDataBlock(r io.Reader, length uint16) (result []byte) {
 	var total uint16 = 0
 	for total < length {
 		data := make([]byte, length-total)
-		n, err := r.Read(data)
+		n, _ := r.Read(data)
 		result = append(result, data...)
 		total = total + uint16(n)
 	}
