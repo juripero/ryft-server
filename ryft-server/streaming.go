@@ -35,7 +35,9 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 	defer w.Write([]byte("]"))
 
 	firstIteration := true
+	log.Println("+ STARTING IDX ITERATIONS")
 	for idxScanner.Scan() {
+		log.Println("+ START NEW IDX ITERATION")
 		if !firstIteration {
 			w.Write([]byte(","))
 		}
@@ -105,7 +107,10 @@ func StreamJsonContentOfArray(resultsFile, idxFile *os.File, w io.Writer, isFuzz
 		}
 
 		firstIteration = false
+
+		log.Println("+ END NEW IDX ITERATION")
 	}
+	log.Println("+ END IDX ITERATIONS")
 
 	if err := idxScanner.Err(); err != nil {
 		panic(&ServerError{http.StatusInternalServerError, err.Error()})
