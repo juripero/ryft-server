@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -120,15 +120,15 @@ import (
 func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan error) {
 	idxLines := make(chan string, 64)
 	go func() {
-		idxScanner := bufio.NewScanner(idxFile)
+		//idxScanner := bufio.NewScanner(idxFile)
 		for {
 			select {
 			case <-completion:
-				linesScan(idxScanner, idxLines)
+				linesScan(idxFile, idxLines)
 				close(idxLines)
 				return
 			default:
-				linesScan(idxScanner, idxLines)
+				linesScan(idxFile, idxLines)
 			}
 		}
 	}()
@@ -136,19 +136,30 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 	for line := range idxLines {
 		log.Printf("+ SCAN-LINE:%s", line)
 	}
-
 }
 
-func linesScan(scanner *bufio.Scanner, linesChan chan string) {
-	log.Println("+ line scan")
-	for scanner.Scan() {
-		linesChan <- scanner.Text()
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Fatalf("lineScan: %s", err.Error())
+func linesScan(r io.Reader, linesChan chan string) {
+	for {
+		var line string
+		n, err := fmt.Fscanln(r, &line)
+		if n == 1 {
+			linesChan <- line
+			continue
+		}
 	}
 }
+
+// func linesScan(scanner *bufio.Scanner, linesChan chan string) {
+// 	log.Println("+ lines scan")
+// 	for scanner.Scan() {
+// 		log.Println("+ line")
+// 		linesChan <- scanner.Text()
+// 	}
+
+// 	if err := scanner.Err(); err != nil {
+// 		log.Fatalf("lineScan: %s", err.Error())
+// 	}
+// }
 
 /* Index file line format:
 
