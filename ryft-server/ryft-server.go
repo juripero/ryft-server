@@ -74,7 +74,7 @@ func main() {
 		names := GetNewNames()
 
 		addingFilesErrChan := make(chan error)
-		searchingErrChan := make(chan error)
+		// searchingErrChan := make(chan error)
 		go func() {
 			ds := rol.RolDSCreate()
 			defer ds.Delete()
@@ -106,41 +106,47 @@ func main() {
 			panic(addingFilesErr)
 		}
 
-		var idxFile, resFile *os.File
+		log.Println("Start search listening")
+		c.IndentedJSON(http.StatusOK, gin.H{"completion": "ok"})
 
-	waitingForResults:
-		for {
-			select {
-			case searchErr := <-searchingErrChan:
-				if searchErr != nil {
-					panic(searchErr)
-				}
-				break waitingForResults
-			default:
-				var err error
-				if idxFile, err = os.Open(PathInRyftoneForResultDir(names.IdxFile)); err != nil {
-					if os.IsNotExist(err) {
-						continue
-					}
-					panic(&ServerError{http.StatusInternalServerError, err.Error()})
-				}
+		<-searchingErrChan
+		log.Println("Stop search listening")
 
-				if resFile, err = os.Open(PathInRyftoneForResultDir(names.ResultFile)); err != nil {
-					if os.IsNotExist(err) {
-						continue
-					}
-					panic(&ServerError{http.StatusInternalServerError, err.Error()})
-				}
-				break waitingForResults
-			}
-		}
+		// 	var idxFile, resFile *os.File
 
-		c.Stream(func(w io.Writer) bool {
-			w.Write([]byte("["))
-			StreamJsonContentOfArray(resFile, idxFile, w, false)
-			w.Write([]byte("]"))
-			return false
-		})
+		// waitingForResults:
+		// 	for {
+		// 		select {
+		// 		case searchErr := <-searchingErrChan:
+		// 			if searchErr != nil {
+		// 				panic(searchErr)
+		// 			}
+		// 			break waitingForResults
+		// 		default:
+		// 			var err error
+		// 			if idxFile, err = os.Open(PathInRyftoneForResultDir(names.IdxFile)); err != nil {
+		// 				if os.IsNotExist(err) {
+		// 					continue
+		// 				}
+		// 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
+		// 			}
+
+		// 			if resFile, err = os.Open(PathInRyftoneForResultDir(names.ResultFile)); err != nil {
+		// 				if os.IsNotExist(err) {
+		// 					continue
+		// 				}
+		// 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
+		// 			}
+		// 			break waitingForResults
+		// 		}
+		// 	}
+
+		// 	c.Stream(func(w io.Writer) bool {
+		// 		w.Write([]byte("["))
+		// 		StreamJsonContentOfArray(resFile, idxFile, w, false)
+		// 		w.Write([]byte("]"))
+		// 		return false
+		// 	})
 	})
 
 	if err := os.RemoveAll(ResultsDirPath()); err != nil {
