@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -26,10 +25,10 @@ type IdxRecord struct {
 }
 
 func NewIdxRecord(line string) (r IdxRecord, err error) {
-	fields := strings.Split(text, ",")
+	fields := strings.Split(line, ",")
 	if len(fields) < 4 {
-		panic(&ServerError{http.StatusInternalServerError,
-			fmt.Sprintf("Could not parse index file `%s`, string `%s`", idxFile.Name(), text)})
+		err = fmt.Errorf("Could not parse string `%s`", line)
+		return
 	}
 
 	// NOTE: filename (first field of idx file) may contains ','
@@ -53,7 +52,7 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 	if fuzziness, err = strconv.ParseUint(fields[3], 10, 8); err != nil {
 		return
 	}
-	r.Fuzziness = fuzziness
+	r.Fuzziness = uint8(fuzziness)
 
 	return
 }
@@ -199,7 +198,7 @@ func recordsScan(r io.Reader, recordsChan chan IdxRecord) {
 		}
 
 		r, err := NewIdxRecord(line)
-		if err {
+		if err != nil {
 			break
 		}
 
