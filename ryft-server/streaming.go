@@ -162,6 +162,7 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 			select {
 			case <-completion:
 				recordsScan(idxFile, idxRecords)
+				close(idxRecords)
 				return
 			default:
 				recordsScan(idxFile, idxRecords)
