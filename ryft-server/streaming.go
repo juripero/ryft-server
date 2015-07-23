@@ -179,7 +179,7 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 			w.Write([]byte(","))
 		}
 
-		err = wEncoder.Encode(record)
+		err = wEncoder.Encode(r)
 		if err != nil {
 			log.Printf("Encoding error: %s", err.Error())
 			panic(&ServerError{http.StatusInternalServerError, err.Error()})
