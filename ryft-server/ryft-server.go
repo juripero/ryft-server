@@ -130,23 +130,29 @@ func main() {
 			}
 
 			var err error
-			if idxFile, err = os.Open(ResultsDirPath(names.IdxFile)); err != nil {
-				if os.IsNotExist(err) {
-					log.Printf("Index %s do not exists. Continue...", ResultsDirPath(names.IdxFile))
-					continue
-				}
-				panic(&ServerError{http.StatusInternalServerError, err.Error()})
-			}
-			log.Printf("Index %s has been opened.", ResultsDirPath(names.IdxFile))
 
-			if resFile, err = os.Open(ResultsDirPath(names.ResultFile)); err != nil {
-				if os.IsNotExist(err) {
-					log.Printf("Results %s do not exists. Continue...", ResultsDirPath(names.ResultFile))
-					continue
+			if idxFile == nil {
+				if idxFile, err = os.Open(ResultsDirPath(names.IdxFile)); err != nil {
+					if os.IsNotExist(err) {
+						log.Printf("Index %s do not exists. Continue...", ResultsDirPath(names.IdxFile))
+						continue
+					}
+					panic(&ServerError{http.StatusInternalServerError, err.Error()})
 				}
-				panic(&ServerError{http.StatusInternalServerError, err.Error()})
+				log.Printf("Index %s has been opened.", ResultsDirPath(names.IdxFile))
 			}
-			log.Println("Results %s has been opened.", ResultsDirPath(names.ResultFile))
+
+			if resFile == nil {
+				if resFile, err = os.Open(ResultsDirPath(names.ResultFile)); err != nil {
+					if os.IsNotExist(err) {
+						log.Printf("Results %s do not exists. Continue...", ResultsDirPath(names.ResultFile))
+						continue
+					}
+					panic(&ServerError{http.StatusInternalServerError, err.Error()})
+				}
+				log.Println("Results %s has been opened.", ResultsDirPath(names.ResultFile))
+			}
+
 			break
 		}
 
