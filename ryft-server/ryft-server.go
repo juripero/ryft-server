@@ -147,6 +147,7 @@ func main() {
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
 			log.Println("Results %s has been opened.", ResultsDirPath(names.ResultFile))
+			break
 		}
 
 		idxFile.Close()
