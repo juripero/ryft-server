@@ -106,9 +106,34 @@ func (ds *RolDS) SearchFuzzyHamming(
 	surroundingWidth uint16,
 	fuzziness uint8,
 	delimeter, indexResultsFile string,
-	percentageCallback func() uint8,
 ) *RolDS {
-	return nil
+	var (
+		cResultsFile      *C.char = C.CString(resultsFile)
+		cQuery            *C.char = C.CString(query)
+		cDelimeter        *C.char = C.CString(delimeter)
+		cIndexResultsFile *C.char = nil
+	)
+
+	if indexResultsFile != nil {
+		cIndexResultsFile = C.CString(*indexResultsFile)
+	}
+
+	defer freeAllCStrings([]*C.char{cResultsFile, cQuery, cDelimeter, cIndexResultsFile})
+
+	var newCds C.rol_data_set_t = C.rol_ds_search_fuzzy_hamming(
+		ds.cds,
+		cResultsFile,
+		cQuery,
+		C.uint16_t(surroundingWidth),
+		C.uint8_t(fuzziness),
+		cDelimeter,
+		cIndexResultsFile,
+		nil,
+	)
+
+	cds := rolDSFromCds(newCds)
+
+	return cds
 }
 
 func (ds *RolDS) TermFrequencyRawtext(

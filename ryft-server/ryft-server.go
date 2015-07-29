@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/devicehive/ryft/rol"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -24,6 +23,42 @@ type Search struct {
 
 func (s *Search) ExtractFiles() {
 	s.ExtractedFiles = filepath.SplitList(s.Files)
+}
+
+func rawSearchHandler(isFuzzy bool) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		defer deferRecover(c)
+		s := new(Search)
+		if err := c.Bind(s); err != nil {
+			panic(&ServerError{http.StatusBadRequest, err.Error()})
+		}
+
+		if !isFuzzy {
+			s.Fuzziness = 0
+		}
+
+		s.ExtractFiles()
+
+		names := GetNewNames()
+
+		addingFilesErrChan := make(chan error)
+		searchingErrChan := make(chan error)
+		go RawSearchProgress(s, names, addingFilesErrChan, searchingErrChan)
+
+		ProcessAddingFilesError(addingFilesErrChan)
+
+		resFile, idxFile := WaitingForSearchResults(searchingErrChan)
+
+		c.Stream(func(w io.Writer) bool {
+			StreamJson(resFile, idxFile, w, searchingErrChan)
+			return false
+		})
+
+		idxFile.Close()
+		resFile.Close()
+
+		log.Println("Processing request complete")
+	}
 }
 
 func main() {
@@ -62,113 +97,8 @@ func main() {
 		panic(&ServerError{http.StatusInternalServerError, "Test error"})
 	})
 
-	r.GET("/search/exact", func(c *gin.Context) {
-		defer deferRecover(c)
-		s := new(Search)
-		if err := c.Bind(s); err != nil {
-			panic(&ServerError{http.StatusBadRequest, err.Error()})
-		}
-
-		s.ExtractFiles()
-
-		names := GetNewNames()
-
-		addingFilesErrChan := make(chan error)
-		searchingErrChan := make(chan error)
-		go func() {
-			ds := rol.RolDSCreate()
-			defer ds.Delete()
-
-			for _, f := range s.ExtractedFiles {
-				ok := ds.AddFile(f)
-				if !ok {
-					addingFilesErrChan <- &ServerError{http.StatusNotFound, "Could not add file " + f}
-				}
-			}
-			addingFilesErrChan <- nil
-
-			idxFile := PathInRyftoneForResultDir(names.IdxFile)
-			resultsDs := ds.SearchExact(PathInRyftoneForResultDir(names.ResultFile), s.Query, s.Surrounding, "", &idxFile)
-			defer resultsDs.Delete()
-
-			if err := resultsDs.HasErrorOccured(); err != nil {
-				if !err.IsStrangeError() {
-					searchingErrChan <- &ServerError{http.StatusInternalServerError, err.Error()}
-				}
-			}
-
-			searchingErrChan <- nil
-
-		}()
-
-		addingFilesErr := <-addingFilesErrChan
-		if addingFilesErr != nil {
-			panic(addingFilesErr)
-		}
-
-		log.Println("Start search listening")
-
-		var idxFile, resFile *os.File
-		var searchErr error = nil
-		var searchErrReady bool = false
-
-		for {
-			if !searchErrReady {
-				select {
-				case searchErr = <-searchingErrChan:
-					searchErrReady = true
-					if searchErr != nil {
-						log.Printf("Error in search channel: %s", searchErr)
-						panic(searchErr)
-					} else {
-						log.Println("SearchErr==nil, but files is not created for this time.")
-					}
-
-				default:
-					//log.Println("No information about searching status. Continue...")
-				}
-			}
-
-			var err error
-
-			if idxFile == nil {
-				if idxFile, err = os.Open(ResultsDirPath(names.IdxFile)); err != nil {
-					if os.IsNotExist(err) {
-						//log.Printf("Index %s do not exists. Continue...", ResultsDirPath(names.IdxFile))
-						continue
-					}
-					panic(&ServerError{http.StatusInternalServerError, err.Error()})
-				}
-				log.Printf("Index %s has been opened.", ResultsDirPath(names.IdxFile))
-			}
-
-			if resFile == nil {
-				if resFile, err = os.Open(ResultsDirPath(names.ResultFile)); err != nil {
-					if os.IsNotExist(err) {
-						//log.Printf("Results %s do not exists. Continue...", ResultsDirPath(names.ResultFile))
-						continue
-					}
-					panic(&ServerError{http.StatusInternalServerError, err.Error()})
-				}
-				log.Printf("Results %s has been opened.", ResultsDirPath(names.ResultFile))
-			}
-
-			log.Println("ALL FILES HAS BEEN COMPLETE OPENING")
-
-			break
-		}
-
-		c.Stream(func(w io.Writer) bool {
-			StreamJson(resFile, idxFile, w, searchingErrChan)
-			return false
-		})
-
-		idxFile.Close()
-		resFile.Close()
-
-		log.Println("Processing request complete")
-
-	})
+	r.GET("/search/exact", rawSearchHandler(false))
+	r.GET("/search/fuzzy", rawSearchHandler(true))
 
 	if err := os.RemoveAll(ResultsDirPath()); err != nil {
 		log.Printf("Could not delete %s with error %s", ResultsDirPath(), err.Error())
