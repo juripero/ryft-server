@@ -95,12 +95,13 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 func recordsScan(r io.Reader, recordsChan chan IdxRecord) {
 	for {
 		var line string
-		n, _ := fmt.Fscanln(r, &line)
+		n, e := fmt.Fscanln(r, &line)
 		if n == 0 {
+			log.Printf("** number of lines = 0, with error: %s", e.Error())
 			break
+		} else {
+			log.Printf("** Scanned line %s", line)
 		}
-
-		log.Printf("** Scanned line %s", line)
 
 		r, err := NewIdxRecord(line)
 		if err != nil {
