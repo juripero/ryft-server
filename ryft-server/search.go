@@ -8,7 +8,7 @@ import (
 	"github.com/devicehive/ryft/rol"
 )
 
-func RawSearchProgress(s Search, n Names, adding, searching chan error) {
+func RawSearchProgress(s *Search, n Names, adding, searching chan error) {
 	ds := rol.RolDSCreate()
 	defer ds.Delete()
 
@@ -21,11 +21,11 @@ func RawSearchProgress(s Search, n Names, adding, searching chan error) {
 	adding <- nil
 
 	idxFile := PathInRyftoneForResultDir(n.IdxFile)
-	resultsDs := func() {
+	resultsDs := func() *rol.RolDS {
 		if s.Fuzziness == 0 {
 			return ds.SearchExact(PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, "", &idxFile)
 		} else {
-			return ds.SearchFuzzy(PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile)
+			return ds.SearchFuzzyHamming(PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile)
 		}
 	}()
 	defer resultsDs.Delete()
@@ -40,13 +40,12 @@ func RawSearchProgress(s Search, n Names, adding, searching chan error) {
 }
 
 func ProcessAddingFilesError(adding chan error) {
-	addingFilesErr := <-addingFilesErrChan
-	if addingFilesErr != nil {
-		panic(addingFilesErr)
+	if e := <-adding; e != nil {
+		panic(e)
 	}
 }
 
-func WaitingForSearchResults() (idxFile, resFile *os.File) {
+func WaitingForSearchResults(n Names, searching chan error) (idxFile, resFile *os.File) {
 	log.Println("Waiting for search result (and index)")
 	var searchErr error = nil
 	var searchErrReady bool = false
@@ -54,7 +53,7 @@ func WaitingForSearchResults() (idxFile, resFile *os.File) {
 	for {
 		if !searchErrReady {
 			select {
-			case searchErr = <-searchingErrChan:
+			case searchErr = <-searching:
 				searchErrReady = true
 				if searchErr != nil {
 					log.Printf("Error in search channel: %s", searchErr)
@@ -67,23 +66,23 @@ func WaitingForSearchResults() (idxFile, resFile *os.File) {
 		var err error
 
 		if idxFile == nil {
-			if idxFile, err = os.Open(ResultsDirPath(names.IdxFile)); err != nil {
+			if idxFile, err = os.Open(ResultsDirPath(n.IdxFile)); err != nil {
 				if os.IsNotExist(err) {
 					continue
 				}
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
-			log.Printf("Index %s has been opened.", ResultsDirPath(names.IdxFile))
+			log.Printf("Index %s has been opened.", ResultsDirPath(n.IdxFile))
 		}
 
 		if resFile == nil {
-			if resFile, err = os.Open(ResultsDirPath(names.ResultFile)); err != nil {
+			if resFile, err = os.Open(ResultsDirPath(n.ResultFile)); err != nil {
 				if os.IsNotExist(err) {
 					continue
 				}
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
 			}
-			log.Printf("Results %s has been opened.", ResultsDirPath(names.ResultFile))
+			log.Printf("Results %s has been opened.", ResultsDirPath(n.ResultFile))
 		}
 
 		log.Println("All files have been complete opened.")
