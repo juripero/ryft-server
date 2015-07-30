@@ -47,7 +47,7 @@ func rawSearchHandler(isFuzzy bool) func(c *gin.Context) {
 
 		ProcessAddingFilesError(addingFilesErrChan)
 
-		resFile, idxFile := WaitingForSearchResults(names, searchingErrChan)
+		idxFile, resFile := WaitingForSearchResults(names, searchingErrChan)
 
 		c.Stream(func(w io.Writer) bool {
 			StreamJson(resFile, idxFile, w, searchingErrChan)
