@@ -59,10 +59,12 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 		for {
 			select {
 			case <-completion:
+				// log.Println("** streaming completion")
 				recordsScan(idxFile, idxRecords)
 				close(idxRecords)
 				return
 			default:
+				// log.Println("** streaming continue")
 				recordsScan(idxFile, idxRecords)
 			}
 		}
@@ -95,8 +97,12 @@ func recordsScan(r io.Reader, recordsChan chan IdxRecord) {
 		var line string
 		n, _ := fmt.Fscanln(r, &line)
 		if n == 0 {
+			//log.Printf("** number of lines = 0, with error: %s", e.Error())
 			break
 		}
+		// else {
+		// 	log.Printf("** Scanned line %s", line)
+		// }
 
 		r, err := NewIdxRecord(line)
 		if err != nil {
@@ -130,22 +136,3 @@ func readDataBlock(r io.Reader, length uint16) (result []byte) {
 	}
 	return
 }
-
-/* error example
-00	00	00	00	00	00	00	00	00	00	00	00	00	00	00	00
-00	00	00	00	00	00	00	00	00	0a	4d	69	63	68	61	65
-6c	20	4b	6e	69	67	68	74	2c	20	30	38	2d	31	37	2d
-31	39
-*/
-
-/* Index file line format:
-
-/ryftone/passengers.txt,31,3,1
-/ryftone/passengers.txt,31,3,0
-
-*/
-
-/*
-
-https://www.datadoghq.com/blog/crossing-streams-love-letter-gos-io-reader/
-*/
