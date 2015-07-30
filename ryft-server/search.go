@@ -89,4 +89,5 @@ func WaitingForSearchResults(n Names, searching chan error) (idxFile, resFile *o
 
 		break
 	}
+	return
 }
