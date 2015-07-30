@@ -105,7 +105,8 @@ func (ds *RolDS) SearchFuzzyHamming(
 	resultsFile, query string,
 	surroundingWidth uint16,
 	fuzziness uint8,
-	delimeter, indexResultsFile string,
+	delimeter string,
+	indexResultsFile *string,
 ) *RolDS {
 	var (
 		cResultsFile      *C.char = C.CString(resultsFile)
