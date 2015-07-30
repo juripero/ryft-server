@@ -59,10 +59,12 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 		for {
 			select {
 			case <-completion:
+				log.Println("** streaming completion")
 				recordsScan(idxFile, idxRecords)
 				close(idxRecords)
 				return
 			default:
+				log.Println("** streaming continue")
 				recordsScan(idxFile, idxRecords)
 			}
 		}
@@ -97,6 +99,8 @@ func recordsScan(r io.Reader, recordsChan chan IdxRecord) {
 		if n == 0 {
 			break
 		}
+
+		log.Printf("** Scanned line %s", line)
 
 		r, err := NewIdxRecord(line)
 		if err != nil {
