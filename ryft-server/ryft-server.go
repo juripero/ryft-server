@@ -98,7 +98,7 @@ func main() {
 	})
 
 	r.GET("/search/exact", rawSearchHandler(false))
-	r.GET("/search/fuzzy", rawSearchHandler(true))
+	r.GET("/search/fuzzy-hamming", rawSearchHandler(true))
 
 	if err := os.RemoveAll(ResultsDirPath()); err != nil {
 		log.Printf("Could not delete %s with error %s", ResultsDirPath(), err.Error())
