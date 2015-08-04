@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/devicehive/ryft/rol"
+	"github.com/DataArt/ryft-rest-api/rol"
 )
 
 func RawSearchProgress(s *Search, n Names, adding, searching chan error) {
