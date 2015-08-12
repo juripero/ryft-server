@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"text/template"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
