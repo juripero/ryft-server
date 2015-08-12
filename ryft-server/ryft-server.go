@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -61,6 +63,17 @@ func rawSearchHandler(isFuzzy bool) func(c *gin.Context) {
 	}
 }
 
+var (
+	Port = 8765 //command line "port"
+)
+
+func init() {
+	portPtr := flag.Int("port", 8765, "The port of the REST-server")
+	Port = *port
+
+	log.Printf("port: %d", Port)
+}
+
 func main() {
 	r := gin.Default()
 
@@ -113,7 +126,7 @@ func main() {
 	StartNamesGenerator()
 	log.SetFlags(log.Ltime)
 
-	r.Run(":8765")
+	r.Run(fmt.Sprintf(":%d", Port))
 }
 
 /* Help

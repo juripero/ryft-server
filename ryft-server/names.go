@@ -1,12 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 )
 
 var RyftoneMountPoint = "/ryftone" //TODO: from config
-var ServerInstance = "RyftServer"  //TODO: from config
+var ServerInstancePrefix = "RyftServer"
 
 type Names struct {
 	ResultFile, IdxFile string
@@ -31,7 +32,7 @@ func GetNewNames() Names {
 }
 
 func ResultsDirName() string {
-	return ServerInstance + "-results"
+	return fmt.Sprintf("%s-%d", ServerInstancePrefix, Port)
 }
 
 func ResultsDirPath(filenames ...string) string {
