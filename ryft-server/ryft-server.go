@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -27,42 +28,6 @@ func (s *Search) ExtractFiles() {
 	s.ExtractedFiles = filepath.SplitList(s.Files)
 }
 
-func rawSearchHandler(isFuzzy bool) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		defer deferRecover(c)
-		s := new(Search)
-		if err := c.Bind(s); err != nil {
-			panic(&ServerError{http.StatusBadRequest, err.Error()})
-		}
-
-		if !isFuzzy {
-			s.Fuzziness = 0
-		}
-
-		s.ExtractFiles()
-
-		names := GetNewNames()
-
-		addingFilesErrChan := make(chan error)
-		searchingErrChan := make(chan error)
-		go RawSearchProgress(s, names, addingFilesErrChan, searchingErrChan)
-
-		ProcessAddingFilesError(addingFilesErrChan)
-
-		idxFile, resFile := WaitingForSearchResults(names, searchingErrChan)
-
-		c.Stream(func(w io.Writer) bool {
-			StreamJson(resFile, idxFile, w, searchingErrChan)
-			return false
-		})
-
-		idxFile.Close()
-		resFile.Close()
-
-		log.Println("Processing request complete")
-	}
-}
-
 var (
 	Port = 8765 //command line "port"
 )
@@ -77,6 +42,14 @@ func main() {
 	log.Printf("port: %d", Port)
 
 	r := gin.Default()
+
+	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
+	r.SetHTMLTemplate(indexTemplate)
+
+	r.GET("/", func(c *gin.Context) {
+		defer deferRecover(c)
+		c.HTML(http.StatusOK, "index", nil)
+	})
 
 	r.GET("/search/test-ok", func(c *gin.Context) {
 		defer deferRecover(c)
@@ -111,8 +84,35 @@ func main() {
 		panic(&ServerError{http.StatusInternalServerError, "Test error"})
 	})
 
-	r.GET("/search/exact", rawSearchHandler(false))
-	r.GET("/search/fuzzy-hamming", rawSearchHandler(true))
+	r.GET("/search", func(c *gin.Context) {
+		defer deferRecover(c)
+		s := new(Search)
+		if err := c.Bind(s); err != nil {
+			panic(&ServerError{http.StatusBadRequest, err.Error()})
+		}
+
+		s.ExtractFiles()
+
+		names := GetNewNames()
+
+		addingFilesErrChan := make(chan error)
+		searchingErrChan := make(chan error)
+		go RawSearchProgress(s, names, addingFilesErrChan, searchingErrChan)
+
+		ProcessAddingFilesError(addingFilesErrChan)
+
+		idxFile, resFile := WaitingForSearchResults(names, searchingErrChan)
+
+		c.Stream(func(w io.Writer) bool {
+			StreamJson(resFile, idxFile, w, searchingErrChan)
+			return false
+		})
+
+		idxFile.Close()
+		resFile.Close()
+
+		log.Println("Processing request complete")
+	})
 
 	if err := os.RemoveAll(ResultsDirPath()); err != nil {
 		log.Printf("Could not delete %s with error %s", ResultsDirPath(), err.Error())

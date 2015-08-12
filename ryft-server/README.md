@@ -19,7 +19,9 @@ Do request in browser:
 ```
 http://192.168.56.103:8765/search/exact?query=( RAW_TEXT CONTAINS "night" )&files=passengers.txt&surrounding=10
 ```
+
 Response:
+
 ```json
 [{"file":"/ryftone/passengers.txt","offset":211,"length":25,"fuzziness":0,"data":"Ck1pY2hhZWwgS25pZ2h0LCAwOC0xNy0xOQ=="}
 ,{"file":"/ryftone/passengers.txt","offset":248,"length":25,"fuzziness":0,"data":"NTUtNDU0NSwiS25pZ2h0IEluZHVzdHJpZQ=="}
@@ -27,6 +29,7 @@ Response:
 ```
 
 The ``data`` fields are encoded by base64: 
+
 ```haskell
 base64decode("Ck1pY2hhZWwgS25pZ2h0LCAwOC0xNy0xOQ==") --> "\nMichael Knight, 08-17-19"
 base64decode("NTUtNDU0NSwiS25pZ2h0IEluZHVzdHJpZQ==") --> "55-4545,"Knight Industrie"
@@ -34,9 +37,12 @@ base64decode("NTUtNDU0NSwiS25pZ2h0IEluZHVzdHJpZQ==") --> "55-4545,"Knight Indust
 
 # How to do fuzzy-hamming search?
 Do request in browser:
+
 ```
 http://192.168.56.101:8765/search/fuzzy-hamming?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2
+```
 Response:
+
 ```json
 [{"file":"/ryftone/passengers.txt","offset":430,"length":24,"fuzziness":2,"data":"ZyB0aGUgZGV2ZWxvcG1lbnQgb2YgQWly"}
 ,{"file":"/ryftone/passengers.txt","offset":551,"length":24,"fuzziness":2,"data":"Ck1pY2hlbGxlIEpvbmVzLDA3LTEyLTE5"}
