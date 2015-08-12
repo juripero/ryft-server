@@ -1,5 +1,4 @@
-pakage main
-
+package main
 
 const IndexHTML = `
 <html><body>
