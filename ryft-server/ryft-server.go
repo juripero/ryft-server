@@ -68,8 +68,10 @@ var (
 )
 
 func main() {
-
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
+
+	flag.Parse()
+
 	Port = *portPtr
 
 	log.Printf("port: %d", Port)
