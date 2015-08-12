@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type IdxRecord struct {
@@ -52,26 +52,38 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 	return
 }
 
-func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan error) {
+func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan error, sleepiness time.Duration) {
 	wEncoder := json.NewEncoder(w)
 	idxRecords := make(chan IdxRecord, 64)
+	dropConnection := make(chan struct{}, 1)
 	go func() {
 		for {
 			select {
 			case <-completion:
 				// log.Println("** streaming completion")
-				recordsScan(idxFile, idxRecords)
+				recordsScan(idxFile, idxRecords, sleepiness)
 				close(idxRecords)
 				return
+
+			case <-dropConnection:
+				close(idxRecords)
+				return
+
 			default:
 				// log.Println("** streaming continue")
-				recordsScan(idxFile, idxRecords)
+				recordsScan(idxFile, idxRecords, sleepiness)
 			}
 		}
 	}()
 
-	w.Write([]byte("["))
-	defer w.Write([]byte("]"))
+	if _, err := w.Write([]byte("[")); err != nil {
+		return
+	}
+	defer func() {
+		if _, err := w.Write([]byte("]")); err != nil {
+			return
+		}
+	}()
 
 	var err error
 	firstIteration := true
@@ -80,24 +92,25 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 			w.Write([]byte(","))
 		}
 
-		r.Data = readDataBlock(resultsFile, r.Length)
+		r.Data = readDataBlock(resultsFile, r.Length, sleepiness)
 
-		err = wEncoder.Encode(r)
-		if err != nil {
+		if err := wEncoder.Encode(r); err != nil {
 			log.Printf("Encoding error: %s", err.Error())
-			panic(&ServerError{http.StatusInternalServerError, err.Error()})
+			dropConnection <- struct{}{}
+			return
 		}
 
 		firstIteration = false
 	}
 }
 
-func recordsScan(r io.Reader, recordsChan chan IdxRecord) {
+func recordsScan(r io.Reader, recordsChan chan IdxRecord, sleepiness time.Duration) {
 	for {
 		var line string
 		n, _ := fmt.Fscanln(r, &line)
 		if n == 0 {
 			//log.Printf("** number of lines = 0, with error: %s", e.Error())
+			time.Sleep(sleepiness)
 			break
 		}
 		// else {
@@ -113,18 +126,7 @@ func recordsScan(r io.Reader, recordsChan chan IdxRecord) {
 	}
 }
 
-func linesScan(r io.Reader, linesChan chan string) {
-	for {
-		var line string
-		n, _ := fmt.Fscanln(r, &line)
-		if n == 0 {
-			break
-		}
-		linesChan <- line
-	}
-}
-
-func readDataBlock(r io.Reader, length uint16) (result []byte) {
+func readDataBlock(r io.Reader, length uint16, sleepiness time.Duration) (result []byte) {
 	var total uint16 = 0
 	for total < length {
 		data := make([]byte, length-total)
@@ -132,6 +134,8 @@ func readDataBlock(r io.Reader, length uint16) (result []byte) {
 		if n != 0 {
 			result = append(result, data...)
 			total = total + uint16(n)
+		} else {
+			time.Sleep(sleepiness)
 		}
 	}
 	return

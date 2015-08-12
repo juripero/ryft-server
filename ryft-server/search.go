@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/DataArt/ryft-rest-api/rol"
 )
@@ -45,11 +46,10 @@ func ProcessAddingFilesError(adding chan error) {
 	}
 }
 
-func WaitingForSearchResults(n Names, searching chan error) (idxFile, resFile *os.File) {
+func WaitingForSearchResults(n Names, searching chan error, sleepiness time.Duration) (idxFile, resFile *os.File) {
 	log.Println("Waiting for search result (and index)")
 	var searchErr error = nil
 	var searchErrReady bool = false
-
 	for {
 		if !searchErrReady {
 			select {
@@ -68,6 +68,7 @@ func WaitingForSearchResults(n Names, searching chan error) (idxFile, resFile *o
 		if idxFile == nil {
 			if idxFile, err = os.Open(ResultsDirPath(n.IdxFile)); err != nil {
 				if os.IsNotExist(err) {
+					time.Sleep(sleepiness)
 					continue
 				}
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})
@@ -78,6 +79,7 @@ func WaitingForSearchResults(n Names, searching chan error) (idxFile, resFile *o
 		if resFile == nil {
 			if resFile, err = os.Open(ResultsDirPath(n.ResultFile)); err != nil {
 				if os.IsNotExist(err) {
+					time.Sleep(sleepiness)
 					continue
 				}
 				panic(&ServerError{http.StatusInternalServerError, err.Error()})

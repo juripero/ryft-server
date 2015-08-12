@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -101,10 +102,10 @@ func main() {
 
 		ProcessAddingFilesError(addingFilesErrChan)
 
-		idxFile, resFile := WaitingForSearchResults(names, searchingErrChan)
+		idxFile, resFile := WaitingForSearchResults(names, searchingErrChan, time.Second)
 
 		c.Stream(func(w io.Writer) bool {
-			StreamJson(resFile, idxFile, w, searchingErrChan)
+			StreamJson(resFile, idxFile, w, searchingErrChan, time.Second)
 			return false
 		})
 
