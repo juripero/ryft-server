@@ -67,14 +67,13 @@ var (
 	Port = 8765 //command line "port"
 )
 
-func init() {
+func main() {
+
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
 	Port = *portPtr
 
 	log.Printf("port: %d", Port)
-}
 
-func main() {
 	r := gin.Default()
 
 	r.GET("/search/test-ok", func(c *gin.Context) {
