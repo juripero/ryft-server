@@ -94,7 +94,7 @@ func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan erro
 
 		r.Data = readDataBlock(resultsFile, r.Length, sleepiness)
 
-		if err := wEncoder.Encode(r); err != nil {
+		if err = wEncoder.Encode(r); err != nil {
 			log.Printf("Encoding error: %s", err.Error())
 			dropConnection <- struct{}{}
 			return
