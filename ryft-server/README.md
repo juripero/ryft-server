@@ -5,7 +5,7 @@
 2. In ``ryft-server`` directory run ``go get`` and ``go install``
 3. Get ``ryft-serevr`` binary from ``$GOPATH/bin`` 
 
-# How to run web-server?
+# How to run the REST-server?
 
 ```
 ryft-server -port=8765
