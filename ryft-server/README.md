@@ -1,8 +1,20 @@
+
+# How to build the REST-server?
+
+1. See installation instructions for golang environment — https://golang.org/doc/install
+2. In ``ryft-server`` directory run ``go get`` and ``go install``
+3. Get ``ryft-serevr`` binary from ``$GOPATH/bin`` 
+
+# How to run web-server?
+
+```
+ryft-server -port=8765
+```
+
 # Index
 
 ```
 http://52.4.187.202:8765
-
 ```
 
 # How to do a search?
