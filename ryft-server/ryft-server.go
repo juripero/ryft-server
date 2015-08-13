@@ -102,10 +102,10 @@ func main() {
 
 		ProcessAddingFilesError(addingFilesErrChan)
 
-		idxFile, resFile := WaitingForSearchResults(names, searchingErrChan, time.Second)
+		idxFile, resFile := WaitingForSearchResults(names, searchingErrChan, 500*time.Millisecond)
 
 		c.Stream(func(w io.Writer) bool {
-			StreamJson(resFile, idxFile, w, searchingErrChan, time.Second)
+			StreamJson(resFile, idxFile, w, searchingErrChan, 500*time.Millisecond)
 			return false
 		})
 
