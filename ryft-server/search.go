@@ -95,7 +95,7 @@ func WaitingForSearchResults(n Names, searching chan error, sleepiness time.Dura
 	return
 }
 
-func WaitingForResults(n Names, s chan err) (idxFile, resFile *os.File) {
+func WaitingForResults(n Names, s chan error) (idxFile, resFile *os.File) {
 	var idxw, resw *fsnotify.Watcher
 	var err error
 
@@ -116,7 +116,7 @@ func WaitingForResults(n Names, s chan err) (idxFile, resFile *os.File) {
 	}
 	defer resw.Close()
 
-	if err = resw.Add(respPath); err != nil {
+	if err = resw.Add(resPath); err != nil {
 		panic(&ServerError{http.StatusInternalServerError, err.Error()})
 	}
 
@@ -136,7 +136,7 @@ func WaitingForResults(n Names, s chan err) (idxFile, resFile *os.File) {
 		case idxErr := <-idxw.Errors:
 			panic(&ServerError{http.StatusInternalServerError, idxErr.Error()})
 		case resEvent := <-resw.Events:
-			log.Printf("Received resEvent=%d", idxEvent)
+			log.Printf("Received resEvent=%d", resEvent)
 			if !resCreated {
 				if resEvent.Op&fsnotify.Create == fsnotify.Create {
 					log.Println("resEvent contains creation flag")
