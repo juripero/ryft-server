@@ -30,17 +30,22 @@ func (s *Search) ExtractFiles() {
 }
 
 var (
-	Port = 8765 //command line "port"
+	Port        = 8765  //command line "port"
+	KeepResults = false //command line "keep-results"
 )
 
-func main() {
+func readParameters() {
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
+	keepResultsPtr := flag.Bool("keep-results", false, "Keep results or delete after response")
 
 	flag.Parse()
 
 	Port = *portPtr
+	KeepResults = *keepResultsPtr
+}
 
-	log.Printf("port: %d", Port)
+func main() {
+	readParameters()
 
 	r := gin.Default()
 
@@ -111,6 +116,11 @@ func main() {
 
 		idxFile.Close()
 		resFile.Close()
+
+		if !KeepResults {
+			os.Remove(idxFile.Name())
+			os.Remove(resFile.Name())
+		}
 
 		log.Println("Processing request complete")
 	})
