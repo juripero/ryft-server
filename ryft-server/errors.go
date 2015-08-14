@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -19,15 +20,18 @@ func (err *ServerError) Error() string {
 func deferRecover(c *gin.Context) {
 	if r := recover(); r != nil {
 		if err, ok := r.(*ServerError); ok {
+			log.Printf("Panic recovered server error: status=%d msg:%s", err.Status, err.Message)
 			c.IndentedJSON(err.Status, gin.H{"message": err.Message, "status": err.Status})
 			return
 		}
 
 		if err, ok := r.(error); ok {
+			log.Printf("Panic recovered unknown error with msg:%s", err.Error())
 			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": err.Error(), "status": http.StatusInternalServerError})
 			return
 		}
 
+		log.Printf("Panic recovered with object:%+v", r)
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%+v", r), "status": http.StatusInternalServerError})
 	}
 }
