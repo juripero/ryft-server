@@ -15,6 +15,16 @@
 ```
 ryft-server -port=8765
 ```
+Default value ``port`` is ``8765``
+
+# Keeping search results
+
+By default REST-server removes search results from ``/ryftone/RyftServer-PORT/``. But it behaviour may be prevented:
+
+```
+ryft-server -keep-results
+```
+Please pay attention that REST-server removes ``/ryftone/RyftServer-PORT`` when it starts.
 
 # Index
 
