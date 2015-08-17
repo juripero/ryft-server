@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
+	"github.com/DataArt/ryft-rest-api/fsobserver"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -33,6 +33,8 @@ var (
 	Port        = 8765  //command line "port"
 	KeepResults = false //command line "keep-results"
 )
+
+var Observer *fsobserver.Observer
 
 func readParameters() {
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
@@ -90,8 +92,45 @@ func main() {
 		panic(&ServerError{http.StatusInternalServerError, "Test error"})
 	})
 
+	// r.GET("/search", func(c *gin.Context) {
+	// 	defer deferRecover(c)
+	// s := new(Search)
+	// if err := c.Bind(s); err != nil {
+	// 	panic(&ServerError{http.StatusBadRequest, err.Error()})
+	// }
+
+	// s.ExtractFiles()
+
+	// names := GetNewNames()
+
+	// 	addingFilesErrChan := make(chan error)
+	// 	searchingErrChan := make(chan error)
+	// 	go RawSearchProgress(s, names, addingFilesErrChan, searchingErrChan)
+
+	// 	ProcessAddingFilesError(addingFilesErrChan)
+
+	// 	// idxFile, resFile := WaitingForSearchResults(names, searchingErrChan, 500*time.Millisecond)
+	// 	idxFile, resFile := WaitingForResults(names, searchingErrChan)
+
+	// 	c.Stream(func(w io.Writer) bool {
+	// 		StreamJson(resFile, idxFile, w, searchingErrChan, 500*time.Millisecond)
+	// 		return false
+	// 	})
+
+	// 	idxFile.Close()
+	// 	resFile.Close()
+
+	// if !KeepResults {
+	// 	os.Remove(idxFile.Name())
+	// 	os.Remove(resFile.Name())
+	// }
+
+	// 	log.Println("Processing request complete")
+	// })
+
 	r.GET("/search", func(c *gin.Context) {
 		defer deferRecover(c)
+
 		s := new(Search)
 		if err := c.Bind(s); err != nil {
 			panic(&ServerError{http.StatusBadRequest, err.Error()})
@@ -99,31 +138,24 @@ func main() {
 
 		s.ExtractFiles()
 
-		names := GetNewNames()
+		n := GetNewNames()
+		ch := make(chan error)
 
-		addingFilesErrChan := make(chan error)
-		searchingErrChan := make(chan error)
-		go RawSearchProgress(s, names, addingFilesErrChan, searchingErrChan)
-
-		ProcessAddingFilesError(addingFilesErrChan)
-
-		// idxFile, resFile := WaitingForSearchResults(names, searchingErrChan, 500*time.Millisecond)
-		idxFile, resFile := WaitingForResults(names, searchingErrChan)
+		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
 
 		c.Stream(func(w io.Writer) bool {
-			StreamJson(resFile, idxFile, w, searchingErrChan, 500*time.Millisecond)
+			streamJson(idx, res, w, watcher, ch)
 			return false
 		})
 
-		idxFile.Close()
-		resFile.Close()
+		Observer.Unfollow(idx.Name())
+		Observer.Unfollow(res.Name())
 
 		if !KeepResults {
-			os.Remove(idxFile.Name())
-			os.Remove(resFile.Name())
+			os.Remove(idx.Name())
+			os.Remove(res.Name())
 		}
 
-		log.Println("Processing request complete")
 	})
 
 	if err := os.RemoveAll(ResultsDirPath()); err != nil {
@@ -133,6 +165,12 @@ func main() {
 
 	if err := os.MkdirAll(ResultsDirPath(), 0777); err != nil {
 		log.Printf("Could not create directory %s with error %s", ResultsDirPath(), err.Error())
+		os.Exit(1)
+	}
+
+	var err error
+	if Observer, err = fsobserver.NewObserver(ResultsDirPath()); err != nil {
+		log.Printf("Could not create directory %s observer with error %s", ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
 

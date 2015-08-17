@@ -7,75 +7,61 @@ import (
 )
 
 type Observer struct {
-	w        *fsnotify.Watcher
-	commands chan command
-	paths    map[string]chan fsnotify.Op
+	w *fsnotify.Watcher
+	m map[string]chan fsnotify.Op
+	c chan control
+}
+
+type control struct {
+	name string
+	ch   chan fsnotify.Op
 }
 
 func NewObserver(dir string) (o *Observer, err error) {
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
+	var w *fsnotify.Watcher
+	if w, err = fsnotify.NewWatcher(); err != nil {
 		return nil, err
 	}
 
-	err = w.Add(dir)
-	if err != nil {
+	if err = w.Add(dir); err != nil {
 		return nil, err
 	}
 
 	o = &Observer{}
-	o.commands = make(chan command, 256)
-	o.paths = make(map[string]chan fsnotify.Op)
+	o.m = make(map[string]chan fsnotify.Op)
+	o.c = make(chan control)
 	o.w = w
-	go o.commander()
+
+	go o.process()
+
 	return o, nil
 }
 
-func (o *Observer) Stop() {
-	o.commands <- stopCommand()
-	o.w.Close()
+func (o *Observer) Follow(name string) chan fsnotify.Op {
+	ch := make(chan fsnotify.Op)
+	o.c <- control{name: name, ch: ch}
+	return ch
 }
 
-func (o *Observer) Wait(file string) fsnotify.Op {
-	c := waitCommand(file)
-	o.commands <- c
-	return <-c.eventc
+func (o *Observer) Unfollow(name string) {
+	o.c <- control{name: name, ch: nil}
 }
 
-func (o *Observer) WaitForCreate(file string) {
-	for {
-		if e := o.Wait(file); e&fsnotify.Create == fsnotify.Create {
-			break
-		}
-	}
-}
-
-func (o *Observer) WaitForWrite(file string) {
-	for {
-		if e := o.Wait(file); e&fsnotify.Write == fsnotify.Write {
-			break
-		}
-	}
-}
-
-func (o *Observer) commander() {
+func (o *Observer) process() {
 	for {
 		select {
-		case c := <-o.commands:
-			switch c.cmd {
-			case stop:
-				return
-			case wait:
-				o.paths[c.path] = c.eventc
+		case c := <-o.c:
+			if c.ch != nil {
+				o.m[c.name] = c.ch
+			} else {
+				delete(o.m, c.name)
 			}
-		case event := <-o.w.Events:
-			if eventc, ok := o.paths[event.Name]; ok {
-				delete(o.paths, event.Name)
-				eventc <- event.Op
-				close(eventc)
+		case e := <-o.w.Events:
+			if ch, ok := o.m[e.Name]; ok {
+				ch <- e.Op
 			}
 		case err := <-o.w.Errors:
-			log.Printf("fsnotify wather error:%+v", err)
+			log.Printf("fsobserver error:%s", err.Error())
 		}
 	}
 }
