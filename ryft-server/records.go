@@ -52,7 +52,8 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 }
 
 func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (records chan IdxRecord) {
-	records = make(chan IdxRecord, 64)
+	//records = make(chan IdxRecord, 64)
+	records = make(chan IdxRecord, 1024) // for debugging reasons
 	go func() {
 		log.Printf("records: start records scanner")
 	scan:
@@ -81,8 +82,10 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 					continue
 				case err := <-ch:
 					if err != nil {
+						log.Printf("records: received error from progress")
 						panic(err)
 					} else {
+						log.Printf("records: received normal completion from progress")
 						break scan
 					}
 				default:
@@ -92,6 +95,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 		}
 
 		close(records)
+		log.Println("records: closed")
 	}()
 	return
 }
