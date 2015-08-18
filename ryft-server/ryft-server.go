@@ -103,7 +103,7 @@ func main() {
 		s.ExtractFiles()
 
 		n := GetNewNames()
-		ch := make(chan error)
+		ch := make(chan error, 1)
 
 		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
 		defer Observer.Unfollow(idx.Name())
