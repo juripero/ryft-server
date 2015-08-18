@@ -59,7 +59,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 		for {
 			for {
 				var line string
-				n, _ := fmt.Fscanln(idx, &line)
+				n, _ := fmt.Fscanln(idxFile, &line)
 
 				if n == 0 {
 					break // waiting for write event

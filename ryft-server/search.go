@@ -39,7 +39,7 @@ func progress(s *Search, n Names, ch chan error) {
 	if err := resultsDs.HasErrorOccured(); err != nil {
 		if !err.IsStrangeError() {
 			log.Printf("progress: end; API-search completed with error: %s", err.Error())
-			searching <- &ServerError{http.StatusInternalServerError, err.Error()}
+			ch <- &ServerError{http.StatusInternalServerError, err.Error()}
 			return
 		}
 	}

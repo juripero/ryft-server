@@ -1,16 +1,5 @@
 package main
 
-import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"os"
-	"time"
-
-	"github.com/go-fsnotify/fsnotify"
-)
-
 // func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan error, sleepiness time.Duration) {
 // wEncoder := json.NewEncoder(w)
 // idxRecords := make(chan IdxRecord, 64)
@@ -63,73 +52,73 @@ import (
 // 	}
 // }
 
-func recordsScanner(idx *os.File, watcher *fsnotify.Watcher, ch chan error, records chan IdxRecord) {
+// func recordsScanner(idx *os.File, watcher *fsnotify.Watcher, ch chan error, records chan IdxRecord) {
 
-	for {
-		var line string
-		n, _ := fmt.Fscanln(idx, &line)
+// 	for {
+// 		var line string
+// 		n, _ := fmt.Fscanln(idx, &line)
 
-		if n == 0 {
-			break // waiting for write event
-		}
+// 		if n == 0 {
+// 			break // waiting for write event
+// 		}
 
-		r, _ := NewIdxRecord(line)
-		records <- r
-	}
+// 		r, _ := NewIdxRecord(line)
+// 		records <- r
+// 	}
 
-	select {
-	case e := <-watcher.Events:
-		if e.Op&fsnotify.Write == fsnotify.Write && e.Name == ResultsDirPath(n.IdxFile) {
-			continue
-		}
-	case err := <-watcher.Errors:
-		log.Printf("records watching error: %s", err)
+// 	select {
+// 	case e := <-watcher.Events:
+// 		if e.Op&fsnotify.Write == fsnotify.Write && e.Name == ResultsDirPath(n.IdxFile) {
+// 			continue
+// 		}
+// 	case err := <-watcher.Errors:
+// 		log.Printf("records watching error: %s", err)
 
-	}
-}
+// 	}
+// }
 
-func streamJson(idx, res *os.File, w io.Writer, watcher *fsnotify.Watcher, ch chan error) {
-	wEncoder := json.NewEncoder(w)
-	idxRecords := make(chan IdxRecord, 64)
-	dropConnection := make(chan struct{}, 1)
+// func streamJson(idx, res *os.File, w io.Writer, watcher *fsnotify.Watcher, ch chan error) {
+// 	wEncoder := json.NewEncoder(w)
+// 	idxRecords := make(chan IdxRecord, 64)
+// 	dropConnection := make(chan struct{}, 1)
 
-	//go recordsScanner(idx, watcher, ch, idxRecords)
+// 	//go recordsScanner(idx, watcher, ch, idxRecords)
 
-}
+// }
 
-func recordsScan(r io.Reader, recordsChan chan IdxRecord, sleepiness time.Duration) {
-	for {
-		var line string
-		n, _ := fmt.Fscanln(r, &line)
-		if n == 0 {
-			//log.Printf("** number of lines = 0, with error: %s", e.Error())
-			time.Sleep(sleepiness)
-			break
-		}
-		// else {
-		// 	log.Printf("** Scanned line %s", line)
-		// }
+// func recordsScan(r io.Reader, recordsChan chan IdxRecord, sleepiness time.Duration) {
+// 	for {
+// 		var line string
+// 		n, _ := fmt.Fscanln(r, &line)
+// 		if n == 0 {
+// 			//log.Printf("** number of lines = 0, with error: %s", e.Error())
+// 			time.Sleep(sleepiness)
+// 			break
+// 		}
+// 		// else {
+// 		// 	log.Printf("** Scanned line %s", line)
+// 		// }
 
-		r, err := NewIdxRecord(line)
-		if err != nil {
-			break
-		}
+// 		r, err := NewIdxRecord(line)
+// 		if err != nil {
+// 			break
+// 		}
 
-		recordsChan <- r
-	}
-}
+// 		recordsChan <- r
+// 	}
+// }
 
-func readDataBlock(r io.Reader, length uint16, sleepiness time.Duration) (result []byte) {
-	var total uint16 = 0
-	for total < length {
-		data := make([]byte, length-total)
-		n, _ := r.Read(data)
-		if n != 0 {
-			result = append(result, data...)
-			total = total + uint16(n)
-		} else {
-			time.Sleep(sleepiness)
-		}
-	}
-	return
-}
+// func readDataBlock(r io.Reader, length uint16, sleepiness time.Duration) (result []byte) {
+// 	var total uint16 = 0
+// 	for total < length {
+// 		data := make([]byte, length-total)
+// 		n, _ := r.Read(data)
+// 		if n != 0 {
+// 			result = append(result, data...)
+// 			total = total + uint16(n)
+// 		} else {
+// 			time.Sleep(sleepiness)
+// 		}
+// 	}
+// 	return
+// }
