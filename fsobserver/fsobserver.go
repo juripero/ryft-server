@@ -37,8 +37,13 @@ func NewObserver(dir string) (o *Observer, err error) {
 	return o, nil
 }
 
-func (o *Observer) Follow(name string) (ch chan fsnotify.Op) {
-	ch = make(chan fsnotify.Op)
+func (o *Observer) Follow(name string, size int) (ch chan fsnotify.Op) {
+	if size == 0 {
+		ch = make(chan fsnotify.Op)
+	} else {
+		ch = make(chan fsnotify.Op, size)
+	}
+
 	o.c <- control{name: name, ch: ch}
 	return ch
 }

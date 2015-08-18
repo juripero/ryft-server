@@ -56,8 +56,8 @@ func startAndWaitFiles(s *Search, n Names, ch chan error) (idxFile, resFile *os.
 	idxPath := ResultsDirPath(n.IdxFile)
 	resPath := ResultsDirPath(n.ResultFile)
 
-	idxops = Observer.Follow(idxPath)
-	resops = Observer.Follow(resPath)
+	idxops = Observer.Follow(idxPath, 16)
+	resops = Observer.Follow(resPath, 16)
 	log.Printf("waiting: followed %s and %s", idxPath, resPath)
 
 	go progress(s, n, ch)
