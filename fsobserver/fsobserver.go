@@ -55,15 +55,18 @@ func (o *Observer) process() {
 		case c := <-o.c:
 			if c.ch != nil {
 				o.m[c.name] = c.ch
+				log.Printf("PROC: add %s", c.name)
 			} else {
 				delete(o.m, c.name)
+				log.Printf("PROC: del %s", c.name)
 			}
 		case e := <-o.w.Events:
 			if ch, ok := o.m[e.Name]; ok {
 				ch <- e.Op
+				log.Printf("PROC: %s", e)
 			}
 		case err := <-o.w.Errors:
-			log.Printf("fsobserver error:%s", err.Error())
+			log.Printf("PROC: error:%s", err.Error())
 		}
 	}
 }
