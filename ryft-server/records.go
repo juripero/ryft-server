@@ -79,13 +79,13 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 				log.Printf("records: sent: %+v", r)
 			}
 
-			// ops:
+		ops:
 			for {
 				log.Println("records: start iteration signals loop")
 				select {
 				case op := <-idxops:
 					log.Printf("records: received op %+v", op)
-					continue
+					break ops
 				case err := <-ch:
 					if err != nil {
 						log.Printf("records: received error from progress")
