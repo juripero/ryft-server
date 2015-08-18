@@ -106,6 +106,8 @@ func main() {
 		ch := make(chan error)
 
 		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
+		_ = idxops
+		_ = resops
 
 		c.Stream(func(w io.Writer) bool {
 			//streamJson(idx, res, w, watcher, ch)

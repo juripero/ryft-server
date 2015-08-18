@@ -77,6 +77,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 			for {
 				select {
 				case op := <-idxops:
+					log.Printf("records: received op %+v", op)
 					continue
 				case err := <-ch:
 					if err != nil {
