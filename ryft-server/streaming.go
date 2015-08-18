@@ -19,21 +19,23 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 			log.Printf("WW: new -> %s", err.Error())
 			return
 		}
-		defer w.Close()
+
+		go func() {
+			for {
+				select {
+				case e := <-w.Events:
+					log.Printf("WW: EVENT %s", e)
+				case err = <-w.Errors:
+					log.Printf("WW: ERROR %+v", err)
+				}
+			}
+		}()
 
 		if err = w.Add(res.Name()); err != nil {
 			log.Printf("WW: new -> %s", err.Error())
 			return
 		}
 
-		for {
-			select {
-			case e := <-w.Events:
-				log.Printf("WW: EVENT %s", e)
-			case err = <-w.Errors:
-				log.Printf("WW: ERROR %+v", err)
-			}
-		}
 	}()
 
 	var err error
