@@ -65,8 +65,11 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 				n, _ := fmt.Fscanln(idxFile, &line)
 
 				if n == 0 {
+					log.Println("records: nothing for read -> signals loop")
 					break // waiting for write event
 				}
+
+				log.Printf("records: received line for parsing: %s", line)
 
 				r, err := NewIdxRecord(line)
 				if err != nil {
@@ -91,9 +94,9 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 						log.Printf("records: received normal completion from progress")
 						break scan
 					}
-				default:
-					log.Println("records: no external signals -> next iteration of scan loop...")
-					break ops
+					// default:
+					// 	log.Println("records: no external signals -> next iteration of scan loop...")
+					// 	break ops
 				}
 			}
 		}
