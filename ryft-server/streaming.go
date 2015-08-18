@@ -6,53 +6,10 @@ import (
 	"io"
 	"log"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-fsnotify/fsnotify"
 )
-
-type IdxRecord struct {
-	File      string `json:"file"`
-	Offset    uint64 `json:"offset"`
-	Length    uint16 `json:"length"`
-	Fuzziness uint8  `json:"fuzziness"`
-	Data      []byte `json:"data"`
-}
-
-func NewIdxRecord(line string) (r IdxRecord, err error) {
-	fields := strings.Split(line, ",")
-	if len(fields) < 4 {
-		err = fmt.Errorf("Could not parse string `%s`", line)
-		return
-	}
-
-	// NOTE: filename (first field of idx file) may contains ','
-	for len(fields) != 4 {
-		fields = append([]string{fields[0] + "," + fields[1]}, fields[2:]...)
-	}
-
-	r.File = fields[0]
-
-	if r.Offset, err = strconv.ParseUint(fields[1], 10, 64); err != nil {
-		return
-	}
-
-	var length uint64
-	if length, err = strconv.ParseUint(fields[2], 10, 16); err != nil {
-		return
-	}
-	r.Length = uint16(length)
-
-	var fuzziness uint64
-	if fuzziness, err = strconv.ParseUint(fields[3], 10, 8); err != nil {
-		return
-	}
-	r.Fuzziness = uint8(fuzziness)
-
-	return
-}
 
 // func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan error, sleepiness time.Duration) {
 // wEncoder := json.NewEncoder(w)

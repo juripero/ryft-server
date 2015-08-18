@@ -92,42 +92,6 @@ func main() {
 		panic(&ServerError{http.StatusInternalServerError, "Test error"})
 	})
 
-	// r.GET("/search", func(c *gin.Context) {
-	// 	defer deferRecover(c)
-	// s := new(Search)
-	// if err := c.Bind(s); err != nil {
-	// 	panic(&ServerError{http.StatusBadRequest, err.Error()})
-	// }
-
-	// s.ExtractFiles()
-
-	// names := GetNewNames()
-
-	// 	addingFilesErrChan := make(chan error)
-	// 	searchingErrChan := make(chan error)
-	// 	go RawSearchProgress(s, names, addingFilesErrChan, searchingErrChan)
-
-	// 	ProcessAddingFilesError(addingFilesErrChan)
-
-	// 	// idxFile, resFile := WaitingForSearchResults(names, searchingErrChan, 500*time.Millisecond)
-	// 	idxFile, resFile := WaitingForResults(names, searchingErrChan)
-
-	// 	c.Stream(func(w io.Writer) bool {
-	// 		StreamJson(resFile, idxFile, w, searchingErrChan, 500*time.Millisecond)
-	// 		return false
-	// 	})
-
-	// 	idxFile.Close()
-	// 	resFile.Close()
-
-	// if !KeepResults {
-	// 	os.Remove(idxFile.Name())
-	// 	os.Remove(resFile.Name())
-	// }
-
-	// 	log.Println("Processing request complete")
-	// })
-
 	r.GET("/search", func(c *gin.Context) {
 		defer deferRecover(c)
 
@@ -144,7 +108,9 @@ func main() {
 		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
 
 		c.Stream(func(w io.Writer) bool {
-			streamJson(idx, res, w, watcher, ch)
+			//streamJson(idx, res, w, watcher, ch)
+			w.Write([]byte("[]"))
+
 			return false
 		})
 
@@ -180,12 +146,4 @@ func main() {
 	r.Run(fmt.Sprintf(":%d", Port))
 }
 
-/* Help
-https://golang.org/src/net/http/status.go -- statuses
-*/
-
-/* Ready fro requests
-http://localhost:8765/search/exact?query=%28%20RAW_TEXT%20CONTAINS%20%22night%22%20%29&files=passengers.txt&surrounding=10
-http://192.168.56.103:8765/search/exact?query=( RAW_TEXT CONTAINS "night" )&files=passengers.txt&surrounding=10
-
-*/
+// https://golang.org/src/net/http/status.go -- statuses
