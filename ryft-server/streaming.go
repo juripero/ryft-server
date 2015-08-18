@@ -86,28 +86,6 @@ package main
 
 // }
 
-// func recordsScan(r io.Reader, recordsChan chan IdxRecord, sleepiness time.Duration) {
-// 	for {
-// 		var line string
-// 		n, _ := fmt.Fscanln(r, &line)
-// 		if n == 0 {
-// 			//log.Printf("** number of lines = 0, with error: %s", e.Error())
-// 			time.Sleep(sleepiness)
-// 			break
-// 		}
-// 		// else {
-// 		// 	log.Printf("** Scanned line %s", line)
-// 		// }
-
-// 		r, err := NewIdxRecord(line)
-// 		if err != nil {
-// 			break
-// 		}
-
-// 		recordsChan <- r
-// 	}
-// }
-
 // func readDataBlock(r io.Reader, length uint16, sleepiness time.Duration) (result []byte) {
 // 	var total uint16 = 0
 // 	for total < length {

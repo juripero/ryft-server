@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -51,6 +52,28 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 	return
 }
 
+func recordsScan(r io.Reader, records chan IdxRecord) {
+	log.Println("records-scan: start")
+	for {
+		var line string
+		n, _ := fmt.Fscanln(r, &line)
+		if n == 0 {
+			log.Println("records-scan: nothing for read -> complete ")
+			break
+		}
+
+		og.Printf("records-scan: received line for parsing: %s", line)
+		r, err := NewIdxRecord(line)
+		if err != nil {
+			log.Printf("records-scan: record parsing error '%s': %s", line, err.Error())
+		}
+
+		records <- r
+		log.Printf("records-scan: sent: %+v", r)
+	}
+	log.Println("records-scan: end")
+}
+
 func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (records chan IdxRecord) {
 	//records = make(chan IdxRecord, 64)
 	records = make(chan IdxRecord, 1024) // for debugging reasons
@@ -58,27 +81,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 		log.Printf("records: start records scanner")
 	scan:
 		for {
-			log.Println("records: start iteration scan loop")
-			for {
-				log.Println("records: start iteration readline loop")
-				var line string
-				n, _ := fmt.Fscanln(idxFile, &line)
-
-				if n == 0 {
-					log.Println("records: nothing for read -> signals loop")
-					break // waiting for write event
-				}
-
-				log.Printf("records: received line for parsing: %s", line)
-
-				r, err := NewIdxRecord(line)
-				if err != nil {
-					log.Printf("records: record parsing error '%s': %s", line, err.Error())
-				}
-				records <- r
-				log.Printf("records: sent: %+v", r)
-			}
-
+			recordsScan(idxFile, records)
 		ops:
 			for {
 				log.Println("records: start iteration signals loop")
@@ -92,11 +95,9 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 						panic(err)
 					} else {
 						log.Printf("records: received normal completion from progress")
+						recordsScan(idxFile, records)
 						break scan
 					}
-					// default:
-					// 	log.Println("records: no external signals -> next iteration of scan loop...")
-					// 	break ops
 				}
 			}
 		}
