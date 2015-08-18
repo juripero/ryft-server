@@ -44,6 +44,7 @@ func progress(s *Search, n Names, ch chan error) {
 		}
 	}
 
+	log.Println("progress: sending nil to the search-chan")
 	ch <- nil
 	log.Println("progress: end")
 }
