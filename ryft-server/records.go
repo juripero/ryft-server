@@ -54,6 +54,9 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 
 func recordsScan(r io.Reader, records chan IdxRecord) {
 	log.Println("records-scan: start")
+
+	var i uint64 = 0
+
 	for {
 		var line string
 		n, _ := fmt.Fscanln(r, &line)
@@ -69,7 +72,8 @@ func recordsScan(r io.Reader, records chan IdxRecord) {
 		}
 
 		records <- r
-		log.Printf("records-scan: sent: %+v", r)
+		log.Printf("records-scan: sent(%d): %+v", i, r)
+		i++
 	}
 	log.Println("records-scan: end")
 }
