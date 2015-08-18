@@ -118,6 +118,7 @@ func main() {
 			w.Write([]byte("[]"))
 			log.Println("response: written (in)")
 
+			w.Close()
 			return false
 		})
 		log.Println("response: complete streaming")
