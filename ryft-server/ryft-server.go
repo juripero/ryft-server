@@ -106,23 +106,19 @@ func main() {
 		ch := make(chan error, 1)
 
 		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
-		defer Observer.Unfollow(idx.Name())
-		defer Observer.Unfollow(res.Name())
-		_ = resops
+		defer func() {
+			Observer.Unfollow(idx.Name())
+			Observer.Unfollow(res.Name())
+			idx.Close()
+			res.Close()
+		}()
 
 		records := GetRecordsChan(idx, idxops, ch)
-		_ = records
 
-		log.Println("response: start streaming")
 		c.Stream(func(w io.Writer) bool {
-			//streamJson(idx, res, w, watcher, ch)
-			log.Println("response: start streaming (in)")
-			w.Write([]byte("[]"))
-			log.Println("response: written (in)")
-
+			generateJson(records, res, resops, w)
 			return false
 		})
-		log.Println("response: complete streaming")
 
 		if !KeepResults {
 			// os.Remove(idx.Name())

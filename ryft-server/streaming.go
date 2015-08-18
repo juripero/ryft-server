@@ -1,102 +1,48 @@
 package main
 
-// func StreamJson(resultsFile, idxFile *os.File, w io.Writer, completion chan error, sleepiness time.Duration) {
-// wEncoder := json.NewEncoder(w)
-// idxRecords := make(chan IdxRecord, 64)
-// dropConnection := make(chan struct{}, 1)
-// 	go func() {
-// 		for {
-// 			select {
-// 			case <-completion:
-// 				// log.Println("** streaming completion")
-// 				recordsScan(idxFile, idxRecords, sleepiness)
-// 				close(idxRecords)
-// 				return
+import (
+	"encoding/json"
+	"io"
+	"log"
+	"os"
 
-// 			case <-dropConnection:
-// 				close(idxRecords)
-// 				return
+	"github.com/go-fsnotify/fsnotify"
+)
 
-// 			default:
-// 				// log.Println("** streaming continue")
-// 				recordsScan(idxFile, idxRecords, sleepiness)
-// 			}
-// 		}
-// 	}()
+func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op, w io.Writer) {
+	var err error
 
-// 	if _, err := w.Write([]byte("[")); err != nil {
-// 		return
-// 	}
-// 	defer func() {
-// 		if _, err := w.Write([]byte("]")); err != nil {
-// 			return
-// 		}
-// 	}()
+	w.Write([]byte("["))
 
-// 	var err error
-// 	firstIteration := true
-// 	for r := range idxRecords {
-// 		if !firstIteration {
-// 			w.Write([]byte(","))
-// 		}
+	wEncoder := json.NewEncoder(w)
+	firstIteration := true
+	for r := range idxRecords {
+		if !firstIteration {
+			w.Write([]byte(","))
+		}
+		r.Data = readDataBlock(res, resops, r.Length)
 
-// 		r.Data = readDataBlock(resultsFile, r.Length, sleepiness)
+		if err = wEncoder.Encode(r); err != nil {
+			log.Printf("Encoding error: %s", err.Error())
+			return
+		}
+		firstIteration = false
+	}
 
-// 		if err = wEncoder.Encode(r); err != nil {
-// 			log.Printf("Encoding error: %s", err.Error())
-// 			dropConnection <- struct{}{}
-// 			return
-// 		}
+	w.Write([]byte("]"))
+}
 
-// 		firstIteration = false
-// 	}
-// }
-
-// func recordsScanner(idx *os.File, watcher *fsnotify.Watcher, ch chan error, records chan IdxRecord) {
-
-// 	for {
-// 		var line string
-// 		n, _ := fmt.Fscanln(idx, &line)
-
-// 		if n == 0 {
-// 			break // waiting for write event
-// 		}
-
-// 		r, _ := NewIdxRecord(line)
-// 		records <- r
-// 	}
-
-// 	select {
-// 	case e := <-watcher.Events:
-// 		if e.Op&fsnotify.Write == fsnotify.Write && e.Name == ResultsDirPath(n.IdxFile) {
-// 			continue
-// 		}
-// 	case err := <-watcher.Errors:
-// 		log.Printf("records watching error: %s", err)
-
-// 	}
-// }
-
-// func streamJson(idx, res *os.File, w io.Writer, watcher *fsnotify.Watcher, ch chan error) {
-// 	wEncoder := json.NewEncoder(w)
-// 	idxRecords := make(chan IdxRecord, 64)
-// 	dropConnection := make(chan struct{}, 1)
-
-// 	//go recordsScanner(idx, watcher, ch, idxRecords)
-
-// }
-
-// func readDataBlock(r io.Reader, length uint16, sleepiness time.Duration) (result []byte) {
-// 	var total uint16 = 0
-// 	for total < length {
-// 		data := make([]byte, length-total)
-// 		n, _ := r.Read(data)
-// 		if n != 0 {
-// 			result = append(result, data...)
-// 			total = total + uint16(n)
-// 		} else {
-// 			time.Sleep(sleepiness)
-// 		}
-// 	}
-// 	return
-// }
+func readDataBlock(r io.Reader, resops chan fsnotify.Op, length uint16) (result []byte) {
+	var total uint16 = 0
+	for total < length {
+		data := make([]byte, length-total)
+		n, _ := r.Read(data)
+		if n != 0 {
+			result = append(result, data...)
+			total = total + uint16(n)
+		} else {
+			<-resops
+		}
+	}
+	return
+}
