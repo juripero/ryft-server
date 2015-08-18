@@ -5,39 +5,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/go-fsnotify/fsnotify"
 )
 
 func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op, w io.Writer) {
-	go func() {
-		log.Printf("WW: start for %s", res.Name())
-		var w *fsnotify.Watcher
-		var err error
-
-		if w, err = fsnotify.NewWatcher(); err != nil {
-			log.Printf("WW: new -> %s", err.Error())
-			return
-		}
-
-		go func() {
-			for {
-				select {
-				case e := <-w.Events:
-					log.Printf("WW: EVENT %s", e)
-				case err = <-w.Errors:
-					log.Printf("WW: ERROR %+v", err)
-				}
-			}
-		}()
-
-		if err = w.Add(res.Name()); err != nil {
-			log.Printf("WW: new -> %s", err.Error())
-			return
-		}
-
-	}()
-
 	var err error
 
 	w.Write([]byte("["))
@@ -50,7 +23,7 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 		}
 
 		log.Printf("generate: processing offset=%d...", r.Offset)
-		r.Data = readDataBlock(res, resops, r.Length)
+		r.Data = readDataBlock(res, r.Length)
 		log.Printf("generate: processed offset=%d, len=%d", r.Offset, len(r.Data))
 
 		if err = wEncoder.Encode(r); err != nil {
@@ -63,7 +36,7 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 	w.Write([]byte("]"))
 }
 
-func readDataBlock(r io.Reader, resops chan fsnotify.Op, length uint16) (result []byte) {
+func readDataBlock(r io.Reader, length uint16) (result []byte) {
 	var total uint16 = 0
 	for total < length {
 		data := make([]byte, length-total)
@@ -72,9 +45,7 @@ func readDataBlock(r io.Reader, resops chan fsnotify.Op, length uint16) (result 
 			result = append(result, data...)
 			total = total + uint16(n)
 		} else {
-			log.Println("read-data: wait data...")
-			<-resops
-			log.Println("read-data: data received")
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
 	return
