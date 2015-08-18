@@ -71,9 +71,9 @@ func (o *Observer) process() {
 			log.Printf("PROC: RAW %s", e)
 			if ch, ok := o.m[e.Name]; ok {
 				go func() {
-					log.Printf("PROC: sending... %s", e)
+					log.Printf("PROC-ASYNC: sending... %s", e)
 					ch <- e.Op
-					log.Printf("PROC: sent %s", e)
+					log.Printf("PROC-ASYNC: sent %s", e)
 				}()
 			}
 		case err := <-o.w.Errors:
