@@ -41,7 +41,9 @@ func readDataBlock(r io.Reader, resops chan fsnotify.Op, length uint16) (result 
 			result = append(result, data...)
 			total = total + uint16(n)
 		} else {
+			log.Println("read-data: wait data...")
 			<-resops
+			log.Println("read-data: data received")
 		}
 	}
 	return
