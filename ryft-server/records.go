@@ -76,7 +76,7 @@ func recordsScan(r io.Reader, records chan IdxRecord) {
 
 func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (records chan IdxRecord) {
 	//records = make(chan IdxRecord, 64)
-	records = make(chan IdxRecord, 1024) // for debugging reasons
+	records = make(chan IdxRecord, 4096) // for debugging reasons
 	go func() {
 		log.Printf("records: start records scanner")
 	scan:
@@ -102,6 +102,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 			}
 		}
 
+		log.Println("records: closing records...")
 		close(records)
 		log.Println("records: closed")
 	}()
