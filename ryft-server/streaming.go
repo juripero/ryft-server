@@ -16,7 +16,7 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 
 	wEncoder := json.NewEncoder(w)
 	firstIteration := true
-	for r := range idxRecords {
+	for r := range records {
 		if !firstIteration {
 			w.Write([]byte(","))
 		}
