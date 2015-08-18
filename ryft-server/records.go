@@ -52,7 +52,7 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 	return
 }
 
-func recordsScan(r io.Reader, records chan IdxRecord) {
+func recordsScan(r io.Reader, records chan IdxRecord) error {
 	log.Println("records-scan: start")
 
 	var i uint64 = 0
@@ -68,6 +68,7 @@ func recordsScan(r io.Reader, records chan IdxRecord) {
 		r, err := NewIdxRecord(line)
 		if err != nil {
 			log.Printf("records-scan: record parsing error '%s': %s", line, err.Error())
+			return err
 		}
 
 		log.Printf("records-scan: sending %s", line)
@@ -76,29 +77,28 @@ func recordsScan(r io.Reader, records chan IdxRecord) {
 		i++
 	}
 	log.Println("records-scan: end")
+	return nil
 }
 
 func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (records chan IdxRecord) {
 	//records = make(chan IdxRecord, 64)
-	records = make(chan IdxRecord, 4) // for debugging reasons
+	records = make(chan IdxRecord, 4) // debugging purposes
 	go func() {
-		log.Printf("records: start records scanner")
 	scan:
 		for {
-			recordsScan(idxFile, records)
+			if err := recordsScan(idxFile, records); err != nil {
+				break scan
+			}
 		ops:
 			for {
-				log.Println("records: start iteration signals loop")
 				select {
 				case op := <-idxops:
-					log.Printf("records: received op %+v", op)
 					break ops
 				case err := <-ch:
 					if err != nil {
-						log.Printf("records: received error from progress")
+
 						panic(err)
 					} else {
-						log.Printf("records: received normal completion from progress")
 						recordsScan(idxFile, records)
 						break scan
 					}
@@ -106,9 +106,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 			}
 		}
 
-		log.Println("records: closing records...")
 		close(records)
-		log.Println("records: closed")
 	}()
 	return
 }
