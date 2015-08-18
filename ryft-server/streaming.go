@@ -10,6 +10,32 @@ import (
 )
 
 func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op, w io.Writer) {
+	go func() {
+		log.Printf("WW: start for %s", res.Name())
+		var w *fsnotify.Watcher
+		var err error
+
+		if w, err = fsnotify.NewWatcher(); err != nil {
+			log.Printf("WW: new -> %s", err.Error())
+			return
+		}
+		defer w.Close()
+
+		if err = w.Add(res.Name()); err != nil {
+			log.Printf("WW: new -> %s", err.Error())
+			return
+		}
+
+		for {
+			select {
+			case e := <-w.Events:
+				log.Printf("WW: EVENT %s", e)
+			case err = <-w.Errors:
+				log.Printf("WW: ERROR %+v", err)
+			}
+		}
+	}()
+
 	var err error
 
 	w.Write([]byte("["))
