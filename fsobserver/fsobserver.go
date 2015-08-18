@@ -65,9 +65,11 @@ func (o *Observer) process() {
 		case e := <-o.w.Events:
 			log.Printf("PROC: RAW %s", e)
 			if ch, ok := o.m[e.Name]; ok {
-				log.Printf("PROC: sending... %s", e)
-				ch <- e.Op
-				log.Printf("PROC: sent %s", e)
+				go func() {
+					log.Printf("PROC: sending... %s", e)
+					ch <- e.Op
+					log.Printf("PROC: sent %s", e)
+				}()
 			}
 		case err := <-o.w.Errors:
 			log.Printf("PROC: error:%s", err.Error())
