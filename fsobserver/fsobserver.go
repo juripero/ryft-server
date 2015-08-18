@@ -29,7 +29,7 @@ func NewObserver(dir string) (o *Observer, err error) {
 
 	o = &Observer{}
 	o.m = make(map[string]chan fsnotify.Op)
-	o.c = make(chan control)
+	o.c = make(chan control, 256)
 	o.w = w
 
 	go o.process()
@@ -37,8 +37,13 @@ func NewObserver(dir string) (o *Observer, err error) {
 	return o, nil
 }
 
-func (o *Observer) Follow(name string) chan fsnotify.Op {
-	ch := make(chan fsnotify.Op)
+func (o *Observer) Follow(name string) (ch chan fsnotify.Op) {
+	// if size == 0 {
+	ch = make(chan fsnotify.Op)
+	// } else {
+	// 	ch = make(chan fsnotify.Op, size)
+	// }
+
 	o.c <- control{name: name, ch: ch}
 	return ch
 }
