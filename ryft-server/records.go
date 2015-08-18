@@ -62,7 +62,7 @@ func recordsScan(r io.Reader, records chan IdxRecord) {
 			break
 		}
 
-		og.Printf("records-scan: received line for parsing: %s", line)
+		log.Printf("records-scan: received line for parsing: %s", line)
 		r, err := NewIdxRecord(line)
 		if err != nil {
 			log.Printf("records-scan: record parsing error '%s': %s", line, err.Error())
