@@ -20,7 +20,10 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 		if !firstIteration {
 			w.Write([]byte(","))
 		}
+
+		log.Printf("generate: processing offset=%d...", r.Offset)
 		r.Data = readDataBlock(res, resops, r.Length)
+		log.Printf("generate: processed offset=%d, length=%d", r.Offset, length(r.Data))
 
 		if err = wEncoder.Encode(r); err != nil {
 			log.Printf("Encoding error: %s", err.Error())
