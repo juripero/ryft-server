@@ -92,11 +92,10 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 		ops:
 			for {
 				select {
-				case op := <-idxops:
+				case <-idxops:
 					break ops
 				case err := <-ch:
 					if err != nil {
-
 						panic(err)
 					} else {
 						recordsScan(idxFile, records)
