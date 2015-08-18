@@ -102,14 +102,14 @@ func main() {
 
 		s.ExtractFiles()
 
-		// n := GetNewNames()
-		// ch := make(chan error)
+		n := GetNewNames()
+		ch := make(chan error)
 
-		// idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
-		// defer Observer.Unfollow(idx.Name())
-		// defer Observer.Unfollow(res.Name())
-		// _ = idxops
-		// _ = resops
+		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
+		defer Observer.Unfollow(idx.Name())
+		defer Observer.Unfollow(res.Name())
+		_ = idxops
+		_ = resops
 
 		log.Println("response: start streaming")
 		c.Stream(func(w io.Writer) bool {
