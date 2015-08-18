@@ -108,8 +108,10 @@ func main() {
 		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
 		defer Observer.Unfollow(idx.Name())
 		defer Observer.Unfollow(res.Name())
-		_ = idxops
 		_ = resops
+
+		records := GetRecordsChan(idx, idxops, ch)
+		_ = records
 
 		log.Println("response: start streaming")
 		c.Stream(func(w io.Writer) bool {
