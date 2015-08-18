@@ -58,7 +58,9 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 		log.Printf("records: start records scanner")
 	scan:
 		for {
+			log.Println("records: start iteration scan loop")
 			for {
+				log.Println("records: start iteration readline loop")
 				var line string
 				n, _ := fmt.Fscanln(idxFile, &line)
 
@@ -76,6 +78,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 
 		ops:
 			for {
+				log.Println("records: start iteration signals loop")
 				select {
 				case op := <-idxops:
 					log.Printf("records: received op %+v", op)
@@ -89,6 +92,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 						break scan
 					}
 				default:
+					log.Println("records: no external signals -> next iteration of scan loop...")
 					break ops
 				}
 			}
