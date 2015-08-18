@@ -81,7 +81,7 @@ ops:
 				resCreated = true
 			}
 		case err = <-ch:
-			log.Printf("waiting: select: receive ch=%s", err.Error())
+			log.Printf("waiting: select: receive from ch=%+v", err)
 			if err != nil {
 				panic(err)
 			} else {
