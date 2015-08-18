@@ -44,7 +44,9 @@ func (o *Observer) Follow(name string) chan fsnotify.Op {
 }
 
 func (o *Observer) Unfollow(name string) {
+	log.Printf("Unfollow: start %s", name)
 	o.c <- control{name: name, ch: nil}
+	log.Printf("Unfollow: end %s", name)
 }
 
 func (o *Observer) process() {
