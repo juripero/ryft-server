@@ -54,16 +54,20 @@ func (o *Observer) process() {
 		select {
 		case c := <-o.c:
 			if c.ch != nil {
+				log.Printf("PROC: adding %s ...", c.name)
 				o.m[c.name] = c.ch
 				log.Printf("PROC: add %s", c.name)
 			} else {
+				log.Printf("PROC: deleting %s ...", c.name)
 				delete(o.m, c.name)
 				log.Printf("PROC: del %s", c.name)
 			}
 		case e := <-o.w.Events:
+			log.Printf("PROC: RAW %s", e)
 			if ch, ok := o.m[e.Name]; ok {
+				log.Printf("PROC: sending... %s", e)
 				ch <- e.Op
-				log.Printf("PROC: %s", e)
+				log.Printf("PROC: sent %s", e)
 			}
 		case err := <-o.w.Errors:
 			log.Printf("PROC: error:%s", err.Error())
