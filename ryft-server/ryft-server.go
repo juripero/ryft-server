@@ -105,11 +105,11 @@ func main() {
 		n := GetNewNames()
 		ch := make(chan error)
 
-		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
-		defer Observer.Unfollow(idx.Name())
-		defer Observer.Unfollow(res.Name())
-		_ = idxops
-		_ = resops
+		// idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
+		// defer Observer.Unfollow(idx.Name())
+		// defer Observer.Unfollow(res.Name())
+		// _ = idxops
+		// _ = resops
 
 		log.Println("response: start streaming")
 		c.Stream(func(w io.Writer) bool {
@@ -118,8 +118,7 @@ func main() {
 			w.Write([]byte("[]"))
 			log.Println("response: written (in)")
 
-			// return false
-			return true
+			return false
 		})
 		log.Println("response: complete streaming")
 
