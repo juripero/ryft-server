@@ -110,6 +110,13 @@ func main() {
 		defer func() {
 			Observer.Unfollow(idx.Name())
 			Observer.Unfollow(res.Name())
+
+			if !KeepResults {
+				os.Remove(idx.Name())
+				os.Remove(res.Name())
+				log.Println("request: file deleted")
+			}
+
 			idx.Close()
 			res.Close()
 			log.Println("request: ops & files closed")
@@ -134,14 +141,6 @@ func main() {
 			}
 			return false
 		})
-		log.Println("request: after stream loop")
-
-		if !KeepResults {
-			os.Remove(idx.Name())
-			os.Remove(res.Name())
-			log.Println("request: file deleted")
-		}
-
 		log.Println("request: end")
 
 	})
