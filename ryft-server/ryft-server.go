@@ -127,7 +127,7 @@ func main() {
 		if !KeepResults {
 			os.Remove(idx.Name())
 			os.Remove(res.Name())
-			log.Prinln("request: file deleted")
+			log.Println("request: file deleted")
 		}
 
 	})
