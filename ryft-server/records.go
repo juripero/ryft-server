@@ -77,6 +77,7 @@ func recordsScan(r io.Reader, records chan IdxRecord, dropper chan struct{}) err
 			return err
 		}
 
+		log.Printf("records: sending[%d] %+v", i, r)
 		records <- r
 		log.Printf("records: sent[%d] %+v", i, r)
 		i++
