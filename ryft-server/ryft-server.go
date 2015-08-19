@@ -119,12 +119,15 @@ func main() {
 		dropper := make(chan struct{}, 1)
 		records := GetRecordsChan(idx, idxops, ch, dropper)
 
+		if conn, _, err := c.Writer.Hijack(); err == nil {
+			conn.SetWriteDeadline(20 * time.Seconds)
+		} else {
+			log.Printf("request: hijacking error: %s", err.Error())
+		}
+
 		c.Stream(func(w io.Writer) bool {
 			err := generateJson(records, res, resops, w, dropper)
 			log.Println("request: after generateJson")
-			if err != nil {
-				c.Writer.CloseNotify() <- true
-			}
 
 			return false
 		})
