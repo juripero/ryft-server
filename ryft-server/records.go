@@ -86,7 +86,7 @@ func recordsScan(r io.Reader, records chan IdxRecord, dropper chan struct{}) err
 }
 
 func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error, dropper chan struct{}) (records chan IdxRecord) {
-	records = make(chan IdxRecord, 64)
+	records = make(chan IdxRecord, 4)
 	go func() {
 	scan:
 		for {
