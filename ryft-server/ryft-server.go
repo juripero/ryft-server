@@ -121,14 +121,18 @@ func main() {
 
 		c.Stream(func(w io.Writer) bool {
 			generateJson(records, res, resops, w, dropper)
+			log.Println("request: after generateJson")
 			return false
 		})
+		log.Println("request: after stream loop")
 
 		if !KeepResults {
 			os.Remove(idx.Name())
 			os.Remove(res.Name())
 			log.Println("request: file deleted")
 		}
+
+		log.Println("request: end")
 
 	})
 
