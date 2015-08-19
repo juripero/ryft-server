@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -70,6 +71,6 @@ func encodeJson(encoder *json.Encoder, obj interface{}, timeout time.Duration) (
 	case err = <-ch:
 		return
 	case <-time.After(timeout):
-		return fmt.Error("Json encoding timeout")
+		return fmt.Errorf("Json encoding timeout")
 	}
 }
