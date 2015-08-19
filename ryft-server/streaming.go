@@ -24,7 +24,9 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 		r.Data = readDataBlock(res, resops, r.Length)
 
 		if err = wEncoder.Encode(r); err != nil {
+			log.Printf("writer: external termination %s, %d sending", r.File, r.Offset)
 			dropper <- struct{}{}
+			log.Printf("writer: external termination %s, %d sent", r.File, r.Offset)
 			return
 		}
 		log.Printf("writer: written record %s, %d", r.File, r.Offset)
