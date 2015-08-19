@@ -115,7 +115,7 @@ func main() {
 		}()
 		log.Println("request: all files created & opened")
 
-		dropper := make(struct{}, 1)
+		dropper := make(chan struct{}, 1)
 		records := GetRecordsChan(idx, idxops, ch, dropper)
 
 		c.Stream(func(w io.Writer) bool {

@@ -89,7 +89,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error, dr
 	go func() {
 	scan:
 		for {
-			if err := recordsScan(idxFile, records); err != nil {
+			if err := recordsScan(idxFile, records, dropper); err != nil {
 				break scan
 			}
 		ops:
@@ -104,7 +104,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error, dr
 					if err != nil {
 						panic(err)
 					} else {
-						recordsScan(idxFile, records)
+						recordsScan(idxFile, records, dropper)
 						break scan
 					}
 				}
