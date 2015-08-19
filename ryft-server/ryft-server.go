@@ -112,6 +112,7 @@ func main() {
 			Observer.Unfollow(res.Name())
 			idx.Close()
 			res.Close()
+			log.Println("request: ops & files closed")
 		}()
 		log.Println("request: all files created & opened")
 
@@ -126,6 +127,7 @@ func main() {
 		if !KeepResults {
 			os.Remove(idx.Name())
 			os.Remove(res.Name())
+			log.Prinln("request: file deleted")
 		}
 
 	})

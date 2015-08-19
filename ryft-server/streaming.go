@@ -40,6 +40,8 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 			for _ = range records {
 			}
 
+			log.Printf("writer: records cleaned")
+
 			return
 		}
 

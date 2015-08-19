@@ -113,6 +113,7 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error, dr
 		}
 
 		close(records)
+		log.Println("records: records closed")
 	}()
 	return
 }
