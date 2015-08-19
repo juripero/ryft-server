@@ -120,12 +120,6 @@ func main() {
 		dropper := make(chan struct{}, 1)
 		records := GetRecordsChan(idx, idxops, ch, dropper)
 
-		if conn, _, err := c.Writer.Hijack(); err == nil {
-			conn.SetWriteDeadline(20 * time.Second)
-		} else {
-			log.Printf("request: hijacking error: %s", err.Error())
-		}
-
 		c.Stream(func(w io.Writer) bool {
 			err := generateJson(records, res, resops, w, dropper)
 			log.Println("request: after generateJson")
@@ -163,7 +157,53 @@ func main() {
 	StartNamesGenerator()
 	log.SetFlags(log.Ltime)
 
-	r.Run(fmt.Sprintf(":%d", Port))
+	//r.Run(fmt.Sprintf(":%d", Port))
+	CustomRun(r, fmt.Sprintf(":%d", Port))
+}
+
+// func (engine *Engine) Run(addr ...string) (err error) {
+// defer func() { debugPrintError(err) }()
+
+// address := resolveAddress(addr)
+// debugPrint("Listening and serving HTTP on %s\n", address)
+// err = http.ListenAndServe(address, engine)
+// return
+// }
+
+func CustomRun(r *gin.Engine, addr ...string) (err error) {
+	address := resolveAddress(addr)
+	debugPrint("Listening and serving HTTP on %s\n", address)
+	err = CustomListenAndServe(address, engine)
+	return
+}
+
+func CustomListenAndServe(addr string, handler Handler) error {
+	server := &http.Server{Addr: addr, Handler: handler}
+	server.WriteTimeout = 20 * time.Second
+	return server.ListenAndServe()
+}
+
+func resolveAddress(addr []string) string {
+	switch len(addr) {
+	case 0:
+		if port := os.Getenv("PORT"); len(port) > 0 {
+			debugPrint("Environment variable PORT=\"%s\"", port)
+			return ":" + port
+		} else {
+			debugPrint("Environment variable PORT is undefined. Using port :8080 by default")
+			return ":8080"
+		}
+	case 1:
+		return addr[0]
+	default:
+		panic("too much parameters")
+	}
+}
+
+func debugPrint(format string, values ...interface{}) {
+	if gin.IsDebugging() {
+		log.Printf("[GIN-debug] "+format, values...)
+	}
 }
 
 // https://golang.org/src/net/http/status.go -- statuses
