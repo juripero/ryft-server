@@ -121,9 +121,8 @@ func main() {
 		records := GetRecordsChan(idx, idxops, ch, dropper)
 
 		c.Stream(func(w io.Writer) bool {
-			err := generateJson(records, res, resops, w, dropper)
+			generateJson(records, res, resops, w, dropper)
 			log.Println("request: after generateJson")
-
 			return false
 		})
 		log.Println("request: after stream loop")
