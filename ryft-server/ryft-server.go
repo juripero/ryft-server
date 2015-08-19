@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/DataArt/ryft-rest-api/fsobserver"
 	"github.com/gin-gonic/gin"
@@ -120,7 +121,7 @@ func main() {
 		records := GetRecordsChan(idx, idxops, ch, dropper)
 
 		if conn, _, err := c.Writer.Hijack(); err == nil {
-			conn.SetWriteDeadline(20 * time.Seconds)
+			conn.SetWriteDeadline(20 * time.Second)
 		} else {
 			log.Printf("request: hijacking error: %s", err.Error())
 		}
