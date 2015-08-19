@@ -170,14 +170,14 @@ func main() {
 // return
 // }
 
-func CustomRun(r *gin.Engine, addr ...string) (err error) {
+func CustomRun(engine *gin.Engine, addr ...string) (err error) {
 	address := resolveAddress(addr)
 	debugPrint("Listening and serving HTTP on %s\n", address)
 	err = CustomListenAndServe(address, engine)
 	return
 }
 
-func CustomListenAndServe(addr string, handler Handler) error {
+func CustomListenAndServe(addr string, handler http.Handler) error {
 	server := &http.Server{Addr: addr, Handler: handler}
 	server.WriteTimeout = 20 * time.Second
 	return server.ListenAndServe()
