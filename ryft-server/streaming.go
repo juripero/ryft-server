@@ -11,7 +11,7 @@ import (
 	"github.com/go-fsnotify/fsnotify"
 )
 
-func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op, w io.Writer, dropper chan struct{}) {
+func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op, w io.Writer, dropper chan struct{}) error {
 	var err error
 
 	w.Write([]byte("["))
@@ -42,7 +42,7 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 
 			log.Printf("writer: records cleaned")
 
-			return
+			return err
 		}
 
 		log.Printf("writer: written record %s, %d", r.File, r.Offset)
@@ -50,6 +50,7 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 	}
 
 	w.Write([]byte("]"))
+	return nil
 }
 
 func readDataBlock(r io.Reader, resops chan fsnotify.Op, length uint16) (result []byte) {
