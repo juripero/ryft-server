@@ -178,7 +178,7 @@ func CustomRun(engine *gin.Engine, addr ...string) (err error) {
 
 func CustomListenAndServe(addr string, handler http.Handler) error {
 	server := &http.Server{Addr: addr, Handler: handler}
-	server.WriteTimeout = 20 * time.Second
+	server.WriteTimeout = 60 * time.Second
 	return server.ListenAndServe()
 }
 
