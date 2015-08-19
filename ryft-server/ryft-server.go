@@ -121,8 +121,8 @@ func main() {
 		})
 
 		if !KeepResults {
-			// os.Remove(idx.Name())
-			// os.Remove(res.Name())
+			os.Remove(idx.Name())
+			os.Remove(res.Name())
 		}
 
 	})

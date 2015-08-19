@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"os"
 	"time"
 
@@ -21,13 +20,9 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 		if !firstIteration {
 			w.Write([]byte(","))
 		}
-
-		log.Printf("generate: processing offset=%d...", r.Offset)
-		r.Data = readDataBlock(res, r.Length)
-		log.Printf("generate: processed offset=%d, len=%d", r.Offset, len(r.Data))
+		r.Data = readDataBlock(res, resops, r.Length)
 
 		if err = wEncoder.Encode(r); err != nil {
-			log.Printf("Encoding error: %s", err.Error())
 			return
 		}
 		firstIteration = false
@@ -36,7 +31,7 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 	w.Write([]byte("]"))
 }
 
-func readDataBlock(r io.Reader, length uint16) (result []byte) {
+func readDataBlock(r io.Reader, resops chan fsnotify.Op, length uint16) (result []byte) {
 	var total uint16 = 0
 	for total < length {
 		data := make([]byte, length-total)

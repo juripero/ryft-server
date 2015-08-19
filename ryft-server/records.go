@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -53,7 +52,6 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 }
 
 func recordsScan(r io.Reader, records chan IdxRecord) error {
-	log.Println("records-scan: start")
 
 	var i uint64 = 0
 
@@ -61,28 +59,22 @@ func recordsScan(r io.Reader, records chan IdxRecord) error {
 		var line string
 		n, _ := fmt.Fscanln(r, &line)
 		if n == 0 {
-			log.Println("records-scan: nothing for read -> complete ")
 			break
 		}
 
 		r, err := NewIdxRecord(line)
 		if err != nil {
-			log.Printf("records-scan: record parsing error '%s': %s", line, err.Error())
 			return err
 		}
 
-		log.Printf("records-scan: sending %s", line)
 		records <- r
-		log.Printf("records-scan: sent(%d): %+v", i, r)
 		i++
 	}
-	log.Println("records-scan: end")
 	return nil
 }
 
 func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (records chan IdxRecord) {
-	//records = make(chan IdxRecord, 64)
-	records = make(chan IdxRecord, 4) // debugging purposes
+	records = make(chan IdxRecord, 64)
 	go func() {
 	scan:
 		for {
