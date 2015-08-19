@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -51,12 +52,20 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 	return
 }
 
-func recordsScan(r io.Reader, records chan IdxRecord) error {
+func recordsScan(r io.Reader, records chan IdxRecord, dropper chan struct{}) error {
 
 	var i uint64 = 0
 
 	for {
 		var line string
+
+		select {
+		case <-dropper:
+			log.Println("records: read - external termination")
+			return fmt.Errorf("External termination")
+		default:
+		}
+
 		n, _ := fmt.Fscanln(r, &line)
 		if n == 0 {
 			break
@@ -64,16 +73,18 @@ func recordsScan(r io.Reader, records chan IdxRecord) error {
 
 		r, err := NewIdxRecord(line)
 		if err != nil {
+			log.Printf("records: error '%s': %s", line, err.Error())
 			return err
 		}
 
 		records <- r
+		log.Printf("records: sent[%d] %+v", i, r)
 		i++
 	}
 	return nil
 }
 
-func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (records chan IdxRecord) {
+func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error, dropper chan struct{}) (records chan IdxRecord) {
 	records = make(chan IdxRecord, 64)
 	go func() {
 	scan:
@@ -84,6 +95,9 @@ func GetRecordsChan(idxFile *os.File, idxops chan fsnotify.Op, ch chan error) (r
 		ops:
 			for {
 				select {
+				case <-dropper:
+					log.Println("records: events - external termination")
+					break scan
 				case <-idxops:
 					break ops
 				case err := <-ch:

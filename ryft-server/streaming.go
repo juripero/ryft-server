@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"os"
 	"time"
 
 	"github.com/go-fsnotify/fsnotify"
 )
 
-func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op, w io.Writer) {
+func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op, w io.Writer, dropper chan struct{}) {
 	var err error
 
 	w.Write([]byte("["))
@@ -23,8 +24,10 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 		r.Data = readDataBlock(res, resops, r.Length)
 
 		if err = wEncoder.Encode(r); err != nil {
+			dropper <- struct{}{}
 			return
 		}
+		log.Printf("writer: written record %s, %d", r.File, r.Offset)
 		firstIteration = false
 	}
 

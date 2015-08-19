@@ -105,6 +105,7 @@ func main() {
 		n := GetNewNames()
 		ch := make(chan error, 1)
 
+		log.Printf("request: start waiting for files %+v", n)
 		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
 		defer func() {
 			Observer.Unfollow(idx.Name())
@@ -112,11 +113,13 @@ func main() {
 			idx.Close()
 			res.Close()
 		}()
+		log.Println("request: all files created & opened")
 
-		records := GetRecordsChan(idx, idxops, ch)
+		dropper := make(struct{}, 1)
+		records := GetRecordsChan(idx, idxops, ch, dropper)
 
 		c.Stream(func(w io.Writer) bool {
-			generateJson(records, res, resops, w)
+			generateJson(records, res, resops, w, dropper)
 			return false
 		})
 

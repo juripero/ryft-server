@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 
@@ -58,10 +59,12 @@ ops:
 		select {
 		case idxop := <-idxops:
 			if !idxCreated && idxop&fsnotify.Create == fsnotify.Create {
+				log.Println("waiting: idx-file created")
 				idxCreated = true
 			}
 		case resop := <-resops:
 			if !resCreated && resop&fsnotify.Create == fsnotify.Create {
+				log.Println("waiting: res-file created")
 				resCreated = true
 			}
 		case err = <-ch:
