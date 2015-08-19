@@ -36,6 +36,10 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 			log.Printf("writer: external termination %s, %d sending: %s", r.File, r.Offset, err.Error())
 			dropper <- struct{}{}
 			log.Printf("writer: external termination %s, %d sent", r.File, r.Offset)
+
+			for _ = range records {
+			}
+
 			return
 		}
 
