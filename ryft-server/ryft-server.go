@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/DataArt/ryft-rest-api/fsobserver"
 	"github.com/gin-gonic/gin"
@@ -121,8 +120,18 @@ func main() {
 		records := GetRecordsChan(idx, idxops, ch, dropper)
 
 		c.Stream(func(w io.Writer) bool {
-			generateJson(records, res, resops, w, dropper)
+			err := generateJson(records, res, resops, w, dropper)
 			log.Println("request: after generateJson")
+
+			if err != nil {
+				Observer.Unfollow(idx.Name())
+				Observer.Unfollow(res.Name())
+				idx.Close()
+				res.Close()
+				idx = nil
+				res = nil
+				log.Println("request: ops & files closed")
+			}
 			return false
 		})
 		log.Println("request: after stream loop")
@@ -156,53 +165,8 @@ func main() {
 	StartNamesGenerator()
 	log.SetFlags(log.Ltime)
 
-	//r.Run(fmt.Sprintf(":%d", Port))
-	CustomRun(r, fmt.Sprintf(":%d", Port))
-}
+	r.Run(fmt.Sprintf(":%d", Port))
 
-// func (engine *Engine) Run(addr ...string) (err error) {
-// defer func() { debugPrintError(err) }()
-
-// address := resolveAddress(addr)
-// debugPrint("Listening and serving HTTP on %s\n", address)
-// err = http.ListenAndServe(address, engine)
-// return
-// }
-
-func CustomRun(engine *gin.Engine, addr ...string) (err error) {
-	address := resolveAddress(addr)
-	debugPrint("Listening and serving HTTP on %s\n", address)
-	err = CustomListenAndServe(address, engine)
-	return
-}
-
-func CustomListenAndServe(addr string, handler http.Handler) error {
-	server := &http.Server{Addr: addr, Handler: handler}
-	server.WriteTimeout = 60 * time.Second
-	return server.ListenAndServe()
-}
-
-func resolveAddress(addr []string) string {
-	switch len(addr) {
-	case 0:
-		if port := os.Getenv("PORT"); len(port) > 0 {
-			debugPrint("Environment variable PORT=\"%s\"", port)
-			return ":" + port
-		} else {
-			debugPrint("Environment variable PORT is undefined. Using port :8080 by default")
-			return ":8080"
-		}
-	case 1:
-		return addr[0]
-	default:
-		panic("too much parameters")
-	}
-}
-
-func debugPrint(format string, values ...interface{}) {
-	if gin.IsDebugging() {
-		log.Printf("[GIN-debug] "+format, values...)
-	}
 }
 
 // https://golang.org/src/net/http/status.go -- statuses
