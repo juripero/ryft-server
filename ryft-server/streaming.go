@@ -23,19 +23,8 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 			w.Write([]byte(","))
 		}
 		r.Data = readDataBlock(res, resops, r.Length)
-
-		log.Printf("writer: writing record... %s, %d", r.File, r.Offset)
-		// if err = wEncoder.Encode(r); err != nil {
-		// log.Printf("writer: external termination %s, %d sending", r.File, r.Offset)
-		// dropper <- struct{}{}
-		// log.Printf("writer: external termination %s, %d sent", r.File, r.Offset)
-		// return
-		// }
-
 		if err = encodeJson(wEncoder, r, 15*time.Second); err != nil {
-			log.Printf("writer: external termination %s, %d sending: %s", r.File, r.Offset, err.Error())
 			dropper <- struct{}{}
-			log.Printf("writer: external termination %s, %d sent", r.File, r.Offset)
 
 			for _ = range records {
 			}
@@ -45,7 +34,6 @@ func generateJson(records chan IdxRecord, res *os.File, resops chan fsnotify.Op,
 			return err
 		}
 
-		log.Printf("writer: written record %s, %d", r.File, r.Offset)
 		firstIteration = false
 	}
 
