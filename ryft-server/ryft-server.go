@@ -11,6 +11,8 @@ import (
 	"os"
 
 	"github.com/DataArt/ryft-rest-api/fsobserver"
+	"github.com/DataArt/ryft-rest-api/ryft-server/binding"
+
 	"github.com/gin-gonic/gin"
 )
 

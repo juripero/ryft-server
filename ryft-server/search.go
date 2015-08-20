@@ -14,7 +14,7 @@ func progress(s *binding.Search, n Names, ch chan error) {
 	ds := rol.RolDSCreate()
 	defer ds.Delete()
 
-	for _, f := range s.ExtractedFiles {
+	for _, f := range s.Files {
 		ok := ds.AddFile(f)
 		if !ok {
 			ch <- &ServerError{http.StatusNotFound, "Could not add file " + f}
@@ -42,7 +42,7 @@ func progress(s *binding.Search, n Names, ch chan error) {
 	ch <- nil
 }
 
-func startAndWaitFiles(s *Search, n Names, ch chan error) (idxFile, resFile *os.File, idxops, resops chan fsnotify.Op) {
+func startAndWaitFiles(s *binding.Search, n Names, ch chan error) (idxFile, resFile *os.File, idxops, resops chan fsnotify.Op) {
 	var err error
 
 	idxPath := ResultsDirPath(n.IdxFile)
