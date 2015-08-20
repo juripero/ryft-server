@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
+	"github.com/DataArt/ryft-rest-api/fsobserver"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -33,6 +33,8 @@ var (
 	Port        = 8765  //command line "port"
 	KeepResults = false //command line "keep-results"
 )
+
+var Observer *fsobserver.Observer
 
 func readParameters() {
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
@@ -92,6 +94,7 @@ func main() {
 
 	r.GET("/search", func(c *gin.Context) {
 		defer deferRecover(c)
+
 		s := new(Search)
 		if err := c.Bind(s); err != nil {
 			panic(&ServerError{http.StatusBadRequest, err.Error()})
@@ -99,31 +102,47 @@ func main() {
 
 		s.ExtractFiles()
 
-		names := GetNewNames()
+		n := GetNewNames()
+		ch := make(chan error, 1)
 
-		addingFilesErrChan := make(chan error)
-		searchingErrChan := make(chan error)
-		go RawSearchProgress(s, names, addingFilesErrChan, searchingErrChan)
+		log.Printf("request: start waiting for files %+v", n)
+		idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
+		defer func() {
+			Observer.Unfollow(idx.Name())
+			Observer.Unfollow(res.Name())
 
-		ProcessAddingFilesError(addingFilesErrChan)
+			if !KeepResults {
+				os.Remove(idx.Name())
+				os.Remove(res.Name())
+				log.Println("request: file deleted")
+			}
 
-		// idxFile, resFile := WaitingForSearchResults(names, searchingErrChan, 500*time.Millisecond)
-		idxFile, resFile := WaitingForResults(names, searchingErrChan)
+			idx.Close()
+			res.Close()
+			log.Println("request: ops & files closed")
+		}()
+		log.Println("request: all files created & opened")
+
+		dropper := make(chan struct{}, 1)
+		records := GetRecordsChan(idx, idxops, ch, dropper)
 
 		c.Stream(func(w io.Writer) bool {
-			StreamJson(resFile, idxFile, w, searchingErrChan, 500*time.Millisecond)
+			err := generateJson(records, res, resops, w, dropper)
+			log.Println("request: after generateJson")
+
+			if err != nil {
+				Observer.Unfollow(idx.Name())
+				Observer.Unfollow(res.Name())
+				idx.Close()
+				res.Close()
+				idx = nil
+				res = nil
+				log.Println("request: ops & files closed")
+			}
 			return false
 		})
+		log.Println("request: end")
 
-		idxFile.Close()
-		resFile.Close()
-
-		if !KeepResults {
-			os.Remove(idxFile.Name())
-			os.Remove(resFile.Name())
-		}
-
-		log.Println("Processing request complete")
 	})
 
 	if err := os.RemoveAll(ResultsDirPath()); err != nil {
@@ -136,18 +155,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	var err error
+	if Observer, err = fsobserver.NewObserver(ResultsDirPath()); err != nil {
+		log.Printf("Could not create directory %s observer with error %s", ResultsDirPath(), err.Error())
+		os.Exit(1)
+	}
+
 	StartNamesGenerator()
 	log.SetFlags(log.Ltime)
 
 	r.Run(fmt.Sprintf(":%d", Port))
+
 }
 
-/* Help
-https://golang.org/src/net/http/status.go -- statuses
-*/
-
-/* Ready fro requests
-http://localhost:8765/search/exact?query=%28%20RAW_TEXT%20CONTAINS%20%22night%22%20%29&files=passengers.txt&surrounding=10
-http://192.168.56.103:8765/search/exact?query=( RAW_TEXT CONTAINS "night" )&files=passengers.txt&surrounding=10
-
-*/
+// https://golang.org/src/net/http/status.go -- statuses

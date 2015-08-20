@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,6 +28,7 @@ func deferRecover(c *gin.Context) {
 
 		if err, ok := r.(error); ok {
 			log.Printf("Panic recovered unknown error with msg:%s", err.Error())
+			debug.PrintStack()
 			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": err.Error(), "status": http.StatusInternalServerError})
 			return
 		}

@@ -80,6 +80,13 @@ http://192.168.56.103:8765/search/test-fail
 ```
 
 
+# Good requests for tests
+
+
+```
+curl "http://ryft-emulator:8765/search?query=(RAW_TEXT%20CONTAINS%20%22bin%22)&files=jdk-8u45-linux-x64.tar.gzfuzziness=2&surrounding=10"
+```
+
 
 
 Links:
