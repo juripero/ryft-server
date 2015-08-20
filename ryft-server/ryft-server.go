@@ -61,7 +61,7 @@ func main() {
 
 	r.GET("/search/test-ok", func(c *gin.Context) {
 		defer deferRecover(c)
-		c.Writer.Header()["Content-Type"] = []string{binding.MIMEJSON}
+		//c.Writer.Header()["Content-Type"] = []string{binding.MIMEJSON}
 		c.Stream(func(w io.Writer) bool {
 			w.Write([]byte("["))
 			firstIteration := true
