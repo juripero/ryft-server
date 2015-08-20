@@ -9,25 +9,23 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/DataArt/ryft-rest-api/fsobserver"
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 )
 
-type Search struct {
-	Query       string `form:"query" json:"query" binding:"required"`             // For example: ( RAW_TEXT CONTAINS "night" )
-	Files       string `form:"files" json:"files" binding:"required"`             // Splitted OS-specific ListSeparator: "/a/b/c:/usr/bin/file" -> "/a/b/c", "/usr/bin/file"
-	Surrounding uint16 `form:"surrounding" json:"surrounding" binding:"required"` // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-	Fuzziness   uint8  `form:"fuzziness" json:"fuzziness"`                        // Is the fuzziness of the search. Measured as the maximum Hamming distance.
+// type Search struct {
+// 	Query       string `form:"query" json:"query" binding:"required"`             // For example: ( RAW_TEXT CONTAINS "night" )
+// 	Files       string `form:"files" json:"files" binding:"required"`             // Splitted OS-specific ListSeparator: "/a/b/c:/usr/bin/file" -> "/a/b/c", "/usr/bin/file"
+// 	Surrounding uint16 `form:"surrounding" json:"surrounding" binding:"required"` // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
+// 	Fuzziness   uint8  `form:"fuzziness" json:"fuzziness"`                        // Is the fuzziness of the search. Measured as the maximum Hamming distance.
 
-	ExtractedFiles []string `json:"extractedFiles"` // Contains files from Files (after ExtractFiles())
-}
+// 	ExtractedFiles []string `json:"extractedFiles"` // Contains files from Files (after ExtractFiles())
+// }
 
-func (s *Search) ExtractFiles() {
-	s.ExtractedFiles = filepath.SplitList(s.Files)
-}
+// func (s *Search) ExtractFiles() {
+// 	s.ExtractedFiles = filepath.SplitList(s.Files)
+// }
 
 var (
 	Port        = 8765  //command line "port"
@@ -95,12 +93,17 @@ func main() {
 	r.GET("/search", func(c *gin.Context) {
 		defer deferRecover(c)
 
-		s := new(Search)
-		if err := c.Bind(s); err != nil {
+		// s := new(Search)
+		// if err := c.Bind(s); err != nil {
+		// 	panic(&ServerError{http.StatusBadRequest, err.Error()})
+		// }
+
+		s, err := binding.NewSearch(c)
+		if err != nil {
 			panic(&ServerError{http.StatusBadRequest, err.Error()})
 		}
 
-		s.ExtractFiles()
+		//s.ExtractFiles()
 
 		n := GetNewNames()
 		ch := make(chan error, 1)

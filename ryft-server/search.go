@@ -6,10 +6,11 @@ import (
 	"os"
 
 	"github.com/DataArt/ryft-rest-api/rol"
+	"github.com/DataArt/ryft-rest-api/ryft-server/binding"
 	"github.com/go-fsnotify/fsnotify"
 )
 
-func progress(s *Search, n Names, ch chan error) {
+func progress(s *binding.Search, n Names, ch chan error) {
 	ds := rol.RolDSCreate()
 	defer ds.Delete()
 
