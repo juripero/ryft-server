@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cp $GOPATH/bin/ryft-server  ryft-server/usr/bin/
+dpkg --build ryft-server
+rm ryft-server-0.1_x86_64.deb
+mv ryft-server.deb ryft-server-0.1_x86_64.deb
+

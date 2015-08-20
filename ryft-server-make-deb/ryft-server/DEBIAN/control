@@ -1,0 +1,9 @@
+Package: ryft-sever
+Version: 0.1
+Section: custom
+Priority: optional
+Architecture: x86_64
+Essential: no
+Installed-Size: 1024
+Maintainer: dataart.com
+Description: ryft-server
