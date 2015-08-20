@@ -1,3 +1,6 @@
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package main
 
 import (
@@ -15,19 +18,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
-
-// type Search struct {
-// 	Query       string `form:"query" json:"query" binding:"required"`             // For example: ( RAW_TEXT CONTAINS "night" )
-// 	Files       string `form:"files" json:"files" binding:"required"`             // Splitted OS-specific ListSeparator: "/a/b/c:/usr/bin/file" -> "/a/b/c", "/usr/bin/file"
-// 	Surrounding uint16 `form:"surrounding" json:"surrounding" binding:"required"` // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-// 	Fuzziness   uint8  `form:"fuzziness" json:"fuzziness"`                        // Is the fuzziness of the search. Measured as the maximum Hamming distance.
-
-// 	ExtractedFiles []string `json:"extractedFiles"` // Contains files from Files (after ExtractFiles())
-// }
-
-// func (s *Search) ExtractFiles() {
-// 	s.ExtractedFiles = filepath.SplitList(s.Files)
-// }
 
 var (
 	Port        = 8765  //command line "port"
@@ -61,7 +51,6 @@ func main() {
 
 	r.GET("/search/test-ok", func(c *gin.Context) {
 		defer deferRecover(c)
-		//c.Writer.Header()["Content-Type"] = []string{binding.MIMEJSON}
 		c.Stream(func(w io.Writer) bool {
 			w.Write([]byte("["))
 			firstIteration := true
@@ -95,17 +84,10 @@ func main() {
 	r.GET("/search", func(c *gin.Context) {
 		defer deferRecover(c)
 
-		// s := new(Search)
-		// if err := c.Bind(s); err != nil {
-		// 	panic(&ServerError{http.StatusBadRequest, err.Error()})
-		// }
-
 		s, err := binding.NewSearch(c)
 		if err != nil {
 			panic(&ServerError{http.StatusBadRequest, err.Error()})
 		}
-
-		//s.ExtractFiles()
 
 		n := GetNewNames()
 		ch := make(chan error, 1)
