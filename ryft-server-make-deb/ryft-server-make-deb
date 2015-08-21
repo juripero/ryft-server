@@ -1,7 +1,30 @@
 #!/bin/bash
 
-cp $GOPATH/bin/ryft-server  ryft-server/usr/bin/
+VERSION=$1
+
+if [ -z "$VERSION" ]; then
+	VERSION=0.1
+fi
+
+DEBNAME="ryft-server-${VERSION}_x86_64.deb"
+CONTROLFILE="ryft-server/DEBIAN/control"
+
+
+echo Package: ryft-sever > $CONTROLFILE
+echo Version: $VERSION >> $CONTROLFILE
+echo Section: custom >> $CONTROLFILE
+echo Priority: optional >> $CONTROLFILE
+echo Architecture: x86_64 >> $CONTROLFILE
+echo Essential: no >> $CONTROLFILE
+echo Installed-Size: 1024 >> $CONTROLFILE
+echo Maintainer: dataart.com >> $CONTROLFILE
+echo Description: ryft-server >> $CONTROLFILE
+
+cp $GOPATH/bin/ryft-server ryft-server/usr/bin/
+
+
 dpkg --build ryft-server
-rm ryft-server-0.1_x86_64.deb
-mv ryft-server.deb ryft-server-0.1_x86_64.deb
+rm ${DEBNAME}
+mv ryft-server.deb ${DEBNAME}
+
 
