@@ -1,8 +1,8 @@
 #!/bin/bash
 # ryft-server daemon
 # chkconfig: 345 20 80
-# description: myapp daemon
-# processname: myapp
+# description: ryft-server daemon
+# processname: ryft-server
 
 DAEMON_PATH=/usr/bin/ryft-server
 
