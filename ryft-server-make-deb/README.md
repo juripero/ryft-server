@@ -21,7 +21,7 @@ Build ``.deb`` file:
 ## How to install ``.deb`` package
 
 ```
-sudo dpkg -i DEB_PACKAGE
+sudo dpkg -i ryft-server-0.1_x86_64.deb
 
 ```
 
@@ -29,5 +29,5 @@ sudo dpkg -i DEB_PACKAGE
 ## How to uninstall ``.deb`` package
 
 ```
-sudo dpkg -r PACKAGE_NAME
+sudo dpkg -r ryft-server
 ```

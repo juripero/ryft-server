@@ -10,9 +10,6 @@ DEBNAME="ryft-server-${VERSION}_amd64.deb"
 CONTROLFILE="ryft-server/DEBIAN/control"
 
 
-if [ ! -d "ryft-server/DEBIAN" ]; then
-  mkdir -pv ryft-server/DEBIAN
-fi
 echo Package: ryft-server > $CONTROLFILE
 echo Version: $VERSION >> $CONTROLFILE
 echo Section: custom >> $CONTROLFILE
@@ -37,5 +34,3 @@ if [ -f "$DEBNAME" ]; then
 fi
 
 mv ryft-server.deb ${DEBNAME}
-
-
