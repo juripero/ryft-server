@@ -4,7 +4,7 @@
 # description: ryft-server daemon
 # processname: ryft-server
 
-DAEMON_PATH=/usr/bin/ryft-server
+DAEMON_PATH=/usr/bin
 
 DAEMON=ryft-server
 DAEMONOPTS="-port:8778"
