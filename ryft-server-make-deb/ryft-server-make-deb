@@ -6,18 +6,18 @@ if [ -z "$VERSION" ]; then
 	VERSION=0.1
 fi
 
-DEBNAME="ryft-server-${VERSION}_x86_64.deb"
+DEBNAME="ryft-server-${VERSION}_amd64.deb"
 CONTROLFILE="ryft-server/DEBIAN/control"
 
 
 if [ ! -d "ryft-server/DEBIAN" ]; then
   mkdir -pv ryft-server/DEBIAN
 fi
-echo Package: ryft-sever > $CONTROLFILE
+echo Package: ryft-server > $CONTROLFILE
 echo Version: $VERSION >> $CONTROLFILE
 echo Section: custom >> $CONTROLFILE
 echo Priority: optional >> $CONTROLFILE
-echo Architecture: x86_64 >> $CONTROLFILE
+echo Architecture: amd64 >> $CONTROLFILE
 echo Essential: no >> $CONTROLFILE
 echo Installed-Size: 1024 >> $CONTROLFILE
 echo Maintainer: dataart.com >> $CONTROLFILE
