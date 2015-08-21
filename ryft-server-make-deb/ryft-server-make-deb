@@ -31,7 +31,11 @@ cp $GOPATH/bin/ryft-server ryft-server/usr/bin/
 
 
 dpkg --build ryft-server
-rm ${DEBNAME}
+
+if [ -f "$DEBNAME" ]; then
+  rm ${DEBNAME}
+fi
+
 mv ryft-server.deb ${DEBNAME}
 
 
