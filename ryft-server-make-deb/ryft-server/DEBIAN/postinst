@@ -1,3 +1,4 @@
 #!/bin/bash
 
-echo RYFT-SERVER: postist runned
+echo ryft-server-d stopping...
+service ryft-server-d stop
