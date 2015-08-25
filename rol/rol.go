@@ -9,7 +9,7 @@ package rol
 #include <stdlib.h>
 */
 import "C"
-import "log"
+import "unsafe"
 
 type RolDS struct {
 	cds      C.rol_data_set_t
@@ -17,7 +17,7 @@ type RolDS struct {
 }
 
 func freeCString(str *C.char) {
-	//C.free(unsafe.Pointer(str))
+	C.free(unsafe.Pointer(str))
 }
 
 func freeAllCStrings(cStrings []*C.char) {
@@ -88,14 +88,6 @@ func (ds *RolDS) SearchExact(
 	}
 
 	defer freeAllCStrings([]*C.char{cResultsFile, cQuery, cDelimeter, cIndexResultsFile})
-
-	log.Println("DEBUG_ROL:")
-	log.Println(ds.cds)
-	log.Println(cResultsFile)
-	log.Println(cQuery)
-	log.Println(surroundingWidth)
-	log.Println(cDelimeter)
-	log.Println(cIndexResultsFile)
 
 	var newCds C.rol_data_set_t = C.rol_ds_search_exact(
 		ds.cds,

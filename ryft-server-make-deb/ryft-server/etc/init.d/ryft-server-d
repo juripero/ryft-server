@@ -14,6 +14,25 @@ DESC="Ryft server"
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
+
+export TERM=xterm-256color
+export LC_ALL=en_US.UTF-8
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export LANG=en_US.UTF-8
+export HOME=/home/ryftuser
+export LC_CTYPE=UTF-8
+export SHELL=/bin/bash
+export MAIL=/var/mail/root
+export LOGNAME=root
+export USER=root
+export USERNAME=root
+export SUDO_COMMAND=/usr/bin/printenv
+export SUDO_USER=ryftuser
+export SUDO_UID=1001
+export SUDO_GID=1001
+
+
+
 case "$1" in
 start)
 	printf "%-50s" "Starting $NAME..."
