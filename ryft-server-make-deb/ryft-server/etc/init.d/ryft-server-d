@@ -19,7 +19,8 @@ start)
 	printf "%-50s" "Starting $NAME..."
 	cd $DAEMON_PATH
 	#PID=`$DAEMON $DAEMONOPTS > /dev/null 2>&1 & echo $!`
-    PID=`$DAEMON $DAEMONOPTS > /home/ryftuser/ryft-server-d-start.log 2>&1 & echo $!`
+    #PID=`$DAEMON $DAEMONOPTS > /home/ryftuser/ryft-server-d-start.log 2>&1 & echo $!`
+    PID=`$DAEMON $DAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
 
 	#echo "Saving PID" $PID " to " $PIDFILE
         if [ -z $PID ]; then
