@@ -1,8 +1,7 @@
 #!/bin/bash
 
-
+echo ryft-server-d installing for autostart...
+update-rc.d ryft-server-d defaults
 
 echo ryft-server-d starting...
 service ryft-server-d start
-echo Log:
-tail /home/ryftuser/ryft-server-d-start.log
