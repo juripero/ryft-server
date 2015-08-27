@@ -27,3 +27,12 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 ============
 ```
+
+## Folders
+
+* ``fsobserver`` - wrapper on https://github.com/go-fsnotify/fsnotify
+* ``rol`` - go-wrapper on libryftone
+* ``ryft-server-ab-test`` - load test 
+* ``ryft-server-make-deb`` - script for .deb package creation
+* ``ryft-server`` - ryft REST-server
+
