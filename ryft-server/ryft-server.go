@@ -16,6 +16,7 @@ import (
 	"github.com/DataArt/ryft-rest-api/fsobserver"
 	"github.com/DataArt/ryft-rest-api/ryft-server/binding"
 
+	"github.com/gin-gonic/contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,6 +42,8 @@ func main() {
 
 	r := gin.Default()
 
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
+
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
 
@@ -51,7 +54,11 @@ func main() {
 
 	r.GET("/search/test-ok", func(c *gin.Context) {
 		defer deferRecover(c)
+
+		c.Header("Content-Type", gin.MIMEPlain)
+
 		c.Stream(func(w io.Writer) bool {
+
 			w.Write([]byte("["))
 			firstIteration := true
 			for i := 0; i <= 100; i++ {
@@ -83,6 +90,8 @@ func main() {
 
 	r.GET("/search", func(c *gin.Context) {
 		defer deferRecover(c)
+
+		c.Header("Content-Type", gin.MIMEPlain)
 
 		s, err := binding.NewSearch(c)
 		if err != nil {
