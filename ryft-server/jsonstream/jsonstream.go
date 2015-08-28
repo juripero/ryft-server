@@ -19,14 +19,11 @@ func Write(source chan records.IdxRecord, res *os.File, w io.Writer, drop chan s
 	wEncoder := json.NewEncoder(w)
 	firstIteration := true
 	for r := range source {
-		log.Printf("%s: RECV OFFSET=%d", res.Name(), r.Offset)
 		if !firstIteration {
 			w.Write([]byte(","))
 		}
 
-		log.Printf("%s: DATA READING OFFSET=%d...", res.Name(), r.Offset)
 		r.Data = datapoll.Next(res, r.Length)
-		log.Printf("%s: DATA READ COMPLETE OFFSET=%d, DATA ENCODING...", res.Name(), r.Offset)
 		if err = encode(wEncoder, r, WriteInterval); err != nil {
 			log.Printf("%s: DATA ENCODED OFFSET=%d WITH ERROR: %s", res.Name(), r.Offset, err.Error())
 			drop <- struct{}{}
@@ -36,7 +33,6 @@ func Write(source chan records.IdxRecord, res *os.File, w io.Writer, drop chan s
 			log.Printf("%s: DROPPED CONNECTION", res.Name())
 			return
 		}
-		log.Printf("%s: DATA ENCODED OFFSET=%d", res.Name(), r.Offset)
 
 		firstIteration = false
 	}

@@ -49,6 +49,8 @@ func search(c *gin.Context) {
 	}
 
 	n := names.New()
+	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
+
 	p := progress.Progress(s, n)
 
 	var idx, res *os.File

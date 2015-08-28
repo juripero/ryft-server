@@ -1,6 +1,7 @@
 package progress
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/DataArt/ryft-rest-api/rol"
@@ -30,6 +31,7 @@ func Progress(s *binding.Search, n names.Names) (ch chan error) {
 			} else {
 				return ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile)
 			}
+			log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
 		}()
 		defer resultsDs.Delete()
 

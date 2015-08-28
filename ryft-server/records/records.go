@@ -56,6 +56,8 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 func scan(f *os.File, drop chan struct{}, out chan IdxRecord) (err error) {
 	var line string
 	var r IdxRecord
+
+	firstRec := true
 	for err == nil {
 		if n, _ := fmt.Fscanln(f, &line); n == 0 {
 			break
@@ -66,13 +68,16 @@ func scan(f *os.File, drop chan struct{}, out chan IdxRecord) (err error) {
 			break
 		}
 
-		log.Printf("%s: sending %+v", f.Name(), r)
+		if firstRec {
+			log.Printf("%s: first sending %+v ...", f.Name(), r)
+			firstRec = false
+		}
+
 		select {
 		case <-drop:
 			err = fmt.Errorf("%s: external termination!", f.Name())
 			break
 		case out <- r:
-			log.Printf("%s: sent %+v", f.Name(), r)
 		}
 	}
 
