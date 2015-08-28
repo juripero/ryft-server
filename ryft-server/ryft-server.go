@@ -133,6 +133,7 @@ func main() {
 	readParameters()
 
 	r := gin.Default()
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
@@ -143,6 +144,7 @@ func main() {
 	})
 
 	r.GET("/search/test-ok", func(c *gin.Context) {
+		c.Header("Content-Type", gin.MIMEPlain)
 		testOk(c)
 	})
 
@@ -152,33 +154,9 @@ func main() {
 	})
 
 	r.GET("/search", func(c *gin.Context) {
+		c.Header("Content-Type", gin.MIMEPlain)
 		search(c)
 	})
-
-	compressed := r.Group("/gzip")
-
-	compressed.Use(gzip.Gzip(gzip.DefaultCompression))
-	{
-		compressed.GET("/", func(c *gin.Context) {
-			defer srverr.DeferRecover(c)
-			c.HTML(http.StatusOK, "index", nil)
-		})
-
-		compressed.GET("/search/test-ok", func(c *gin.Context) {
-			c.Header("Content-Type", gin.MIMEPlain)
-			testOk(c)
-		})
-
-		compressed.GET("/search/test-fail", func(c *gin.Context) {
-			defer srverr.DeferRecover(c)
-			panic(srverr.New(http.StatusInternalServerError, "Test error"))
-		})
-
-		compressed.GET("/search", func(c *gin.Context) {
-			c.Header("Content-Type", gin.MIMEPlain)
-			search(c)
-		})
-	}
 
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
 		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
