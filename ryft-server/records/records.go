@@ -60,6 +60,8 @@ func scan(f *os.File, drop chan struct{}, out chan IdxRecord) (err error) {
 		if n, _ := fmt.Fscanln(f, &line); n == 0 {
 			break
 		}
+		log.Printf("%s: RAW: %s", f.Name(), line)
+
 		if r, err = NewIdxRecord(line); err != nil {
 			log.Printf("%s: parsing err '%s': %s", f.Name(), line, err.Error())
 			break
@@ -104,7 +106,7 @@ func Poll(idx *os.File, s chan error) (records chan IdxRecord, drop chan struct{
 		loop := true
 		for loop {
 			if err := scan(idx, drop, records); err != nil {
-				log.Printf("%s: READING", idx.Name())
+				log.Printf("%s: READ WITH ERR: %s", idx.Name(), err.Error())
 				close(records)
 				return
 			}

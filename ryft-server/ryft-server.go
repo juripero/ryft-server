@@ -27,7 +27,7 @@ import (
 
 var (
 	//Port        = 8765  //command line "port"
-	KeepResults = false //command line "keep-results"
+	KeepResults = true //command line "keep-results"
 )
 
 // var Observer *fsobserver.Observer
