@@ -59,6 +59,8 @@ func search(c *gin.Context) {
 	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
+	log.Printf("%d: idx-file opened", n.Index)
+
 	defer func() {
 		if idx != nil {
 			idx.Close()
@@ -71,6 +73,8 @@ func search(c *gin.Context) {
 	if res, err = crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
+	log.Printf("%d: res-file opened", n.Index)
+
 	defer func() {
 		if res != nil {
 			res.Close()
