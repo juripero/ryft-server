@@ -56,7 +56,7 @@ func search(c *gin.Context) {
 	p := progress.Progress(s, n)
 
 	var idx, res *os.File
-	if idx, err := crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
+	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
 	defer func() {
@@ -68,7 +68,7 @@ func search(c *gin.Context) {
 		}
 	}()
 
-	if res, err := crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
+	if res, err = crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
 	defer func() {
