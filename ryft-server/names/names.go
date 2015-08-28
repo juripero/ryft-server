@@ -1,7 +1,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package names
 
 import (
 	"fmt"
@@ -9,10 +9,12 @@ import (
 	"strconv"
 )
 
-var RyftoneMountPoint = "/ryftone" //TODO: from config
+var RyftoneMountPoint = "/ryftone"
 var ServerInstancePrefix = "RyftServer"
+var Port = 8765
 
 type Names struct {
+	Index               uint64
 	ResultFile, IdxFile string
 }
 
@@ -24,13 +26,13 @@ func StartNamesGenerator() {
 		for {
 			for i := uint64(0); i <= ^uint64(0); i++ {
 				s = strconv.FormatUint(i, 10)
-				namesChan <- Names{"result-" + s + ".bin", "idx-" + s + ".txt"}
+				namesChan <- Names{i, "result-" + s + ".bin", "idx-" + s + ".txt"}
 			}
 		}
 	}()
 }
 
-func GetNewNames() Names {
+func New() Names {
 	return <-namesChan
 }
 

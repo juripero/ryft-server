@@ -56,18 +56,26 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 func scan(f *os.File, drop chan struct{}, out chan IdxRecord) (err error) {
 	var line string
 	var r IdxRecord
-	for err != nil {
+
+	firstRec := true
+	for err == nil {
 		if n, _ := fmt.Fscanln(f, &line); n == 0 {
 			break
 		}
+
 		if r, err = NewIdxRecord(line); err != nil {
 			log.Printf("%s: parsing err '%s': %s", f.Name(), line, err.Error())
 			break
 		}
 
+		if firstRec {
+			log.Printf("%s: first sending %+v ...", f.Name(), r)
+			firstRec = false
+		}
+
 		select {
 		case <-drop:
-			err = fmt.Errorf("%s: external termination.", f.Name())
+			err = fmt.Errorf("%s: external termination!", f.Name())
 			break
 		case out <- r:
 		}
@@ -102,6 +110,7 @@ func Poll(idx *os.File, s chan error) (records chan IdxRecord, drop chan struct{
 		loop := true
 		for loop {
 			if err := scan(idx, drop, records); err != nil {
+				log.Printf("%s: READ WITH ERR: %s", idx.Name(), err.Error())
 				close(records)
 				return
 			}
@@ -110,16 +119,21 @@ func Poll(idx *os.File, s chan error) (records chan IdxRecord, drop chan struct{
 				drop, s,
 
 				// Timeout
-				func() bool { return true },
+				func() bool {
+					//log.Printf("%s: TIMEOUT.", idx.Name())
+					return true
+				},
 
 				// Dropping connection or another external reason to stop records reading
 				func() bool {
+					log.Printf("%s: DROPPED CONNECTION.", idx.Name())
 					close(records)
 					return false
 				},
 
 				// Search complete
 				func() bool {
+					log.Printf("%s: SEARCH COMPLETE.", idx.Name())
 					scan(idx, drop, records) // Connection can be dropped or not.
 					close(records)
 					return false
@@ -127,7 +141,7 @@ func Poll(idx *os.File, s chan error) (records chan IdxRecord, drop chan struct{
 
 				// Search complete with error
 				func(err error) bool {
-					log.Printf("%s: API error: %s", idx.Name(), err.Error())
+					log.Printf("%s: API ERROR: %s", idx.Name(), err.Error())
 					close(records)
 					return false
 				},
