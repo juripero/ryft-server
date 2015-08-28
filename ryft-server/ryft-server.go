@@ -113,7 +113,6 @@ func testOk(c *gin.Context) {
 		w.Write([]byte("]"))
 		return false
 	})
-
 }
 
 func main() {
@@ -139,16 +138,13 @@ func main() {
 	})
 
 	r.GET("/search", func(c *gin.Context) {
-
 		search(c)
-
 	})
 
 	compressed := r.Group("/gzip")
 
 	compressed.Use(gzip.Gzip(gzip.DefaultCompression))
 	{
-
 		compressed.GET("/", func(c *gin.Context) {
 			defer deferRecover(c)
 			c.HTML(http.StatusOK, "index", nil)
