@@ -9,8 +9,8 @@ import (
 	"github.com/DataArt/ryft-rest-api/ryft-server/srverr"
 )
 
-func Progress(s *binding.Search, n names.Names) (ch chan *srverr.ServerError) {
-	ch = make(chan *srverr.ServerError, 1)
+func Progress(s *binding.Search, n names.Names) (ch chan error) {
+	ch = make(chan error, 1)
 	go func() {
 		ds := rol.RolDSCreate()
 		defer ds.Delete()

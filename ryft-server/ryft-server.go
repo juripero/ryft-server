@@ -46,7 +46,9 @@ func readParameters() {
 func search(c *gin.Context) {
 	defer srverr.DeferRecover(c)
 
-	if s, err := binding.NewSearch(c); err != nil {
+	var s *binding.Search
+	var err error
+	if s, err = binding.NewSearch(c); err != nil {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
@@ -184,7 +186,7 @@ func main() {
 	r.SetHTMLTemplate(indexTemplate)
 
 	r.GET("/", func(c *gin.Context) {
-		defer deferRecover(c)
+		defer srverr.DeferRecover(c)
 		c.HTML(http.StatusOK, "index", nil)
 	})
 
@@ -193,7 +195,7 @@ func main() {
 	})
 
 	r.GET("/search/test-fail", func(c *gin.Context) {
-		defer deferRecover(c)
+		defer srverr.DeferRecover(c)
 		panic(srverr.New(http.StatusInternalServerError, "Test error"))
 	})
 
@@ -206,7 +208,7 @@ func main() {
 	compressed.Use(gzip.Gzip(gzip.DefaultCompression))
 	{
 		compressed.GET("/", func(c *gin.Context) {
-			defer deferRecover(c)
+			defer srverr.DeferRecover(c)
 			c.HTML(http.StatusOK, "index", nil)
 		})
 
@@ -216,7 +218,7 @@ func main() {
 		})
 
 		compressed.GET("/search/test-fail", func(c *gin.Context) {
-			defer deferRecover(c)
+			defer srverr.DeferRecover(c)
 			panic(&ServerError{http.StatusInternalServerError, "Test error"})
 		})
 
