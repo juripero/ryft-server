@@ -13,19 +13,24 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/DataArt/ryft-rest-api/fsobserver"
 	"github.com/DataArt/ryft-rest-api/ryft-server/binding"
+	"github.com/DataArt/ryft-rest-api/ryft-server/crpoll"
+	"github.com/DataArt/ryft-rest-api/ryft-server/jsonstream"
+	"github.com/DataArt/ryft-rest-api/ryft-server/names"
+	"github.com/DataArt/ryft-rest-api/ryft-server/progress"
+	"github.com/DataArt/ryft-rest-api/ryft-server/records"
+	"github.com/DataArt/ryft-rest-api/ryft-server/srverr"
 
 	"github.com/gin-gonic/contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
 var (
-	Port        = 8765  //command line "port"
+	//Port        = 8765  //command line "port"
 	KeepResults = false //command line "keep-results"
 )
 
-var Observer *fsobserver.Observer
+// var Observer *fsobserver.Observer
 
 func readParameters() {
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
@@ -33,62 +38,117 @@ func readParameters() {
 
 	flag.Parse()
 
-	Port = *portPtr
+	//Port = *portPtr
+	names.Port = *portPtr
 	KeepResults = *keepResultsPtr
 }
 
 func search(c *gin.Context) {
-	defer deferRecover(c)
+	defer srverr.DeferRecover(c)
 
-	s, err := binding.NewSearch(c)
-	if err != nil {
-		panic(&ServerError{http.StatusBadRequest, err.Error()})
+	if s, err := binding.NewSearch(c); err != nil {
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
-	n := GetNewNames()
-	ch := make(chan error, 1)
+	n := names.New()
+	p := progress.Progress(s, n)
 
-	log.Printf("request: start waiting for files %+v", n)
-	idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
+	var idx, res *os.File
+	if idx, err := crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
+		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	}
 	defer func() {
-		Observer.Unfollow(idx.Name())
-		Observer.Unfollow(res.Name())
-
-		if !KeepResults {
-			os.Remove(idx.Name())
-			os.Remove(res.Name())
-			log.Println("request: file deleted")
+		if idx != nil {
+			idx.Close()
+			if !KeepResults {
+				os.Remove(idx.Name())
+			}
 		}
-
-		idx.Close()
-		res.Close()
-		log.Println("request: ops & files closed")
 	}()
-	log.Println("request: all files created & opened")
 
-	dropper := make(chan struct{}, 1)
-	records := GetRecordsChan(idx, idxops, ch, dropper)
+	if res, err := crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
+		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	}
+	defer func() {
+		if res != nil {
+			res.Close()
+			if !KeepResults {
+				os.Remove(res.Name())
+			}
+		}
+	}()
+
+	recs, drop := records.Poll(idx, p)
 
 	c.Stream(func(w io.Writer) bool {
-		err := generateJson(records, res, resops, w, dropper)
-		log.Println("request: after generateJson")
-
-		if err != nil {
-			Observer.Unfollow(idx.Name())
-			Observer.Unfollow(res.Name())
+		if err := jsonstream.Write(recs, res, w, drop); err != nil {
 			idx.Close()
-			res.Close()
 			idx = nil
+			if !KeepResults {
+				os.Remove(idx.Name())
+			}
+			res.Close()
 			res = nil
-			log.Println("request: ops & files closed")
+			if !KeepResults {
+				os.Remove(res.Name())
+			}
 		}
 		return false
 	})
-	log.Println("request: end")
 }
 
+// func searchOld(c *gin.Context) {
+// 	defer deferRecover(c)
+
+// 	s, err := binding.NewSearch(c)
+// 	if err != nil {
+// 		panic(&ServerError{http.StatusBadRequest, err.Error()})
+// 	}
+
+// 	n := GetNewNames()
+// 	ch := make(chan error, 1)
+
+// 	log.Printf("request: start waiting for files %+v", n)
+// 	idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
+// 	defer func() {
+// 		Observer.Unfollow(idx.Name())
+// 		Observer.Unfollow(res.Name())
+
+// 		if !KeepResults {
+// 			os.Remove(idx.Name())
+// 			os.Remove(res.Name())
+// 			log.Println("request: file deleted")
+// 		}
+
+// 		idx.Close()
+// 		res.Close()
+// 		log.Println("request: ops & files closed")
+// 	}()
+// 	log.Println("request: all files created & opened")
+
+// 	dropper := make(chan struct{}, 1)
+// 	records := GetRecordsChan(idx, idxops, ch, dropper)
+
+// 	c.Stream(func(w io.Writer) bool {
+// 		err := generateJson(records, res, resops, w, dropper)
+// 		log.Println("request: after generateJson")
+
+// 		if err != nil {
+// 			Observer.Unfollow(idx.Name())
+// 			Observer.Unfollow(res.Name())
+// 			idx.Close()
+// 			res.Close()
+// 			idx = nil
+// 			res = nil
+// 			log.Println("request: ops & files closed")
+// 		}
+// 		return false
+// 	})
+// 	log.Println("request: end")
+// }
+
 func testOk(c *gin.Context) {
-	defer deferRecover(c)
+	defer srverr.DeferRecover(c)
 
 	c.Stream(func(w io.Writer) bool {
 
@@ -102,7 +162,7 @@ func testOk(c *gin.Context) {
 			record := gin.H{"number": i}
 			bytes, err := json.Marshal(record)
 			if err != nil {
-				panic(&ServerError{http.StatusInternalServerError, err.Error()})
+				panic(srverr.New(http.StatusInternalServerError, err.Error()))
 			}
 
 			w.Write(bytes)
@@ -134,7 +194,7 @@ func main() {
 
 	r.GET("/search/test-fail", func(c *gin.Context) {
 		defer deferRecover(c)
-		panic(&ServerError{http.StatusInternalServerError, "Test error"})
+		panic(srverr.New(http.StatusInternalServerError, "Test error"))
 	})
 
 	r.GET("/search", func(c *gin.Context) {
@@ -176,13 +236,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	var err error
-	if Observer, err = fsobserver.NewObserver(ResultsDirPath()); err != nil {
-		log.Printf("Could not create directory %s observer with error %s", ResultsDirPath(), err.Error())
-		os.Exit(1)
-	}
+	// var err error
+	// if Observer, err = fsobserver.NewObserver(ResultsDirPath()); err != nil {
+	// 	log.Printf("Could not create directory %s observer with error %s", ResultsDirPath(), err.Error())
+	// 	os.Exit(1)
+	// }
 
-	StartNamesGenerator()
+	names.StartNamesGenerator()
 	log.SetFlags(log.Ltime)
 
 	r.Run(fmt.Sprintf(":%d", Port))

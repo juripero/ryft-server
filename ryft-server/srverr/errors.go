@@ -1,7 +1,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package srverr
 
 import (
 	"fmt"
@@ -21,7 +21,11 @@ func (err *ServerError) Error() string {
 	return fmt.Sprintf("%d %s", err.Status, err.Message)
 }
 
-func deferRecover(c *gin.Context) {
+func New(status int, message string) *ServerError {
+	return &ServerError{status, message}
+}
+
+func DeferRecover(c *gin.Context) {
 	if r := recover(); r != nil {
 		if err, ok := r.(*ServerError); ok {
 			log.Printf("Panic recovered server error: status=%d msg:%s", err.Status, err.Message)

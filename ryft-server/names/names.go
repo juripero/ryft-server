@@ -1,7 +1,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package names
 
 import (
 	"fmt"
@@ -9,8 +9,9 @@ import (
 	"strconv"
 )
 
-var RyftoneMountPoint = "/ryftone" //TODO: from config
+var RyftoneMountPoint = "/ryftone"
 var ServerInstancePrefix = "RyftServer"
+var Port = 8765
 
 type Names struct {
 	ResultFile, IdxFile string
@@ -30,7 +31,7 @@ func StartNamesGenerator() {
 	}()
 }
 
-func GetNewNames() Names {
+func New() Names {
 	return <-namesChan
 }
 
