@@ -56,7 +56,7 @@ func NewIdxRecord(line string) (r IdxRecord, err error) {
 func scan(f *os.File, drop chan struct{}, out chan IdxRecord) (err error) {
 	var line string
 	var r IdxRecord
-	for err != nil {
+	for err == nil {
 		if n, e := fmt.Fscanln(f, &line); n == 0 {
 			if e != nil {
 				log.Printf("%s: scan err: %s", f.Name(), err.Error())
