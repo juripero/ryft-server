@@ -36,7 +36,7 @@ http://52.4.187.202:8765
 Do request in browser:
 
 ```
-http://192.168.56.101:8765/search/fuzzy-hamming?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2
+http://192.168.56.101:8765/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2
 ```
 Response:
 
@@ -64,7 +64,6 @@ LTEyMTMsTXMuIEpvbmVzIHByb3ZlcyB0 --> "-1213,Ms. Jones proves t"
 ```
 
 
-
 # How to check error and success results?
 ```
 http://192.168.56.103:8765/search/test-ok 
@@ -79,9 +78,17 @@ http://192.168.56.103:8765/search/test-fail
 }
 ```
 
+# How to get compressed results
+
+The following links are valid:
+
+```
+http://192.168.56.103:8765/gzip/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2
+http://192.168.56.103:8765/gzip/search/test-ok 
+http://192.168.56.103:8765/gzip/search/test-fail
+```
 
 # Good requests for tests
-
 
 ```
 curl "http://ryft-emulator:8765/search?query=(RAW_TEXT%20CONTAINS%20%22bin%22)&files=jdk-8u45-linux-x64.tar.gzfuzziness=2&surrounding=10"
@@ -89,5 +96,5 @@ curl "http://ryft-emulator:8765/search?query=(RAW_TEXT%20CONTAINS%20%22bin%22)&f
 
 
 
-Links:
+# Links
  * http://base64-encoding.online-domain-tools.com/ --- online base64 encoder/decoder
