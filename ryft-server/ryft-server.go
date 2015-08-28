@@ -219,7 +219,7 @@ func main() {
 
 		compressed.GET("/search/test-fail", func(c *gin.Context) {
 			defer srverr.DeferRecover(c)
-			panic(&ServerError{http.StatusInternalServerError, "Test error"})
+			panic(srverr.New(http.StatusInternalServerError, "Test error"))
 		})
 
 		compressed.GET("/search", func(c *gin.Context) {
@@ -228,13 +228,13 @@ func main() {
 		})
 	}
 
-	if err := os.RemoveAll(ResultsDirPath()); err != nil {
-		log.Printf("Could not delete %s with error %s", ResultsDirPath(), err.Error())
+	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
+		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
 
-	if err := os.MkdirAll(ResultsDirPath(), 0777); err != nil {
-		log.Printf("Could not create directory %s with error %s", ResultsDirPath(), err.Error())
+	if err := os.MkdirAll(names.ResultsDirPath(), 0777); err != nil {
+		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
 
@@ -247,7 +247,7 @@ func main() {
 	names.StartNamesGenerator()
 	log.SetFlags(log.Ltime)
 
-	r.Run(fmt.Sprintf(":%d", Port))
+	r.Run(fmt.Sprintf(":%d", names.Port))
 
 }
 
