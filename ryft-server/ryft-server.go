@@ -26,11 +26,8 @@ import (
 )
 
 var (
-	//Port        = 8765  //command line "port"
-	KeepResults = true //command line "keep-results"
+	KeepResults = false
 )
-
-// var Observer *fsobserver.Observer
 
 func readParameters() {
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
@@ -38,7 +35,6 @@ func readParameters() {
 
 	flag.Parse()
 
-	//Port = *portPtr
 	names.Port = *portPtr
 	KeepResults = *keepResultsPtr
 }
@@ -91,67 +87,17 @@ func search(c *gin.Context) {
 			idx.Close()
 			idx = nil
 			if !KeepResults {
-				os.Remove(idx.Name())
+				os.Remove(names.ResultsDirPath(n.IdxFile))
 			}
 			res.Close()
 			res = nil
 			if !KeepResults {
-				os.Remove(res.Name())
+				os.Remove(names.ResultsDirPath(n.ResultFile))
 			}
 		}
 		return false
 	})
 }
-
-// func searchOld(c *gin.Context) {
-// 	defer deferRecover(c)
-
-// 	s, err := binding.NewSearch(c)
-// 	if err != nil {
-// 		panic(&ServerError{http.StatusBadRequest, err.Error()})
-// 	}
-
-// 	n := GetNewNames()
-// 	ch := make(chan error, 1)
-
-// 	log.Printf("request: start waiting for files %+v", n)
-// 	idx, res, idxops, resops := startAndWaitFiles(s, n, ch)
-// 	defer func() {
-// 		Observer.Unfollow(idx.Name())
-// 		Observer.Unfollow(res.Name())
-
-// 		if !KeepResults {
-// 			os.Remove(idx.Name())
-// 			os.Remove(res.Name())
-// 			log.Println("request: file deleted")
-// 		}
-
-// 		idx.Close()
-// 		res.Close()
-// 		log.Println("request: ops & files closed")
-// 	}()
-// 	log.Println("request: all files created & opened")
-
-// 	dropper := make(chan struct{}, 1)
-// 	records := GetRecordsChan(idx, idxops, ch, dropper)
-
-// 	c.Stream(func(w io.Writer) bool {
-// 		err := generateJson(records, res, resops, w, dropper)
-// 		log.Println("request: after generateJson")
-
-// 		if err != nil {
-// 			Observer.Unfollow(idx.Name())
-// 			Observer.Unfollow(res.Name())
-// 			idx.Close()
-// 			res.Close()
-// 			idx = nil
-// 			res = nil
-// 			log.Println("request: ops & files closed")
-// 		}
-// 		return false
-// 	})
-// 	log.Println("request: end")
-// }
 
 func testOk(c *gin.Context) {
 	defer srverr.DeferRecover(c)
@@ -241,12 +187,6 @@ func main() {
 		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
-
-	// var err error
-	// if Observer, err = fsobserver.NewObserver(ResultsDirPath()); err != nil {
-	// 	log.Printf("Could not create directory %s observer with error %s", ResultsDirPath(), err.Error())
-	// 	os.Exit(1)
-	// }
 
 	names.StartNamesGenerator()
 	log.SetFlags(log.Ltime)
