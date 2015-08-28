@@ -78,16 +78,6 @@ http://192.168.56.103:8765/search/test-fail
 }
 ```
 
-# How to get compressed results
-
-The following links are valid:
-
-```
-http://192.168.56.103:8765/gzip/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2
-http://192.168.56.103:8765/gzip/search/test-ok 
-http://192.168.56.103:8765/gzip/search/test-fail
-```
-
 # Good requests for tests
 
 ```
