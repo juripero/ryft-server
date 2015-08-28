@@ -19,7 +19,6 @@ type Search struct {
 
 func NewSearch(c *gin.Context) (*Search, error) {
 	s := new(Search)
-
 	if err := c.Bind(s); err != nil {
 		log.Printf("SEARCH = %+v", s)
 		if s.Query == "" {
