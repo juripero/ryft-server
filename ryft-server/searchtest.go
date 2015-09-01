@@ -4,7 +4,7 @@ import "net/http"
 
 import "github.com/gin-gonic/gin"
 
-const testresp interface{} = []interface{}{
+var testresp interface{} = []interface{}{
 	map[string]interface{}{
 		"_index": map[string]interface{}{
 			"file":      "/ryftone/passengers.txt",
