@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/DataArt/ryft-rest-api/ryft-server/datapoll"
-	"github.com/DataArt/ryft-rest-api/ryft-server/records"
+	"github.com/getryft/ryft-rest-api/ryft-server/datapoll"
+	"github.com/getryft/ryft-rest-api/ryft-server/records"
 )
 
 var WriteInterval = time.Second * 20

@@ -4,10 +4,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/DataArt/ryft-rest-api/rol"
-	"github.com/DataArt/ryft-rest-api/ryft-server/binding"
-	"github.com/DataArt/ryft-rest-api/ryft-server/names"
-	"github.com/DataArt/ryft-rest-api/ryft-server/srverr"
+	"github.com/getryft/ryft-rest-api/rol"
+	"github.com/getryft/ryft-rest-api/ryft-server/binding"
+	"github.com/getryft/ryft-rest-api/ryft-server/names"
+	"github.com/getryft/ryft-rest-api/ryft-server/srverr"
 )
 
 func Progress(s *binding.Search, n names.Names) (ch chan error) {

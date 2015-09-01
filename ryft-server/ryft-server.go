@@ -148,6 +148,11 @@ func main() {
 		testOk(c)
 	})
 
+	r.GET("/searchtest", func(c *gin.Context) {
+		c.Header("Content-Type", gin.MIMEPlain)
+		searchtest(c)
+	})
+
 	r.GET("/search/test-fail", func(c *gin.Context) {
 		defer srverr.DeferRecover(c)
 		panic(srverr.New(http.StatusInternalServerError, "Test error"))
