@@ -14,8 +14,8 @@ const testresp interface{} = []interface{}{
 		},
 		"field1": "value1",
 		"field2": "value2",
-		"field2": "value3",
-		"field3": "value4",
+		"field3": "value3",
+		"field4": "value4",
 	},
 	map[string]interface{}{
 		"_index": map[string]interface{}{
@@ -26,8 +26,8 @@ const testresp interface{} = []interface{}{
 		},
 		"field1": "value11",
 		"field2": "value12",
-		"field2": "value13",
-		"field3": "value14",
+		"field3": "value13",
+		"field4": "value14",
 	},
 }
 
