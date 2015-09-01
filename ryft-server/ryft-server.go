@@ -13,14 +13,13 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/DataArt/ryft-rest-api/ryft-server/binding"
-	"github.com/DataArt/ryft-rest-api/ryft-server/crpoll"
-	"github.com/DataArt/ryft-rest-api/ryft-server/jsonstream"
-	"github.com/DataArt/ryft-rest-api/ryft-server/names"
-	"github.com/DataArt/ryft-rest-api/ryft-server/progress"
-	"github.com/DataArt/ryft-rest-api/ryft-server/records"
-	"github.com/DataArt/ryft-rest-api/ryft-server/srverr"
-
+	"github.com/getryft/ryft-rest-api/ryft-server/binding"
+	"github.com/getryft/ryft-rest-api/ryft-server/crpoll"
+	"github.com/getryft/ryft-rest-api/ryft-server/jsonstream"
+	"github.com/getryft/ryft-rest-api/ryft-server/names"
+	"github.com/getryft/ryft-rest-api/ryft-server/progress"
+	"github.com/getryft/ryft-rest-api/ryft-server/records"
+	"github.com/getryft/ryft-rest-api/ryft-server/srverr"
 	"github.com/gin-gonic/contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
