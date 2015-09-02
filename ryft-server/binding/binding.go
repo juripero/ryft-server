@@ -8,6 +8,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/getryft/ryft-rest-api/ryft-server/formats"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,6 +17,7 @@ type Search struct {
 	Files       []string `form:"files" json:"files" binding:"required"`             // Splitted OS-specific ListSeparator: "/a/b/c:/usr/bin/file" -> "/a/b/c", "/usr/bin/file"
 	Surrounding uint16   `form:"surrounding" json:"surrounding" binding:"required"` // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
 	Fuzziness   uint8    `form:"fuzziness" json:"fuzziness"`                        // Is the fuzziness of the search. Measured as the maximum Hamming distance.
+	Format      string   `form:"format" json:"format"`                              // Source format parser
 }
 
 const (
@@ -23,26 +25,26 @@ const (
 	filesTag       = "files"
 	surroundingTag = "surrounding"
 	fuzzinessTag   = "fuzziness"
+	formatTag      = "format"
 )
 
 func NewSearch(c *gin.Context) (*Search, error) {
 	s := new(Search)
-
 	url := c.Request.URL.Query()
 
 	query, hasQuery := url[queryTag]
-	files, hasFiles := url[filesTag]
-	surrounding, hasSurrounding := url[surroundingTag]
-	fuzziness, hasFuzziness := url[fuzzinessTag]
-
-	if !hasQuery || len(query) <= 0 {
-		return nil, fmt.Errorf("Query can not be empty")
+	if !hasQuery || len(query) != 1 {
+		return nil, fmt.Errorf("Query can not be empty. Query should be single.")
 	}
+	s.Query = query[0]
 
-	if !hasFiles || len(files) <= 0 {
+	files, hasFiles := url[filesTag]
+	if !hasFiles || len(files) == 0 {
 		return nil, fmt.Errorf("At least one file should be specified")
 	}
+	s.Files = files
 
+	surrounding, hasSurrounding := url[surroundingTag]
 	if !hasSurrounding {
 		s.Surrounding = 0
 	} else {
@@ -60,8 +62,10 @@ func NewSearch(c *gin.Context) (*Search, error) {
 			}
 
 		}
+		s.Surrounding = uint16(srValue)
 	}
 
+	fuzziness, hasFuzziness := url[fuzzinessTag]
 	if !hasFuzziness {
 		s.Fuzziness = 0
 	} else {
@@ -75,11 +79,21 @@ func NewSearch(c *gin.Context) (*Search, error) {
 
 			if fzValue > 254 {
 				log.Println("inside")
-				return nil, fmt.Errorf("Fuzziness should not be more than 254 ")
+				return nil, fmt.Errorf("Fuzziness should not be more than 254")
 			}
 		}
+		s.Fuzziness = uint8(fzValue)
 	}
-	c.Bind(s)
-	return s, nil
 
+	format, hasFormat := url[formatTag]
+	if !hasFormat {
+		s.Format = formats.Default()
+	} else {
+		if !formats.Available(format[0]) {
+			return nil, fmt.Errorf("Parsing format has not supported")
+		}
+		s.Format = format[0]
+	}
+
+	return s, nil
 }
