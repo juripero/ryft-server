@@ -18,6 +18,7 @@ type Search struct {
 	Surrounding uint16   `form:"surrounding" json:"surrounding" binding:"required"` // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
 	Fuzziness   uint8    `form:"fuzziness" json:"fuzziness"`                        // Is the fuzziness of the search. Measured as the maximum Hamming distance.
 	Format      string   `form:"format" json:"format"`                              // Source format parser
+	Out         string
 }
 
 const (
@@ -31,6 +32,14 @@ const (
 func NewSearch(c *gin.Context) (*Search, error) {
 	s := new(Search)
 	url := c.Request.URL.Query()
+
+	if c.Request.Header.Get("Content-Type") == "application/msgpk"
+	||c.Request.Header.Get("Content-Type") == "application/x-msgpk" {
+		s.Out = "msgpk"
+	} else {
+		s.Out = "json"
+
+	}
 
 	query, hasQuery := url[queryTag]
 	if !hasQuery || len(query) != 1 {

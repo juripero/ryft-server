@@ -16,6 +16,7 @@ import (
 	"github.com/getryft/ryft-rest-api/ryft-server/binding"
 	"github.com/getryft/ryft-rest-api/ryft-server/crpoll"
 	"github.com/getryft/ryft-rest-api/ryft-server/jsonstream"
+	"github.com/getryft/ryft-rest-api/ryft-server/msgpkstream"
 	"github.com/getryft/ryft-rest-api/ryft-server/names"
 	"github.com/getryft/ryft-rest-api/ryft-server/progress"
 	"github.com/getryft/ryft-rest-api/ryft-server/records"
@@ -84,7 +85,15 @@ func search(c *gin.Context) {
 	recs, drop := records.Poll(idx, p)
 
 	c.Stream(func(w io.Writer) bool {
-		if err := jsonstream.Write(recs, res, w, drop); err != nil {
+		var err error
+		if s.Out == "json" {
+			err = jsonstream.Write(recs, res, w, drop)
+		} else if s.Out == "msgpk" {
+			err = msgpkstream.Write(recs, res, w, drop)
+		}
+
+		if err != nil {
+
 			idx.Close()
 			idx = nil
 			if !KeepResults {
