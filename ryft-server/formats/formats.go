@@ -28,7 +28,7 @@ func init() {
 	if formats != nil {
 		return
 	}
-
+	formats = make(map[string]func(data []byte) (interface{}, error))
 	formats[XMLFormat] = parseXML
 }
 
