@@ -1,6 +1,10 @@
 package formats
 
-import "log"
+import (
+	"log"
+
+	"github.com/getryft/ryft-rest-api/ryft-server/formats/universalxml"
+)
 
 const XMLFormat = "xml"
 
@@ -33,6 +37,5 @@ func init() {
 }
 
 func parseXML(data []byte) (interface{}, error) {
-	//TODO
-	return nil, nil
+	return universalxml.DecodeBytes(data)
 }
