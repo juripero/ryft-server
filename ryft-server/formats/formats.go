@@ -30,11 +30,7 @@ func Formats() map[string]func(r records.IdxRecord) (interface{}, error) {
 }
 
 func Available(name string) (hasParser bool) {
-	if formats != nil {
-		return
-	}
-
-	_, hasParser = formats[name]
+	_, hasParser = Formats()[name]
 	return
 }
 
