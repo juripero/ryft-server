@@ -75,6 +75,7 @@ func (ds *RolDS) SearchExact(
 	surroundingWidth uint16,
 	delimeter string,
 	indexResultsFile *string,
+	caseSensitive bool,
 ) *RolDS {
 	var (
 		cResultsFile      *C.char = C.CString(resultsFile)
@@ -96,6 +97,7 @@ func (ds *RolDS) SearchExact(
 		C.uint16_t(surroundingWidth),
 		cDelimeter,
 		cIndexResultsFile,
+		c.bool_t(caseSensitive),
 		nil,
 	)
 
@@ -110,6 +112,8 @@ func (ds *RolDS) SearchFuzzyHamming(
 	fuzziness uint8,
 	delimeter string,
 	indexResultsFile *string,
+	caseSensitive bool,
+
 ) *RolDS {
 	var (
 		cResultsFile      *C.char = C.CString(resultsFile)
@@ -132,6 +136,7 @@ func (ds *RolDS) SearchFuzzyHamming(
 		C.uint8_t(fuzziness),
 		cDelimeter,
 		cIndexResultsFile,
+		c.bool_t(caseSensitive),
 		nil,
 	)
 
