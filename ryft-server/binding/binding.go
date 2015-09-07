@@ -7,26 +7,52 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 
 	"github.com/getryft/ryft-rest-api/ryft-server/formats"
 	"github.com/gin-gonic/gin"
 )
 
 type Search struct {
-	Query       string   `form:"query" json:"query" binding:"required"`             // For example: ( RAW_TEXT CONTAINS "night" )
-	Files       []string `form:"files" json:"files" binding:"required"`             // Splitted OS-specific ListSeparator: "/a/b/c:/usr/bin/file" -> "/a/b/c", "/usr/bin/file"
-	Surrounding uint16   `form:"surrounding" json:"surrounding" binding:"required"` // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-	Fuzziness   uint8    `form:"fuzziness" json:"fuzziness"`                        // Is the fuzziness of the search. Measured as the maximum Hamming distance.
-	Format      string   `form:"format" json:"format"`                              // Source format parser
-	Out         string
+	Query         string   `form:"query" json:"query" binding:"required"`             // For example: ( RAW_TEXT CONTAINS "night" )
+	Files         []string `form:"files" json:"files" binding:"required"`             // Splitted OS-specific ListSeparator: "/a/b/c:/usr/bin/file" -> "/a/b/c", "/usr/bin/file"
+	Surrounding   uint16   `form:"surrounding" json:"surrounding" binding:"required"` // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
+	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`                        // Is the fuzziness of the search. Measured as the maximum Hamming distance.
+	Format        string   `form:"format" json:"format"`                              // Source format parser
+	CaseSensitive bool
+	Out           string
+}
+
+var (
+	yesValues = []string{"1", "y", "yes", "t", "true"}
+	noValues  = []string{"0", "n", "no", "f", "false"}
+)
+
+func isAnyStr(s string, ss []string) bool {
+	ls := strings.ToLower(s)
+	for _, t := range ss {
+		if ls == t {
+			return true
+		}
+	}
+	return false
+}
+
+func isYes(s string) bool {
+	return isAnyStr(s, yesValues)
+}
+
+func isNo(s string) bool {
+	return isAnyStr(s, noValues)
 }
 
 const (
-	queryTag       = "query"
-	filesTag       = "files"
-	surroundingTag = "surrounding"
-	fuzzinessTag   = "fuzziness"
-	formatTag      = "format"
+	queryTag         = "query"
+	filesTag         = "files"
+	surroundingTag   = "surrounding"
+	fuzzinessTag     = "fuzziness"
+	formatTag        = "format"
+	caseSensitiveTag = "cs"
 )
 
 func NewSearch(c *gin.Context) (*Search, error) {
@@ -102,6 +128,20 @@ func NewSearch(c *gin.Context) (*Search, error) {
 			return nil, fmt.Errorf("Parsing format has not supported")
 		}
 		s.Format = format[0]
+	}
+
+	cs, hasCs := url[caseSensitiveTag]
+	if hasCs {
+		if isNo(cs[0]) {
+			s.CaseSensitive = false
+		} else if isYes(s[0]) {
+			s.CaseSensitive = true
+		} else {
+			return nil, fmt.Errorf(`Supported cs (Case Sensitivy) values: "1", "y", "yes", "t", "true", "0", "n", "no", "f", "false"`)
+		}
+
+	} else {
+		s.CaseSensitive = true
 	}
 
 	return s, nil
