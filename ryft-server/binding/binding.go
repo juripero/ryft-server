@@ -134,7 +134,7 @@ func NewSearch(c *gin.Context) (*Search, error) {
 	if hasCs {
 		if isNo(cs[0]) {
 			s.CaseSensitive = false
-		} else if isYes(s[0]) {
+		} else if isYes(cs[0]) {
 			s.CaseSensitive = true
 		} else {
 			return nil, fmt.Errorf(`Supported cs (Case Sensitivy) values: "1", "y", "yes", "t", "true", "0", "n", "no", "f", "false"`)
