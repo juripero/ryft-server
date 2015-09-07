@@ -97,7 +97,7 @@ func (ds *RolDS) SearchExact(
 		C.uint16_t(surroundingWidth),
 		cDelimeter,
 		cIndexResultsFile,
-		c.bool_t(caseSensitive),
+		c.bool(caseSensitive),
 		nil,
 	)
 
@@ -136,7 +136,7 @@ func (ds *RolDS) SearchFuzzyHamming(
 		C.uint8_t(fuzziness),
 		cDelimeter,
 		cIndexResultsFile,
-		c.bool_t(caseSensitive),
+		c.bool(caseSensitive),
 		nil,
 	)
 
