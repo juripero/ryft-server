@@ -19,6 +19,13 @@ const (
 var formats map[string]func(r records.IdxRecord) (interface{}, error)
 
 func Formats() map[string]func(r records.IdxRecord) (interface{}, error) {
+	if formats == nil {
+		log.Printf("Formats init.")
+		formats = make(map[string]func(r records.IdxRecord) (interface{}, error))
+		formats[XMLFormat] = xml
+		formats[RAWFormat] = raw
+	}
+
 	return formats
 }
 
@@ -33,16 +40,6 @@ func Available(name string) (hasParser bool) {
 
 func Default() string {
 	return RAWFormat
-}
-
-func init() {
-	log.Printf("Formats init.")
-	if formats != nil {
-		return
-	}
-	formats = make(map[string]func(r records.IdxRecord) (interface{}, error))
-	formats[XMLFormat] = xml
-	formats[RAWFormat] = raw
 }
 
 func xml(r records.IdxRecord) (interface{}, error) {
