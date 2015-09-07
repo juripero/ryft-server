@@ -27,9 +27,9 @@ func Progress(s *binding.Search, n names.Names) (ch chan error) {
 		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
 		resultsDs := func() *rol.RolDS {
 			if s.Fuzziness == 0 {
-				return ds.SearchExact(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, "", &idxFile)
+				return ds.SearchExact(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, "", &idxFile, s.CaseSensitive)
 			} else {
-				return ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile)
+				return ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
 			}
 		}()
 		log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
