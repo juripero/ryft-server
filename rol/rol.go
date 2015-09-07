@@ -7,7 +7,6 @@ package rol
 #cgo LDFLAGS: -lryftone
 #include <libryftone.h>
 #include <stdlib.h>
-#include <stdbool.h>
 */
 import "C"
 import "unsafe"
@@ -98,7 +97,7 @@ func (ds *RolDS) SearchExact(
 		C.uint16_t(surroundingWidth),
 		cDelimeter,
 		cIndexResultsFile,
-		c.bool(caseSensitive),
+		C.bool_t(caseSensitive),
 		nil,
 	)
 
@@ -137,7 +136,7 @@ func (ds *RolDS) SearchFuzzyHamming(
 		C.uint8_t(fuzziness),
 		cDelimeter,
 		cIndexResultsFile,
-		c.bool(caseSensitive),
+		C.bool_t(caseSensitive),
 		nil,
 	)
 
