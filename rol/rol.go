@@ -7,6 +7,7 @@ package rol
 #cgo LDFLAGS: -lryftone
 #include <libryftone.h>
 #include <stdlib.h>
+#include <stdbool.h>
 */
 import "C"
 import "unsafe"
