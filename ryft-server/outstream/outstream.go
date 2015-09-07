@@ -17,7 +17,6 @@ import (
 var WriteInterval = time.Second * 20
 
 func Write(s *binding.Search, source chan records.IdxRecord, res *os.File, w io.Writer, drop chan struct{}) (err error) {
-
 	if s.IsOutJson() {
 		w.Write([]byte("["))
 		wEncoder := json.NewEncoder(w)

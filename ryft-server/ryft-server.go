@@ -47,6 +47,15 @@ func search(c *gin.Context) {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
+	c.Header("Content-Type", gin.MIMEPlain)
+	if s.IsOutJson() {
+		c.Header("Content-Type", gin.MIMEPlain)
+	} else if s.IsOutMsgpk() {
+		c.Header("Content-Type", "application/x-msgpack")
+	} else {
+		panic(srverr.New(http.StatusBadRequest, "Supported formats (Content-Type): application/json, application/x-msgpack"))
+	}
+
 	n := names.New()
 	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
 
@@ -161,7 +170,6 @@ func main() {
 	})
 
 	r.GET("/search", func(c *gin.Context) {
-		c.Header("Content-Type", gin.MIMEPlain)
 		search(c)
 	})
 

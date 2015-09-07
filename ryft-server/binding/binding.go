@@ -66,8 +66,8 @@ func NewSearch(c *gin.Context) (*Search, error) {
 	s := new(Search)
 	url := c.Request.URL.Query()
 
-	if c.Request.Header.Get("Content-Type") == "application/msgpk" ||
-		c.Request.Header.Get("Content-Type") == "application/x-msgpk" {
+	if c.Request.Header.Get("Content-Type") == "application/msgpack" ||
+		c.Request.Header.Get("Content-Type") == "application/x-msgpack" {
 		s.out = outMsgpk
 	} else {
 		s.out = outJson
