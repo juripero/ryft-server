@@ -10,18 +10,25 @@ import (
 	"strings"
 
 	"github.com/getryft/ryft-rest-api/ryft-server/formats"
+	"github.com/getryft/ryft-rest-api/ryft-server/records"
 	"github.com/gin-gonic/gin"
 )
 
 type Search struct {
-	Query         string   `form:"query" json:"query" binding:"required"`             // For example: ( RAW_TEXT CONTAINS "night" )
-	Files         []string `form:"files" json:"files" binding:"required"`             // Splitted OS-specific ListSeparator: "/a/b/c:/usr/bin/file" -> "/a/b/c", "/usr/bin/file"
-	Surrounding   uint16   `form:"surrounding" json:"surrounding" binding:"required"` // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`                        // Is the fuzziness of the search. Measured as the maximum Hamming distance.
-	Format        string   `form:"format" json:"format"`                              // Source format parser
-	CaseSensitive bool
-	Out           string
+	Query           string                                         // For example: ( RAW_TEXT CONTAINS "night" )
+	Files           []string                                       // Source files
+	Surrounding     uint16                                         // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
+	Fuzziness       uint8                                          // Is the fuzziness of the search. Measured as the maximum Hamming distance.
+	Format          string                                         // Source format parser name
+	FormatConvertor func(r records.IdxRecord) (interface{}, error) // Source format parser (calculating from Format)
+	CaseSensitive   bool                                           // Case sensitive flag
+	out             string                                         // Output format in header (msgpack or json)
 }
+
+const (
+	outJson  = "json"
+	outMsgpk = "msgpk"
+)
 
 var (
 	yesValues = []string{"1", "y", "yes", "t", "true"}
@@ -61,10 +68,9 @@ func NewSearch(c *gin.Context) (*Search, error) {
 
 	if c.Request.Header.Get("Content-Type") == "application/msgpk" ||
 		c.Request.Header.Get("Content-Type") == "application/x-msgpk" {
-		s.Out = "msgpk"
+		s.out = outMsgpk
 	} else {
-		s.Out = "json"
-
+		s.out = outJson
 	}
 
 	query, hasQuery := url[queryTag]
@@ -130,6 +136,8 @@ func NewSearch(c *gin.Context) (*Search, error) {
 		s.Format = format[0]
 	}
 
+	s.FormatConvertor = formats.Formats()[s.Format]
+
 	cs, hasCs := url[caseSensitiveTag]
 	if hasCs {
 		if isNo(cs[0]) {
@@ -137,7 +145,7 @@ func NewSearch(c *gin.Context) (*Search, error) {
 		} else if isYes(cs[0]) {
 			s.CaseSensitive = true
 		} else {
-			return nil, fmt.Errorf(`Supported cs (Case Sensitivy) values: "1", "y", "yes", "t", "true", "0", "n", "no", "f", "false"`)
+			return nil, fmt.Errorf(`Supported cs (Case Sensitivity) values: "1", "y", "yes", "t", "true", "0", "n", "no", "f", "false"`)
 		}
 
 	} else {
@@ -145,4 +153,12 @@ func NewSearch(c *gin.Context) (*Search, error) {
 	}
 
 	return s, nil
+}
+
+func (s *Search) IsOutJson() bool {
+	return s.out == outJson
+}
+
+func (s *Search) IsOutMsgpk() bool {
+	return s.out == outMsgpk
 }
