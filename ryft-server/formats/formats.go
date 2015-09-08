@@ -39,13 +39,19 @@ func Default() string {
 }
 
 func xml(r records.IdxRecord) (interface{}, error) {
+	log.Println("*** start xml convertor")
 	obj, err := universalxml.DecodeBytes(r.Data)
+	log.Println("**** xml convertor: bytes decoded")
 	if err != nil {
+		log.Println("**** xml convertor: bytes decoded with error: %s", err.Error())
 		return nil, err
 	}
 
+	log.Println("**** xml convertor: start adding fields")
 	addFields(obj, rawMap(r))
+	log.Println("**** xml convertor: complete adding fields")
 
+	log.Println("*** end xml convertor")
 	return obj, nil
 }
 
