@@ -41,6 +41,7 @@ func readParameters() {
 func search(c *gin.Context) {
 	defer srverr.DeferRecover(c)
 
+	log.Printf("** start binding")
 	var s *binding.Search
 	var err error
 	if s, err = binding.NewSearch(c); err != nil {
@@ -65,7 +66,6 @@ func search(c *gin.Context) {
 	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
-	log.Printf("%d: idx-file opened", n.Index)
 
 	defer func() {
 		if idx != nil {
@@ -79,7 +79,6 @@ func search(c *gin.Context) {
 	if res, err = crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
-	log.Printf("%d: res-file opened", n.Index)
 
 	defer func() {
 		if res != nil {

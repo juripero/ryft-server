@@ -28,7 +28,9 @@ func Write(s *binding.Search, source chan records.IdxRecord, res *os.File, w io.
 
 			r.Data = datapoll.Next(res, r.Length)
 
+			log.Println("** start format convertor")
 			obj, recerr := s.FormatConvertor(r)
+			log.Println("** end format convertor")
 			if recerr != nil {
 				log.Printf("%s: DATA RECORD OFFSET=%d CAN NOT BE CONVERTED WITH ERROR: %s", res.Name(), r.Offset, recerr.Error())
 				log.Printf("%s:!DATA RECORD OFFSET=%d: %+v", r)
