@@ -47,7 +47,7 @@ func xml(r records.IdxRecord) (interface{}, error) {
 		return nil, err
 	}
 
-	log.Println("**** xml convertor: start adding fields")
+	log.Println("**** xml convertor: start adding fields to obj=%+v", obj)
 	addFields(obj, rawMap(r))
 	log.Println("**** xml convertor: complete adding fields")
 
