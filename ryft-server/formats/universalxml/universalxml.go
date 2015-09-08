@@ -3,7 +3,6 @@ package universalxml
 import (
 	"bytes"
 	"encoding/xml"
-	"log"
 )
 
 // https://jan.newmarch.name/go/xml/chapter-xml.html
@@ -50,6 +49,7 @@ func processToken(decoder *xml.Decoder) (obj map[string]interface{}, end bool, e
 		for {
 			child, childEnd, childErr := processToken(decoder)
 			if childErr != nil {
+				err = childErr
 				return
 			}
 
@@ -82,10 +82,8 @@ func processToken(decoder *xml.Decoder) (obj map[string]interface{}, end bool, e
 }
 
 func DecodeBytes(raw []byte) (obj map[string]interface{}, err error) {
-	log.Printf("+++ start decoding bytes '%s'", string(raw))
 	buff := bytes.NewBuffer(raw)
 	decoder := xml.NewDecoder(buff)
 	obj, _, err = processToken(decoder)
-	log.Printf("+++ complete decoding bytes '%s': obj=%+v, err=%+v", string(raw), obj, err)
 	return
 }

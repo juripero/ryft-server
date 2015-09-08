@@ -1,8 +1,6 @@
 package formats
 
 import (
-	"log"
-
 	"github.com/getryft/ryft-rest-api/ryft-server/formats/universalxml"
 	"github.com/getryft/ryft-rest-api/ryft-server/records"
 )
@@ -20,7 +18,6 @@ var formats map[string]func(r records.IdxRecord) (interface{}, error)
 
 func Formats() map[string]func(r records.IdxRecord) (interface{}, error) {
 	if formats == nil {
-		log.Printf("Formats init.")
 		formats = make(map[string]func(r records.IdxRecord) (interface{}, error))
 		formats[XMLFormat] = xml
 		formats[RAWFormat] = raw
@@ -39,19 +36,13 @@ func Default() string {
 }
 
 func xml(r records.IdxRecord) (interface{}, error) {
-	log.Println("*** start xml convertor")
 	obj, err := universalxml.DecodeBytes(r.Data)
-	log.Println("**** xml convertor: bytes decoded")
 	if err != nil {
-		log.Println("**** xml convertor: bytes decoded with error: %s", err.Error())
 		return nil, err
 	}
 
-	log.Println("**** xml convertor: start adding fields to obj=%+v", obj)
 	addFields(obj, rawMap(r))
-	log.Println("**** xml convertor: complete adding fields")
 
-	log.Println("*** end xml convertor")
 	return obj, nil
 }
 
