@@ -31,7 +31,9 @@ func Write(s *binding.Search, source chan records.IdxRecord, res *os.File, w io.
 			obj, recerr := s.FormatConvertor(r)
 			if recerr != nil {
 				log.Printf("%s: DATA RECORD OFFSET=%d CAN NOT BE CONVERTED WITH ERROR: %s", res.Name(), r.Offset, recerr.Error())
-				log.Printf("%s:!DATA RECORD OFFSET=%d: %+v", res.Name(), r.Offset, r.Data)
+				if r.Data != nil {
+					log.Printf("%s:!DATA RECORD OFFSET=%d: `%s`", res.Name(), r.Offset, string(r.Data))
+				}
 				continue
 			}
 
@@ -60,7 +62,9 @@ func Write(s *binding.Search, source chan records.IdxRecord, res *os.File, w io.
 			obj, recerr := s.FormatConvertor(r)
 			if recerr != nil {
 				log.Printf("%s: DATA RECORD OFFSET=%d CAN NOT BE CONVERTED WITH ERROR: %s", res.Name(), r.Offset, recerr.Error())
-				log.Printf("%s:!DATA RECORD OFFSET=%d: %+v", res.Name(), r.Offset, r.Data)
+				if r.Data != nil {
+					log.Printf("%s:!DATA RECORD OFFSET=%d: `%s`", res.Name(), r.Offset, string(r.Data))
+				}
 
 				continue
 			}
