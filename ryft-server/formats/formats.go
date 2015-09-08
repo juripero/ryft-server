@@ -58,11 +58,11 @@ func rawMap(r records.IdxRecord) map[string]interface{} {
 		"offset":    r.Offset,
 		"length":    r.Length,
 		"fuzziness": r.Fuzziness,
-		"base64":    r.Data,
 	}
 
 	return map[string]interface{}{
-		metaTag: index,
+		metaTag:  index,
+		"base64": r.Data,
 	}
 }
 
