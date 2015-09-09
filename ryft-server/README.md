@@ -339,10 +339,13 @@ http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&file
 
 ```
 
-# Parameters
-
-TODO
-
+# Parameters (TODO)
+* ``query``
+* ``files``
+* ``fuzziness``
+* ``cs``
+* ``format``
+* ``surrounding``
 
 # How to check error and success results?
 ```
@@ -361,10 +364,8 @@ http://192.168.56.103:8765/search/test-fail
 # Good requests for tests
 
 ```
-curl "http://ryft-emulator:8765/search?query=(RAW_TEXT%20CONTAINS%20%22bin%22)&files=jdk-8u45-linux-x64.tar.gzfuzziness=2&surrounding=10"
+curl "http://ryft-emulator:8765/search?query=(RAW_TEXT%20CONTAINS%20%22bin%22)&files=jdk-8u45-linux-x64.tar.gz&fuzziness=2&surrounding=10"
 ```
-
-
 
 # Links
  * http://base64-encoding.online-domain-tools.com/ --- online base64 encoder/decoder
