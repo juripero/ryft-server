@@ -1,9 +1,11 @@
 package formats
 
 import (
-	"github.com/getryft/ryft-rest-api/ryft-server/formats/universalxml"
+	"fmt"
+
 	"github.com/getryft/ryft-rest-api/ryft-server/records"
 )
+import "github.com/clbanning/x2j"
 
 const (
 	XMLFormat = "xml"
@@ -36,14 +38,18 @@ func Default() string {
 }
 
 func xml(r records.IdxRecord) (interface{}, error) {
-	obj, err := universalxml.DecodeBytes(r.Data)
+	obj, err := x2j.ByteDocToMap(r.Data, false)
 	if err != nil {
 		return nil, err
 	}
+	data, ok := obj["rec"]
+	if ok {
+		addFields(data.(map[string]interface{}), rawMap(r, true))
+		return data, nil
+	} else {
+		return nil, fmt.Errorf("Could not parse xml")
+	}
 
-	addFields(obj, rawMap(r))
-
-	return obj, nil
 }
 
 func addFields(m, from map[string]interface{}) {
@@ -52,20 +58,25 @@ func addFields(m, from map[string]interface{}) {
 	}
 }
 
-func rawMap(r records.IdxRecord) map[string]interface{} {
+func rawMap(r records.IdxRecord, isXml bool) map[string]interface{} {
 	var index = map[string]interface{}{
 		"file":      r.File,
 		"offset":    r.Offset,
 		"length":    r.Length,
 		"fuzziness": r.Fuzziness,
 	}
-
-	return map[string]interface{}{
-		metaTag:  index,
-		"base64": r.Data,
+	if isXml {
+		return map[string]interface{}{
+			metaTag: index,
+		}
+	} else {
+		return map[string]interface{}{
+			metaTag:  index,
+			"base64": r.Data,
+		}
 	}
 }
 
 func raw(r records.IdxRecord) (interface{}, error) {
-	return rawMap(r), nil
+	return rawMap(r, false), nil
 }
