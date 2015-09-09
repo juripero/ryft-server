@@ -7,7 +7,7 @@ import (
 
 // https://jan.newmarch.name/go/xml/chapter-xml.html
 
-func processToken(decoder *xml.Decoder) (obj interface{}, end bool, err error) {
+func processToken(decoder *xml.Decoder) (obj map[string]interface{}, end bool, err error) {
 	token, err := decoder.Token()
 
 	if err != nil {
@@ -49,6 +49,7 @@ func processToken(decoder *xml.Decoder) (obj interface{}, end bool, err error) {
 		for {
 			child, childEnd, childErr := processToken(decoder)
 			if childErr != nil {
+				err = childErr
 				return
 			}
 
@@ -80,7 +81,7 @@ func processToken(decoder *xml.Decoder) (obj interface{}, end bool, err error) {
 	return
 }
 
-func DecodeBytes(raw []byte) (obj interface{}, err error) {
+func DecodeBytes(raw []byte) (obj map[string]interface{}, err error) {
 	buff := bytes.NewBuffer(raw)
 	decoder := xml.NewDecoder(buff)
 	obj, _, err = processToken(decoder)

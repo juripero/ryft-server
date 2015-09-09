@@ -15,9 +15,8 @@ import (
 
 	"github.com/getryft/ryft-rest-api/ryft-server/binding"
 	"github.com/getryft/ryft-rest-api/ryft-server/crpoll"
-	"github.com/getryft/ryft-rest-api/ryft-server/jsonstream"
-	"github.com/getryft/ryft-rest-api/ryft-server/msgpkstream"
 	"github.com/getryft/ryft-rest-api/ryft-server/names"
+	"github.com/getryft/ryft-rest-api/ryft-server/outstream"
 	"github.com/getryft/ryft-rest-api/ryft-server/progress"
 	"github.com/getryft/ryft-rest-api/ryft-server/records"
 	"github.com/getryft/ryft-rest-api/ryft-server/srverr"
@@ -42,10 +41,20 @@ func readParameters() {
 func search(c *gin.Context) {
 	defer srverr.DeferRecover(c)
 
+	log.Printf("** start binding")
 	var s *binding.Search
 	var err error
 	if s, err = binding.NewSearch(c); err != nil {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	}
+
+	c.Header("Content-Type", gin.MIMEPlain)
+	if s.IsOutJson() {
+		c.Header("Content-Type", gin.MIMEPlain)
+	} else if s.IsOutMsgpk() {
+		c.Header("Content-Type", "application/x-msgpack")
+	} else {
+		panic(srverr.New(http.StatusBadRequest, "Supported formats (Content-Type): application/json, application/x-msgpack"))
 	}
 
 	n := names.New()
@@ -57,7 +66,6 @@ func search(c *gin.Context) {
 	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
-	log.Printf("%d: idx-file opened", n.Index)
 
 	defer func() {
 		if idx != nil {
@@ -71,7 +79,6 @@ func search(c *gin.Context) {
 	if res, err = crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
-	log.Printf("%d: res-file opened", n.Index)
 
 	defer func() {
 		if res != nil {
@@ -86,12 +93,7 @@ func search(c *gin.Context) {
 
 	c.Stream(func(w io.Writer) bool {
 		var err error
-		if s.Out == "json" {
-			err = jsonstream.Write(recs, res, w, drop)
-		} else if s.Out == "msgpk" {
-			err = msgpkstream.Write(recs, res, w, drop)
-		}
-
+		err = outstream.Write(s, recs, res, w, drop)
 		if err != nil {
 
 			idx.Close()
@@ -167,7 +169,6 @@ func main() {
 	})
 
 	r.GET("/search", func(c *gin.Context) {
-		c.Header("Content-Type", gin.MIMEPlain)
 		search(c)
 	})
 
