@@ -3,9 +3,9 @@ package formats
 import (
 	"fmt"
 
+	"github.com/clbanning/x2j"
 	"github.com/getryft/ryft-rest-api/ryft-server/records"
 )
-import "github.com/clbanning/x2j"
 
 const (
 	XMLFormat = "xml"
