@@ -23,7 +23,14 @@ type Search struct {
 	FormatConvertor func(r records.IdxRecord) (interface{}, error) // Source format parser (calculating from Format)
 	CaseSensitive   bool                                           // Case sensitive flag
 	out             string                                         // Output format in header (msgpack or json)
+	State	        int	                                          // Output State; for output array wrapper
 }
+
+const (
+	StateBegin 	= iota
+	StateBody	= iota
+	StateEnd		= iota	
+)
 
 const (
 	outJson  = "json"
@@ -64,6 +71,8 @@ const (
 
 func NewSearch(c *gin.Context) (*Search, error) {
 	s := new(Search)
+	s.State = StateBegin
+	
 	url := c.Request.URL.Query()
 
 	if c.Request.Header.Get("Content-Type") == "application/msgpack" ||

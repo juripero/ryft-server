@@ -4,10 +4,8 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -91,7 +89,19 @@ func search(c *gin.Context) {
 
 	recs, drop := records.Poll(idx, p)
 
-	c.Stream(func(w io.Writer) bool {
+	c.Stream(func(w io.Writer) bool {	
+	
+		switch s.State {
+			case binding.StateBegin:
+				log.Println("StateBegin") 
+				s.State = binding.StateBody
+			case binding.StateBody:
+				log.Println("StateBody")
+				s.State = binding.StateEnd 
+			case binding.StateEnd:
+				log.Println("StateEnd") 
+		}
+	
 		var err error
 		err = outstream.Write(s, recs, res, w, drop)
 		if err != nil {
@@ -111,80 +121,33 @@ func search(c *gin.Context) {
 	})
 }
 
-func testOk(c *gin.Context) {
-	defer srverr.DeferRecover(c)
 
-	c.Stream(func(w io.Writer) bool {
-
-		w.Write([]byte("["))
-		firstIteration := true
-		for i := 0; i <= 100; i++ {
-			if !firstIteration {
-				w.Write([]byte(","))
-			}
-
-			record := gin.H{"number": i}
-			bytes, err := json.Marshal(record)
-			if err != nil {
-				panic(srverr.New(http.StatusInternalServerError, err.Error()))
-			}
-
-			w.Write(bytes)
-
-			firstIteration = false
-		}
-
-		w.Write([]byte("]"))
-		return false
-	})
-}
 
 func main() {
+	log.SetFlags(log.Lmicroseconds)
 	readParameters()
 
 	r := gin.Default()
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
-	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
-	r.SetHTMLTemplate(indexTemplate)
 
-	r.GET("/", func(c *gin.Context) {
-		defer srverr.DeferRecover(c)
-		c.HTML(http.StatusOK, "index", nil)
-	})
+	r.GET("/search", search)
+	r.StaticFile("/", "./index.html");
 
-	r.GET("/search/test-ok", func(c *gin.Context) {
-		c.Header("Content-Type", gin.MIMEPlain)
-		testOk(c)
-	})
-
-	r.GET("/searchtest", func(c *gin.Context) {
-		c.Header("Content-Type", gin.MIMEPlain)
-		searchtest(c)
-	})
-
-	r.GET("/search/test-fail", func(c *gin.Context) {
-		defer srverr.DeferRecover(c)
-		panic(srverr.New(http.StatusInternalServerError, "Test error"))
-	})
-
-	r.GET("/search", func(c *gin.Context) {
-		search(c)
-	})
-
+	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
 		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
 
+	// Create folder for results cache
 	if err := os.MkdirAll(names.ResultsDirPath(), 0777); err != nil {
 		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
 
+	// Name Generator will produce unique file names for each new results files
 	names.StartNamesGenerator()
-	log.SetFlags(log.Lmicroseconds)
-
 	r.Run(fmt.Sprintf(":%d", names.Port))
 
 }
