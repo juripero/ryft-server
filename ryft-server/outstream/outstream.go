@@ -22,9 +22,6 @@ func Write(s *binding.Search, source chan records.IdxRecord, res *os.File, w io.
 		wEncoder := json.NewEncoder(w)
 		firstIteration := true
 		for r := range source {
-			if !firstIteration {
-				w.Write([]byte(","))
-			}
 
 			r.Data = datapoll.Next(res, r.Length)
 
@@ -36,6 +33,11 @@ func Write(s *binding.Search, source chan records.IdxRecord, res *os.File, w io.
 				}
 				continue
 			}
+
+			if !firstIteration {
+				w.Write([]byte(","))
+			}
+
 
 			if err = jsonEncode(wEncoder, obj, WriteInterval); err != nil {
 				log.Printf("%s: DATA ENCODED OFFSET=%d WITH ERROR: %s", res.Name(), r.Offset, err.Error())

@@ -183,7 +183,7 @@ func main() {
 	}
 
 	names.StartNamesGenerator()
-	log.SetFlags(log.Ltime)
+	log.SetFlags(log.Lmicroseconds)
 
 	r.Run(fmt.Sprintf(":%d", names.Port))
 
