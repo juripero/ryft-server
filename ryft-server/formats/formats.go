@@ -42,14 +42,15 @@ func xml(r records.IdxRecord) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, ok := obj["rec"]
-	if ok {
-		addFields(data.(map[string]interface{}), rawMap(r, true))
-		return data, nil
-	} else {
-		return nil, fmt.Errorf("Could not parse xml")
+	
+	for k := range obj{
+		data, ok := obj[k]
+		if ok {
+			addFields(data.(map[string]interface{}), rawMap(r, true))
+			return data, nil
+		} 
 	}
-
+	return nil, fmt.Errorf("Could not parse xml")
 }
 
 func addFields(m, from map[string]interface{}) {
