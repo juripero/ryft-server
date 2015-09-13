@@ -28,61 +28,51 @@
  * ============
  */
 
-package main
+package encoder
 
 import (
-	"flag"
+	"io"
 	"fmt"
-	"log"
-	"os"
-
-	"github.com/getryft/ryft-rest-api/ryft-server/names"
-	"github.com/gin-gonic/contrib/gzip"
-	"github.com/gin-gonic/gin"
+	"time"
 )
 
-var (
-	KeepResults = false
+const (
+	MIMEJSON = "application/json"
+	MIMEMSGPACKX = "application/x-msgpack"
+	MIMEMSGPACK = "application/msgpack"
+
+
+	WriteInterval = time.Second * 20
+
 )
 
-func readParameters() {
-	portPtr := flag.Int("port", 8765, "The port of the REST-server")
-	keepResultsPtr := flag.Bool("keep-results", false, "Keep results or delete after response")
+type Encoder interface {
+	Begin(w io.Writer) error
+	End(w io.Writer) error
+	Write(w io.Writer, itm interface{}) error
+}
 
-	flag.Parse()
+var hash map[string]Encoder
 
-	names.Port = *portPtr
-	KeepResults = *keepResultsPtr
+func init(){
+
+	hash = map[string]Encoder{
+		MIMEJSON: new(JsonEncoder),
+	}
+}
+
+func GetSupportedMimeTypes() []string {
+	return []string{MIMEJSON, MIMEMSGPACK, MIMEMSGPACKX}
 }
 
 
-func main() {
-	log.SetFlags(log.Lmicroseconds)
-	readParameters()
-
-	r := gin.Default()
-	r.Use(gzip.Gzip(gzip.DefaultCompression))
-
-
-	r.GET("/search", search)
-	r.StaticFile("/", "./index.html");
-
-	// Clean previously created folder
-	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
-		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
-		os.Exit(1)
+func GetByMimeType(mime string) (Encoder, error) {
+	switch mime{
+		case MIMEJSON:
+			return new(JsonEncoder), nil
+		case MIMEMSGPACKX, MIMEMSGPACK:
+			return new(MsgPackEncoder), nil
+		default:
+			return nil, fmt.Errorf("Unsupported mime type: %s", mime)
 	}
-
-	// Create folder for results cache
-	if err := os.MkdirAll(names.ResultsDirPath(), 0777); err != nil {
-		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
-		os.Exit(1)
-	}
-
-	// Name Generator will produce unique file names for each new results files
-	names.StartNamesGenerator()
-	r.Run(fmt.Sprintf(":%d", names.Port))
-
 }
-
-// https://golang.org/src/net/http/status.go -- statuses

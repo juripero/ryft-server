@@ -28,7 +28,57 @@
  * ============
  */
 
-package rol
+package encoder
 
-const q1 = `( record.city EQUALS "Rockville" ) AND ( record.state EQUALS "MD" )`
-const q2 = `( ( record.city EQUALS "Rockville" ) OR ( record.city EQUALS "Gaithersburg" ) ) AND ( record.state EQUALS "MD" )`
+import (
+	"io"
+	"fmt"
+	"time"
+	"encoding/json"
+)
+
+type JsonEncoder struct {
+	Encoder
+	needSeparator bool
+}
+
+
+
+
+func (enc *JsonEncoder) Begin(w io.Writer) error {
+	_, err := w.Write([]byte("["))
+	return err
+}
+
+func (enc *JsonEncoder) End(w io.Writer) error {
+	_, err := w.Write([]byte("]"))
+	return err
+}
+
+func (enc *JsonEncoder) Write(w io.Writer, itm interface{}) error {
+	if enc.needSeparator {
+		w.Write([]byte(","))
+		enc.needSeparator = false
+	}
+	wEncoder := json.NewEncoder(w)
+	err := jsonEncode(wEncoder, itm, WriteInterval)
+	if err == nil {
+		enc.needSeparator = true
+	}
+	return err
+}
+
+func jsonEncode(enc *json.Encoder, obj interface{}, timeout time.Duration) (err error) {
+	ch := make(chan error, 1)
+	go func() {
+		ch <- enc.Encode(obj)
+	}()
+
+	select {
+	case err = <-ch:
+		return
+	case <-time.After(timeout):
+		return fmt.Errorf("Json encoding timeout")
+	}
+}
+

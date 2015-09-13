@@ -28,61 +28,53 @@
  * ============
  */
 
-package main
+package encoder
 
 import (
-	"flag"
+	"io"
 	"fmt"
-	"log"
-	"os"
-
-	"github.com/getryft/ryft-rest-api/ryft-server/names"
-	"github.com/gin-gonic/contrib/gzip"
-	"github.com/gin-gonic/gin"
+	"time"
+	"github.com/ugorji/go/codec"
 )
 
-var (
-	KeepResults = false
-)
-
-func readParameters() {
-	portPtr := flag.Int("port", 8765, "The port of the REST-server")
-	keepResultsPtr := flag.Bool("keep-results", false, "Keep results or delete after response")
-
-	flag.Parse()
-
-	names.Port = *portPtr
-	KeepResults = *keepResultsPtr
+type MsgPackEncoder struct {
+	Encoder
+	needSeparator bool
 }
 
 
-func main() {
-	log.SetFlags(log.Lmicroseconds)
-	readParameters()
 
-	r := gin.Default()
-	r.Use(gzip.Gzip(gzip.DefaultCompression))
-
-
-	r.GET("/search", search)
-	r.StaticFile("/", "./index.html");
-
-	// Clean previously created folder
-	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
-		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
-		os.Exit(1)
-	}
-
-	// Create folder for results cache
-	if err := os.MkdirAll(names.ResultsDirPath(), 0777); err != nil {
-		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
-		os.Exit(1)
-	}
-
-	// Name Generator will produce unique file names for each new results files
-	names.StartNamesGenerator()
-	r.Run(fmt.Sprintf(":%d", names.Port))
-
+func (enc *MsgPackEncoder) Begin(w io.Writer) error {
+	_, err := w.Write([]byte("["))
+	return err
 }
 
-// https://golang.org/src/net/http/status.go -- statuses
+func (enc *MsgPackEncoder) End(w io.Writer) error {
+	_, err := w.Write([]byte("]"))
+	return err
+}
+
+func (enc *MsgPackEncoder) Write(w io.Writer, itm interface{}) error {
+
+	var mh codec.MsgpackHandle
+	wEncoder := codec.NewEncoder(w, &mh)
+	err := msgpkEncode(wEncoder, itm, WriteInterval)
+
+	return err
+}
+
+func msgpkEncode(enc *codec.Encoder, v interface{}, timeout time.Duration) (err error) {
+	ch := make(chan error, 1)
+	go func() {
+		ch <- enc.Encode(v)
+	}()
+
+	select {
+	case err = <-ch:
+		return
+	case <-time.After(timeout):
+		return fmt.Errorf("Msgpk encoding timeout")
+	}
+}
+
+
