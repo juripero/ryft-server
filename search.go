@@ -37,7 +37,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/getryft/rol"
+	"github.com/getryft/ryft-server/rol"
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/transcoder"
 	"github.com/getryft/ryft-server/crpoll"
