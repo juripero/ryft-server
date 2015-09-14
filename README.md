@@ -4,12 +4,12 @@
 1. See installation instructions for golang environment — https://golang.org/doc/install
 2. ``go get github.com/getryft/ryft-server``
 3. ``go install``
-4. Get ``ryft-server`` binary from ``$GOPATH/bin``
+4. Get ``ryft-rest-api`` binary from ``$GOPATH/bin``
 
 # Running & Command Line Parameters
 
 ```
-ryft-server -port=8765
+ryft-rest-api -port=8765
 ```
 Default value ``port`` is ``8765``
 # Packaging into deb file
@@ -21,7 +21,7 @@ https://github.com/getryft/ryft-server/blob/master/ryft-server-make-deb/README.m
 By default REST-server removes search results from ``/ryftone/RyftServer-PORT/``. But it behaviour may be prevented:
 
 ```
-ryft-server -keep-results
+ryft-rest-api -keep-results
 ```
 Please pay attention that REST-server removes ``/ryftone/RyftServer-PORT`` when it starts.
 
