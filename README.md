@@ -47,12 +47,12 @@ http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&file
 ```
 
 # Parameters (TODO)
-* ``query``
-* ``files``
-* ``fuzziness``
+* ``query`` is the string specifying the search criteria.
+* ``files``  is the input data set to be searched
+* ``fuzziness`` Specify the fuzzy search distance [0..255]
 * ``cs``
-* ``format``
-* ``surrounding``
+* ``format`` is the parameter for the structed search. Specify the search format.
+* ``surrounding`` width when generating results. For example, a value of 2 means that 2 + * characters before and after a search match will be included with data result
 
 
 # Good requests for tests
