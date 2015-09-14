@@ -45,13 +45,11 @@ type MsgPackEncoder struct {
 
 
 func (enc *MsgPackEncoder) Begin(w io.Writer) error {
-	_, err := w.Write([]byte("["))
-	return err
+	return nil
 }
 
 func (enc *MsgPackEncoder) End(w io.Writer) error {
-	_, err := w.Write([]byte("]"))
-	return err
+	return nil
 }
 
 func (enc *MsgPackEncoder) Write(w io.Writer, itm interface{}) error {

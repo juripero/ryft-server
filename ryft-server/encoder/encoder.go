@@ -41,24 +41,13 @@ const (
 	MIMEMSGPACKX = "application/x-msgpack"
 	MIMEMSGPACK = "application/msgpack"
 
-
 	WriteInterval = time.Second * 20
-
 )
 
 type Encoder interface {
 	Begin(w io.Writer) error
 	End(w io.Writer) error
 	Write(w io.Writer, itm interface{}) error
-}
-
-var hash map[string]Encoder
-
-func init(){
-
-	hash = map[string]Encoder{
-		MIMEJSON: new(JsonEncoder),
-	}
 }
 
 func GetSupportedMimeTypes() []string {

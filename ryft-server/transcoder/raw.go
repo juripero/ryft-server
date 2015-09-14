@@ -28,48 +28,35 @@
  * ============
  */
 
-package progress
+package transcoder
 
 import (
-	"log"
-	"net/http"
-
-	"github.com/getryft/ryft-rest-api/rol"
-	"github.com/getryft/ryft-rest-api/ryft-server/binding"
-	"github.com/getryft/ryft-rest-api/ryft-server/names"
-	"github.com/getryft/ryft-rest-api/ryft-server/srverr"
+	"github.com/getryft/ryft-rest-api/ryft-server/records"
 )
 
-func Progress(s *binding.Search, n names.Names) (ch chan error) {
-	ch = make(chan error, 1)
-	go func() {
-		ds := rol.RolDSCreate()
-		defer ds.Delete()
+type RawTranscoder struct {
+	Transcoder
+}
 
-		for _, f := range s.Files {
-			ok := ds.AddFile(f)
-			if !ok {
-				ch <- srverr.New(http.StatusNotFound, "Could not add file "+f)
-				return
+type RawData struct {
+	Index     Index  `json:"_index"`
+	Data      []byte `json:"data"`
+}
+
+func (transcoder *RawTranscoder) Transcode(recs chan records.IdxRecord) (chan interface{}, chan error){
+	output := make(chan interface{}, TranscodeBufferCapacity)
+	errors := make(chan error)
+
+	go func(){
+		defer close(output)
+		defer close(errors)
+		for rec := range recs {
+			output <- RawData{
+				Index{rec.File, rec.Offset, rec.Length, rec.Fuzziness},
+				rec.Data,
 			}
 		}
-
-		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
-		resultsDs := func() *rol.RolDS {
-			return ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
-		}()
-		log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
-		defer resultsDs.Delete()
-
-		if err := resultsDs.HasErrorOccured(); err != nil {
-			if !err.IsStrangeError() {
-				ch <- srverr.New(http.StatusInternalServerError, err.Error())
-				return
-			}
-		}
-
-		ch <- nil
-
 	}()
-	return
+
+	return output, errors
 }

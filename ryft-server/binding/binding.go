@@ -56,7 +56,7 @@ type Search struct {
 const (
 	StateBegin 	= iota
 	StateBody	= iota
-	StateEnd		= iota	
+	StateEnd		= iota
 )
 
 const (
@@ -99,7 +99,7 @@ const (
 func NewSearch(c *gin.Context) (*Search, error) {
 	s := new(Search)
 	s.State = StateBegin
-	
+
 	url := c.Request.URL.Query()
 
 	if c.Request.Header.Get("Content-Type") == "application/msgpack" ||

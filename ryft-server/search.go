@@ -35,9 +35,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/getryft/ryft-rest-api/rol"
 	"github.com/getryft/ryft-rest-api/ryft-server/encoder"
+	"github.com/getryft/ryft-rest-api/ryft-server/transcoder"
 	"github.com/getryft/ryft-rest-api/ryft-server/crpoll"
 	"github.com/getryft/ryft-rest-api/ryft-server/names"
 	"github.com/getryft/ryft-rest-api/ryft-server/records"
@@ -63,6 +65,10 @@ type SearchParams struct {
 	CaseSensitive   bool     `form:"cs"`                           // Case sensitive flag
 }
 
+func NewSearchParams() (p SearchParams) {
+	p.Format = transcoder.RAWTRANSCODER
+	return
+}
 
 func search(c *gin.Context) {
 	defer srverr.DeferRecover(c)
@@ -70,8 +76,28 @@ func search(c *gin.Context) {
 	var err error
 
 	// parse request parameters
-	var params SearchParams
+	params := NewSearchParams()
 	if err = c.Bind(&params); err != nil {
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	}
+
+	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
+	// default to JSON
+	if accept == "" {
+		accept = encoder.MIMEJSON
+	}
+
+	// setting up encoder to respond with requested format
+	var enc encoder.Encoder
+	if enc, err = encoder.GetByMimeType(accept); err != nil {
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	}
+	c.Header("Content-Type", accept)
+
+
+	// setting up transcoder to convert raw data
+	var tcode transcoder.Transcoder
+	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
@@ -109,56 +135,17 @@ func search(c *gin.Context) {
 	}
 	defer cleanup(res)
 
-	recs, drop := records.Poll(idx, p)
+	indexes, drop := records.Poll(idx, p)
+	recs 	:= dataPoll(indexes, res)
+	items, transcodeErrors := tcode.Transcode(recs)
+	go logErrors("Transcode Error: %s", transcodeErrors)
 
 	_ = drop
 
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = encoder.MIMEJSON
-	}
-	log.Printf("ACCEPT(%d): %s", n.Index, accept)
+	streamAllRecords(c, enc, items)
 
-	var enc encoder.Encoder
-	if enc, err = encoder.GetByMimeType(accept); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
-	}
 
-	c.Header("Content-Type", accept)
 
-	first := true
-
-	c.Stream(func(w io.Writer) bool {
-
-		if first {
-			enc.Begin(w)
-			first = false
-		}
-
-		if record, ok := <-recs; ok {
-			log.Printf("RECORD: %v", record)
-			if err := enc.Write(w, record); err != nil {
-				log.Panicln(err)
-			} else {
-				c.Writer.Flush()
-			}
-			return true
-		} else {
-			enc.End(w)
-			return false
-		}
-
-//		switch s.State {
-//			case binding.StateBegin:
-//				log.Println("StateBegin")
-//				s.State = binding.StateBody
-//			case binding.StateBody:
-//				log.Println("StateBody")
-//				s.State = binding.StateEnd
-//			case binding.StateEnd:
-//				log.Println("StateEnd")
-//		}
 //		err = outstream.Write(s, recs, res, w, drop)
 //		if err != nil {
 //			idx.Close()
@@ -173,8 +160,75 @@ func search(c *gin.Context) {
 //			}
 //		}
 //		return false
+//	})
+}
+
+func logErrors(format string,  errors chan error){
+	for err := range errors {
+		if err != nil {
+			log.Printf(format, err.Error())
+		}
+	}
+}
+
+func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}){
+	first := true
+	c.Stream(func(w io.Writer) bool {
+		if first {
+			enc.Begin(w)
+			first = false
+		}
+
+//		log.Printf("GET NEW RECORD")
+		if record, ok := <-recs; ok {
+//			log.Printf("RECORD: %+v", record)
+			if err := enc.Write(w, record); err != nil {
+				log.Panicln(err)
+			} else {
+				c.Writer.Flush()
+			}
+			return true
+		} else {
+			enc.End(w)
+//			log.Printf("ALL RECORDS COMPLETED")
+			return false
+		}
 	})
 }
+
+
+const (
+	PollingInterval = time.Millisecond * 50
+	PollBufferCapacity = 64
+)
+
+func dataPoll(input chan records.IdxRecord, dataFile *os.File) chan records.IdxRecord {
+	output := make(chan records.IdxRecord, PollBufferCapacity)
+	go func(){
+		for rec := range input {
+			rec.Data = nextData(dataFile, rec.Length)
+			output <- rec
+		}
+		close(output)
+	}()
+	return output
+}
+
+func nextData(res *os.File, length uint16) (result []byte) {
+	var total uint16 = 0
+	for total < length {
+		data := make([]byte, length-total)
+		n, _ := res.Read(data)
+		if n != 0 {
+			result = append(result, data...)
+			total = total + uint16(n)
+		} else {
+			time.Sleep(PollingInterval)
+		}
+	}
+	return
+}
+
 
 func progress(s *SearchParams, n names.Names) (ch chan error) {
 	ch = make(chan error, 1)
@@ -191,10 +245,10 @@ func progress(s *SearchParams, n names.Names) (ch chan error) {
 		}
 
 		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
-		resultsDs := func() *rol.RolDS {
-			return ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
-		}()
+
+		resultsDs := ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
 		log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
+
 		defer resultsDs.Delete()
 
 		if err := resultsDs.HasErrorOccured(); err != nil {

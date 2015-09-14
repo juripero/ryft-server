@@ -28,26 +28,47 @@
  * ============
  */
 
-package datapoll
+package transcoder
 
 import (
-	"os"
-	"time"
+	"fmt"
+	"github.com/getryft/ryft-rest-api/ryft-server/records"
+	"github.com/clbanning/x2j"
 )
 
-var PollingInterval = time.Millisecond * 50
+type XmlTranscoder struct {
+	Transcoder
+}
 
-func Next(res *os.File, length uint16) (result []byte) {
-	var total uint16 = 0
-	for total < length {
-		data := make([]byte, length-total)
-		n, _ := res.Read(data)
-		if n != 0 {
-			result = append(result, data...)
-			total = total + uint16(n)
-		} else {
-			time.Sleep(PollingInterval)
+
+func (transcoder *XmlTranscoder) Transcode(recs chan records.IdxRecord) (chan interface{}, chan error){
+	output := make(chan interface{}, TranscodeBufferCapacity)
+	errors := make(chan error)
+
+	go func(){
+		defer close(output)
+		defer close(errors)
+		for rec := range recs {
+//			log.Printf("PASRING XML: %s", rec.Data)
+			obj, err := x2j.ByteDocToMap(rec.Data, false)
+//			log.Printf("PASRING XML COMPLETE")
+			if err != nil {
+//				log.Printf("PASRING XML ERROR: %s", err.Error())
+				errors <- err
+				continue
+			}
+
+			for k := range obj {
+				item, ok := obj[k]
+				if ok {
+					item.(map[string]interface{})["_index"] = Index{rec.File, rec.Offset, rec.Length, rec.Fuzziness}
+					output <-item
+				} else {
+					errors <- fmt.Errorf("Can't parse as xml: %+v", rec)
+				}
+			}
 		}
-	}
-	return
+	}()
+
+	return output, errors
 }
