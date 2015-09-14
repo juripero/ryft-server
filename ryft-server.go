@@ -55,7 +55,6 @@ func readParameters() {
 	KeepResults = *keepResultsPtr
 }
 
-
 func main() {
 	log.SetFlags(log.Lmicroseconds)
 	readParameters()
@@ -63,9 +62,8 @@ func main() {
 	r := gin.Default()
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
-
 	r.GET("/search", search)
-	r.StaticFile("/", "./index.html");
+	r.StaticFile("/", "./index.html")
 
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
