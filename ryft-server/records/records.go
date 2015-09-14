@@ -115,7 +115,7 @@ func scan(f *os.File, drop chan struct{}, out chan IdxRecord) (err error) {
 }
 
 func sleep(
-	drop chan struct{}, s chan error,
+	drop chan struct{}, errors chan error,
 	timeout, dropped, complete func() bool,
 	completeWithError func(err error) bool,
 ) bool {
@@ -124,7 +124,7 @@ func sleep(
 		return timeout()
 	case <-drop:
 		return dropped()
-	case err := <-s:
+	case err := <-errors:
 		if err != nil {
 			return completeWithError(err)
 		} else {
@@ -133,7 +133,7 @@ func sleep(
 	}
 }
 
-func Poll(idx *os.File, s chan error) (records chan IdxRecord, drop chan struct{}) {
+func Poll(idx *os.File, errors chan error) (records chan IdxRecord, drop chan struct{}) {
 	records = make(chan IdxRecord, Capacity)
 	drop = make(chan struct{}, 1)
 	go func() {
@@ -146,7 +146,7 @@ func Poll(idx *os.File, s chan error) (records chan IdxRecord, drop chan struct{
 			}
 
 			loop = sleep(
-				drop, s,
+				drop, errors,
 
 				// Timeout
 				func() bool {

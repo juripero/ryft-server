@@ -94,7 +94,6 @@ func search(c *gin.Context) {
 	}
 	c.Header("Content-Type", accept)
 
-
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
 	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
@@ -104,21 +103,6 @@ func search(c *gin.Context) {
 	// get a new unique search index
 	n := names.New()
 	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
-
-//	log.Printf("** start binding")
-//	var s *binding.Search
-//	var err error
-//	if s, err = binding.NewSearch(c); err != nil {
-//		panic(srverr.New(http.StatusBadRequest, err.Error()))
-//	}
-//	c.Header("Content-Type", gin.MIMEPlain)
-//	if s.IsOutJson() {
-//		c.Header("Content-Type", gin.MIMEPlain)
-//	} else if s.IsOutMsgpk() {
-//		c.Header("Content-Type", "application/x-msgpack")
-//	} else {
-//		panic(srverr.New(http.StatusBadRequest, "Supported formats (Content-Type): application/json, application/x-msgpack"))
-//	}
 
 	p := progress(&params, n)
 
@@ -144,23 +128,6 @@ func search(c *gin.Context) {
 
 	streamAllRecords(c, enc, items)
 
-
-
-//		err = outstream.Write(s, recs, res, w, drop)
-//		if err != nil {
-//			idx.Close()
-//			idx = nil
-//			if !KeepResults {
-//				os.Remove(names.ResultsDirPath(n.IdxFile))
-//			}
-//			res.Close()
-//			res = nil
-//			if !KeepResults {
-//				os.Remove(names.ResultsDirPath(n.ResultFile))
-//			}
-//		}
-//		return false
-//	})
 }
 
 func logErrors(format string,  errors chan error){
@@ -179,7 +146,6 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 			first = false
 		}
 
-//		log.Printf("GET NEW RECORD")
 		if record, ok := <-recs; ok {
 //			log.Printf("RECORD: %+v", record)
 			if err := enc.Write(w, record); err != nil {
@@ -190,7 +156,6 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 			return true
 		} else {
 			enc.End(w)
-//			log.Printf("ALL RECORDS COMPLETED")
 			return false
 		}
 	})
