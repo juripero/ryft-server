@@ -1,17 +1,20 @@
 
-# How to build the REST-server?
+# Installing Dependencies & Building
 
 1. See installation instructions for golang environment — https://golang.org/doc/install
 2. ``go get github.com/getryft/ryft-server``
 3. ``go install``
 4. Get ``ryft-server`` binary from ``$GOPATH/bin``
 
-# How to run the REST-server?
+# Running & Command Line Parameters
 
 ```
 ryft-server -port=8765
 ```
 Default value ``port`` is ``8765``
+# Packaging into deb file
+
+https://github.com/getryft/ryft-server/blob/master/ryft-server-make-deb/README.md
 
 # Keeping search results
 
@@ -53,7 +56,7 @@ http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&file
 
 # How to check error and success results?
 ```
-http://192.168.56.103:8765/search/test-ok 
+http://192.168.56.103:8765/search/test-ok
 [{"number":0},{"number":1},{"number":2},...,{"number":98},{"number":99},{"number":100}]
 ```
 
@@ -73,3 +76,5 @@ curl "http://ryft-emulator:8765/search?query=(RAW_TEXT%20CONTAINS%20%22bin%22)&f
 
 # Links
  * http://base64-encoding.online-domain-tools.com/ --- online base64 encoder/decoder
+ * http://msgpack.org/ --- link to msgpack official
+ * https://github.com/ugorji/go --- link to msgpack library
