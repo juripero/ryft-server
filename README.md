@@ -54,19 +54,6 @@ http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&file
 * ``format``
 * ``surrounding``
 
-# How to check error and success results?
-```
-http://192.168.56.103:8765/search/test-ok
-[{"number":0},{"number":1},{"number":2},...,{"number":98},{"number":99},{"number":100}]
-```
-
-```
-http://192.168.56.103:8765/search/test-fail
-{
-    "message": "Test error",
-    "status": 500
-}
-```
 
 # Good requests for tests
 
