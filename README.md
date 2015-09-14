@@ -2,13 +2,9 @@
 # How to build the REST-server?
 
 1. See installation instructions for golang environment — https://golang.org/doc/install
-2. ``mkdir -pv $GOPATH/src/github.com/DataArt/``
-3. ``cd $GOPATH/src/github.com/DataArt/``
-4. ``git clone https://github.com/DataArt/ryft-rest-api.git``
-5. ``cd ryft-server-api``
-7. ``go get``
-8. ``go install``
-9. Get ``ryft-server`` binary from ``$GOPATH/bin``
+2. ``go get github.com/getryft/ryft-server``
+3. ``go install``
+4. Get ``ryft-server`` binary from ``$GOPATH/bin``
 
 # How to run the REST-server?
 
