@@ -7,7 +7,7 @@ Test Data Generator
 `logsgen.py` is a pyton test data generation utility. It can be used to produce test files of any size by given template. 
 It uses [faker](https://github.com/joke2k/faker) and [pystache](https://github.com/defunkt/pystache) libraries for tempaltes declaration and random data providers.
 
-** Usage
+### Usage
 Install Dependencies First:
 ```
 pip install fake-factory
@@ -29,6 +29,8 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 ```
+
+### Template Spec
 
 See [Mustache](http://mustache.github.io/mustache.5.html) spec for syntax details.
 
