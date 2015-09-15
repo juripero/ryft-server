@@ -1,0 +1,1 @@
+<log><name>{{name}}</name><time>{{date_time}}</time><source>{{phone_number}}</source><dest>{{phone_number}}</dest></log>
