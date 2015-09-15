@@ -36,6 +36,23 @@ optional arguments:
   -h, --help  show this help message and exit
 ```
 
+### Example
+```
+> ./logsgen.py templates/phonelog.csv 10
+
+Dr. Alby Cartwright;1978-08-28 14:15:02;271-998-5122;(156)720-8213
+Allan Farrell;1984-07-19 06:49:10;1-078-095-3947x072;438.628.8899x218
+Dr. Marlys Funk;1976-06-09 20:46:23;392-434-2681x00871;711-124-8754
+Gustie Price;2007-05-13 19:32:54;1-103-200-1590x305;958-508-8189x12195
+Aloma Hahn PhD;2009-06-17 10:59:58;1-811-982-6537;(200)272-4980x0093
+Arminta Koss;1972-11-23 12:18:02;315-849-9564x075;(531)547-9058x21757
+Alfreda Kris;1981-01-07 20:21:01;(659)328-2180;008-663-6149x3732
+Dane Dooley;1975-07-08 06:56:45;966.314.6483x9934;06621789371
+Dr. Corliss Casper PhD;1998-06-28 21:42:18;124.876.3629x85634;05263928513
+Pernell Christiansen;1978-05-11 18:51:39;121.003.8007x4998;1-265-816-4035x952
+
+```
+
 ### Template Spec
 
 See [Mustache](http://mustache.github.io/mustache.5.html) spec for syntax details.
