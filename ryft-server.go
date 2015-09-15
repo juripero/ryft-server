@@ -33,10 +33,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html/template"
 	"log"
+	"net/http"
 	"os"
 
-	"github.com/getryft/ryft-server/names"
+	"github.com/getryft/ryft-rest-api/names"
+
 	"github.com/gin-gonic/contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
@@ -62,8 +65,12 @@ func main() {
 	r := gin.Default()
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
+	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
+	r.SetHTMLTemplate(indexTemplate)
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index", nil)
+	})
 	r.GET("/search", search)
-	r.StaticFile("/", "./index.html")
 
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {

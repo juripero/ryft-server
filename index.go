@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+package main
+
+const IndexHTML = `
 <html>
     <head>
         <title>index</title>
@@ -23,3 +25,4 @@
 
     </body>
 </html>
+`
