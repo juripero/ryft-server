@@ -1,6 +1,7 @@
 package main
 
 const IndexHTML = `
+<!DOCTYPE html>
 <html>
     <head>
         <title>index</title>
