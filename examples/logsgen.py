@@ -5,6 +5,7 @@ from faker import Faker
 import pystache
 import argparse
 import sys
+from codecs import decode
 
 
 fake = Faker()
@@ -28,6 +29,6 @@ if __name__ == '__main__':
 		sys.stderr.write("Error: count parameter should be a positive number.")
 		sys.exit(1)
 
-	parsed = pystache.parse(args.template.read().decode('utf8'))
+	parsed = pystache.parse(decode(args.template.read(), 'utf8'))
 	for x in xrange(0, args.count):
 		args.output.write(pystache.render(parsed, FakerThing()))
