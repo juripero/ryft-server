@@ -10,13 +10,19 @@ It uses [faker](https://github.com/joke2k/faker) and [pystache](https://github.c
 ### Usage
 Install Dependencies First:
 ```
-pip install fake-factory
-pip install pystache
+# python 3
+[sudo] pip3 install fake-factory
+[sudo] pip3 install pystache
+
+# python 2
+[sudo] pip install fake-factory
+[sudo] pip install pystache
+
 ```
 
 Then see command line arguments: 
 ```
->python logsgen.py -h
+>python3 logsgen.py -h
 usage: logsgen.py [-h] template count [output]
 
 Generate log files per template.
