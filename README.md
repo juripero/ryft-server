@@ -9,7 +9,7 @@
 # Running & Command Line Parameters
 
 ```
-ryft-rest-api -port=8765
+ryft-server -port=8765
 ```
 Default value ``port`` is ``8765``
 # Packaging into deb file
@@ -21,7 +21,7 @@ https://github.com/getryft/ryft-server/blob/master/ryft-server-make-deb/README.m
 By default REST-server removes search results from ``/ryftone/RyftServer-PORT/``. But it behaviour may be prevented:
 
 ```
-ryft-rest-api -keep-results
+ryft-server -keep-results
 ```
 Please pay attention that REST-server removes ``/ryftone/RyftServer-PORT`` when it starts.
 
