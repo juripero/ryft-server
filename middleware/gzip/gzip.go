@@ -1,5 +1,9 @@
 package gzip
 
+/*
+* Copied from https://github.com/gin-gonic/contrib/tree/master/gzip to fix issue with gziping String data
+ */
+
 import (
 	"compress/gzip"
 	"net/http"
@@ -42,6 +46,7 @@ type gzipWriter struct {
 	writer *gzip.Writer
 }
 
+//added this function to fix issue with gziping String data
 func (g *gzipWriter) WriteString(s string) (n int, err error) {
 	return g.writer.Write([]byte(s))
 }
