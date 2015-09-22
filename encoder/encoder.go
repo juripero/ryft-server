@@ -31,15 +31,15 @@
 package encoder
 
 import (
-	"io"
 	"fmt"
+	"io"
 	"time"
 )
 
 const (
-	MIMEJSON = "application/json"
+	MIMEJSON     = "application/json"
 	MIMEMSGPACKX = "application/x-msgpack"
-	MIMEMSGPACK = "application/msgpack"
+	MIMEMSGPACK  = "application/msgpack"
 
 	WriteInterval = time.Second * 20
 )
@@ -54,14 +54,13 @@ func GetSupportedMimeTypes() []string {
 	return []string{MIMEJSON, MIMEMSGPACK, MIMEMSGPACKX}
 }
 
-
 func GetByMimeType(mime string) (Encoder, error) {
-	switch mime{
-		case MIMEJSON:
-			return new(JsonEncoder), nil
-		case MIMEMSGPACKX, MIMEMSGPACK:
-			return new(MsgPackEncoder), nil
-		default:
-			return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+	switch mime {
+	case MIMEJSON:
+		return new(JsonEncoder), nil
+	case MIMEMSGPACKX, MIMEMSGPACK:
+		return new(MsgPackEncoder), nil
+	default:
+		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
 	}
 }

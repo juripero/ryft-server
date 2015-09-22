@@ -37,13 +37,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/getryft/ryft-server/rol"
-	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/transcoder"
 	"github.com/getryft/ryft-server/crpoll"
+	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/records"
+	"github.com/getryft/ryft-server/rol"
 	"github.com/getryft/ryft-server/srverr"
+	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
 )
 
@@ -57,12 +57,12 @@ func cleanup(file *os.File) {
 }
 
 type SearchParams struct {
-	Query           string   `form:"query" binding:"required"`     // Search query, for example: ( RAW_TEXT CONTAINS "night" )
-	Files           []string `form:"files" binding:"required"`     // Source files
-	Surrounding     uint16   `form:"surrounding"`                  // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-	Fuzziness       uint8    `form:"fuzziness"`                    // Is the fuzziness of the search. Measured as the maximum Hamming distance.
-	Format          string   `form:"format"`                       // Source format parser name
-	CaseSensitive   bool     `form:"cs"`                           // Case sensitive flag
+	Query         string   `form:"query" binding:"required"` // Search query, for example: ( RAW_TEXT CONTAINS "night" )
+	Files         []string `form:"files" binding:"required"` // Source files
+	Surrounding   uint16   `form:"surrounding"`              // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
+	Fuzziness     uint8    `form:"fuzziness"`                // Is the fuzziness of the search. Measured as the maximum Hamming distance.
+	Format        string   `form:"format"`                   // Source format parser name
+	CaseSensitive bool     `form:"cs"`                       // Case sensitive flag
 }
 
 func NewSearchParams() (p SearchParams) {
@@ -120,7 +120,7 @@ func search(c *gin.Context) {
 	defer cleanup(res)
 
 	indexes, drop := records.Poll(idx, p)
-	recs 	:= dataPoll(indexes, res)
+	recs := dataPoll(indexes, res)
 	items, transcodeErrors := tcode.Transcode(recs)
 	go logErrors("Transcode Error: %s", transcodeErrors)
 
@@ -130,7 +130,7 @@ func search(c *gin.Context) {
 
 }
 
-func logErrors(format string,  errors chan error){
+func logErrors(format string, errors chan error) {
 	for err := range errors {
 		if err != nil {
 			log.Printf(format, err.Error())
@@ -138,7 +138,7 @@ func logErrors(format string,  errors chan error){
 	}
 }
 
-func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}){
+func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}) {
 	first := true
 	c.Stream(func(w io.Writer) bool {
 		if first {
@@ -147,7 +147,7 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 		}
 
 		if record, ok := <-recs; ok {
-//			log.Printf("RECORD: %+v", record)
+			// log.Printf("RECORD: %+v", record)
 			if err := enc.Write(w, record); err != nil {
 				log.Panicln(err)
 			} else {
@@ -161,15 +161,14 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 	})
 }
 
-
 const (
-	PollingInterval = time.Millisecond * 50
+	PollingInterval    = time.Millisecond * 50
 	PollBufferCapacity = 64
 )
 
 func dataPoll(input chan records.IdxRecord, dataFile *os.File) chan records.IdxRecord {
 	output := make(chan records.IdxRecord, PollBufferCapacity)
-	go func(){
+	go func() {
 		for rec := range input {
 			rec.Data = nextData(dataFile, rec.Length)
 			output <- rec
@@ -193,7 +192,6 @@ func nextData(res *os.File, length uint16) (result []byte) {
 	}
 	return
 }
-
 
 func progress(s *SearchParams, n names.Names) (ch chan error) {
 	ch = make(chan error, 1)

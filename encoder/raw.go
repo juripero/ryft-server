@@ -31,19 +31,16 @@
 package encoder
 
 import (
-	"io"
-	"fmt"
-	"time"
 	"encoding/json"
+	"fmt"
+	"io"
+	"time"
 )
 
 type JsonEncoder struct {
 	Encoder
 	needSeparator bool
 }
-
-
-
 
 func (enc *JsonEncoder) Begin(w io.Writer) error {
 	_, err := w.Write([]byte("["))
@@ -81,4 +78,3 @@ func jsonEncode(enc *json.Encoder, obj interface{}, timeout time.Duration) (err 
 		return fmt.Errorf("Json encoding timeout")
 	}
 }
-

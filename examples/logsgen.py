@@ -5,8 +5,11 @@ from faker import Faker
 import pystache
 import argparse
 import sys
-from codecs import  decode
 
+try:
+    xrange
+except NameError:
+    xrange = range
 
 fake = Faker()
 
@@ -18,9 +21,9 @@ if __name__ == '__main__':
 	# execute_from_command_line()
 
 	parser = argparse.ArgumentParser(description='Generate log files per template.')
-	parser.add_argument('template', metavar='template', type=argparse.FileType('r'), help='template file, use - for <stdin>')
+	parser.add_argument('template', metavar='template', type=argparse.FileType('rt'), help='template file, use - for <stdin>')
 	parser.add_argument('count', metavar='count', type=int, help='number of records to generate')
-	parser.add_argument('output', metavar='output', type=argparse.FileType('w'), nargs='?', help='result output file, use - for <stdout> (default)')
+	parser.add_argument('output', metavar='output', type=argparse.FileType('wt'), nargs='?', help='result output file, use - for <stdout> (default)')
 	parser.set_defaults(output='-')
 
 	args = parser.parse_args()
@@ -29,6 +32,13 @@ if __name__ == '__main__':
 		sys.stderr.write("Error: count parameter should be a positive number.")
 		sys.exit(1)
 
-	parsed = pystache.parse(decode(args.template.read(), 'utf8'))
+	template = args.template.read()
+	
+	try:
+		template = template.decode('utf-8')
+	except NameError:
+		pass
+
+	parsed = pystache.parse(template)
 	for x in xrange(0, args.count):
 		args.output.write(pystache.render(parsed, FakerThing()))
