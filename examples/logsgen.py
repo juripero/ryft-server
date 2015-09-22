@@ -5,7 +5,7 @@ from faker import Faker
 import pystache
 import argparse
 import sys
-from codecs import decode
+from codecs import  decode
 
 
 fake = Faker()
