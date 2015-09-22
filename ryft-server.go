@@ -40,13 +40,18 @@ import (
 
 	"github.com/getryft/ryft-server/names"
 
-	"github.com/gin-gonic/contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
 var (
 	KeepResults = false
 )
+
+var secrets = gin.H{
+	"foo":    gin.H{"email": "foo@bar.com", "phone": "123433"},
+	"austin": gin.H{"email": "austin@example.com", "phone": "666"},
+	"lena":   gin.H{"email": "lena@guapa.com", "phone": "523443"},
+}
 
 func readParameters() {
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
@@ -63,14 +68,36 @@ func main() {
 	readParameters()
 
 	r := gin.Default()
+
+	//User credentials examples
+	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
+		"eugene": "123",
+		"admin":  "admin",
+	}))
+
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
+
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index", nil)
 	})
+
 	r.GET("/search", search)
+
+	// /login endpoint
+	// hit "localhost:PORT/login
+	authorized.GET("/login", func(c *gin.Context) {
+		// get user, it was setted by the BasicAuth middleware
+		_ = c.MustGet(gin.AuthUserKey).(string)
+		c.HTML(http.StatusOK, "index", nil)
+
+	})
+	//
+	authorized.GET("/login/search", func(c *gin.Context) {
+		_ = c.MustGet(gin.AuthUserKey).(string)
+	}, search)
 
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
