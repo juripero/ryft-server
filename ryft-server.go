@@ -38,7 +38,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/getryft/ryft-rest-api/names"
+	"github.com/getryft/ryft-server/names"
 
 	"github.com/gin-gonic/contrib/gzip"
 	"github.com/gin-gonic/gin"
