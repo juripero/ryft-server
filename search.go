@@ -78,7 +78,7 @@ func search(c *gin.Context) {
 	// parse request parameters
 	params := NewSearchParams()
 	if err = c.Bind(&params); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+		// panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
 	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
@@ -97,7 +97,7 @@ func search(c *gin.Context) {
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
 	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+		// panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
 	// get a new unique search index
@@ -121,8 +121,8 @@ func search(c *gin.Context) {
 
 	indexes, drop := records.Poll(idx, p)
 	recs := dataPoll(indexes, res)
-	items, transcodeErrors := tcode.Transcode(recs)
-	go logErrors("Transcode Error: %s", transcodeErrors)
+	items, _ := tcode.Transcode(recs)
+	// go logErrors("Transcode Error: %s", transcodeErrors)
 
 	_ = drop
 

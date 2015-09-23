@@ -46,22 +46,24 @@ import (
 
 var (
 	KeepResults = false
+	AuthVar     = authNone
 )
 
-var secrets = gin.H{
-	"foo":    gin.H{"email": "foo@bar.com", "phone": "123433"},
-	"austin": gin.H{"email": "austin@example.com", "phone": "666"},
-	"lena":   gin.H{"email": "lena@guapa.com", "phone": "523443"},
-}
+const (
+	authNone        = "none"
+	authBasicSystem = "basic-system"
+	authBasicFile   = "basic-file"
+)
 
 func readParameters() {
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
 	keepResultsPtr := flag.Bool("keep-results", false, "Keep results or delete after response")
-
+	authVar := flag.String("auth", "nan", "Endable or Disable BasicAuth")
 	flag.Parse()
 
 	names.Port = *portPtr
 	KeepResults = *keepResultsPtr
+	AuthVar = *authVar
 }
 
 func main() {
@@ -71,34 +73,42 @@ func main() {
 	r := gin.Default()
 
 	//User credentials examples
-	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-		"eugene": "123",
-		"admin":  "admin",
-	}))
 
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
 
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index", nil)
-	})
+	switch AuthVar {
+	case authNone:
+		r.GET("/", func(c *gin.Context) {
+			c.HTML(http.StatusOK, "index", nil)
+		})
 
-	r.GET("/search", search)
+		r.GET("/search", search)
+		break
+	case authBasicFile:
+		break
+	case authBasicSystem:
+		authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
+			"eugene": "123",
+			"admin":  "admin",
+		}))
+		// /login endpoint
+		// hit "localhost:PORT/login
+		authorized.GET("/", func(c *gin.Context) {
+			// get user, it was setted by the BasicAuth middleware
+			_ = c.MustGet(gin.AuthUserKey).(string)
+			c.HTML(http.StatusOK, "index", nil)
 
-	// /login endpoint
-	// hit "localhost:PORT/login
-	authorized.GET("/login", func(c *gin.Context) {
-		// get user, it was setted by the BasicAuth middleware
-		_ = c.MustGet(gin.AuthUserKey).(string)
-		c.HTML(http.StatusOK, "index", nil)
+		})
+		//
+		authorized.GET("/search", func(c *gin.Context) {
+			_ = c.MustGet(gin.AuthUserKey).(string)
+		}, search)
+		break
 
-	})
-	//
-	authorized.GET("/login/search", func(c *gin.Context) {
-		_ = c.MustGet(gin.AuthUserKey).(string)
-	}, search)
+	}
 
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
