@@ -36,7 +36,7 @@ if __name__ == '__main__':
 	
 	try:
 		template = template.decode('utf-8')
-	except NameError:
+	except AttributeError:
 		pass
 
 	parsed = pystache.parse(template)
