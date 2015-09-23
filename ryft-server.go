@@ -58,7 +58,7 @@ const (
 func readParameters() {
 	portPtr := flag.Int("port", 8765, "The port of the REST-server")
 	keepResultsPtr := flag.Bool("keep-results", false, "Keep results or delete after response")
-	authVar := flag.String("auth", "nan", "Endable or Disable BasicAuth")
+	authVar := flag.String("auth", "none", "Endable or Disable BasicAuth (can be \"none\" \"base-system\" \"base-file\")")
 	flag.Parse()
 
 	names.Port = *portPtr
