@@ -38,6 +38,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
 
@@ -45,29 +46,42 @@ import (
 )
 
 var (
-	KeepResults = false
-	AuthVar     = authNone
+	//KeepResults - Flag that enables/disables log saving
+	KeepResults                   bool
+	authType, fileName, groupName string
+	portPtr                       int
 )
 
 const (
-	authNone        = "none"
+	none            = "none"
 	authBasicSystem = "basic-system"
 	authBasicFile   = "basic-file"
 )
 
 func readParameters() {
-	portPtr := flag.Int("port", 8765, "The port of the REST-server")
-	keepResultsPtr := flag.Bool("keep-results", false, "Keep results or delete after response")
-	authVar := flag.String("auth", "none", "Endable or Disable BasicAuth (can be \"none\" \"base-system\" \"base-file\")")
+	//Port number
+	flag.IntVar(&portPtr, "port", 8765, "The port of the REST-server")
+	flag.IntVar(&portPtr, "p", 8765, "The port of the REST-server (shorthand)")
+	//keep-results
+	flag.BoolVar(&KeepResults, "keep-results", false, "Keep results or delete after response")
+	flag.BoolVar(&KeepResults, "k", false, "Keep results or delete after response (shorthand)")
+	//Auth type
+	flag.StringVar(&authType, "auth", none, "Endable or Disable BasicAuth (can be \"none\" \"basic-system -g *usergroup*\" \"basic-file -f *filename*\")")
+	flag.StringVar(&authType, "a", none, "Endable or Disable BasicAuth (can be \"none\" \"basic-system -g *usergroup*\" \"basic-file -f *filename*\") (shorthand)")
+	//Users group
+	flag.StringVar(&groupName, "users-group", "", "Add user group for the \"basic-system\" ")
+	flag.StringVar(&groupName, "g", "", "Add user group for the \"basic-system\" (shorthand)")
+	//Users file
+	flag.StringVar(&fileName, "users-file", "", "Add user file for the \"basic-file\")")
+	flag.StringVar(&fileName, "f", "", "Add user file for the \"basic-file\") (shorthand)")
+
 	flag.Parse()
 
-	names.Port = *portPtr
-	KeepResults = *keepResultsPtr
-	AuthVar = *authVar
 }
 
 func main() {
 	log.SetFlags(log.Lmicroseconds)
+
 	readParameters()
 
 	r := gin.Default()
@@ -79,36 +93,33 @@ func main() {
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
 
-	switch AuthVar {
-	case authNone:
-		r.GET("/", func(c *gin.Context) {
-			c.HTML(http.StatusOK, "index", nil)
-		})
-
-		r.GET("/search", search)
-		break
+	switch authType {
 	case authBasicFile:
+		if fileName == "" {
+			log.Printf("File parameter users-file is required when using basic-file authentication.")
+			os.Exit(1)
+		}
+		auth, err := auth.AuthBasicFile(fileName)
+		if err != nil {
+			log.Printf("Error reading users-file %v", err)
+			os.Exit(1)
+		}
+		r.Use(auth)
 		break
 	case authBasicSystem:
-		authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-			"eugene": "123",
-			"admin":  "admin",
-		}))
-		// /login endpoint
-		// hit "localhost:PORT/login
-		authorized.GET("/", func(c *gin.Context) {
-			// get user, it was setted by the BasicAuth middleware
-			_ = c.MustGet(gin.AuthUserKey).(string)
-			c.HTML(http.StatusOK, "index", nil)
-
-		})
-		//
-		authorized.GET("/search", func(c *gin.Context) {
-			_ = c.MustGet(gin.AuthUserKey).(string)
-		}, search)
+		if groupName == "" {
+			log.Printf("Group parameter users-group is required when using basic-system authentication.")
+			os.Exit(1)
+		}
 		break
 
 	}
+
+	//Setting routes
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index", nil)
+	})
+	r.GET("/search", search)
 
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
