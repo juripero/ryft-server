@@ -31,12 +31,14 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/gzip"
@@ -50,6 +52,7 @@ var (
 	KeepResults                   bool
 	authType, fileName, groupName string
 	portPtr                       int
+	flagArgs                      []string
 )
 
 const (
@@ -76,7 +79,7 @@ func readParameters() {
 	flag.StringVar(&fileName, "f", "", "Add user file for the \"basic-file\") (shorthand)")
 
 	flag.Parse()
-
+	flagArgs = flag.Args()
 }
 
 func main() {
@@ -87,8 +90,6 @@ func main() {
 	r := gin.Default()
 
 	//User credentials examples
-
-	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
@@ -107,14 +108,20 @@ func main() {
 		r.Use(auth)
 		break
 	case authBasicSystem:
-		if groupName == "" {
-			log.Printf("Group parameter users-group is required when using basic-system authentication.")
+		settings, err := parseParams(flagArgs)
+		if err != nil {
+			log.Printf(err.Error())
 			os.Exit(1)
+		} else {
+
+			r.Use(auth.BasicAuthLDAP(settings))
 		}
+
 		break
 
 	}
 
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 	//Setting routes
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index", nil)
@@ -137,6 +144,38 @@ func main() {
 	names.StartNamesGenerator()
 	r.Run(fmt.Sprintf(":%d", names.Port))
 
+}
+func parseParams(flagArgs []string) (auth.Settings, error) {
+	var settings auth.Settings
+	var url, port, userPrefix, userPostfix string
+	for _, s := range flagArgs {
+		if strings.Contains(s, "url=") {
+			fmt.Println(s + "\n")
+			url = strings.Replace(s, "url=", "", 1)
+		} else if strings.Contains(s, "usr=") {
+			userPostfix = "1"
+			userPrefix = "1"
+			fmt.Println(s + "\n")
+		} else if strings.Contains(s, "port=") {
+			port = strings.Replace(s, "port=", "", 1)
+			fmt.Println(s + "\n")
+		}
+	}
+	if url != "" && port != "" && userPrefix != "" && userPostfix != "" {
+		settings = auth.Settings{
+			port,
+			url,
+			auth.UserDN{
+				userPrefix,
+				userPostfix,
+			},
+		}
+		fmt.Println("noerror")
+		return settings, nil
+	} else {
+		fmt.Println("error")
+		return settings, errors.New("Invalid parameters")
+	}
 }
 
 // https://golang.org/src/net/http/status.go -- statuses
