@@ -9,7 +9,29 @@
 # Running & Command Line Parameters
 
 ```
-ryft-server -port=8765
+usage: ryft-server [<flags>] [<address>]
+
+Flags:
+  --help           Show context-sensitive help (also try --help-long and --help-man).
+  -k, --keep       Keep search results temporary files.
+  -d, --debug      Run http server in debug mode.
+  -a, --auth=AUTH  Authentication type: none, file, ldap.
+  --users-file=USERS-FILE
+                   File with user credentials. Required for --auth=file.
+  --ldap-server=LDAP-SERVER
+                   LDAP Server address:port. Required for --auth=ldap.
+  --ldap-user=LDAP-USER
+                   LDAP username for binding. Required for --auth=ldap.
+  --ldap-pass=LDAP-PASS
+                   LDAP password for binding. Required for --auth=ldap.
+  --ldap-query="(&(uid=%s))"
+                   LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.
+  --ldap-basedn=LDAP-BASEDN
+                   LDAP BaseDN for lookups.'. Required for --auth=ldap.
+
+Args:
+  [<address>]  Address:port to listen on. Default is 0.0.0.0:8765.
+
 ```
 Default value ``port`` is ``8765``
 # Packaging into deb file

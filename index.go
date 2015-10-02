@@ -18,11 +18,11 @@ const IndexHTML = `
 
 <h2>Examples</h2>
 <h3>Not structed request example</h3>
-<p><a href="http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0">
-    http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0</a ></p>
+<p><a href="/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0">
+  /search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0</a ></p>
 <h3>Structed request example</h3>
-<p><a href="http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml">
-  http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml</a ></p>
+<p><a href="/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml">
+  /search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml</a ></p>
 
     </body>
 </html>

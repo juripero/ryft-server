@@ -31,84 +31,126 @@
 package main
 
 import (
-	"flag"
-	"fmt"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
 
 	"github.com/gin-gonic/gin"
 )
 
+
 var (
-	KeepResults = false
-	AuthVar     = authNone
+	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
+	debug = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
+
+	authType = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
+	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
+
+	authLdapServer = kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").TCP()
+	authLdapUser = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
+	authLdapPass = kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").String()
+	authLdapQuery = kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").Default("(&(uid=%s))").String()
+	authLdapBase = kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups.'. Required for --auth=ldap.").String()
+
+	listenAddress = kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").TCP()
 )
 
-const (
-	authNone        = "none"
-	authBasicSystem = "basic-system"
-	authBasicFile   = "basic-file"
-)
-
-func readParameters() {
-	portPtr := flag.Int("port", 8765, "The port of the REST-server")
-	keepResultsPtr := flag.Bool("keep-results", false, "Keep results or delete after response")
-	authVar := flag.String("auth", "none", "Endable or Disable BasicAuth (can be \"none\" \"base-system\" \"base-file\")")
-	flag.Parse()
-
-	names.Port = *portPtr
-	KeepResults = *keepResultsPtr
-	AuthVar = *authVar
+func ensureDefault(flag *string, message string){
+	if *flag == "" {
+			kingpin.FatalUsage(message)
+		}
 }
+
+func parseParams(){
+	kingpin.Parse()
+
+	// check extra dependencies logic not handled by kingpin
+	switch *authType {
+	case "file":
+		ensureDefault(authUsersFile, "users-file is required for file authentication.")
+		break
+	case "ldap":
+		if (*authLdapServer) == nil {
+			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
+		}
+		if (*authLdapServer).IP == nil {
+			kingpin.FatalUsage("ldap-server requires addresse name part, not only port.")
+		}
+
+		ensureDefault(authLdapUser, "ldap-user is required for ldap authentication.")
+		ensureDefault(authLdapPass, "ldap-pass is required for ldap authentication.")
+		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
+
+		break
+
+	}
+}
+
+//func readParameters() {
+	//Port number
+//	flag.IntVar(&portPtr, "port", 8765, "The http port to listen on")
+//	flag.IntVar(&portPtr, "p", 8765, "The http port to listen on (shorthand)")
+//	//keep-results
+//	flag.BoolVar(&KeepResults, "keep-results", false, "Keep results or delete after response")
+//	flag.BoolVar(&KeepResults, "k", false, "Keep results or delete after response (shorthand)")
+//	//Auth type
+//	flag.StringVar(&authType, "auth", none, "Endable or Disable BasicAuth (can be \"none\" \"basic-system -g *usergroup*\" \"basic-file -f *filename*\")")
+//	flag.StringVar(&authType, "a", none, "Endable or Disable BasicAuth (can be \"none\" \"basic-system -g *usergroup*\" \"basic-file -f *filename*\") (shorthand)")
+//	//Users group
+//	flag.StringVar(&groupName, "users-group", "", "Add user group for the \"basic-system\" ")
+//	flag.StringVar(&groupName, "g", "", "Add user group for the \"basic-system\" (shorthand)")
+//	//Users file
+//	flag.StringVar(&fileName, "users-file", "", "Add user file for the \"basic-file\")")
+//	flag.StringVar(&fileName, "f", "", "Add user file for the \"basic-file\") (shorthand)")
+
+//	flag.Parse()
+//	flagArgs = flag.Args()
+//}
 
 func main() {
 	log.SetFlags(log.Lmicroseconds)
-	readParameters()
+	parseParams()
+	if !*debug {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	r := gin.Default()
 
-	//User credentials examples
 
-	r.Use(gzip.Gzip(gzip.DefaultCompression))
+	//User credentials examples
 
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
 
-	switch AuthVar {
-	case authNone:
-		r.GET("/", func(c *gin.Context) {
-			c.HTML(http.StatusOK, "index", nil)
-		})
+	switch *authType {
+	case "file":
 
-		r.GET("/search", search)
+		auth, err := auth.AuthBasicFile(*authUsersFile)
+		if err != nil {
+			log.Printf("Error reading users file: %v", err)
+			os.Exit(1)
+		}
+		r.Use(auth)
 		break
-	case authBasicFile:
-		break
-	case authBasicSystem:
-		authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-			"eugene": "123",
-			"admin":  "admin",
-		}))
-		// /login endpoint
-		// hit "localhost:PORT/login
-		authorized.GET("/", func(c *gin.Context) {
-			// get user, it was setted by the BasicAuth middleware
-			_ = c.MustGet(gin.AuthUserKey).(string)
-			c.HTML(http.StatusOK, "index", nil)
+	case "ldap":
+		r.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser, *authLdapPass, *authLdapQuery, *authLdapBase))
 
-		})
-		//
-		authorized.GET("/search", func(c *gin.Context) {
-			_ = c.MustGet(gin.AuthUserKey).(string)
-		}, search)
 		break
 
 	}
+
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
+	//Setting routes
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index", nil)
+	})
+	r.GET("/search", search)
 
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
@@ -124,8 +166,44 @@ func main() {
 
 	// Name Generator will produce unique file names for each new results files
 	names.StartNamesGenerator()
-	r.Run(fmt.Sprintf(":%d", names.Port))
+	r.Run((*listenAddress).String())
 
 }
+//func parseParams(flagArgs []string) (auth.LdapSettings, error) {
+//	var settings auth.LdapSettings
+//	var url, port, query, binduser, bindpass string
+//	for _, s := range flagArgs {
+//		if strings.Contains(s, "url=") {
+//			fmt.Println(s + "\n")
+//			url = strings.Replace(s, "url=", "", 1)
+//		} else if strings.Contains(s, "query=") {
+//			fmt.Println(s + "\n")
+//			query = strings.Replace(s, "query=", "", 1)
+//		} else if strings.Contains(s, "port=") {
+//			port = strings.Replace(s, "port=", "", 1)
+//			fmt.Println(s + "\n")
+//		} else if strings.Contains(s, "binduser=") {
+//			binduser = strings.Replace(s, "binduser=", "", 1)
+//			fmt.Println(s + "\n")
+//		} else if strings.Contains(s, "bindpass=") {
+//			bindpass = strings.Replace(s, "bindpass=", "", 1)
+//			fmt.Println(s + "\n")
+//		}
+//	}
+//	if url != "" && port != "" {
+//		settings = auth.LdapSettings{
+//			port,
+//			url,
+//			query,
+//			binduser,
+//			bindpass,
+//		}
+//		fmt.Println("noerror")
+//		return settings, nil
+//	} else {
+//		fmt.Println("error")
+//		return settings, errors.New("Invalid parameters")
+//	}
+//}
 
 // https://golang.org/src/net/http/status.go -- statuses

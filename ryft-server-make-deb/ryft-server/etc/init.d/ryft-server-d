@@ -7,7 +7,7 @@
 DAEMON_PATH=/usr/bin
 
 DAEMON=ryft-server
-DAEMONOPTS="-port=8778"
+DAEMONOPTS="@/etc/ryft-rest.conf"
 
 NAME=ryft-server-d
 DESC="Ryft server"
