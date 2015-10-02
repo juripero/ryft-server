@@ -25,6 +25,7 @@ type (
 		Query string
 		BindUsername string
 		BindPassword string
+		BaseDN string
 	}
 )
 
@@ -46,11 +47,11 @@ func BasicAuthLDAPForRealm(settings ldapSettings, realm string) gin.HandlerFunc 
 
 		if !binded {
 			// Credentials doesn't match, we return 401 and abort handlers chain.
-			fmt.Printf("\nAUTH: %v", "not binded\n")
+//			log.Printf("\nAUTH: %v", "not binded\n")
 			setError(c, realm)
 
 		} else {
-			fmt.Printf("\nAUTH: %v", "binded\n")
+//			log.Printf("\nAUTH: %v", "binded\n")
 			// The user credentials was found, set user's id to key AuthUserKey in this context, the userId can be read later using
 			// c.MustGet(gin.AuthUserKey)
 			c.Set(AuthUserKey, user)
@@ -65,12 +66,13 @@ func setError(c *gin.Context, realm string) {
 
 // BasicAuth returns a Basic HTTP Authorization middleware. It takes as argument a map[string]string where
 // the key is the user name and the value is the password.
-func BasicAuthLDAP(address, username, password, query string) gin.HandlerFunc {
+func BasicAuthLDAP(address, username, password, query, baseDN string) gin.HandlerFunc {
 	settings := ldapSettings {
 		address,
 		query,
 		username,
 		password,
+		baseDN,
 	}
 	return BasicAuthLDAPForRealm(settings, "")
 }
@@ -82,18 +84,20 @@ func authorizationHeader(user, password string) string {
 
 func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
 
+//	log.Printf("LDAP Settings: %+v", settings)
+
 	// The username and password we want to check
 	username, password, ok := parseBasicAuth(userdata)
 
 	if !ok {
-		fmt.Printf("AUTH: couldn't parse '%v'\n", userdata)
+		log.Printf("AUTH: couldn't parse '%v'\n", userdata)
 		return "", false
 	}
 
 	// Connect to LDAP server
 	l, err := ldap.Dial("tcp", settings.Address)
 	if err != nil {
-		log.Fatalf("Error Dialing LDAP: %v", err)
+		log.Printf("Error Dialing LDAP: %v", err)
 		return "", false
 	}
 	defer l.Close()
@@ -101,21 +105,20 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
 	// Reconnect with TLS
 	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
 	if err != nil {
-		log.Fatalf("Error using TLS: %v", err)
+		log.Printf("Error using TLS: %v", err)
 		return "", false
 	}
 
-	log.Println("Binding..")
 	// First bind with a read only user
 	err = l.Bind(settings.BindUsername, settings.BindPassword)
 	if err != nil {
-		log.Fatalf("Error Binding readonly: %v", err)
+		log.Printf("Error Binding readonly: %v", err)
 		return "", false
 	}
 
 	// Search for the given username
 	searchRequest := ldap.NewSearchRequest(
-		"dc=example,dc=com",
+		settings.BaseDN,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf(settings.Query, username),
 		[]string{"dn"},
@@ -124,12 +127,12 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
 
 	sr, err := l.Search(searchRequest)
 	if err != nil {
-		log.Fatalf("Error Searching: %v", err)
+		log.Printf("Error Searching: %v", err)
 		return "", false
 	}
 
 	if len(sr.Entries) != 1 {
-		log.Fatalf("User does not exist or too many entries returned: %v", searchRequest)
+		log.Printf("User does not exist or too many entries returned: %v", searchRequest)
 		return "", false
 	}
 
@@ -138,7 +141,7 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
 	// Bind as the user to verify their password
 	err = l.Bind(userdn, password)
 	if err != nil {
-		log.Fatalf("Error binding User: %v", err)
+		log.Printf("Error binding User: %v", err)
 		return "", false
 	}
 

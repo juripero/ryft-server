@@ -47,6 +47,7 @@ import (
 
 var (
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
+	debug = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
 
 	authType = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
 	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
@@ -54,7 +55,8 @@ var (
 	authLdapServer = kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").TCP()
 	authLdapUser = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
 	authLdapPass = kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").String()
-	authLdapQuery = kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").String()
+	authLdapQuery = kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").Default("(&(uid=%s))").String()
+	authLdapBase = kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups.'. Required for --auth=ldap.").String()
 
 	listenAddress = kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").TCP()
 )
@@ -80,14 +82,10 @@ func parseParams(){
 		if (*authLdapServer).IP == nil {
 			kingpin.FatalUsage("ldap-server requires addresse name part, not only port.")
 		}
-		if (*authLdapServer).Port == 0 {
-			(*authLdapServer).Port = 389
-			log.Printf("Setting ldap port to default %d", (*authLdapServer).Port)
-		}
 
-		ensureDefault(authLdapQuery, "ldap-query is required for ldap authentication.")
 		ensureDefault(authLdapUser, "ldap-user is required for ldap authentication.")
 		ensureDefault(authLdapPass, "ldap-pass is required for ldap authentication.")
+		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
 
 		break
 
@@ -117,10 +115,13 @@ func parseParams(){
 
 func main() {
 	log.SetFlags(log.Lmicroseconds)
-
 	parseParams()
+	if !*debug {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	r := gin.Default()
+
 
 	//User credentials examples
 
@@ -138,7 +139,7 @@ func main() {
 		r.Use(auth)
 		break
 	case "ldap":
-		r.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser, *authLdapPass, *authLdapQuery))
+		r.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser, *authLdapPass, *authLdapQuery, *authLdapBase))
 
 		break
 
