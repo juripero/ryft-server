@@ -8,25 +8,24 @@ package auth
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
+	"crypto/tls"
 	"github.com/gin-gonic/gin"
-	"github.com/hamano/golang-openldap"
+	"gopkg.in/ldap.v2"
 )
 
 const AuthUserKey = "user"
 
 type (
-	Settings struct {
+	LdapSettings struct {
 		Port string
-		Url  string
-		User UserDN
-	}
-
-	UserDN struct {
-		UserPrefix  string
-		UserPostfix string
+		Host  string
+		Query string
+		BindUsername string
+		BindPassword string
 	}
 )
 
@@ -34,7 +33,7 @@ type (
 // the key is the user name and the value is the password, as well as the name of the Realm.
 // If the realm is empty, "Authorization Required" will be used by default.
 // (see http://tools.ietf.org/html/rfc2617#section-1.2)
-func BasicAuthLDAPForRealm(settings Settings, realm string) gin.HandlerFunc {
+func BasicAuthLDAPForRealm(settings LdapSettings, realm string) gin.HandlerFunc {
 
 	if realm == "" {
 		realm = "Authorization Required"
@@ -43,7 +42,7 @@ func BasicAuthLDAPForRealm(settings Settings, realm string) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
-		if settings.Url == "" {
+		if settings.Host == "" {
 			setError(c, realm)
 		} else if settings.Port == "" {
 			setError(c, realm)
@@ -72,7 +71,7 @@ func setError(c *gin.Context, realm string) {
 
 // BasicAuth returns a Basic HTTP Authorization middleware. It takes as argument a map[string]string where
 // the key is the user name and the value is the password.
-func BasicAuthLDAP(settings Settings) gin.HandlerFunc {
+func BasicAuthLDAP(settings LdapSettings) gin.HandlerFunc {
 	return BasicAuthLDAPForRealm(settings, "")
 }
 
@@ -81,32 +80,72 @@ func authorizationHeader(user, password string) string {
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(base))
 }
 
-func bindLDAP(settings Settings, userdata string) (string, bool) {
+func bindLDAP(settings LdapSettings, userdata string) (string, bool) {
+
+	// The username and password we want to check
 	username, password, ok := parseBasicAuth(userdata)
 
 	if !ok {
-		fmt.Printf("AUTH: %v", "couldn't parse\n")
+		fmt.Printf("AUTH: couldn't parse '%v'\n", userdata)
 		return "", false
 	}
 
-	url := settings.Url + ":" + settings.Port + "/"
-	fmt.Printf("AUTH: %v", url+"\n")
-	// user := settings.User.UserPrefix + username + "," + settings.User.UserPostfix
-	user := "cn=" + username + "," + "dc=example,dc=com"
-
-	ldap, err := openldap.Initialize(url)
-	defer ldap.Close()
-
+	// Connect to LDAP server
+	l, err := ldap.Dial("tcp", fmt.Sprintf("%s:%d", "ldap.forumsys.com", 389))
 	if err != nil {
+		log.Fatalf("Error Dialing LDAP: %v", err)
 		return "", false
 	}
+	defer l.Close()
 
-	ldap.SetOption(openldap.LDAP_OPT_PROTOCOL_VERSION, openldap.LDAP_VERSION3)
-	err = ldap.Bind(user, password)
-
+	// Reconnect with TLS
+	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
 	if err != nil {
+		log.Fatalf("Error using TLS: %v", err)
 		return "", false
 	}
+
+	log.Println("Binding..")
+	// First bind with a read only user
+	err = l.Bind(settings.BindUsername, settings.BindPassword)
+	if err != nil {
+		log.Fatalf("Error Binding readonly: %v", err)
+		return "", false
+	}
+
+	if (settings.Query == ""){
+		settings.Query = "(&(uid=%s))"
+	}
+
+	// Search for the given username
+	searchRequest := ldap.NewSearchRequest(
+		"dc=example,dc=com",
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf(settings.Query, username),
+		[]string{"dn"},
+		nil,
+	)
+
+	sr, err := l.Search(searchRequest)
+	if err != nil {
+		log.Fatalf("Error Searching: %v", err)
+		return "", false
+	}
+
+	if len(sr.Entries) != 1 {
+		log.Fatalf("User does not exist or too many entries returned: %v", searchRequest)
+		return "", false
+	}
+
+	userdn := sr.Entries[0].DN
+
+	// Bind as the user to verify their password
+	err = l.Bind(userdn, password)
+	if err != nil {
+		log.Fatalf("Error binding User: %v", err)
+		return "", false
+	}
+
 	return "authorizationHeader(username, password)", true
 }
 

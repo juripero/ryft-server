@@ -63,8 +63,8 @@ const (
 
 func readParameters() {
 	//Port number
-	flag.IntVar(&portPtr, "port", 8765, "The port of the REST-server")
-	flag.IntVar(&portPtr, "p", 8765, "The port of the REST-server (shorthand)")
+	flag.IntVar(&portPtr, "port", 8765, "The http port to listen on")
+	flag.IntVar(&portPtr, "p", 8765, "The http port to listen on (shorthand)")
 	//keep-results
 	flag.BoolVar(&KeepResults, "keep-results", false, "Keep results or delete after response")
 	flag.BoolVar(&KeepResults, "k", false, "Keep results or delete after response (shorthand)")
@@ -145,30 +145,34 @@ func main() {
 	r.Run(fmt.Sprintf(":%d", names.Port))
 
 }
-func parseParams(flagArgs []string) (auth.Settings, error) {
-	var settings auth.Settings
-	var url, port, userPrefix, userPostfix string
+func parseParams(flagArgs []string) (auth.LdapSettings, error) {
+	var settings auth.LdapSettings
+	var url, port, query, binduser, bindpass string
 	for _, s := range flagArgs {
 		if strings.Contains(s, "url=") {
 			fmt.Println(s + "\n")
 			url = strings.Replace(s, "url=", "", 1)
-		} else if strings.Contains(s, "usr=") {
-			userPostfix = "1"
-			userPrefix = "1"
+		} else if strings.Contains(s, "query=") {
 			fmt.Println(s + "\n")
+			query = strings.Replace(s, "query=", "", 1)
 		} else if strings.Contains(s, "port=") {
 			port = strings.Replace(s, "port=", "", 1)
 			fmt.Println(s + "\n")
+		} else if strings.Contains(s, "binduser=") {
+			binduser = strings.Replace(s, "binduser=", "", 1)
+			fmt.Println(s + "\n")
+		} else if strings.Contains(s, "bindpass=") {
+			bindpass = strings.Replace(s, "bindpass=", "", 1)
+			fmt.Println(s + "\n")
 		}
 	}
-	if url != "" && port != "" && userPrefix != "" && userPostfix != "" {
-		settings = auth.Settings{
+	if url != "" && port != "" {
+		settings = auth.LdapSettings{
 			port,
 			url,
-			auth.UserDN{
-				userPrefix,
-				userPostfix,
-			},
+			query,
+			binduser,
+			bindpass,
 		}
 		fmt.Println("noerror")
 		return settings, nil
