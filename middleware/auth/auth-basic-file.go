@@ -38,7 +38,7 @@ import (
 )
 
 func AuthBasicFile(fileName string) (gin.HandlerFunc, error) {
-	users, err := checkPwd(fileName)
+	users, err := readUsersFile(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func AuthBasicFile(fileName string) (gin.HandlerFunc, error) {
 
 }
 
-func checkPwd(fileName string) (map[string]string, error) {
+func readUsersFile(fileName string) (map[string]string, error) {
 	var users map[string]string
 
 	data, err := ioutil.ReadFile(fileName)

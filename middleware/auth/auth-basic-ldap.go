@@ -20,9 +20,8 @@ import (
 const AuthUserKey = "user"
 
 type (
-	LdapSettings struct {
-		Port string
-		Host  string
+	ldapSettings struct {
+		Address string
 		Query string
 		BindUsername string
 		BindPassword string
@@ -33,7 +32,7 @@ type (
 // the key is the user name and the value is the password, as well as the name of the Realm.
 // If the realm is empty, "Authorization Required" will be used by default.
 // (see http://tools.ietf.org/html/rfc2617#section-1.2)
-func BasicAuthLDAPForRealm(settings LdapSettings, realm string) gin.HandlerFunc {
+func BasicAuthLDAPForRealm(settings ldapSettings, realm string) gin.HandlerFunc {
 
 	if realm == "" {
 		realm = "Authorization Required"
@@ -42,11 +41,6 @@ func BasicAuthLDAPForRealm(settings LdapSettings, realm string) gin.HandlerFunc 
 
 	return func(c *gin.Context) {
 
-		if settings.Host == "" {
-			setError(c, realm)
-		} else if settings.Port == "" {
-			setError(c, realm)
-		}
 		// Search user in the slice of allowed credentials
 		user, binded := bindLDAP(settings, c.Request.Header.Get("Authorization"))
 
@@ -71,7 +65,13 @@ func setError(c *gin.Context, realm string) {
 
 // BasicAuth returns a Basic HTTP Authorization middleware. It takes as argument a map[string]string where
 // the key is the user name and the value is the password.
-func BasicAuthLDAP(settings LdapSettings) gin.HandlerFunc {
+func BasicAuthLDAP(address, username, password, query string) gin.HandlerFunc {
+	settings := ldapSettings {
+		address,
+		query,
+		username,
+		password,
+	}
 	return BasicAuthLDAPForRealm(settings, "")
 }
 
@@ -80,7 +80,7 @@ func authorizationHeader(user, password string) string {
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(base))
 }
 
-func bindLDAP(settings LdapSettings, userdata string) (string, bool) {
+func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
 
 	// The username and password we want to check
 	username, password, ok := parseBasicAuth(userdata)
@@ -91,7 +91,7 @@ func bindLDAP(settings LdapSettings, userdata string) (string, bool) {
 	}
 
 	// Connect to LDAP server
-	l, err := ldap.Dial("tcp", fmt.Sprintf("%s:%d", "ldap.forumsys.com", 389))
+	l, err := ldap.Dial("tcp", settings.Address)
 	if err != nil {
 		log.Fatalf("Error Dialing LDAP: %v", err)
 		return "", false
@@ -111,10 +111,6 @@ func bindLDAP(settings LdapSettings, userdata string) (string, bool) {
 	if err != nil {
 		log.Fatalf("Error Binding readonly: %v", err)
 		return "", false
-	}
-
-	if (settings.Query == ""){
-		settings.Query = "(&(uid=%s))"
 	}
 
 	// Search for the given username

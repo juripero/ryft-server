@@ -50,7 +50,7 @@ import (
 func cleanup(file *os.File) {
 	if file != nil {
 		file.Close()
-		if !KeepResults {
+		if !*KeepResults {
 			os.Remove(file.Name())
 		}
 	}
