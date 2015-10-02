@@ -43,28 +43,22 @@ https://github.com/getryft/ryft-server/blob/master/ryft-server-make-deb/README.m
 By default REST-server removes search results from ``/ryftone/RyftServer-PORT/``. But it behaviour may be prevented:
 
 ```
-ryft-server -keep-results
+ryft-server --keep
 ```
 Please pay attention that REST-server removes ``/ryftone/RyftServer-PORT`` when it starts.
-
-# Index
-
-```
-http://52.4.187.202:8765
-```
 
 # How to do a search?
 Do request in browser:
 
 ```
-http://192.168.56.101:8765/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2
+http://localhost:8765/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2
 
 ```
 
 # How to do search by field's value?
 
 ```
-http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml
+http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml
 
 ```
 
@@ -76,6 +70,4 @@ http://52.20.99.136:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&file
 * ``format`` is the parameter for the structed search. Specify the search format.
 * ``surrounding`` width when generating results. For example, a value of 2 means that 2 + * characters before and after a search match will be included with data result
 
-# Links
- * http://msgpack.org/ --- link to msgpack official
- * https://github.com/ugorji/go --- link to msgpack library
+
