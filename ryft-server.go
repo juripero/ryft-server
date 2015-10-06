@@ -92,7 +92,10 @@ func parseParams() {
 		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
 
 		break
-
+	}
+	if *tlsEnabled {
+		ensureDefault(tlsCrtFile, "tls-crt is required for enabled tls property")
+		ensureDefault(tlsKeyFile, "tls-key is required for enabled tls property")
 	}
 }
 
