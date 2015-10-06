@@ -78,3 +78,4 @@ http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*
 * ``cs``
 * ``format`` is the parameter for the structed search. Specify the search format.
 * ``surrounding`` width when generating results. For example, a value of 2 means that 2 + * characters before and after a search match will be included with data result
+* ``fields`` specifies needed keys in result. Required format=xml.
