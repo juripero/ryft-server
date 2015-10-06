@@ -35,6 +35,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/getryft/ryft-server/crpoll"
@@ -56,6 +57,8 @@ func cleanup(file *os.File) {
 	}
 }
 
+const sepSign string = ","
+
 type SearchParams struct {
 	Query         string   `form:"query" binding:"required"` // Search query, for example: ( RAW_TEXT CONTAINS "night" )
 	Files         []string `form:"files" binding:"required"` // Source files
@@ -63,10 +66,13 @@ type SearchParams struct {
 	Fuzziness     uint8    `form:"fuzziness"`                // Is the fuzziness of the search. Measured as the maximum Hamming distance.
 	Format        string   `form:"format"`                   // Source format parser name
 	CaseSensitive bool     `form:"cs"`                       // Case sensitive flag
+	Fields        string   `form:"fields"`
+	Keys          []string
 }
 
 func NewSearchParams() (p SearchParams) {
 	p.Format = transcoder.RAWTRANSCODER
+
 	return
 }
 
@@ -126,7 +132,12 @@ func search(c *gin.Context) {
 
 	_ = drop
 
-	streamAllRecords(c, enc, items)
+	if params.Format == "xml" && params.Fields != "" {
+		params.Keys = strings.Split(params.Fields, sepSign)
+		streamSmplRecords(c, enc, items, params.Keys)
+	} else {
+		streamAllRecords(c, enc, items)
+	}
 
 }
 
@@ -154,6 +165,43 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 				c.Writer.Flush()
 			}
 			return true
+		} else {
+			enc.End(w)
+			return false
+		}
+	})
+}
+
+func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}, sample []string) {
+	first := true
+
+	c.Stream(func(w io.Writer) bool {
+		if first {
+			enc.Begin(w)
+			first = false
+		}
+
+		if record, ok := <-recs; ok {
+			rec := map[string]interface{}{}
+
+			for i := range sample {
+				value, ok := record.(map[string]interface{})[sample[i]]
+				if ok {
+					rec[sample[i]] = value
+				} else {
+					enc.End(w)
+					return false
+				}
+			}
+			if err := enc.Write(w, rec); err != nil {
+				log.Panicln(err)
+			} else {
+				c.Writer.Flush()
+			}
+			// log.Printf("RECORD: %+v", record)
+
+			return true
+
 		} else {
 			enc.End(w)
 			return false
