@@ -17,7 +17,7 @@ echo Priority: optional >> $CONTROLFILE
 echo Architecture: amd64 >> $CONTROLFILE
 echo Essential: no >> $CONTROLFILE
 echo Installed-Size: 1024 >> $CONTROLFILE
-echo Maintainer: dataart.com >> $CONTROLFILE
+echo Maintainer: www.ryft.com >> $CONTROLFILE
 echo Description: ryft-server >> $CONTROLFILE
 
 

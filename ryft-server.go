@@ -31,7 +31,6 @@
 package main
 
 import (
-	"gopkg.in/alecthomas/kingpin.v2"
 	"html/template"
 	"log"
 	"net/http"
@@ -42,32 +41,37 @@ import (
 	"github.com/getryft/ryft-server/names"
 
 	"github.com/gin-gonic/gin"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
-
 
 var (
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
-	debug = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
+	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
 
-	authType = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
+	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
 	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
 
 	authLdapServer = kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").TCP()
-	authLdapUser = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
-	authLdapPass = kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").String()
-	authLdapQuery = kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").Default("(&(uid=%s))").String()
-	authLdapBase = kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups.'. Required for --auth=ldap.").String()
+	authLdapUser   = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
+	authLdapPass   = kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").String()
+	authLdapQuery  = kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").Default("(&(uid=%s))").String()
+	authLdapBase   = kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups.'. Required for --auth=ldap.").String()
 
 	listenAddress = kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").TCP()
+
+	tlsEnabled        = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
+	tlsCrtFile        = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
+	tlsKeyFile        = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
+	tlsListenAdderess = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
 )
 
-func ensureDefault(flag *string, message string){
+func ensureDefault(flag *string, message string) {
 	if *flag == "" {
-			kingpin.FatalUsage(message)
-		}
+		kingpin.FatalUsage(message)
+	}
 }
 
-func parseParams(){
+func parseParams() {
 	kingpin.Parse()
 
 	// check extra dependencies logic not handled by kingpin
@@ -93,7 +97,7 @@ func parseParams(){
 }
 
 //func readParameters() {
-	//Port number
+//Port number
 //	flag.IntVar(&portPtr, "port", 8765, "The http port to listen on")
 //	flag.IntVar(&portPtr, "p", 8765, "The http port to listen on (shorthand)")
 //	//keep-results
@@ -121,7 +125,6 @@ func main() {
 	}
 
 	r := gin.Default()
-
 
 	//User credentials examples
 
@@ -166,9 +169,13 @@ func main() {
 
 	// Name Generator will produce unique file names for each new results files
 	names.StartNamesGenerator()
+	if *tlsEnabled {
+		go r.RunTLS((*tlsListenAdderess).String(), *tlsCrtFile, *tlsKeyFile)
+	}
 	r.Run((*listenAddress).String())
 
 }
+
 //func parseParams(flagArgs []string) (auth.LdapSettings, error) {
 //	var settings auth.LdapSettings
 //	var url, port, query, binduser, bindpass string
