@@ -29,6 +29,15 @@ Flags:
   --ldap-basedn=LDAP-BASEDN
                    LDAP BaseDN for lookups.'. Required for --auth=ldap.
 
+  -t, --tls          
+                    Enable TLS/SSL. Default 'false'.
+  --tls-crt=TLS-CRT  
+                    Certificate file. Required for --tls=true.
+  --tls-key=TLS-KEY  
+                    Key-file. Required for --tls=true.
+  --tls-address=0.0.0.0:8766  
+                     Address:port to listen on HTTPS. Default is 0.0.0.0:8766
+
 Args:
   [<address>]  Address:port to listen on. Default is 0.0.0.0:8765.
 
@@ -69,5 +78,3 @@ http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*
 * ``cs``
 * ``format`` is the parameter for the structed search. Specify the search format.
 * ``surrounding`` width when generating results. For example, a value of 2 means that 2 + * characters before and after a search match will be included with data result
-
-
