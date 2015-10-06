@@ -188,9 +188,6 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 				value, ok := record.(map[string]interface{})[sample[i]]
 				if ok {
 					rec[sample[i]] = value
-				} else {
-					enc.End(w)
-					return false
 				}
 			}
 			if err := enc.Write(w, rec); err != nil {
