@@ -44,7 +44,8 @@ import (
 
 const (
 	constJson = ".json"
-	constYaml = ".yml"
+	constYml  = ".yml"
+	constYaml = ".yaml"
 )
 
 func AuthBasicFile(fileName string) (gin.HandlerFunc, error) {
@@ -67,7 +68,7 @@ func readUsersFile(fileName string) (map[string]string, error) {
 	}
 	if ext == constJson {
 		err = json.Unmarshal(data, &users)
-	} else if ext == constYaml {
+	} else if ext == constYaml || ext == constYml {
 		err = yaml.Unmarshal(data, &users)
 	} else {
 		err = errors.New("Unrecognized file extention " + ext)
