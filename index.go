@@ -24,9 +24,9 @@ const IndexHTML = `
 <h3>Structed request example</h3>
 <p><a href="/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml">
   /search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml</a ></p>
-  <h3>Count request example</h3>
-<p><a href="/count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime&format=xml">
-  /count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime&format=xml</a ></p>
+<h3>Count request example</h3>
+<p><a href="/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime&format=xml">
+  /count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime&format=xml</a ></p>
 
     </body>
 </html>
