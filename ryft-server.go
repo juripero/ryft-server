@@ -157,7 +157,7 @@ func main() {
 		c.HTML(http.StatusOK, "index", nil)
 	})
 	r.GET("/search", search)
-
+	r.GET("/count", count)
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
 		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())

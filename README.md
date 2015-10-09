@@ -70,6 +70,12 @@ http://localhost:8765/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers
 http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml
 
 ```
+# How to count matches?
+
+```
+http://localhost:8765//count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime&format=xml
+
+```
 
 # Parameters (TODO)
 * ``query`` is the string specifying the search criteria.
