@@ -92,8 +92,8 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool, int) {
 	username, password, ok := parseBasicAuth(userdata)
 
 	if !ok {
-		log.Printf("AUTH: couldn't parse '%v'\n", userdata)
-		return "", false, 400
+		log.Printf("AUTH: Invalid username or password, couldn't parse '%v'\n", userdata)
+		return "", false, 401
 	}
 
 	// Connect to LDAP server
