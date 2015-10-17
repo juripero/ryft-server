@@ -35,7 +35,7 @@ import (
 	"log"
 	"runtime/debug"
 
-	"github.com/clbanning/x2j"
+	"github.com/clbanning/mxj"
 	"github.com/getryft/ryft-server/records"
 )
 
@@ -52,7 +52,7 @@ func (transcoder *XmlTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 		defer close(errors)
 		for rec := range recs {
 			//			log.Printf("PASRING XML: %s", rec.Data)
-			obj, err := x2j.ByteDocToMap(rec.Data, false)
+			obj, err := mxj.NewMapXml(rec.Data)
 			//			log.Printf("PASRING XML COMPLETE")
 			if err != nil {
 				//				log.Printf("PASRING XML ERROR: %s", err.Error())
