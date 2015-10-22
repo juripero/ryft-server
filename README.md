@@ -84,4 +84,5 @@ http://localhost:8765//count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&
 * ``cs``
 * ``format`` is the parameter for the structed search. Specify the search format.
 * ``surrounding`` width when generating results. For example, a value of 2 means that 2 + * characters before and after a search match will be included with data result
-* ``fields`` specifies needed keys in result. Required format=xml.
+* ``fields`` specifies needed keys in result. Required format=xml.``
+* ``nodes`` specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value .``

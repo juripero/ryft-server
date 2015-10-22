@@ -16,6 +16,7 @@ const IndexHTML = `
 <p><b>format - </b>  is the parameter for the structed search.  Specify the input data format 'xml' or 'raw'(Default). </p>
 <p><b>surrounding - </b> specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text </p>
 <p><b>fields - </b> specifies needed keys in result. Required format=xml. </p>
+<p><b>nodes - </b> specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value. </p>
 
 <h2>Examples</h2>
 <h3>Not structed request example</h3>

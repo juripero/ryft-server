@@ -68,6 +68,7 @@ type SearchParams struct {
 	CaseSensitive bool     `form:"cs"`                       // Case sensitive flag
 	Fields        string   `form:"fields"`
 	Keys          []string
+	Nodes         uint8 `form:"nodes"` //Active Nodes Count
 }
 
 func NewSearchParams() (p SearchParams) {
@@ -241,7 +242,12 @@ func nextData(res *os.File, length uint16) (result []byte) {
 func progress(s *SearchParams, n names.Names) (ch chan error) {
 	ch = make(chan error, 1)
 	go func() {
-		ds := rol.RolDSCreate()
+		var ds *rol.RolDS
+		if s.Nodes == 0 {
+			ds = rol.RolDSCreate()
+		} else {
+			ds = rol.RolDSCreateNodes(s.Nodes)
+		}
 		defer ds.Delete()
 
 		for _, f := range s.Files {
