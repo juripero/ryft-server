@@ -51,11 +51,8 @@ func (transcoder *XmlTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 		defer close(output)
 		defer close(errors)
 		for rec := range recs {
-			//			log.Printf("PASRING XML: %s", rec.Data)
 			obj, err := mxj.NewMapXml(rec.Data)
-			//			log.Printf("PASRING XML COMPLETE")
 			if err != nil {
-				//				log.Printf("PASRING XML ERROR: %s", err.Error())
 				errors <- err
 				continue
 			}

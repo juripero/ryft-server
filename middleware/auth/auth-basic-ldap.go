@@ -49,11 +49,9 @@ func BasicAuthLDAPForRealm(settings ldapSettings, realm string) gin.HandlerFunc 
 
 		if !binded {
 			// Credentials doesn't match, we return 401 and abort handlers chain.
-			//			log.Printf("\nAUTH: %v", "not binded\n")
 			setError(c, realm, code)
 
 		} else {
-			//			log.Printf("\nAUTH: %v", "binded\n")
 			// The user credentials was found, set user's id to key AuthUserKey in this context, the userId can be read later using
 			// c.MustGet(gin.AuthUserKey)
 			c.Set(AuthUserKey, user)
@@ -85,8 +83,6 @@ func authorizationHeader(user, password string) string {
 }
 
 func bindLDAP(settings ldapSettings, userdata string) (string, bool, int) {
-
-	//	log.Printf("LDAP Settings: %+v", settings)
 
 	// The username and password we want to check
 	username, password, ok := parseBasicAuth(userdata)
@@ -150,6 +146,7 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool, int) {
 	return "authorizationHeader(username, password)", true, 200
 }
 
+//Decode string in Base64 to get username and password
 func parseBasicAuth(auth string) (username, password string, ok bool) {
 	const prefix = "Basic "
 	if !strings.HasPrefix(auth, prefix) {
@@ -166,5 +163,3 @@ func parseBasicAuth(auth string) (username, password string, ok bool) {
 	}
 	return cs[:s], cs[s+1:], true
 }
-
-////////

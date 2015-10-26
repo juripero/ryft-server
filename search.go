@@ -59,6 +59,7 @@ func cleanup(file *os.File) {
 
 const sepSign string = ","
 
+// SearchParams - parameters that we get from the query to setup search
 type SearchParams struct {
 	Query         string   `form:"query" binding:"required"` // Search query, for example: ( RAW_TEXT CONTAINS "night" )
 	Files         []string `form:"files" binding:"required"` // Source files
@@ -85,7 +86,7 @@ func search(c *gin.Context) {
 	// parse request parameters
 	params := NewSearchParams()
 	if err = c.Bind(&params); err != nil {
-		// panic(srverr.New(http.StatusBadRequest, err.Error()))
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
 	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
@@ -104,7 +105,7 @@ func search(c *gin.Context) {
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
 	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
-		// panic(srverr.New(http.StatusBadRequest, err.Error()))
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
 	// get a new unique search index
@@ -129,7 +130,6 @@ func search(c *gin.Context) {
 	indexes, drop := records.Poll(idx, p)
 	recs := dataPoll(indexes, res)
 	items, _ := tcode.Transcode(recs)
-	// go logErrors("Transcode Error: %s", transcodeErrors)
 
 	_ = drop
 
@@ -159,7 +159,6 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 		}
 
 		if record, ok := <-recs; ok {
-			// log.Printf("RECORD: %+v", record)
 			if err := enc.Write(w, record); err != nil {
 				log.Panicln(err)
 			} else {
@@ -196,7 +195,6 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 			} else {
 				c.Writer.Flush()
 			}
-			// log.Printf("RECORD: %+v", record)
 
 			return true
 
