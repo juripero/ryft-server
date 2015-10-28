@@ -67,7 +67,7 @@ http://localhost:8765/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers
 # How to do search by field's value?
 
 ```
-http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml
+http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml&cs=true
 
 ```
 # How to count matches?
