@@ -60,14 +60,14 @@ Please pay attention that REST-server removes ``/ryftone/RyftServer-PORT`` when 
 Do request in browser:
 
 ```
-http://localhost:8765/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2
+http://localhost:8765/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2&cs=true
 
 ```
 
 # How to do search by field's value?
 
 ```
-http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml&cs=true
+http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml
 
 ```
 # How to count matches?
