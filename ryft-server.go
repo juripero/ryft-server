@@ -132,6 +132,7 @@ func main() {
 	//Setting routes
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index", nil)
+
 	})
 	r.GET("/search", search)
 	r.GET("/count", count)

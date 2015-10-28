@@ -81,7 +81,7 @@ http://localhost:8765//count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&
 * ``query`` is the string specifying the search criteria.
 * ``files``  is the input data set to be searched
 * ``fuzziness`` Specify the fuzzy search distance [0..255]
-* ``cs``
+* ``cs`` Case sensitive flag. Default 'false'.
 * ``format`` is the parameter for the structed search. Specify the search format.
 * ``surrounding`` width when generating results. For example, a value of 2 means that 2 + * characters before and after a search match will be included with data result
 * ``fields`` specifies needed keys in result. Required format=xml.
