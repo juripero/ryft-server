@@ -273,7 +273,7 @@ const IndexHTML = `
 <!-- <h2>Examples</h2> -->
 <h3>Not structed request example</h3>
 <p><a href="/search?query=(RAW_TEXT%20CONTAINS%20%2210%22)&files=passengers.txt&surrounding=10&fuzziness=0">
-  /search?query=(RAW_TEXT%20CONTAINS%20%2210%22)&amp;files=passengers.txt&amp;surrounding=10&amp;fuzziness=0</a ></p>
+  /search?query=(RAW_TEXT CONTAINS "10")&amp;files=passengers.txt&amp;surrounding=10&amp;fuzziness=0</a ></p>
   <samp>[
     {
         "_index": {
@@ -386,7 +386,7 @@ const IndexHTML = `
 ]</samp>
 <h3>Structed request example</h3>
 <p><a href="/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml">
-  /search?query=(RECORD.id%20EQUALS%20%2210034183%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml</a ></p>
+  /search?query=(RECORD.id EQUALS "10034183")&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml</a ></p>
 <samp>{
     "Arrest": "false",
     "Beat": "0313",
@@ -465,7 +465,7 @@ const IndexHTML = `
 </table>
 <h3>Count request example</h3>
 <p><a href="/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime">
-  /count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&amp;files=*.pcrime</a ></p>
+  /count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&amp;files=*.pcrime</a ></p>
 <pre>"Matching: 10000"</pre>
 </div>
     </body>
