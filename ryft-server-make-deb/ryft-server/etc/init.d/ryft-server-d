@@ -8,6 +8,7 @@ DAEMON_PATH=/usr/bin
 
 DAEMON=ryft-server
 DAEMONOPTS="@/etc/ryft-rest.conf"
+DEFAULTDAEMONOPTS="0.0.0.0:8765"
 
 NAME=ryft-server-d
 DESC="Ryft server"
@@ -39,8 +40,13 @@ start)
 	cd $DAEMON_PATH
 	#PID=`$DAEMON $DAEMONOPTS > /dev/null 2>&1 & echo $!`
     #PID=`$DAEMON $DAEMONOPTS > /home/ryftuser/ryft-server-d-start.log 2>&1 & echo $!`
-    PID=`$DAEMON $DAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
+    # PID=`$DAEMON $DAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
 
+				if [ -f $DAEMONOPTS ]; then
+					PID=`$DAEMON $DAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
+				else
+					PID=`$DAEMON $DEFAULTDAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
+				fi
 	#echo "Saving PID" $PID " to " $PIDFILE
         if [ -z $PID ]; then
             printf "%s\n" "Fail"
