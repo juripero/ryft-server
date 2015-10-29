@@ -265,7 +265,7 @@ const IndexHTML = `
     <tr>
         <td><a>nodes</a></td>
         <td>string</td>
-        <td>GET /search?query={QUERY}&apm;files={FILE}&amp;nodes={VALUE}</td>
+        <td>GET /search?query={QUERY}&amp;files={FILE}&amp;nodes={VALUE}</td>
         <td>Parameter that specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value.</td>
     </tr>
 </tbody>
@@ -458,7 +458,7 @@ const IndexHTML = `
     <tr>
         <td><a>nodes</a></td>
         <td>string</td>
-        <td>GET /count?query={QUERY}&apm;files={FILE}&amp;nodes={VALUE}</td>
+        <td>GET /count?query={QUERY}&amp;files={FILE}&amp;nodes={VALUE}</td>
         <td>Parameter that specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value.</td>
     </tr>
 </tbody>
