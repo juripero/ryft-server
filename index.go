@@ -273,7 +273,7 @@ const IndexHTML = `
 <!-- <h2>Examples</h2> -->
 <h3>Not structed request example</h3>
 <p><a href="/search?query=(RAW_TEXT%20CONTAINS%20%2210%22)&files=passengers.txt&surrounding=10&fuzziness=0">
-  /search?query=(RAW_TEXT%20CONTAINS%20%2210%22)&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0</a ></p>
+  /search?query=(RAW_TEXT%20CONTAINS%20%2210%22)&amp;files=passengers.txt&amp;surrounding=10&amp;fuzziness=0</a ></p>
   <samp>[
     {
         "_index": {
