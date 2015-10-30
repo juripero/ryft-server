@@ -50,5 +50,6 @@ func count(c *gin.Context) {
 	}
 	fmt.Println()
 
-	c.JSON(http.StatusOK, fmt.Sprintf("Matching: %v", counter))
+	// c.JSON(http.StatusOK, fmt.Sprintf("Matching: %v", counter))
+	c.JSON(http.StatusOK, counter)
 }
