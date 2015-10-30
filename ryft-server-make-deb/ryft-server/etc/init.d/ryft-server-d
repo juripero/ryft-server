@@ -45,6 +45,9 @@ start)
 				if [ -f $DAEMONOPTS ]; then
 					PID=`$DAEMON $DAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
 				else
+					echo 
+					echo There is no config file was found in /home/ryftuser/ryft-server-d-start.log
+					echo Default settings will be 0.0.0.0:8765
 					PID=`$DAEMON $DEFAULTDAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
 				fi
 	#echo "Saving PID" $PID " to " $PIDFILE
