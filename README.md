@@ -97,6 +97,9 @@ ryft-server --keep
 ]
 ```
 
+`data` is a base64 encoded bytes of search results.
+
+
 ### Structed request example
 
 [/search?query=(RECORD.id EQUALS "10034183")&files=*.pcrime&surrounding=10&fuzziness=0&format=xml](/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml)
