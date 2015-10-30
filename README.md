@@ -54,35 +54,192 @@ By default REST-server removes search results from ``/ryftone/RyftServer-PORT/``
 ```
 ryft-server --keep
 ```
-Please pay attention that REST-server removes ``/ryftone/RyftServer-PORT`` when it starts.
 
-# How to do a search?
-Do request in browser:
+# API endpoints
+
+## Search endpoint /search parameters :
+
+| Method | Input type | Uri | Description |
+| --- | --- | --- | --- |
+| *query* | string | GET /search?query={QUERY} | String that specifying the search criteria. Required file parameter |
+| *files* | string | GET /search?query={QUERY}&files={FILE} | Input data set to be searched. Comma separated list of files or directories. |
+| *fuzziness* | uint8 | GET /search?query={QUERY}&files={FILE}&fuzziness={VALUE} | Specify the fuzzy search distance [0..255] . |
+| *cs* | string | GET /search?query={QUERY}&files={FILE}&cs=true | Case sensitive flag. Default 'false'. |
+| *format* | string | GET /search?query={QUERY}&files={FILE}&apm;format={FORMAT} | Parameter for the structed search. Specify the input data format 'xml' or 'raw'(Default). |
+| *surroinding* | uint16 | GET /search?query={QUERY}&files={FILE}&surrounding={VALUE} | Parameter that specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text |
+| *fields* | string | GET /search?query={QUERY}&files={FILE}&format=xml&fields={FIELDS...} | Parametr that specifies needed keys in result. Required format=xml. |
+| *nodes* | string | GET /search?query={QUERY}&files={FILE}&nodes={VALUE} | Parameter that specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value. |
+
+### Not structed request example
+
+[/search?query=(RAW_TEXT CONTAINS "10")&files=passengers.txt&surrounding=10&fuzziness=0](/search?query=(RAW_TEXT%20CONTAINS%20%2210%22)&files=passengers.txt&surrounding=10&fuzziness=0)
 
 ```
-http://localhost:8765/search?query=( RAW_TEXT CONTAINS "Johm" )&files=passengers.txt&surrounding=10&fuzziness=2&cs=true
-
+[
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 27,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "YWwgU21pdGgsIDEwLTAxLTE5MjgsMA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 43,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "MTkyOCwwMTEtMzEwLTU1NS0xMjEyLA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 108,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTI5LTE5NDUsMzEwLTU1NS0yMzIzLA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 167,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTMwLTE5MjAsMzEwLTU1NS0zNDM0LA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 234,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "MTk1MiwwMTEtMzEwLTU1NS00NTQ1LA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 344,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTE1LTE5NDQsMzEwLTU1NS01NjU2LA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 478,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTE0LTE5NDksMzEwLTU1NS02NzY3LA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 569,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTEyLTE5NTksMzEwLTU1NS0xMjEzLA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 663,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTEyLTE5NTksMzEwLTU1NS0xMjEzLA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 770,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTEyLTE5NTksMzEwLTU1NS0xMjEzLA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 890,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTEyLTE5ODksMzEwLTU1NS05ODc2LA=="
+  },
+  {
+    "_index": {
+      "file": "/ryftone/passengers.txt",
+      "offset": 966,
+      "length": 22,
+      "fuzziness": 0
+    },
+    "data": "LTI1LTE5ODUsMzEwLTU1NS0zNDI1LA=="
+  }
+]
 ```
 
-# How to do search by field's value?
+### Structed request example
+
+[/search?query=(RECORD.id EQUALS "10034183")&files=*.pcrime&surrounding=10&fuzziness=0&format=xml](/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml)
 
 ```
-http://localhost:8765/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml
+[
+{
+  "Arrest": "false",
+  "Beat": "0313",
+  "Block": "062XX S ST LAWRENCE AVE",
+  "CaseNumber": "HY223673",
+  "CommunityArea": "42",
+  "Date": "04/15/2015 11:59:00 PM",
+  "Description": "DOMESTIC BATTERY SIMPLE",
+  "District": "003",
+  "Domestic": "true",
+  "FBICode": "08B",
+  "ID": "10034183",
+  "IUCR": "0486",
+  "Latitude": "41.781961688",
+  "Location": "\"(41.781961688, -87.610984705)\"",
+  "LocationDescription": "STREET",
+  "Longitude": "-87.610984705",
+  "PrimaryType": "BATTERY",
+  "UpdatedOn": "04/22/2015 12:47:10 PM",
+  "Ward": "20",
+  "XCoordinate": "1181263",
+  "YCoordinate": "1863965",
+  "Year": "2015",
+  "_index": {
+    "file": "/ryftone/chicago.pcrime",
+    "offset": 0,
+    "length": 693,
+    "fuzziness": 0
+  }
+}
+]
+```
+
+## Count endpoint
+
+| Method | Input type | Uri | Description |
+| --- | --- | --- | --- |
+| *query* | string | GET /count?query={QUERY} | String that specifying the search criteria. Required file parameter |
+| *files* | string | GET /count?query={QUERY}&files={FILE} | Input data set to be searched. Comma separated list of files or directories. |
+| *fuzziness* | uint8 | GET /count?query={QUERY}&files={FILE}&fuzziness={VALUE} | Specify the fuzzy search distance [0..255] . |
+| *cs* | string | GET /count?query={QUERY}&files={FILE}&cs=true | Case sensitive flag. Default 'false'. |
+| *nodes* | string | GET /count?query={QUERY}&files={FILE}&nodes={VALUE} | Parameter that specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value. |
+
+### Count request example
+
+[/count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime](/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime)
 
 ```
-# How to count matches?
-
+"Matching: 10000"
 ```
-http://localhost:8765//count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime&format=xml
-
-```
-
-# Parameters (TODO)
-* ``query`` is the string specifying the search criteria.
-* ``files``  is the input data set to be searched
-* ``fuzziness`` Specify the fuzzy search distance [0..255]
-* ``cs`` Case sensitive flag. Default 'false'.
-* ``format`` is the parameter for the structed search. Specify the search format.
-* ``surrounding`` width when generating results. For example, a value of 2 means that 2 + * characters before and after a search match will be included with data result
-* ``fields`` specifies needed keys in result. Required format=xml.
-* ``nodes`` specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value .
