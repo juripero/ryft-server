@@ -35,6 +35,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/getryft/ryft-server/crpoll"
@@ -56,6 +57,9 @@ func cleanup(file *os.File) {
 	}
 }
 
+const sepSign string = ","
+
+// SearchParams - parameters that we get from the query to setup search
 type SearchParams struct {
 	Query         string   `form:"query" binding:"required"` // Search query, for example: ( RAW_TEXT CONTAINS "night" )
 	Files         []string `form:"files" binding:"required"` // Source files
@@ -63,10 +67,14 @@ type SearchParams struct {
 	Fuzziness     uint8    `form:"fuzziness"`                // Is the fuzziness of the search. Measured as the maximum Hamming distance.
 	Format        string   `form:"format"`                   // Source format parser name
 	CaseSensitive bool     `form:"cs"`                       // Case sensitive flag
+	Fields        string   `form:"fields"`
+	Keys          []string
+	Nodes         uint8 `form:"nodes"` //Active Nodes Count
 }
 
 func NewSearchParams() (p SearchParams) {
 	p.Format = transcoder.RAWTRANSCODER
+
 	return
 }
 
@@ -78,7 +86,7 @@ func search(c *gin.Context) {
 	// parse request parameters
 	params := NewSearchParams()
 	if err = c.Bind(&params); err != nil {
-		// panic(srverr.New(http.StatusBadRequest, err.Error()))
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
 	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
@@ -97,7 +105,7 @@ func search(c *gin.Context) {
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
 	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
-		// panic(srverr.New(http.StatusBadRequest, err.Error()))
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
 	// get a new unique search index
@@ -122,11 +130,15 @@ func search(c *gin.Context) {
 	indexes, drop := records.Poll(idx, p)
 	recs := dataPoll(indexes, res)
 	items, _ := tcode.Transcode(recs)
-	// go logErrors("Transcode Error: %s", transcodeErrors)
 
 	_ = drop
 
-	streamAllRecords(c, enc, items)
+	if params.Format == "xml" && params.Fields != "" {
+		params.Keys = strings.Split(params.Fields, sepSign)
+		streamSmplRecords(c, enc, items, params.Keys)
+	} else {
+		streamAllRecords(c, enc, items)
+	}
 
 }
 
@@ -147,13 +159,45 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 		}
 
 		if record, ok := <-recs; ok {
-			// log.Printf("RECORD: %+v", record)
 			if err := enc.Write(w, record); err != nil {
 				log.Panicln(err)
 			} else {
 				c.Writer.Flush()
 			}
 			return true
+		} else {
+			enc.End(w)
+			return false
+		}
+	})
+}
+
+func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}, sample []string) {
+	first := true
+
+	c.Stream(func(w io.Writer) bool {
+		if first {
+			enc.Begin(w)
+			first = false
+		}
+
+		if record, ok := <-recs; ok {
+			rec := map[string]interface{}{}
+
+			for i := range sample {
+				value, ok := record.(map[string]interface{})[sample[i]]
+				if ok {
+					rec[sample[i]] = value
+				}
+			}
+			if err := enc.Write(w, rec); err != nil {
+				log.Panicln(err)
+			} else {
+				c.Writer.Flush()
+			}
+
+			return true
+
 		} else {
 			enc.End(w)
 			return false
@@ -196,7 +240,12 @@ func nextData(res *os.File, length uint16) (result []byte) {
 func progress(s *SearchParams, n names.Names) (ch chan error) {
 	ch = make(chan error, 1)
 	go func() {
-		ds := rol.RolDSCreate()
+		var ds *rol.RolDS
+		if s.Nodes == 0 {
+			ds = rol.RolDSCreate()
+		} else {
+			ds = rol.RolDSCreateNodes(s.Nodes)
+		}
 		defer ds.Delete()
 
 		for _, f := range s.Files {

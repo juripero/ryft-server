@@ -50,13 +50,13 @@ type Search struct {
 	FormatConvertor func(r records.IdxRecord) (interface{}, error) // Source format parser (calculating from Format)
 	CaseSensitive   bool                                           // Case sensitive flag
 	out             string                                         // Output format in header (msgpack or json)
-	State	        int	                                          // Output State; for output array wrapper
+	State           int                                            // Output State; for output array wrapper
 }
 
 const (
-	StateBegin 	= iota
-	StateBody	= iota
-	StateEnd		= iota
+	StateBegin = iota
+	StateBody  = iota
+	StateEnd   = iota
 )
 
 const (

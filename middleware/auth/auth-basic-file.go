@@ -32,9 +32,20 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 
+	"gopkg.in/yaml.v2"
+
+	"path/filepath"
+
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	constJson = ".json"
+	constYml  = ".yml"
+	constYaml = ".yaml"
 )
 
 func AuthBasicFile(fileName string) (gin.HandlerFunc, error) {
@@ -49,11 +60,20 @@ func AuthBasicFile(fileName string) (gin.HandlerFunc, error) {
 func readUsersFile(fileName string) (map[string]string, error) {
 	var users map[string]string
 
+	ext := filepath.Ext(fileName)
+
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, err
 	}
-	json.Unmarshal(data, &users)
+	if ext == constJson {
+		err = json.Unmarshal(data, &users)
+	} else if ext == constYaml || ext == constYml {
+		err = yaml.Unmarshal(data, &users)
+	} else {
+		err = errors.New("Unrecognized file extention " + ext)
+	}
+
 	if err != nil {
 		return nil, err
 	}

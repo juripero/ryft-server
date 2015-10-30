@@ -32,6 +32,7 @@ package transcoder
 
 import (
 	"fmt"
+
 	"github.com/getryft/ryft-server/records"
 )
 
@@ -54,12 +55,12 @@ type Index struct {
 }
 
 func GetByFormat(format string) (Transcoder, error) {
-	switch format{
-		case XMLTRANSCODER:
-			return new(XmlTranscoder), nil
-		case RAWTRANSCODER:
-			return new(RawTranscoder), nil
-		default:
-			return nil, fmt.Errorf("Unsupported transcoder format: %s", format)
+	switch format {
+	case XMLTRANSCODER:
+		return new(XmlTranscoder), nil
+	case RAWTRANSCODER:
+		return new(RawTranscoder), nil
+	default:
+		return nil, fmt.Errorf("Unsupported transcoder format: %s", format)
 	}
 }

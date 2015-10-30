@@ -99,27 +99,6 @@ func parseParams() {
 	}
 }
 
-//func readParameters() {
-//Port number
-//	flag.IntVar(&portPtr, "port", 8765, "The http port to listen on")
-//	flag.IntVar(&portPtr, "p", 8765, "The http port to listen on (shorthand)")
-//	//keep-results
-//	flag.BoolVar(&KeepResults, "keep-results", false, "Keep results or delete after response")
-//	flag.BoolVar(&KeepResults, "k", false, "Keep results or delete after response (shorthand)")
-//	//Auth type
-//	flag.StringVar(&authType, "auth", none, "Endable or Disable BasicAuth (can be \"none\" \"basic-system -g *usergroup*\" \"basic-file -f *filename*\")")
-//	flag.StringVar(&authType, "a", none, "Endable or Disable BasicAuth (can be \"none\" \"basic-system -g *usergroup*\" \"basic-file -f *filename*\") (shorthand)")
-//	//Users group
-//	flag.StringVar(&groupName, "users-group", "", "Add user group for the \"basic-system\" ")
-//	flag.StringVar(&groupName, "g", "", "Add user group for the \"basic-system\" (shorthand)")
-//	//Users file
-//	flag.StringVar(&fileName, "users-file", "", "Add user file for the \"basic-file\")")
-//	flag.StringVar(&fileName, "f", "", "Add user file for the \"basic-file\") (shorthand)")
-
-//	flag.Parse()
-//	flagArgs = flag.Args()
-//}
-
 func main() {
 	log.SetFlags(log.Lmicroseconds)
 	parseParams()
@@ -128,8 +107,6 @@ func main() {
 	}
 
 	r := gin.Default()
-
-	//User credentials examples
 
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
@@ -155,9 +132,10 @@ func main() {
 	//Setting routes
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index", nil)
+
 	})
 	r.GET("/search", search)
-
+	r.GET("/count", count)
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
 		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
@@ -178,42 +156,3 @@ func main() {
 	r.Run((*listenAddress).String())
 
 }
-
-//func parseParams(flagArgs []string) (auth.LdapSettings, error) {
-//	var settings auth.LdapSettings
-//	var url, port, query, binduser, bindpass string
-//	for _, s := range flagArgs {
-//		if strings.Contains(s, "url=") {
-//			fmt.Println(s + "\n")
-//			url = strings.Replace(s, "url=", "", 1)
-//		} else if strings.Contains(s, "query=") {
-//			fmt.Println(s + "\n")
-//			query = strings.Replace(s, "query=", "", 1)
-//		} else if strings.Contains(s, "port=") {
-//			port = strings.Replace(s, "port=", "", 1)
-//			fmt.Println(s + "\n")
-//		} else if strings.Contains(s, "binduser=") {
-//			binduser = strings.Replace(s, "binduser=", "", 1)
-//			fmt.Println(s + "\n")
-//		} else if strings.Contains(s, "bindpass=") {
-//			bindpass = strings.Replace(s, "bindpass=", "", 1)
-//			fmt.Println(s + "\n")
-//		}
-//	}
-//	if url != "" && port != "" {
-//		settings = auth.LdapSettings{
-//			port,
-//			url,
-//			query,
-//			binduser,
-//			bindpass,
-//		}
-//		fmt.Println("noerror")
-//		return settings, nil
-//	} else {
-//		fmt.Println("error")
-//		return settings, errors.New("Invalid parameters")
-//	}
-//}
-
-// https://golang.org/src/net/http/status.go -- statuses

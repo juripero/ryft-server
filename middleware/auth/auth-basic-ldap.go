@@ -13,23 +13,25 @@ import (
 	"strings"
 
 	"crypto/tls"
+
 	"github.com/gin-gonic/gin"
 	"gopkg.in/ldap.v2"
 )
 
+//AuthUserKey needed for HTTP response header
 const AuthUserKey = "user"
 
 type (
 	ldapSettings struct {
-		Address string
-		Query string
+		Address      string
+		Query        string
 		BindUsername string
 		BindPassword string
-		BaseDN string
+		BaseDN       string
 	}
 )
 
-// BasicAuthForRealm returns a Basic HTTP Authorization middleware. It takes as arguments a map[string]string where
+// BasicAuthLDAPForRealm returns a Basic HTTP Authorization middleware. It takes as arguments a map[string]string where
 // the key is the user name and the value is the password, as well as the name of the Realm.
 // If the realm is empty, "Authorization Required" will be used by default.
 // (see http://tools.ietf.org/html/rfc2617#section-1.2)
@@ -43,15 +45,13 @@ func BasicAuthLDAPForRealm(settings ldapSettings, realm string) gin.HandlerFunc 
 	return func(c *gin.Context) {
 
 		// Search user in the slice of allowed credentials
-		user, binded := bindLDAP(settings, c.Request.Header.Get("Authorization"))
+		user, binded, code := bindLDAP(settings, c.Request.Header.Get("Authorization"))
 
 		if !binded {
 			// Credentials doesn't match, we return 401 and abort handlers chain.
-//			log.Printf("\nAUTH: %v", "not binded\n")
-			setError(c, realm)
+			setError(c, realm, code)
 
 		} else {
-//			log.Printf("\nAUTH: %v", "binded\n")
 			// The user credentials was found, set user's id to key AuthUserKey in this context, the userId can be read later using
 			// c.MustGet(gin.AuthUserKey)
 			c.Set(AuthUserKey, user)
@@ -59,15 +59,15 @@ func BasicAuthLDAPForRealm(settings ldapSettings, realm string) gin.HandlerFunc 
 	}
 }
 
-func setError(c *gin.Context, realm string) {
+func setError(c *gin.Context, realm string, code int) {
 	c.Header("WWW-Authenticate", realm)
-	c.AbortWithStatus(401)
+	c.AbortWithStatus(code)
 }
 
-// BasicAuth returns a Basic HTTP Authorization middleware. It takes as argument a map[string]string where
+// BasicAuthLDAP returns a Basic HTTP Authorization middleware. It takes as argument a map[string]string where
 // the key is the user name and the value is the password.
 func BasicAuthLDAP(address, username, password, query, baseDN string) gin.HandlerFunc {
-	settings := ldapSettings {
+	settings := ldapSettings{
 		address,
 		query,
 		username,
@@ -82,23 +82,21 @@ func authorizationHeader(user, password string) string {
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(base))
 }
 
-func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
-
-//	log.Printf("LDAP Settings: %+v", settings)
+func bindLDAP(settings ldapSettings, userdata string) (string, bool, int) {
 
 	// The username and password we want to check
 	username, password, ok := parseBasicAuth(userdata)
 
 	if !ok {
-		log.Printf("AUTH: couldn't parse '%v'\n", userdata)
-		return "", false
+		log.Printf("AUTH: Invalid username or password, couldn't parse '%v'\n", userdata)
+		return "", false, 401
 	}
 
 	// Connect to LDAP server
 	l, err := ldap.Dial("tcp", settings.Address)
 	if err != nil {
 		log.Printf("Error Dialing LDAP: %v", err)
-		return "", false
+		return "", false, 500
 	}
 	defer l.Close()
 
@@ -106,14 +104,14 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
 	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		log.Printf("Error using TLS: %v", err)
-		return "", false
+		return "", false, 500
 	}
 
 	// First bind with a read only user
 	err = l.Bind(settings.BindUsername, settings.BindPassword)
 	if err != nil {
 		log.Printf("Error Binding readonly: %v", err)
-		return "", false
+		return "", false, 500
 	}
 
 	// Search for the given username
@@ -128,12 +126,12 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
 	sr, err := l.Search(searchRequest)
 	if err != nil {
 		log.Printf("Error Searching: %v", err)
-		return "", false
+		return "", false, 500
 	}
 
 	if len(sr.Entries) != 1 {
 		log.Printf("User does not exist or too many entries returned: %v", searchRequest)
-		return "", false
+		return "", false, 401
 	}
 
 	userdn := sr.Entries[0].DN
@@ -142,12 +140,13 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool) {
 	err = l.Bind(userdn, password)
 	if err != nil {
 		log.Printf("Error binding User: %v", err)
-		return "", false
+		return "", false, 401
 	}
 
-	return "authorizationHeader(username, password)", true
+	return "authorizationHeader(username, password)", true, 200
 }
 
+//Decode string in Base64 to get username and password
 func parseBasicAuth(auth string) (username, password string, ok bool) {
 	const prefix = "Basic "
 	if !strings.HasPrefix(auth, prefix) {
@@ -164,5 +163,3 @@ func parseBasicAuth(auth string) (username, password string, ok bool) {
 	}
 	return cs[:s], cs[s+1:], true
 }
-
-////////

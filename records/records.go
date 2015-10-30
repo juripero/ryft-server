@@ -150,7 +150,6 @@ func Poll(idx *os.File, errors chan error) (records chan IdxRecord, drop chan st
 
 				// Timeout
 				func() bool {
-					//log.Printf("%s: TIMEOUT.", idx.Name())
 					return true
 				},
 
