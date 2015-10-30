@@ -97,7 +97,7 @@ ryft-server --keep
 ]
 ```
 
-`data` is a base64 encoded bytes of search results.
+`data` is *base64* encoded bytes of search results.
 
 
 ### Structed request example
