@@ -9,6 +9,7 @@ DAEMON_PATH=/usr/bin
 DAEMON=ryft-server
 DAEMONOPTS="@/etc/ryft-rest.conf"
 DEFAULTDAEMONOPTS="0.0.0.0:8765"
+FILELOCATION="/etc/ryft-rest.conf"
 
 NAME=ryft-server-d
 DESC="Ryft server"
@@ -36,7 +37,7 @@ while [[ ! -d $PARTITIONPATH ]]; do
 	printf "\nWaiting for ryftone partition"
 	sleep 5s
 done
-printf "\nDaemon started normaly"
+printf "\nDaemon started normaly\n"
 
 case "$1" in
 start)
@@ -45,12 +46,13 @@ start)
 	#PID=`$DAEMON $DAEMONOPTS > /dev/null 2>&1 & echo $!`
     #PID=`$DAEMON $DAEMONOPTS > /home/ryftuser/ryft-server-d-start.log 2>&1 & echo $!`
     # PID=`$DAEMON $DAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
-
-				if [ -f $DAEMONOPTS ]; then
+echo
+echo $DAEMONOPTS
+				if [ -f $FILELOCATION ]; then
 					PID=`$DAEMON $DAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
 				else
 					echo
-					echo There is no config file was found in /home/ryftuser/ryft-server-d-start.log
+					echo There is no config $FILELOCATION was found in /etc
 					echo Default settings will be 0.0.0.0:8765
 					PID=`$DAEMON $DEFAULTDAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
 				fi
