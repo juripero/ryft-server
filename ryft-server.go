@@ -154,5 +154,4 @@ func main() {
 		go r.RunTLS((*tlsListenAdderess).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	r.Run((*listenAddress).String())
-
 }

@@ -14,7 +14,7 @@ NAME=ryft-server-d
 DESC="Ryft server"
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-
+PARTITIONPATH=/ryftone
 
 export TERM=xterm-256color
 export LC_ALL=en_US.UTF-8
@@ -32,7 +32,11 @@ export SUDO_USER=ryftuser
 export SUDO_UID=1001
 export SUDO_GID=1001
 
-
+while [[ ! -d $PARTITIONPATH ]]; do
+	printf "\nWaiting for ryftone partition"
+	sleep 5s
+done
+printf "\nDaemon started normaly"
 
 case "$1" in
 start)
@@ -45,7 +49,7 @@ start)
 				if [ -f $DAEMONOPTS ]; then
 					PID=`$DAEMON $DAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
 				else
-					echo 
+					echo
 					echo There is no config file was found in /home/ryftuser/ryft-server-d-start.log
 					echo Default settings will be 0.0.0.0:8765
 					PID=`$DAEMON $DEFAULTDAEMONOPTS &>/home/ryftuser/ryft-server-d-start.log & echo $!`
