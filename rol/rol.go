@@ -36,7 +36,10 @@ package rol
 #include <stdlib.h>
 */
 import "C"
-import "unsafe"
+import (
+	"fmt"
+	"unsafe"
+)
 
 type RolDS struct {
 	cds      C.rol_data_set_t
@@ -201,7 +204,9 @@ func (ds *RolDS) TermFrequencyField(
 func (ds *RolDS) HasErrorOccured() *Error {
 	if C.rol_ds_has_error_occurred(ds.cds) {
 		var cErrorText *C.char = C.rol_ds_get_error_string(ds.cds)
-		return &Error{C.GoString(cErrorText)}
+		errText := fmt.Sprintf("(0x%x) %s", ds.cds, C.GoString(cErrorText))
+		// log.Printf("ROL %v", errText)
+		return &Error{errText}
 	} else {
 		return nil
 	}

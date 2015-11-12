@@ -50,6 +50,7 @@ import (
 
 func cleanup(file *os.File) {
 	if file != nil {
+		log.Printf(" Close file %v", file.Name())
 		file.Close()
 		if !*KeepResults {
 			os.Remove(file.Name())
@@ -79,6 +80,7 @@ func NewSearchParams() (p SearchParams) {
 }
 
 func search(c *gin.Context) {
+
 	defer srverr.DeferRecover(c)
 
 	var err error
@@ -112,7 +114,9 @@ func search(c *gin.Context) {
 	n := names.New()
 	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
 
-	p := progress(&params, n)
+	// p := progress(&params, n)
+	p := ryftprim(&params, n)
+	log.Print(n)
 
 	// read an index file
 	var idx, res *os.File
@@ -139,7 +143,6 @@ func search(c *gin.Context) {
 	} else {
 		streamAllRecords(c, enc, items)
 	}
-
 }
 
 func logErrors(format string, errors chan error) {
@@ -239,7 +242,11 @@ func nextData(res *os.File, length uint16) (result []byte) {
 
 func progress(s *SearchParams, n names.Names) (ch chan error) {
 	ch = make(chan error, 1)
+	// num := runtime.NumGoroutine()
+	log.Printf("Routine number = %v", s)
 	go func() {
+		pid := os.Getpid()
+		log.Printf("Process pid = %v", pid)
 		var ds *rol.RolDS
 		if s.Nodes == 0 {
 			ds = rol.RolDSCreate()
