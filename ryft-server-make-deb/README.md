@@ -40,8 +40,13 @@ sudo service ryft-server-d start
 sudo service ryft-server-d stop
 ```
 
-## Setting parameters
+## Setting arguments
 
-You can pass parameters to ryft-server daemon by creating `/etc/ryft-rest.conf` file and restarting ryft-server service. 
-Full list of parameters is listed by running `ryft-server --help`. 
+You can pass arguments to ryft-server daemon by creating `/etc/ryft-rest.conf` file and restarting ryft-server service. 
+Full list of arguments is listed by running `ryft-server --help`. Write arguments each on a separate line. For example: 
+```
+0.0.0.0:9000
+--keep
+--debug
+```
 Daemon will start as follows: `ryft-server @/etc/ryft-rest.conf`
