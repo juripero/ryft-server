@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -10,72 +11,75 @@ import (
 	"github.com/getryft/ryft-server/srverr"
 )
 
-var (
+const (
 	cmd                  = "ryftprim"
-	ps                   = "-p"
+	arg_type             = "-p"
 	fuzzy_hamming_search = "fhs"
-	file                 = "-f"
-	query                = "-q"
-	result_file          = "-od"
-	index_file           = "-oi"
-	surrounding          = "-w"
-	nodes                = "-n"
-	case_sensetivity     = "-i"
-	fuzziness            = "-d"
+	arg_separator        = "-e"
+	no_separator         = ""
+	arg_files            = "-f"
+	arg_result_file      = "-od"
+	arg_index_file       = "-oi"
+	arg_surrounding      = "-w"
+	arg_nodes            = "-n"
+	arg_case_insensetive = "-i"
+	arg_fuzziness        = "-d"
+	arg_query            = "-q"
+	arg_verbose          = "-v"
 )
 
-func ryftprim(s *SearchParams, n names.Names) (ch chan error) {
+func ryftprim(s *SearchParams, n *names.Names) (ch chan error) {
 	ch = make(chan error, 1)
 	go func() {
-		testArgs := make([]string, 0)
+		testArgs := []string{
+			arg_type, fuzzy_hamming_search,
+			arg_separator, no_separator,
+			arg_verbose,
+		}
 
-		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
-		resultFile := names.PathInRyftoneForResultDir(n.ResultFile)
-		// cs := s.CaseSensitive
-		// nc := s.Nodes
-		// sr := s.Surrounding
-		// files := s.Files
-		// fz := s.Fuzziness
+		if !s.CaseSensitive {
+			testArgs = append(testArgs, arg_case_insensetive)
+		}
+
+		if n != nil {
+			idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
+			resultFile := names.PathInRyftoneForResultDir(n.ResultFile)
+
+			testArgs = append(testArgs,
+				arg_index_file, idxFile,
+				arg_result_file, resultFile)
+		}
+
+		for _, file := range s.Files {
+			testArgs = append(testArgs, arg_files, file)
+		}
+
+		if s.Nodes > 0 {
+			testArgs = append(testArgs, arg_nodes, fmt.Sprintf("%d", s.Nodes))
+		}
+
+		if s.Surrounding > 0 {
+			testArgs = append(testArgs, arg_surrounding, fmt.Sprintf("%d", s.Surrounding))
+		}
+
+		if s.Fuzziness > 0 {
+			testArgs = append(testArgs, arg_fuzziness, fmt.Sprintf("%d", s.Fuzziness))
+		}
 
 		query, aErr := url.QueryUnescape(s.Query)
-		log.Print(s)
+
 		if aErr != nil {
 			ch <- srverr.New(http.StatusBadRequest, aErr.Error())
 			return
+		} else {
+			testArgs = append(testArgs, arg_query, query)
 		}
 
-		// testArgs = append(testArgs, ps)
-		// testArgs = append(testArgs, fuzzy_hamming_search)
-		// testArgs = append(testArgs, file)
-		// testArgs = append(testArgs, files[0])
-		// testArgs = append(testArgs, result_file)
-		// testArgs = append(testArgs, resultFile)
-		// testArgs = append(testArgs, index_file)
-		// testArgs = append(testArgs, idxFile)
-		//
-		//
-		// if s.Nodes == 0 {
-		// } else {
-		// 	testArgs = append(testArgs, nodes)
-		// 	testArgs = append(testArgs, string(nc))
-		// }
-
 		log.Print(testArgs)
-		command := exec.Command(cmd, "-p", "fhs",
-			"-q",
-			query,
-			"-f",
-			s.Files[0],
-			"-od",
-			resultFile,
-			"-oi",
-			idxFile,
-			"-w",
-			string(s.Surrounding),
-		)
-		// output, err := command.CombinedOutput()
+		command := exec.Command(cmd, testArgs...)
+
 		output, err := command.CombinedOutput()
-		log.Print(output)
+		log.Printf("\r\n%s", output)
 		command.Run()
 
 		if err != nil {

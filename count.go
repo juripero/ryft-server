@@ -35,7 +35,7 @@ func count(c *gin.Context) {
 	// get a new unique search index
 	n := names.New()
 
-	p := progress(&params, n)
+	p := ryftprim(&params, &n)
 
 	// read an index file
 	var idx *os.File
@@ -43,7 +43,7 @@ func count(c *gin.Context) {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
 	defer cleanup(idx)
-	counter := 0
+	counter := uint64(0)
 	indexes, _ := records.Poll(idx, p)
 	for range indexes {
 		counter++
@@ -51,5 +51,7 @@ func count(c *gin.Context) {
 	fmt.Println()
 
 	// c.JSON(http.StatusOK, fmt.Sprintf("Matching: %v", counter))
-	c.JSON(http.StatusOK, counter)
+	c.JSON(http.StatusOK, struct {
+		Matches uint64
+	}{counter})
 }

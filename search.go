@@ -42,7 +42,7 @@ import (
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/records"
-	"github.com/getryft/ryft-server/rol"
+	//	"github.com/getryft/ryft-server/rol"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
@@ -114,9 +114,7 @@ func search(c *gin.Context) {
 	n := names.New()
 	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
 
-	// p := progress(&params, n)
-	p := ryftprim(&params, n)
-	log.Print(n)
+	p := ryftprim(&params, &n)
 
 	// read an index file
 	var idx, res *os.File
@@ -240,45 +238,45 @@ func nextData(res *os.File, length uint16) (result []byte) {
 	return
 }
 
-func progress(s *SearchParams, n names.Names) (ch chan error) {
-	ch = make(chan error, 1)
-	// num := runtime.NumGoroutine()
-	log.Printf("Routine number = %v", s)
-	go func() {
-		pid := os.Getpid()
-		log.Printf("Process pid = %v", pid)
-		var ds *rol.RolDS
-		if s.Nodes == 0 {
-			ds = rol.RolDSCreate()
-		} else {
-			ds = rol.RolDSCreateNodes(s.Nodes)
-		}
-		defer ds.Delete()
+//func progress(s *SearchParams, n names.Names) (ch chan error) {
+//	ch = make(chan error, 1)
+//	// num := runtime.NumGoroutine()
+//	log.Printf("Routine number = %v", s)
+//	go func() {
+//		pid := os.Getpid()
+//		log.Printf("Process pid = %v", pid)
+//		var ds *rol.RolDS
+//		if s.Nodes == 0 {
+//			ds = rol.RolDSCreate()
+//		} else {
+//			ds = rol.RolDSCreateNodes(s.Nodes)
+//		}
+//		defer ds.Delete()
 
-		for _, f := range s.Files {
-			ok := ds.AddFile(f)
-			if !ok {
-				ch <- srverr.New(http.StatusNotFound, "Could not add file "+f)
-				return
-			}
-		}
+//		for _, f := range s.Files {
+//			ok := ds.AddFile(f)
+//			if !ok {
+//				ch <- srverr.New(http.StatusNotFound, "Could not add file "+f)
+//				return
+//			}
+//		}
 
-		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
+//		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
 
-		resultsDs := ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
-		log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
+//		resultsDs := ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
+//		log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
 
-		defer resultsDs.Delete()
+//		defer resultsDs.Delete()
 
-		if err := resultsDs.HasErrorOccured(); err != nil {
-			if !err.IsStrangeError() {
-				ch <- srverr.New(http.StatusInternalServerError, err.Error())
-				return
-			}
-		}
+//		if err := resultsDs.HasErrorOccured(); err != nil {
+//			if !err.IsStrangeError() {
+//				ch <- srverr.New(http.StatusInternalServerError, err.Error())
+//				return
+//			}
+//		}
 
-		ch <- nil
+//		ch <- nil
 
-	}()
-	return
-}
+//	}()
+//	return
+//}
