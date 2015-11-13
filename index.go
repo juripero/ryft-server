@@ -466,7 +466,7 @@ const IndexHTML = `
 <h3>Count request example</h3>
 <p><a href="/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime">
   /count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&amp;files=*.pcrime</a ></p>
-<pre>"Matching: 10000"</pre>
+<pre>"10000"</pre>
 </div>
     </body>
 </html>
