@@ -385,8 +385,8 @@ const IndexHTML = `
     }
 ]</samp>
 <h3>Structed request example</h3>
-<p><a href="/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml">
-  /search?query=(RECORD.id EQUALS "10034183")&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml</a ></p>
+<p><a href="/search?query=(RECORD.ID%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml">
+  /search?query=(RECORD.ID EQUALS "10034183")&amp;files=*.pcrime&amp;surrounding=10&amp;fuzziness=0&amp;format=xml</a ></p>
 <samp>{
     "Arrest": "false",
     "Beat": "0313",

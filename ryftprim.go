@@ -83,7 +83,7 @@ func ryftprim(s *SearchParams, n *names.Names) (ch chan error) {
 		command.Run()
 
 		if err != nil {
-			ch <- srverr.New(http.StatusInternalServerError, err.Error())
+			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
 			return
 		}
 		ch <- nil
