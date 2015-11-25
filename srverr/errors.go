@@ -43,6 +43,7 @@ import (
 type ServerError struct {
 	Status  int
 	Message string
+	Details string
 }
 
 func (err *ServerError) Error() string {
@@ -50,14 +51,22 @@ func (err *ServerError) Error() string {
 }
 
 func New(status int, message string) *ServerError {
-	return &ServerError{status, message}
+	return &ServerError{status, message, ""}
+}
+
+func NewWithDetails(status int, message string, details string) *ServerError {
+	return &ServerError{status, message, details}
 }
 
 func DeferRecover(c *gin.Context) {
 	if r := recover(); r != nil {
 		if err, ok := r.(*ServerError); ok {
-			log.Printf("Panic recovered server error: status=%d msg:%s", err.Status, err.Message)
-			c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status})
+			log.Printf("Panic recovered server error: status=%d msg:%s => %+v", err.Status, err.Message, err)
+			if len(err.Details) > 0 {
+				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status, "details": err.Details})
+			} else {
+				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status})
+			}
 			return
 		}
 
