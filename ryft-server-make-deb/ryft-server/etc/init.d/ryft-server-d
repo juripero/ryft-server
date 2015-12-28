@@ -33,9 +33,9 @@ export SUDO_USER=ryftuser
 export SUDO_UID=1001
 export SUDO_GID=1001
 
-while [[ ! -d $PARTITIONPATH ]]; do
-	printf "\nWaiting for ryftone partition"
-	sleep 5s
+while [[ -z $(mount | grep ryftone) ]]; do
+    printf "\nWaiting for ryftone partition"
+    sleep 5s
 done
 printf "\nDaemon started normaly\n"
 
