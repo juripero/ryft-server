@@ -28,9 +28,31 @@
  * ============
  */
 
+/*
+	Package classification Ryft REST.
+
+	the purpose of this application is to create REST connector to the Ryft One hardware
+
+
+	Schemes: http, https
+	Host: 192.168.57.101:8765
+	BasePath: /swagger.json
+	Version: 1.0
+
+	Consumes:
+		- application/json
+		- application/xml
+
+	Produces:
+		-application/msgpack
+		-application/json
+
+	swagger:meta
+*/
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -99,6 +121,7 @@ func parseParams() {
 	}
 }
 
+// RyftAPI include search, index, count, test
 func main() {
 	log.SetFlags(log.Lmicroseconds)
 	parseParams()
@@ -108,8 +131,17 @@ func main() {
 
 	r := gin.Default()
 
+	gopath := os.Getenv("GOPATH")
+	swagger_file_path := fmt.Sprintf("%s%s", gopath, "/bin/swagger.json")
+
 	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
 	r.SetHTMLTemplate(indexTemplate)
+
+	r.GET("/swagger.json", func(c *gin.Context) {
+		setHeaders(c)
+
+		c.File(swagger_file_path)
+	})
 
 	switch *authType {
 	case "file":
@@ -129,12 +161,29 @@ func main() {
 	}
 
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
-	//Setting routes
+
 	r.GET("/", func(c *gin.Context) {
+		setHeaders(c)
 		c.HTML(http.StatusOK, "index", nil)
 
 	})
+
+	//swagger:route GET /search  search
+	//
+	//Search
+	//
+	//Endpoint for the search
+	//
+	//
 	r.GET("/search", search)
+
+	//swagger:route GET /count  count
+	//
+	//Count
+	//
+	//Endpoint for the count
+	//
+	//
 	r.GET("/count", count)
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
@@ -154,4 +203,13 @@ func main() {
 		go r.RunTLS((*tlsListenAdderess).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	r.Run((*listenAddress).String())
+}
+
+func setHeaders(c *gin.Context) {
+	c.Header("Access-Control-Allow-Headers", "x-requested-with, Content-Type, *")
+	c.Header("Access-Control-Allow-Methods", "POST, GET, PUT")
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Expose-Headers", "Set-Cookie")
+	c.Header("Access-Control-Request-Headers", " Origin, X-Atmosphere-tracking-id, X-Atmosphere-Framework, X-Cache-Date, Content-Type, X-Atmosphere-Transport, *")
+
 }

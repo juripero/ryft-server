@@ -37,6 +37,7 @@ while [[ ! -d $PARTITIONPATH ]]; do
 	printf "\nWaiting for ryftone partition"
 	sleep 5s
 done
+	sleep 2m
 printf "\nDaemon started normaly\n"
 
 case "$1" in

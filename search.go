@@ -61,16 +61,35 @@ func cleanup(file *os.File) {
 const sepSign string = ","
 
 // SearchParams - parameters that we get from the query to setup search
+
+/*
+SearchParams contains all the bound params for the search operation
+
+swagger:parameters search
+
+*/
 type SearchParams struct {
-	Query         string   `form:"query" binding:"required"` // Search query, for example: ( RAW_TEXT CONTAINS "night" )
-	Files         []string `form:"files" binding:"required"` // Source files
-	Surrounding   uint16   `form:"surrounding"`              // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-	Fuzziness     uint8    `form:"fuzziness"`                // Is the fuzziness of the search. Measured as the maximum Hamming distance.
-	Format        string   `form:"format"`                   // Source format parser name
-	CaseSensitive bool     `form:"cs"`                       // Case sensitive flag
-	Fields        string   `form:"fields"`
-	Keys          []string
-	Nodes         uint8 `form:"nodes"` //Active Nodes Count
+	// Search query, for example: ( RAW_TEXT CONTAINS "night" )
+	// Required: true
+	Query string `form:"query" json:"query" binding:"required"`
+	// Source files
+	//Required: true
+	Files []string `form:"files" json:"files" binding:"required"`
+	// Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
+	Surrounding uint16 `form:"surrounding" json:"surrounding"`
+	// Is the fuzziness of the search. Measured as the maximum Hamming distance.
+	Fuzziness uint8 `form:"fuzziness" json:"fuzziness"`
+	// Source format parser name
+	Format string `form:"format" json:"format"`
+	// Case sensitive flag
+	CaseSensitive bool   `form:"cs" json:"cs"`
+	Fields        string `form:"fields" json:"fields"`
+	//
+	Keys []string `json:"keys"`
+	//Active Nodes Count
+	//minimum: 0
+	//maximum: 4
+	Nodes uint8 `form:"nodes" json:"nodes"`
 }
 
 func NewSearchParams() (p SearchParams) {
@@ -96,7 +115,7 @@ func search(c *gin.Context) {
 	if accept == "" {
 		accept = encoder.MIMEJSON
 	}
-
+	setHeaders(c)
 	// setting up encoder to respond with requested format
 	var enc encoder.Encoder
 	if enc, err = encoder.GetByMimeType(accept); err != nil {

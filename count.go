@@ -13,6 +13,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+//swagger:parameters count
+type CountParams struct {
+	// Search query, for example: ( RAW_TEXT CONTAINS "night" )
+	// Required: true
+	Query string `form:"query" json:"query" binding:"required"`
+	// Source files
+	//Required: true
+	Files []string `form:"files" json:"files" binding:"required"`
+	// Is the fuzziness of the search. Measured as the maximum Hamming distance.
+	Fuzziness uint8 `form:"fuzziness" json:"fuzziness"`
+	// Case sensitive flag
+	CaseSensitive bool `form:"cs" json:"cs"`
+	//Active Nodes Count
+	//minimum: 0
+	//maximum: 4
+	Nodes uint8 `form:"nodes" json:"nodes"`
+}
+
 func count(c *gin.Context) {
 	defer srverr.DeferRecover(c)
 
@@ -30,8 +48,9 @@ func count(c *gin.Context) {
 		accept = encoder.MIMEJSON
 	}
 
-	c.Header("Content-Type", accept)
+	setHeaders(c)
 
+	c.Header("Content-Type", accept)
 	// get a new unique search index
 	n := names.New()
 

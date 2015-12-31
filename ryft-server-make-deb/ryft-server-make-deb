@@ -25,6 +25,19 @@ if [ ! -d "ryft-server/usr/bin" ]; then
   mkdir -pv ryft-server/usr/bin
 fi
 
+FILE_RYFT_SWAGGER="$GOPATH/bin/swagger.json"
+
+echo "Swagger spec generating started"
+sgc="(cd .. &&swagger generate spec -o $FILE_RYFT_SWAGGER)"
+eval $sgc
+echo "Swagger spec generating finished"
+if [ -f $FILE_RYFT_SWAGGER ]; then
+	cp $FILE_RYFT_SWAGGER ryft-server/usr/bin
+else
+	echo "No file = $FILE_RYFT_SERVER was founded"
+	echo "Please go to ~/src/ryft-server/ and make 'swagger generate spec -o $FILE_RYFT_SWAGGER' command"
+fi
+
 FILE_RYFT_SERVER="$GOPATH/bin/ryft-server"
 
 if [ -f $FILE_RYFT_SERVER ]; then
