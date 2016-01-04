@@ -31,17 +31,16 @@
 package main
 
 import (
+	"github.com/getryft/ryft-server/crpoll"
+	"github.com/getryft/ryft-server/encoder"
+	"github.com/getryft/ryft-server/names"
+	"github.com/getryft/ryft-server/records"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/getryft/ryft-server/crpoll"
-	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/records"
 	//	"github.com/getryft/ryft-server/rol"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
@@ -138,13 +137,21 @@ func search(c *gin.Context) {
 	// read an index file
 	var idx, res *os.File
 	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
-		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+		if serr, ok := err.(*srverr.ServerError); ok {
+			panic(serr)
+		} else {
+			panic(srverr.New(http.StatusInternalServerError, err.Error()))
+		}
 	}
 	defer cleanup(idx)
 
 	//read a results file
 	if res, err = crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
-		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+		if serr, ok := err.(*srverr.ServerError); ok {
+			panic(serr)
+		} else {
+			panic(srverr.New(http.StatusInternalServerError, err.Error()))
+		}
 	}
 	defer cleanup(res)
 
