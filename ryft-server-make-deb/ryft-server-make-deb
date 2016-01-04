@@ -27,18 +27,7 @@ if [ ! -d "ryft-server/usr/bin" ]; then
   mkdir -pv ryft-server/usr/bin
 fi
 
-FILE_RYFT_SWAGGER="$cwd/swagger.json"
-
-echo "Swagger spec generating started"
-eval "(cd .. &&swagger generate spec -o $FILE_RYFT_SWAGGER)"
-echo "Swagger spec generating finished"
-echo "Getting go-bindata"
-eval "(cd .. &&go get -u github.com/jteeuwen/go-bindata/...)"
-echo "Got go-bindata"
-echo "Creating Assets"
-eval "(cd .. &&go-bindata -o bindata.go index.html $FILE_RYFT_SWAGGER)"
-echo "Assets created"
-
+eval "(cd .. && chmod +x makefile && ./makefile)"
 
 FILE_RYFT_SERVER="$GOPATH/bin/ryft-server"
 
