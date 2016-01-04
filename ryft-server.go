@@ -53,7 +53,6 @@ package main
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -131,21 +130,18 @@ func main() {
 
 	r := gin.Default()
 
-	gopath := os.Getenv("GOPATH")
-	swagger_file_path := fmt.Sprintf("%s%s", gopath, "/bin/swagger.json")
-
-	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
-	r.SetHTMLTemplate(indexTemplate)
+	swaggerJSON, err := Asset("swagger.json")
+	if err != nil {
+		fmt.Println("No file swagger.json was found ")
+	}
 
 	r.GET("/swagger.json", func(c *gin.Context) {
 		setHeaders(c)
-
-		c.File(swagger_file_path)
+		c.Data(http.StatusOK, http.DetectContentType(swaggerJSON), swaggerJSON)
 	})
 
 	switch *authType {
 	case "file":
-
 		auth, err := auth.AuthBasicFile(*authUsersFile)
 		if err != nil {
 			log.Printf("Error reading users file: %v", err)
@@ -162,10 +158,14 @@ func main() {
 
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
+	idxHTML, err := Asset("index.html")
+	if err != nil {
+		fmt.Println("No file index.html was found ")
+	}
+
 	r.GET("/", func(c *gin.Context) {
 		setHeaders(c)
-		c.HTML(http.StatusOK, "index", nil)
-
+		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
 
 	//swagger:route GET /search  search
@@ -210,6 +210,6 @@ func setHeaders(c *gin.Context) {
 	c.Header("Access-Control-Allow-Methods", "POST, GET, PUT")
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Access-Control-Expose-Headers", "Set-Cookie")
-	c.Header("Access-Control-Request-Headers", " Origin, X-Atmosphere-tracking-id, X-Atmosphere-Framework, X-Cache-Date, Content-Type, X-Atmosphere-Transport, *")
+	c.Header("Access-Control-Request-Headers", "Origin, X-Atmosphere-tracking-id, X-Atmosphere-Framework, X-Cache-Date, Content-Type, X-Atmosphere-Transport, *")
 
 }
