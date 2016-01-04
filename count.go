@@ -48,8 +48,6 @@ func count(c *gin.Context) {
 		accept = encoder.MIMEJSON
 	}
 
-	setHeaders(c)
-
 	c.Header("Content-Type", accept)
 	// get a new unique search index
 	n := names.New()

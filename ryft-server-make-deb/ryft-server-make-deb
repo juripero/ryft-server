@@ -30,8 +30,7 @@ fi
 FILE_RYFT_SWAGGER="$cwd/swagger.json"
 
 echo "Swagger spec generating started"
-sgc="(cd .. &&swagger generate spec -o $FILE_RYFT_SWAGGER)"
-eval $sgc
+eval "(cd .. &&swagger generate spec -o $FILE_RYFT_SWAGGER)"
 echo "Swagger spec generating finished"
 echo "Getting go-bindata"
 eval "(cd .. &&go get -u github.com/jteeuwen/go-bindata/...)"

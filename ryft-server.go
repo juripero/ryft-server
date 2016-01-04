@@ -58,6 +58,7 @@ import (
 	"os"
 
 	"github.com/getryft/ryft-server/middleware/auth"
+	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
 
@@ -129,6 +130,7 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.Use(cors.Cors())
 
 	swaggerJSON, err := Asset("swagger.json")
 	if err != nil {
@@ -136,7 +138,6 @@ func main() {
 	}
 
 	r.GET("/swagger.json", func(c *gin.Context) {
-		setHeaders(c)
 		c.Data(http.StatusOK, http.DetectContentType(swaggerJSON), swaggerJSON)
 	})
 
@@ -164,7 +165,6 @@ func main() {
 	}
 
 	r.GET("/", func(c *gin.Context) {
-		setHeaders(c)
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
 
@@ -203,13 +203,4 @@ func main() {
 		go r.RunTLS((*tlsListenAdderess).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	r.Run((*listenAddress).String())
-}
-
-func setHeaders(c *gin.Context) {
-	c.Header("Access-Control-Allow-Headers", "x-requested-with, Content-Type, *")
-	c.Header("Access-Control-Allow-Methods", "POST, GET, PUT")
-	c.Header("Access-Control-Allow-Origin", "*")
-	c.Header("Access-Control-Expose-Headers", "Set-Cookie")
-	c.Header("Access-Control-Request-Headers", "Origin, X-Atmosphere-tracking-id, X-Atmosphere-Framework, X-Cache-Date, Content-Type, X-Atmosphere-Transport, *")
-
 }

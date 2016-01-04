@@ -31,16 +31,17 @@
 package main
 
 import (
-	"github.com/getryft/ryft-server/crpoll"
-	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/records"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/getryft/ryft-server/crpoll"
+	"github.com/getryft/ryft-server/encoder"
+	"github.com/getryft/ryft-server/names"
+	"github.com/getryft/ryft-server/records"
 	//	"github.com/getryft/ryft-server/rol"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
@@ -114,7 +115,6 @@ func search(c *gin.Context) {
 	if accept == "" {
 		accept = encoder.MIMEJSON
 	}
-	setHeaders(c)
 	// setting up encoder to respond with requested format
 	var enc encoder.Encoder
 	if enc, err = encoder.GetByMimeType(accept); err != nil {
@@ -263,46 +263,3 @@ func nextData(res *os.File, length uint16) (result []byte) {
 	}
 	return
 }
-
-//func progress(s *SearchParams, n names.Names) (ch chan error) {
-//	ch = make(chan error, 1)
-//	// num := runtime.NumGoroutine()
-//	log.Printf("Routine number = %v", s)
-//	go func() {
-//		pid := os.Getpid()
-//		log.Printf("Process pid = %v", pid)
-//		var ds *rol.RolDS
-//		if s.Nodes == 0 {
-//			ds = rol.RolDSCreate()
-//		} else {
-//			ds = rol.RolDSCreateNodes(s.Nodes)
-//		}
-//		defer ds.Delete()
-
-//		for _, f := range s.Files {
-//			ok := ds.AddFile(f)
-//			if !ok {
-//				ch <- srverr.New(http.StatusNotFound, "Could not add file "+f)
-//				return
-//			}
-//		}
-
-//		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
-
-//		resultsDs := ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
-//		log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
-
-//		defer resultsDs.Delete()
-
-//		if err := resultsDs.HasErrorOccured(); err != nil {
-//			if !err.IsStrangeError() {
-//				ch <- srverr.New(http.StatusInternalServerError, err.Error())
-//				return
-//			}
-//		}
-
-//		ch <- nil
-
-//	}()
-//	return
-//}
