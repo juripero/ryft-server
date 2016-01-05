@@ -92,6 +92,11 @@ type SearchParams struct {
 	Nodes uint8 `form:"nodes" json:"nodes"`
 }
 
+// SearchResponse is a search result in an array with an elaments of various structure
+//swagger:response searchResp
+type SearchResponse map[string]interface{}
+
+// NewSearchParams sets format to the SearchParams
 func NewSearchParams() (p SearchParams) {
 	p.Format = transcoder.RAWTRANSCODER
 
@@ -192,10 +197,10 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 				c.Writer.Flush()
 			}
 			return true
-		} else {
-			enc.End(w)
-			return false
 		}
+		enc.End(w)
+		return false
+
 	})
 }
 
@@ -209,10 +214,11 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 		}
 
 		if record, ok := <-recs; ok {
-			rec := map[string]interface{}{}
+
+			rec := SearchResponse{}
 
 			for i := range sample {
-				value, ok := record.(map[string]interface{})[sample[i]]
+				value, ok := record.(SearchResponse)[sample[i]]
 				if ok {
 					rec[sample[i]] = value
 				}
@@ -225,15 +231,16 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 
 			return true
 
-		} else {
-			enc.End(w)
-			return false
 		}
+		enc.End(w)
+		return false
 	})
 }
 
 const (
-	PollingInterval    = time.Millisecond * 50
+	// PollingInterval is a const for polling time
+	PollingInterval = time.Millisecond * 50
+	// PollBufferCapacity is a max buffer size
 	PollBufferCapacity = 64
 )
 
@@ -250,7 +257,7 @@ func dataPoll(input chan records.IdxRecord, dataFile *os.File) chan records.IdxR
 }
 
 func nextData(res *os.File, length uint16) (result []byte) {
-	var total uint16 = 0
+	var total uint16
 	for total < length {
 		data := make([]byte, length-total)
 		n, _ := res.Read(data)

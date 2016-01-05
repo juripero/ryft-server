@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// CountParams is a parameters for matches count endpoint
 //swagger:parameters count
 type CountParams struct {
 	// Search query, for example: ( RAW_TEXT CONTAINS "night" )
@@ -29,6 +30,13 @@ type CountParams struct {
 	//minimum: 0
 	//maximum: 4
 	Nodes uint8 `form:"nodes" json:"nodes"`
+}
+
+// CountResponse returnes matches for query
+//swagger:response countResp
+type CountResponse struct {
+	//Required: true
+	Matches uint64
 }
 
 func count(c *gin.Context) {
@@ -68,7 +76,5 @@ func count(c *gin.Context) {
 	fmt.Println()
 
 	// c.JSON(http.StatusOK, fmt.Sprintf("Matching: %v", counter))
-	c.JSON(http.StatusOK, struct {
-		Matches uint64
-	}{counter})
+	c.JSON(http.StatusOK, CountResponse{counter})
 }

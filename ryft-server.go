@@ -29,25 +29,24 @@
  */
 
 /*
-	Package classification Ryft REST.
+Package classification Ryft REST.
+the purpose of this application is to create REST connector to the Ryft One hardware
 
-	the purpose of this application is to create REST connector to the Ryft One hardware
 
+Schemes: http, https
+Host: 192.168.57.101:8765
+BasePath: /swagger.json
+Version: 1.0
 
-	Schemes: http, https
-	Host: 192.168.57.101:8765
-	BasePath: /swagger.json
-	Version: 1.0
+Consumes:
+	- application/json
+	- application/xml
 
-	Consumes:
-		- application/json
-		- application/xml
+Produces:
+	-application/msgpack
+	-application/json
 
-	Produces:
-		-application/msgpack
-		-application/json
-
-	swagger:meta
+swagger:meta
 */
 package main
 
@@ -67,6 +66,7 @@ import (
 )
 
 var (
+	// KeepResults console flag for keeping results files
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
 	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
 
@@ -174,6 +174,9 @@ func main() {
 	//
 	//Endpoint for the search
 	//
+	// Responses:
+	// 	200: searchResp
+	//
 	//
 	r.GET("/search", search)
 
@@ -183,6 +186,8 @@ func main() {
 	//
 	//Endpoint for the count
 	//
+	//Responses:
+	// 200: countResp
 	//
 	r.GET("/count", count)
 	// Clean previously created folder
