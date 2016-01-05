@@ -33,9 +33,10 @@ type CountParams struct {
 }
 
 // CountResponse returnes matches for query
-//swagger:response countResp
+// swagger:response countResp
 type CountResponse struct {
-	//Required: true
+	/*Matches matches
+	 */
 	Matches uint64
 }
 
@@ -45,7 +46,7 @@ func count(c *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := NewSearchParams()
+	params := CountParams{}
 	if err = c.Bind(&params); err != nil {
 		// panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
@@ -60,7 +61,15 @@ func count(c *gin.Context) {
 	// get a new unique search index
 	n := names.New()
 
-	p := ryftprim(&params, &n)
+	ryftParams := &RyftprimParams{
+		Query:         params.Query,
+		Files:         params.Files,
+		Fuzziness:     params.Fuzziness,
+		CaseSensitive: params.CaseSensitive,
+		Nodes:         params.Nodes,
+	}
+
+	p := ryftprim(ryftParams, &n)
 
 	// read an index file
 	var idx *os.File

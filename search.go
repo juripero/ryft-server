@@ -92,15 +92,14 @@ type SearchParams struct {
 	Nodes uint8 `form:"nodes" json:"nodes"`
 }
 
-// SearchResponse is a search result in an array with an elaments of various structure
-//swagger:response searchResp
+//SearchResponse bla bla
 type SearchResponse map[string]interface{}
 
-// NewSearchParams sets format to the SearchParams
-func NewSearchParams() (p SearchParams) {
-	p.Format = transcoder.RAWTRANSCODER
-
-	return
+// SearchResponseOK is a search result in an array with an elaments of various structure
+// swagger:response searchResp
+type SearchResponseOK struct {
+	//In: body
+	Response []map[string]interface{} `json:",string"`
 }
 
 func search(c *gin.Context) {
@@ -110,7 +109,8 @@ func search(c *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := NewSearchParams()
+	params := SearchParams{}
+	params.Format = transcoder.RAWTRANSCODER
 	if err = c.Bind(&params); err != nil {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
@@ -137,7 +137,18 @@ func search(c *gin.Context) {
 	n := names.New()
 	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
 
-	p := ryftprim(&params, &n)
+	ryftParams := &RyftprimParams{
+		Query:         params.Query,
+		Files:         params.Files,
+		Surrounding:   params.Surrounding,
+		Fuzziness:     params.Fuzziness,
+		Format:        params.Format,
+		CaseSensitive: params.CaseSensitive,
+		Fields:        params.Fields,
+		Keys:          params.Keys,
+		Nodes:         params.Nodes,
+	}
+	p := ryftprim(ryftParams, &n)
 
 	// read an index file
 	var idx, res *os.File
