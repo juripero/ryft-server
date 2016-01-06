@@ -27,27 +27,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
-
-/*
-Package classification Ryft REST.
-the purpose of this application is to create REST connector to the Ryft One hardware
-
-
-Schemes: http, https
-Host: 192.168.57.101:8765
-BasePath: /swagger.json
-Version: 1.0
-
-Consumes:
-	- application/json
-	- application/xml
-
-Produces:
-	-application/msgpack
-	-application/json
-
-swagger:meta
-*/
 package main
 
 import (
@@ -168,27 +147,8 @@ func main() {
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
 
-	//swagger:route GET /search  search
-	//
-	//Search
-	//
-	//Endpoint for the search
-	//
-	// Responses:
-	// 	200: searchResp
-	//
-	//
 	r.GET("/search", search)
 
-	//swagger:route GET /count  count
-	//
-	//Count
-	//
-	//Endpoint for the count
-	//
-	//Responses:
-	// 200: countResp
-	//
 	r.GET("/count", count)
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {

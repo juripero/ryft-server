@@ -14,30 +14,18 @@ import (
 )
 
 // CountParams is a parameters for matches count endpoint
-//swagger:parameters count
 type CountParams struct {
-	// Search query, for example: ( RAW_TEXT CONTAINS "night" )
-	// Required: true
-	Query string `form:"query" json:"query" binding:"required"`
-	// Source files
-	//Required: true
-	Files []string `form:"files" json:"files" binding:"required"`
-	// Is the fuzziness of the search. Measured as the maximum Hamming distance.
-	Fuzziness uint8 `form:"fuzziness" json:"fuzziness"`
-	// Case sensitive flag
-	CaseSensitive bool `form:"cs" json:"cs"`
-	//Active Nodes Count
-	//minimum: 0
-	//maximum: 4
-	Nodes uint8 `form:"nodes" json:"nodes"`
+	Query         string   `form:"query" json:"query" binding:"required"`
+	Files         []string `form:"files" json:"files" binding:"required"`
+	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
+	CaseSensitive bool     `form:"cs" json:"cs"`
+	Nodes         uint8    `form:"nodes" json:"nodes"`
 }
 
 // CountResponse returnes matches for query
-// swagger:response countResp
+//
 type CountResponse struct {
-	/*Matches matches
-	 */
-	Matches uint64
+	Mathces uint64 `json:"matches, string"`
 }
 
 func count(c *gin.Context) {

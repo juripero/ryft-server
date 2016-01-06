@@ -60,47 +60,23 @@ func cleanup(file *os.File) {
 
 const sepSign string = ","
 
-// SearchParams - parameters that we get from the query to setup search
-
 /*
 SearchParams contains all the bound params for the search operation
-
-swagger:parameters search
-
 */
 type SearchParams struct {
-	// Search query, for example: ( RAW_TEXT CONTAINS "night" )
-	// Required: true
-	Query string `form:"query" json:"query" binding:"required"`
-	// Source files
-	//Required: true
-	Files []string `form:"files" json:"files" binding:"required"`
-	// Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-	Surrounding uint16 `form:"surrounding" json:"surrounding"`
-	// Is the fuzziness of the search. Measured as the maximum Hamming distance.
-	Fuzziness uint8 `form:"fuzziness" json:"fuzziness"`
-	// Source format parser name
-	Format string `form:"format" json:"format"`
-	// Case sensitive flag
-	CaseSensitive bool   `form:"cs" json:"cs"`
-	Fields        string `form:"fields" json:"fields"`
-	//
-	Keys []string `json:"keys"`
-	//Active Nodes Count
-	//minimum: 0
-	//maximum: 4
-	Nodes uint8 `form:"nodes" json:"nodes"`
+	Query         string   `form:"query" json:"query" binding:"required"`
+	Files         []string `form:"files" json:"files" binding:"required"`
+	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
+	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
+	Format        string   `form:"format" json:"format"`
+	CaseSensitive bool     `form:"cs" json:"cs"`
+	Fields        string   `form:"fields" json:"fields"`
+	Keys          []string `json:"keys"`
+	Nodes         uint8    `form:"nodes" json:"nodes"`
 }
 
 //SearchResponse bla bla
 type SearchResponse map[string]interface{}
-
-// SearchResponseOK is a search result in an array with an elaments of various structure
-// swagger:response searchResp
-type SearchResponseOK struct {
-	//In: body
-	Response []map[string]interface{} `json:",string"`
-}
 
 func search(c *gin.Context) {
 
