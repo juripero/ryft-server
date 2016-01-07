@@ -7,8 +7,11 @@ import (
 	"net/url"
 	"os/exec"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/srverr"
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -40,8 +43,17 @@ type RyftprimParams struct {
 	Nodes         uint8
 }
 
-func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error) {
+type RyftprimOut struct {
+	Duration       uint64
+	TotalBytes     uint64
+	Matches        uint64
+	FabricDataRate string
+	DataRate       string
+}
+
+func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan map[interface{}]interface{}) {
 	ch = make(chan error, 1)
+	headers = make(chan map[interface{}]interface{})
 	go func() {
 		testArgs := []string{
 			arg_type, fuzzy_hamming_search,
@@ -83,23 +95,43 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error) {
 		if aErr != nil {
 			ch <- srverr.New(http.StatusBadRequest, aErr.Error())
 			return
-		} else {
-			testArgs = append(testArgs, arg_query, query)
 		}
+		testArgs = append(testArgs, arg_query, query)
 
 		log.Print(testArgs)
 		command := exec.Command(cmd, testArgs...)
 
 		output, err := command.CombinedOutput()
-		log.Printf("\r\n%s", output)
+		// log.Printf("\r\n%s", output)
+		// log.Printf("Duration %+v Length %+v", output[1], len(output))
 		command.Run()
 
 		if err != nil {
 			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
 			return
 		}
+
+		m := make(map[interface{}]interface{})
+		err = yaml.Unmarshal([]byte(output), m)
+		// log.Printf("--- m:\n%v\n\n", m)
+		//
+		// log.Printf("MAPA Value: %v ", m["Duration"])
+		if err != nil {
+			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
+			return
+		}
+		headers <- m
 		ch <- nil
 	}()
 
 	return
+}
+
+func setHeaders(c *gin.Context, m map[interface{}]interface{}) {
+	log.Printf("--- m:\n%v\n\n", m)
+	c.Header("X-Duration", fmt.Sprintf("%+v", m["Duration"]))
+	c.Header("X-Total-Bytes", fmt.Sprintf("%+v", m["Total Bytes"]))
+	c.Header("X-Matches", fmt.Sprintf("%+v", m["Matches"]))
+	c.Header("X-Fabric-Data-Rate", fmt.Sprintf("%+v", m["Fabric Data Rate"]))
+	c.Header("X-Data-Rate", fmt.Sprintf("%+v", m["Data Rate"]))
 }

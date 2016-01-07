@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
-	"os"
+	"strconv"
 
-	"github.com/getryft/ryft-server/crpoll"
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/records"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/gin-gonic/gin"
 )
@@ -57,21 +56,27 @@ func count(c *gin.Context) {
 		Nodes:         params.Nodes,
 	}
 
-	p := ryftprim(ryftParams, &n)
-
+	_, headers := ryftprim(ryftParams, &n)
+	m := <-headers
+	log.Printf(" Count--- m:\n%v\n\n", m)
+	setHeaders(c, m)
 	// read an index file
-	var idx *os.File
-	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
-		panic(srverr.New(http.StatusInternalServerError, err.Error()))
-	}
-	defer cleanup(idx)
-	counter := uint64(0)
-	indexes, _ := records.Poll(idx, p)
-	for range indexes {
-		counter++
-	}
-	fmt.Println()
+	// var idx *os.File
+	// if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
+	// 	panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	// }
+	// defer cleanup(idx)
+	// counter := uint64(0)
+	// indexes, _ := records.Poll(idx, p)
+	// for range indexes {
+	// 	counter++
+	// }
+	// fmt.Println()
 
 	// c.JSON(http.StatusOK, fmt.Sprintf("Matching: %v", counter))
-	c.JSON(http.StatusOK, CountResponse{counter})
+	matches, err := strconv.ParseUint(fmt.Sprintf("%v", m["Matches"]), 0, 64)
+	if err != nil {
+		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	}
+	c.JSON(http.StatusOK, CountResponse{matches})
 }

@@ -22,8 +22,6 @@ function generateAssets {
 function buildRyftRest {
   echo "Building ryft-server"
   eval go install
-  echo "Starting ryft-rest"
-  eval ryft-server
 }
 
 

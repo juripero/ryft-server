@@ -124,8 +124,10 @@ func search(c *gin.Context) {
 		Keys:          params.Keys,
 		Nodes:         params.Nodes,
 	}
-	p := ryftprim(ryftParams, &n)
-
+	p, headers := ryftprim(ryftParams, &n)
+	m := <-headers
+	log.Printf("--- m:\n%v\n\n", m)
+	setHeaders(c, m)
 	// read an index file
 	var idx, res *os.File
 	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
