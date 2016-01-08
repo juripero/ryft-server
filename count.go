@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/getryft/ryft-server/encoder"
@@ -47,6 +47,8 @@ func count(c *gin.Context) {
 	c.Header("Content-Type", accept)
 	// get a new unique search index
 	n := names.New()
+	defer os.Remove(names.ResultsDirPath(n.IdxFile))
+	defer os.Remove(names.ResultsDirPath(n.ResultFile))
 
 	ryftParams := &RyftprimParams{
 		Query:         params.Query,
@@ -58,22 +60,8 @@ func count(c *gin.Context) {
 
 	_, headers := ryftprim(ryftParams, &n)
 	m := <-headers
-	log.Printf(" Count--- m:\n%v\n\n", m)
 	setHeaders(c, m)
-	// read an index file
-	// var idx *os.File
-	// if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
-	// 	panic(srverr.New(http.StatusInternalServerError, err.Error()))
-	// }
-	// defer cleanup(idx)
-	// counter := uint64(0)
-	// indexes, _ := records.Poll(idx, p)
-	// for range indexes {
-	// 	counter++
-	// }
-	// fmt.Println()
 
-	// c.JSON(http.StatusOK, fmt.Sprintf("Matching: %v", counter))
 	matches, err := strconv.ParseUint(fmt.Sprintf("%v", m["Matches"]), 0, 64)
 	if err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))

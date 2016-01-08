@@ -11,7 +11,6 @@ import (
 
 	"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/srverr"
-	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -41,14 +40,6 @@ type RyftprimParams struct {
 	Fields        string
 	Keys          []string
 	Nodes         uint8
-}
-
-type RyftprimOut struct {
-	Duration       uint64
-	TotalBytes     uint64
-	Matches        uint64
-	FabricDataRate string
-	DataRate       string
 }
 
 func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan map[interface{}]interface{}) {
@@ -125,13 +116,4 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan ma
 	}()
 
 	return
-}
-
-func setHeaders(c *gin.Context, m map[interface{}]interface{}) {
-	log.Printf("--- m:\n%v\n\n", m)
-	c.Header("X-Duration", fmt.Sprintf("%+v", m["Duration"]))
-	c.Header("X-Total-Bytes", fmt.Sprintf("%+v", m["Total Bytes"]))
-	c.Header("X-Matches", fmt.Sprintf("%+v", m["Matches"]))
-	c.Header("X-Fabric-Data-Rate", fmt.Sprintf("%+v", m["Fabric Data Rate"]))
-	c.Header("X-Data-Rate", fmt.Sprintf("%+v", m["Data Rate"]))
 }

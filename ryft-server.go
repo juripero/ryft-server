@@ -60,10 +60,10 @@ var (
 
 	listenAddress = kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").TCP()
 
-	tlsEnabled        = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
-	tlsCrtFile        = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
-	tlsKeyFile        = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
-	tlsListenAdderess = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
+	tlsEnabled       = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
+	tlsCrtFile       = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
+	tlsKeyFile       = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
+	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
 )
 
 func ensureDefault(flag *string, message string) {
@@ -74,7 +74,6 @@ func ensureDefault(flag *string, message string) {
 
 func parseParams() {
 	kingpin.Parse()
-
 	// check extra dependencies logic not handled by kingpin
 	switch *authType {
 	case "file":
@@ -100,7 +99,7 @@ func parseParams() {
 	}
 }
 
-// RyftAPI include search, index, count, test
+// RyftAPI include search, index, count
 func main() {
 	log.SetFlags(log.Lmicroseconds)
 	parseParams()
@@ -110,6 +109,7 @@ func main() {
 
 	r := gin.Default()
 	r.Use(cors.Cors())
+	names.Port = (*listenAddress).Port
 
 	swaggerJSON, err := Asset("swagger.json")
 	if err != nil {
@@ -165,7 +165,15 @@ func main() {
 	// Name Generator will produce unique file names for each new results files
 	names.StartNamesGenerator()
 	if *tlsEnabled {
-		go r.RunTLS((*tlsListenAdderess).String(), *tlsCrtFile, *tlsKeyFile)
+		go r.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	r.Run((*listenAddress).String())
+}
+
+func setHeaders(c *gin.Context, m map[interface{}]interface{}) {
+	c.Header("X-Duration", fmt.Sprintf("%+v", m["Duration"]))
+	c.Header("X-Total-Bytes", fmt.Sprintf("%+v", m["Total Bytes"]))
+	c.Header("X-Matches", fmt.Sprintf("%+v", m["Matches"]))
+	c.Header("X-Fabric-Data-Rate", fmt.Sprintf("%+v", m["Fabric Data Rate"]))
+	c.Header("X-Data-Rate", fmt.Sprintf("%+v", m["Data Rate"]))
 }
