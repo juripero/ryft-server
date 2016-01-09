@@ -84,6 +84,7 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan ma
 		query, aErr := url.QueryUnescape(p.Query)
 
 		if aErr != nil {
+			headers <- nil
 			ch <- srverr.New(http.StatusBadRequest, aErr.Error())
 			return
 		}
@@ -93,21 +94,21 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan ma
 		command := exec.Command(cmd, testArgs...)
 
 		output, err := command.CombinedOutput()
-		// log.Printf("\r\n%s", output)
 		// log.Printf("Duration %+v Length %+v", output[1], len(output))
 		command.Run()
+		log.Printf("\r\n%s", output)
 
 		if err != nil {
+			headers <- nil
 			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
 			return
 		}
 
 		m := make(map[interface{}]interface{})
 		err = yaml.Unmarshal([]byte(output), m)
-		// log.Printf("--- m:\n%v\n\n", m)
-		//
-		// log.Printf("MAPA Value: %v ", m["Duration"])
+
 		if err != nil {
+			headers <- nil
 			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
 			return
 		}

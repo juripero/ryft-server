@@ -126,7 +126,7 @@ func search(c *gin.Context) {
 	}
 	p, headers := ryftprim(ryftParams, &n)
 	m := <-headers
-	setHeaders(c, m)
+
 	// read an index file
 	var idx, res *os.File
 	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
@@ -153,7 +153,7 @@ func search(c *gin.Context) {
 	items, _ := tcode.Transcode(recs)
 
 	_ = drop
-
+	setHeaders(c, m)
 	if params.Format == "xml" && params.Fields != "" {
 		params.Keys = strings.Split(params.Fields, sepSign)
 		streamSmplRecords(c, enc, items, params.Keys)

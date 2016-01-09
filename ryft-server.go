@@ -44,6 +44,19 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
+const (
+	durationHeader       = "X-Duration"
+	durationKey          = "Duration"
+	totalBytesHeader     = "X-Total-Bytes"
+	totalBytesKey        = "Total Bytes"
+	matchesHeader        = "X-Matches"
+	matchesKey           = "Matches"
+	fabricDataRateHeader = "X-Fabric-Data-Rate"
+	fabricDataRateKey    = "Fabric Data Rate"
+	dataRateHeader       = "X-Data-Rate"
+	dataRateKey          = "Data Rate"
+)
+
 var (
 	// KeepResults console flag for keeping results files
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
@@ -171,9 +184,9 @@ func main() {
 }
 
 func setHeaders(c *gin.Context, m map[interface{}]interface{}) {
-	c.Header("X-Duration", fmt.Sprintf("%+v", m["Duration"]))
-	c.Header("X-Total-Bytes", fmt.Sprintf("%+v", m["Total Bytes"]))
-	c.Header("X-Matches", fmt.Sprintf("%+v", m["Matches"]))
-	c.Header("X-Fabric-Data-Rate", fmt.Sprintf("%+v", m["Fabric Data Rate"]))
-	c.Header("X-Data-Rate", fmt.Sprintf("%+v", m["Data Rate"]))
+	c.Header(durationHeader, fmt.Sprintf("%+v", m[durationKey]))
+	c.Header(totalBytesHeader, fmt.Sprintf("%+v", m[totalBytesKey]))
+	c.Header(matchesHeader, fmt.Sprintf("%+v", m[matchesKey]))
+	c.Header(fabricDataRateHeader, fmt.Sprintf("%+v", m[fabricDataRateKey]))
+	c.Header(dataRateHeader, fmt.Sprintf("%+v", m[dataRateKey]))
 }
