@@ -75,9 +75,6 @@ type SearchParams struct {
 	Nodes         uint8    `form:"nodes" json:"nodes"`
 }
 
-//SearchResponse bla bla
-type SearchResponse map[string]interface{}
-
 func search(c *gin.Context) {
 
 	defer srverr.DeferRecover(c)
@@ -203,10 +200,10 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 
 		if record, ok := <-recs; ok {
 
-			rec := SearchResponse{}
+			rec := map[string]interface{}{}
 
 			for i := range sample {
-				value, ok := record.(SearchResponse)[sample[i]]
+				value, ok := record.(map[string]interface{})[sample[i]]
 				if ok {
 					rec[sample[i]] = value
 				}
