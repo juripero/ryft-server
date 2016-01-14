@@ -179,8 +179,11 @@ func search(c *gin.Context) {
 				c.JSON(500, err)
 				return true
 			}
-			fmt.Printf("\n HEADER: %v", response.Header)
 			defer response.Body.Close()
+			for k := range response.Header {
+				c.Header(k, response.Header.Get(k))
+				// fmt.Printf("HEADER %v : %v", k, v)
+			}
 			io.Copy(w, response.Body)
 			return false
 		})
