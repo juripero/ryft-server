@@ -31,14 +31,17 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
+	"github.com/hashicorp/consul/api"
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -169,6 +172,45 @@ func main() {
 		os.Exit(1)
 	}
 
+	r.GET("get", func(c *gin.Context) {
+		c.Header("Content-Type", encoder.MIMEJSON)
+		c.Stream(func(w io.Writer) bool {
+			params := &UrlParams{}
+			params.SetHost("52.3.59.171", "8765")
+			params.Path = "search"
+			params.Params = map[string]interface{}{
+				"query":       "%28RAW_TEXT%20CONTAINS%20%2210%22%29",
+				"files":       "passengers.txt",
+				"surrounding": 10,
+			}
+			url := createClusterUrl(params)
+			response, err := http.Get(url)
+			if err != nil {
+				fmt.Printf("%s", err)
+				c.JSON(500, err)
+				return true
+			}
+			defer response.Body.Close()
+			io.Copy(w, response.Body)
+			return false
+		})
+	})
+
+	r.GET("/cluster/members", func(c *gin.Context) {
+		config := api.DefaultConfig()
+		config.Datacenter = "dc1"
+		client, err := api.NewClient(config)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, fmt.Sprintf("%+v", config))
+		} else {
+			catalog := client.Catalog()
+			// nodes, _, _ := catalog.Nodes(nil)
+			srvc, _, _ := catalog.Service("ryft-rest-api", "", nil)
+
+			c.JSON(http.StatusOK, srvc)
+		}
+	})
 	// Create folder for results cache
 	if err := os.MkdirAll(names.ResultsDirPath(), 0777); err != nil {
 		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())

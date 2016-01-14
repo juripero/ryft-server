@@ -31,6 +31,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -71,7 +72,7 @@ type SearchParams struct {
 	Format        string   `form:"format" json:"format"`
 	CaseSensitive bool     `form:"cs" json:"cs"`
 	Fields        string   `form:"fields" json:"fields"`
-	Keys          []string `json:"keys"`
+	Local         bool     `form:"local" json:"local"`
 	Nodes         uint8    `form:"nodes" json:"nodes"`
 }
 
@@ -118,7 +119,6 @@ func search(c *gin.Context) {
 		Format:        params.Format,
 		CaseSensitive: params.CaseSensitive,
 		Fields:        params.Fields,
-		Keys:          params.Keys,
 		Nodes:         params.Nodes,
 	}
 	p, headers := ryftprim(ryftParams, &n)
@@ -150,12 +150,40 @@ func search(c *gin.Context) {
 	items, _ := tcode.Transcode(recs)
 
 	_ = drop
-	setHeaders(c, m)
-	if params.Format == "xml" && params.Fields != "" {
-		params.Keys = strings.Split(params.Fields, sepSign)
-		streamSmplRecords(c, enc, items, params.Keys)
+	if params.Local {
+		setHeaders(c, m)
+		if params.Format == "xml" && params.Fields != "" {
+			fields := strings.Split(params.Fields, sepSign)
+			streamSmplRecords(c, enc, items, fields)
+		} else {
+			streamAllRecords(c, enc, items)
+		}
 	} else {
-		streamAllRecords(c, enc, items)
+		c.Stream(func(w io.Writer) bool {
+			prms := &UrlParams{}
+			prms.SetHost("52.3.59.171", "8765")
+			prms.Path = "search"
+			prms.Params = map[string]interface{}{
+				"query":       params.Query,
+				"files":       createFilesQuery(params.Files),
+				"surrounding": params.Surrounding,
+				"format":      params.Format,
+				"fuzziness":   params.Fuzziness,
+				"local":       true,
+			}
+
+			url := createClusterUrl(prms)
+			response, err := http.Get(url)
+			if err != nil {
+				fmt.Printf("%s", err)
+				c.JSON(500, err)
+				return true
+			}
+			fmt.Printf("\n HEADER: %v", response.Header)
+			defer response.Body.Close()
+			io.Copy(w, response.Body)
+			return false
+		})
 	}
 }
 

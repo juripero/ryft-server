@@ -38,7 +38,6 @@ type RyftprimParams struct {
 	Format        string
 	CaseSensitive bool
 	Fields        string
-	Keys          []string
 	Nodes         uint8
 }
 
