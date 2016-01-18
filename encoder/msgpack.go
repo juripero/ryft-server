@@ -35,11 +35,12 @@ import (
 	"io"
 	"time"
 
-	"github.com/ugorji/go/codec"
+	"gopkg.in/vmihailenco/msgpack.v2"
+	// "github.com/ugorji/go/codec"
 )
 
 type MsgPackEncoder struct {
-	Encoder
+	msgpack.Encoder
 	needSeparator bool
 }
 
@@ -52,14 +53,17 @@ func (enc *MsgPackEncoder) End(w io.Writer) error {
 }
 
 func (enc *MsgPackEncoder) Write(w io.Writer, itm interface{}) error {
-	var mh codec.MsgpackHandle
-
-	wEncoder := codec.NewEncoder(w, &mh)
+	wEncoder := msgpack.NewEncoder(w)
 	err := msgpkEncode(wEncoder, &itm, WriteInterval)
+	b, _ := msgpack.Marshal(&itm)
+	fmt.Printf("\n MSGPACK : %v \n", b)
+	var v interface{}
+	msgpack.Unmarshal(b, v)
+	fmt.Printf("\n MSGPACK : %v \n", v)
 	return err
 }
 
-func msgpkEncode(enc *codec.Encoder, v *interface{}, timeout time.Duration) (err error) {
+func msgpkEncode(enc *msgpack.Encoder, v *interface{}, timeout time.Duration) (err error) {
 	ch := make(chan error, 1)
 	go func() {
 		ch <- enc.Encode(v)
