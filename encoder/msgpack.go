@@ -36,7 +36,6 @@ import (
 	"time"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
-	// "github.com/ugorji/go/codec"
 )
 
 type MsgPackEncoder struct {

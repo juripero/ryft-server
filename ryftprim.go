@@ -30,6 +30,15 @@ const (
 	arg_verbose          = "-v"
 )
 
+const (
+	ryftprimKey    = "ryftprim"
+	duration       = "Duration"
+	totalBytes     = "Total Bytes"
+	matches        = "Matches"
+	fabricDataRate = "Fabric Data Rate"
+	dataRate       = "Data Rate"
+)
+
 type RyftprimParams struct {
 	Query         string
 	Files         []string
@@ -41,9 +50,9 @@ type RyftprimParams struct {
 	Nodes         uint8
 }
 
-func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan map[interface{}]interface{}) {
+func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, statistic chan map[string]interface{}) {
 	ch = make(chan error, 1)
-	headers = make(chan map[interface{}]interface{})
+	statistic = make(chan map[string]interface{})
 	go func() {
 		testArgs := []string{
 			arg_type, fuzzy_hamming_search,
@@ -83,7 +92,7 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan ma
 		query, aErr := url.QueryUnescape(p.Query)
 
 		if aErr != nil {
-			headers <- nil
+			statistic <- nil
 			ch <- srverr.New(http.StatusBadRequest, aErr.Error())
 			return
 		}
@@ -98,22 +107,38 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan ma
 		log.Printf("\r\n%s", output)
 
 		if err != nil {
-			headers <- nil
+			statistic <- nil
 			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
 			return
 		}
 
-		m := make(map[interface{}]interface{})
+		m := make(map[string]interface{})
 		err = yaml.Unmarshal([]byte(output), m)
 
 		if err != nil {
-			headers <- nil
-			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
+			statistic <- nil
+			ch <- srverr.NewWithDetails(http.StatusInternalServerError, "RYFTPRIM "+err.Error(), string(output))
 			return
 		}
-		headers <- m
+
+		result := map[string]interface{}{}
+		result[ryftprimKey] = m
+
+		statistic <- result
 		ch <- nil
 	}()
 
 	return
+}
+
+func createRyftprimStatistic(m map[interface{}]interface{}) map[string]interface{} {
+	result := map[string]interface{}{}
+	result[ryftprimKey] = map[string]interface{}{
+		duration:       m[duration],
+		totalBytes:     m[totalBytes],
+		matches:        m[matches],
+		fabricDataRate: m[fabricDataRate],
+		dataRate:       m[dataRate],
+	}
+	return result
 }

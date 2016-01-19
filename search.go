@@ -121,8 +121,8 @@ func search(c *gin.Context) {
 		Fields:        params.Fields,
 		Nodes:         params.Nodes,
 	}
-	p, headers := ryftprim(ryftParams, &n)
-	m := <-headers
+	p, statistic := ryftprim(ryftParams, &n)
+	m := <-statistic
 
 	// read an index file
 	var idx, res *os.File
@@ -151,7 +151,8 @@ func search(c *gin.Context) {
 
 	_ = drop
 	if params.Local {
-		setHeaders(c, m)
+		// setHeaders(c, m)
+		items <- m
 		if params.Format == "xml" && params.Fields != "" {
 			fields := strings.Split(params.Fields, sepSign)
 			streamSmplRecords(c, enc, items, fields)

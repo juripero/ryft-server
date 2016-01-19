@@ -41,23 +41,9 @@ import (
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
-	"github.com/hashicorp/consul/api"
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
-)
-
-const (
-	durationHeader       = "X-Duration"
-	durationKey          = "Duration"
-	totalBytesHeader     = "X-Total-Bytes"
-	totalBytesKey        = "Total Bytes"
-	matchesHeader        = "X-Matches"
-	matchesKey           = "Matches"
-	fabricDataRateHeader = "X-Fabric-Data-Rate"
-	fabricDataRateKey    = "Fabric Data Rate"
-	dataRateHeader       = "X-Data-Rate"
-	dataRateKey          = "Data Rate"
 )
 
 var (
@@ -197,17 +183,11 @@ func main() {
 	})
 
 	r.GET("/cluster/members", func(c *gin.Context) {
-		config := api.DefaultConfig()
-		config.Datacenter = "dc1"
-		client, err := api.NewClient(config)
+		srvc, err := GetConsulInfo()
 
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, fmt.Sprintf("%+v", config))
+			c.JSON(http.StatusInternalServerError, fmt.Sprintf("%+v", err))
 		} else {
-			catalog := client.Catalog()
-			// nodes, _, _ := catalog.Nodes(nil)
-			srvc, _, _ := catalog.Service("ryft-rest-api", "", nil)
-
 			c.JSON(http.StatusOK, srvc)
 		}
 	})
@@ -223,12 +203,4 @@ func main() {
 		go r.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	r.Run((*listenAddress).String())
-}
-
-func setHeaders(c *gin.Context, m map[interface{}]interface{}) {
-	c.Header(durationHeader, fmt.Sprintf("%+v", m[durationKey]))
-	c.Header(totalBytesHeader, fmt.Sprintf("%+v", m[totalBytesKey]))
-	c.Header(matchesHeader, fmt.Sprintf("%+v", m[matchesKey]))
-	c.Header(fabricDataRateHeader, fmt.Sprintf("%+v", m[fabricDataRateKey]))
-	c.Header(dataRateHeader, fmt.Sprintf("%+v", m[dataRateKey]))
 }

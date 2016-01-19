@@ -59,9 +59,9 @@ func count(c *gin.Context) {
 	}
 
 	_, headers := ryftprim(ryftParams, &n)
-	m := <-headers
-	setHeaders(c, m)
-	matches, err := strconv.ParseUint(fmt.Sprintf("%v", m[matchesKey]), 0, 64)
+	m := (<-headers)[ryftprimKey]
+	value := m.(map[string]interface{})[matches]
+	matches, err := strconv.ParseUint(fmt.Sprintf("%v", value), 0, 64)
 	if err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
