@@ -154,5 +154,5 @@ ryft-server --keep
 [/count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime](/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime)
 
 ```
-"10000"
+"{"matches":10000}"
 ```

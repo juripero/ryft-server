@@ -31,16 +31,17 @@
 package main
 
 import (
-	"github.com/getryft/ryft-server/crpoll"
-	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/records"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/getryft/ryft-server/crpoll"
+	"github.com/getryft/ryft-server/encoder"
+	"github.com/getryft/ryft-server/names"
+	"github.com/getryft/ryft-server/records"
 	//	"github.com/getryft/ryft-server/rol"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
@@ -59,23 +60,19 @@ func cleanup(file *os.File) {
 
 const sepSign string = ","
 
-// SearchParams - parameters that we get from the query to setup search
+/*
+SearchParams contains all the bound params for the search operation
+*/
 type SearchParams struct {
-	Query         string   `form:"query" binding:"required"` // Search query, for example: ( RAW_TEXT CONTAINS "night" )
-	Files         []string `form:"files" binding:"required"` // Source files
-	Surrounding   uint16   `form:"surrounding"`              // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-	Fuzziness     uint8    `form:"fuzziness"`                // Is the fuzziness of the search. Measured as the maximum Hamming distance.
-	Format        string   `form:"format"`                   // Source format parser name
-	CaseSensitive bool     `form:"cs"`                       // Case sensitive flag
-	Fields        string   `form:"fields"`
-	Keys          []string
-	Nodes         uint8 `form:"nodes"` //Active Nodes Count
-}
-
-func NewSearchParams() (p SearchParams) {
-	p.Format = transcoder.RAWTRANSCODER
-
-	return
+	Query         string   `form:"query" json:"query" binding:"required"`
+	Files         []string `form:"files" json:"files" binding:"required"`
+	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
+	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
+	Format        string   `form:"format" json:"format"`
+	CaseSensitive bool     `form:"cs" json:"cs"`
+	Fields        string   `form:"fields" json:"fields"`
+	Keys          []string `json:"keys"`
+	Nodes         uint8    `form:"nodes" json:"nodes"`
 }
 
 func search(c *gin.Context) {
@@ -85,7 +82,8 @@ func search(c *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := NewSearchParams()
+	params := SearchParams{}
+	params.Format = transcoder.RAWTRANSCODER
 	if err = c.Bind(&params); err != nil {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
@@ -95,7 +93,6 @@ func search(c *gin.Context) {
 	if accept == "" {
 		accept = encoder.MIMEJSON
 	}
-
 	// setting up encoder to respond with requested format
 	var enc encoder.Encoder
 	if enc, err = encoder.GetByMimeType(accept); err != nil {
@@ -113,7 +110,19 @@ func search(c *gin.Context) {
 	n := names.New()
 	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
 
-	p := ryftprim(&params, &n)
+	ryftParams := &RyftprimParams{
+		Query:         params.Query,
+		Files:         params.Files,
+		Surrounding:   params.Surrounding,
+		Fuzziness:     params.Fuzziness,
+		Format:        params.Format,
+		CaseSensitive: params.CaseSensitive,
+		Fields:        params.Fields,
+		Keys:          params.Keys,
+		Nodes:         params.Nodes,
+	}
+	p, headers := ryftprim(ryftParams, &n)
+	m := <-headers
 
 	// read an index file
 	var idx, res *os.File
@@ -141,7 +150,7 @@ func search(c *gin.Context) {
 	items, _ := tcode.Transcode(recs)
 
 	_ = drop
-
+	setHeaders(c, m)
 	if params.Format == "xml" && params.Fields != "" {
 		params.Keys = strings.Split(params.Fields, sepSign)
 		streamSmplRecords(c, enc, items, params.Keys)
@@ -173,10 +182,10 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 				c.Writer.Flush()
 			}
 			return true
-		} else {
-			enc.End(w)
-			return false
 		}
+		enc.End(w)
+		return false
+
 	})
 }
 
@@ -190,6 +199,7 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 		}
 
 		if record, ok := <-recs; ok {
+
 			rec := map[string]interface{}{}
 
 			for i := range sample {
@@ -206,15 +216,16 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 
 			return true
 
-		} else {
-			enc.End(w)
-			return false
 		}
+		enc.End(w)
+		return false
 	})
 }
 
 const (
-	PollingInterval    = time.Millisecond * 50
+	// PollingInterval is a const for polling time
+	PollingInterval = time.Millisecond * 50
+	// PollBufferCapacity is a max buffer size
 	PollBufferCapacity = 64
 )
 
@@ -231,7 +242,7 @@ func dataPoll(input chan records.IdxRecord, dataFile *os.File) chan records.IdxR
 }
 
 func nextData(res *os.File, length uint16) (result []byte) {
-	var total uint16 = 0
+	var total uint16
 	for total < length {
 		data := make([]byte, length-total)
 		n, _ := res.Read(data)
@@ -244,46 +255,3 @@ func nextData(res *os.File, length uint16) (result []byte) {
 	}
 	return
 }
-
-//func progress(s *SearchParams, n names.Names) (ch chan error) {
-//	ch = make(chan error, 1)
-//	// num := runtime.NumGoroutine()
-//	log.Printf("Routine number = %v", s)
-//	go func() {
-//		pid := os.Getpid()
-//		log.Printf("Process pid = %v", pid)
-//		var ds *rol.RolDS
-//		if s.Nodes == 0 {
-//			ds = rol.RolDSCreate()
-//		} else {
-//			ds = rol.RolDSCreateNodes(s.Nodes)
-//		}
-//		defer ds.Delete()
-
-//		for _, f := range s.Files {
-//			ok := ds.AddFile(f)
-//			if !ok {
-//				ch <- srverr.New(http.StatusNotFound, "Could not add file "+f)
-//				return
-//			}
-//		}
-
-//		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
-
-//		resultsDs := ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
-//		log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
-
-//		defer resultsDs.Delete()
-
-//		if err := resultsDs.HasErrorOccured(); err != nil {
-//			if !err.IsStrangeError() {
-//				ch <- srverr.New(http.StatusInternalServerError, err.Error())
-//				return
-//			}
-//		}
-
-//		ch <- nil
-
-//	}()
-//	return
-//}

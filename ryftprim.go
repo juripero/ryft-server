@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"os/exec"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/srverr"
 )
@@ -28,8 +30,21 @@ const (
 	arg_verbose          = "-v"
 )
 
-func ryftprim(s *SearchParams, n *names.Names) (ch chan error) {
+type RyftprimParams struct {
+	Query         string
+	Files         []string
+	Surrounding   uint16
+	Fuzziness     uint8
+	Format        string
+	CaseSensitive bool
+	Fields        string
+	Keys          []string
+	Nodes         uint8
+}
+
+func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, headers chan map[interface{}]interface{}) {
 	ch = make(chan error, 1)
+	headers = make(chan map[interface{}]interface{})
 	go func() {
 		testArgs := []string{
 			arg_type, fuzzy_hamming_search,
@@ -37,7 +52,7 @@ func ryftprim(s *SearchParams, n *names.Names) (ch chan error) {
 			arg_verbose,
 		}
 
-		if !s.CaseSensitive {
+		if !p.CaseSensitive {
 			testArgs = append(testArgs, arg_case_insensetive)
 		}
 
@@ -50,42 +65,54 @@ func ryftprim(s *SearchParams, n *names.Names) (ch chan error) {
 				arg_result_file, resultFile)
 		}
 
-		for _, file := range s.Files {
+		for _, file := range p.Files {
 			testArgs = append(testArgs, arg_files, file)
 		}
 
-		if s.Nodes > 0 {
-			testArgs = append(testArgs, arg_nodes, fmt.Sprintf("%d", s.Nodes))
+		if p.Nodes > 0 {
+			testArgs = append(testArgs, arg_nodes, fmt.Sprintf("%d", p.Nodes))
 		}
 
-		if s.Surrounding > 0 {
-			testArgs = append(testArgs, arg_surrounding, fmt.Sprintf("%d", s.Surrounding))
+		if p.Surrounding > 0 {
+			testArgs = append(testArgs, arg_surrounding, fmt.Sprintf("%d", p.Surrounding))
 		}
 
-		if s.Fuzziness > 0 {
-			testArgs = append(testArgs, arg_fuzziness, fmt.Sprintf("%d", s.Fuzziness))
+		if p.Fuzziness > 0 {
+			testArgs = append(testArgs, arg_fuzziness, fmt.Sprintf("%d", p.Fuzziness))
 		}
 
-		query, aErr := url.QueryUnescape(s.Query)
+		query, aErr := url.QueryUnescape(p.Query)
 
 		if aErr != nil {
+			headers <- nil
 			ch <- srverr.New(http.StatusBadRequest, aErr.Error())
 			return
-		} else {
-			testArgs = append(testArgs, arg_query, query)
 		}
+		testArgs = append(testArgs, arg_query, query)
 
 		log.Print(testArgs)
 		command := exec.Command(cmd, testArgs...)
 
 		output, err := command.CombinedOutput()
-		log.Printf("\r\n%s", output)
+		// log.Printf("Duration %+v Length %+v", output[1], len(output))
 		command.Run()
+		log.Printf("\r\n%s", output)
 
 		if err != nil {
+			headers <- nil
 			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
 			return
 		}
+
+		m := make(map[interface{}]interface{})
+		err = yaml.Unmarshal([]byte(output), m)
+
+		if err != nil {
+			headers <- nil
+			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
+			return
+		}
+		headers <- m
 		ch <- nil
 	}()
 

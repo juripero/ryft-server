@@ -20,10 +20,14 @@ echo Installed-Size: 1024 >> $CONTROLFILE
 echo Maintainer: www.ryft.com >> $CONTROLFILE
 echo Description: ryft-server >> $CONTROLFILE
 
+cwd="$(dirname "$pwd")"
+echo "$cwd"
 
 if [ ! -d "ryft-server/usr/bin" ]; then
   mkdir -pv ryft-server/usr/bin
 fi
+
+eval "(cd .. && chmod +x makefile && ./makefile)"
 
 FILE_RYFT_SERVER="$GOPATH/bin/ryft-server"
 

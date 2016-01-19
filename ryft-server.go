@@ -27,16 +27,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
-
 package main
 
 import (
-	"html/template"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/getryft/ryft-server/middleware/auth"
+	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
 
@@ -44,7 +44,21 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
+const (
+	durationHeader       = "X-Duration"
+	durationKey          = "Duration"
+	totalBytesHeader     = "X-Total-Bytes"
+	totalBytesKey        = "Total Bytes"
+	matchesHeader        = "X-Matches"
+	matchesKey           = "Matches"
+	fabricDataRateHeader = "X-Fabric-Data-Rate"
+	fabricDataRateKey    = "Fabric Data Rate"
+	dataRateHeader       = "X-Data-Rate"
+	dataRateKey          = "Data Rate"
+)
+
 var (
+	// KeepResults console flag for keeping results files
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
 	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
 
@@ -59,10 +73,10 @@ var (
 
 	listenAddress = kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").TCP()
 
-	tlsEnabled        = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
-	tlsCrtFile        = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
-	tlsKeyFile        = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
-	tlsListenAdderess = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
+	tlsEnabled       = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
+	tlsCrtFile       = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
+	tlsKeyFile       = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
+	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
 )
 
 func ensureDefault(flag *string, message string) {
@@ -73,7 +87,6 @@ func ensureDefault(flag *string, message string) {
 
 func parseParams() {
 	kingpin.Parse()
-
 	// check extra dependencies logic not handled by kingpin
 	switch *authType {
 	case "file":
@@ -99,6 +112,7 @@ func parseParams() {
 	}
 }
 
+// RyftAPI include search, index, count
 func main() {
 	log.SetFlags(log.Lmicroseconds)
 	parseParams()
@@ -107,13 +121,20 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.Use(cors.Cors())
+	names.Port = (*listenAddress).Port
 
-	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
-	r.SetHTMLTemplate(indexTemplate)
+	swaggerJSON, err := Asset("swagger.json")
+	if err != nil {
+		fmt.Println("No file swagger.json was found ")
+	}
+
+	r.GET("/swagger.json", func(c *gin.Context) {
+		c.Data(http.StatusOK, http.DetectContentType(swaggerJSON), swaggerJSON)
+	})
 
 	switch *authType {
 	case "file":
-
 		auth, err := auth.AuthBasicFile(*authUsersFile)
 		if err != nil {
 			log.Printf("Error reading users file: %v", err)
@@ -129,12 +150,18 @@ func main() {
 	}
 
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
-	//Setting routes
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index", nil)
 
+	idxHTML, err := Asset("index.html")
+	if err != nil {
+		fmt.Println("No file index.html was found ")
+	}
+
+	r.GET("/", func(c *gin.Context) {
+		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
+
 	r.GET("/search", search)
+
 	r.GET("/count", count)
 	// Clean previously created folder
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
@@ -151,7 +178,15 @@ func main() {
 	// Name Generator will produce unique file names for each new results files
 	names.StartNamesGenerator()
 	if *tlsEnabled {
-		go r.RunTLS((*tlsListenAdderess).String(), *tlsCrtFile, *tlsKeyFile)
+		go r.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	r.Run((*listenAddress).String())
+}
+
+func setHeaders(c *gin.Context, m map[interface{}]interface{}) {
+	c.Header(durationHeader, fmt.Sprintf("%+v", m[durationKey]))
+	c.Header(totalBytesHeader, fmt.Sprintf("%+v", m[totalBytesKey]))
+	c.Header(matchesHeader, fmt.Sprintf("%+v", m[matchesKey]))
+	c.Header(fabricDataRateHeader, fmt.Sprintf("%+v", m[fabricDataRateKey]))
+	c.Header(dataRateHeader, fmt.Sprintf("%+v", m[dataRateKey]))
 }
