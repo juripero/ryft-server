@@ -154,6 +154,7 @@ func search(c *gin.Context) {
 		// setHeaders(c, m)
 
 		if !params.Stats {
+			fmt.Println("CLOSED")
 			statistic = nil
 		}
 
@@ -164,6 +165,7 @@ func search(c *gin.Context) {
 			streamAllRecords(c, enc, items, statistic)
 		}
 	} else {
+		_ = <-statistic
 		c.Stream(func(w io.Writer) bool {
 			prms := &UrlParams{}
 			prms.SetHost("52.3.59.171", "8765")
