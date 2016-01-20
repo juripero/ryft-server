@@ -2,7 +2,7 @@ package main
 
 import "sync"
 
-func merge(cs []chan interface{}) chan interface{} {
+func merge(cs ...chan interface{}) chan interface{} {
 	var wg sync.WaitGroup
 	out := make(chan interface{})
 

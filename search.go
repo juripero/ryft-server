@@ -171,15 +171,16 @@ func search(c *gin.Context) {
 		cnslSrvc, err := GetConsulInfo()
 		if err != nil {
 			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-		}
-		var test []chan interface{}
-		test = append(test, items)
 
-		for _, i := range cnslSrvc {
-			recs, _ := searchInNode(params, i)
-			test = append(test, recs)
 		}
-		ch := merge(test)
+
+		ch := merge(items)
+
+		// time.Sleep(10 * time.Second)
+		for _, srv := range cnslSrvc {
+			recsChan, _ := searchInNode(params, srv)
+			ch = merge(ch, recsChan)
+		}
 		streamAllRecords(c, enc, ch)
 
 	}
@@ -190,16 +191,15 @@ func searchInNode(params SearchParams, service *api.CatalogService) (recs chan i
 	chanErr = make(chan error)
 
 	go func() {
-
 		if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
 			close(recs)
 			close(chanErr)
 			return
 		}
+
 		prms := &UrlParams{}
 		prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
 		prms.Path = "search"
-		fmt.Println(prms.host)
 		prms.Params = map[string]interface{}{
 			"query":       params.Query,
 			"files":       createFilesQuery(params.Files),
@@ -218,14 +218,23 @@ func searchInNode(params SearchParams, service *api.CatalogService) (recs chan i
 
 		defer response.Body.Close()
 		dec := json.NewDecoder(response.Body)
-		var v interface{}
+		var v map[string][]map[string]interface{}
 		dec.Decode(&v)
+
+		if i, ok := v["results"]; ok {
+			for _, v := range i {
+				if index, ok := v["_index"]; ok {
+					index.(map[string]interface{})["address"] = prms.host
+				}
+			}
+		}
+
 		recs <- v
 
-		m := map[string]string{
-			"address": prms.host,
-		}
-		recs <- m
+		// m := map[string]string{
+		// "address": prms.host,
+		// }
+		// recs <- m
 		// recs <- response.Body
 		defer close(chanErr)
 		defer close(recs)
