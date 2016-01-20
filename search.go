@@ -165,36 +165,75 @@ func search(c *gin.Context) {
 			streamAllRecords(c, enc, items, statistic)
 		}
 	} else {
-		_ = <-statistic
-		c.Stream(func(w io.Writer) bool {
-			prms := &UrlParams{}
-			prms.SetHost("52.3.59.171", "8765")
-			prms.Path = "search"
-			prms.Params = map[string]interface{}{
-				"query":       params.Query,
-				"files":       createFilesQuery(params.Files),
-				"surrounding": params.Surrounding,
-				"format":      params.Format,
-				"fuzziness":   params.Fuzziness,
-				"local":       true,
-			}
 
-			url := createClusterUrl(prms)
-			response, err := http.Get(url)
-			if err != nil {
-				fmt.Printf("%s", err)
-				c.JSON(500, err)
-				return true
-			}
-			defer response.Body.Close()
-			for k := range response.Header {
-				c.Header(k, response.Header.Get(k))
-				// fmt.Printf("HEADER %v : %v", k, v)
-			}
-			io.Copy(w, response.Body)
-			return false
-		})
+		otherRecs, _ := testConsul(params)
+		ch := multipexor(items, otherRecs)
+		streamAllRecords(c, enc, ch)
 	}
+}
+
+func multipexor(input1, input2 <-chan interface{}) chan interface{} {
+	mux := make(chan interface{})
+	go func() {
+		for {
+			mux <- input1
+		}
+	}()
+	go func() {
+		for {
+			mux <- input2
+		}
+	}()
+	return mux
+}
+
+func testConsul(params SearchParams) (recs chan interface{}, chanErr chan error) {
+	recs = make(chan interface{})
+	chanErr = make(chan error, 1)
+	go func() {
+		// _, err := GetConsulInfo()
+		// if err != nil {
+		// 	recs <- nil
+		// 	chanErr <- err
+		// 	return
+		// }
+		// for _, service := range cnslSrvc {
+		prms := &UrlParams{}
+		// prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
+		prms.SetHost("52.3.59.171", "8765")
+		prms.Path = "search"
+		prms.Params = map[string]interface{}{
+			"query":       params.Query,
+			"files":       createFilesQuery(params.Files),
+			"surrounding": params.Surrounding,
+			"format":      params.Format,
+			"fuzziness":   params.Fuzziness,
+			"local":       true,
+		}
+
+		url := createClusterUrl(prms)
+		response, err := http.Get(url)
+		if err != nil {
+			recs <- nil
+			chanErr <- err
+			close(recs)
+			return
+		}
+		defer response.Body.Close()
+		// for k := range response.Header {
+		// 	c.Header(k, response.Header.Get(k))
+		// }
+		// io.Copy(w, response.Body)
+		dec := json.NewDecoder(response.Body)
+		var v interface{}
+		dec.Decode(&v)
+		recs <- v
+		// recs <- response.Body
+		chanErr <- nil
+		close(recs)
+		// }
+	}()
+	return
 }
 
 func logErrors(format string, errors chan error) {
