@@ -51,14 +51,18 @@ func (enc *MsgPackEncoder) End(w io.Writer) error {
 	return nil
 }
 
+func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stats map[string]interface{}) error {
+	return nil
+}
+
 func (enc *MsgPackEncoder) Write(w io.Writer, itm interface{}) error {
 	wEncoder := msgpack.NewEncoder(w)
 	err := msgpkEncode(wEncoder, &itm, WriteInterval)
 	b, _ := msgpack.Marshal(&itm)
-	fmt.Printf("\n MSGPACK : %v \n", b)
+	//	fmt.Printf("\n MSGPACK : %v \n", b)
 	var v interface{}
 	msgpack.Unmarshal(b, v)
-	fmt.Printf("\n MSGPACK : %v \n", v)
+	//	fmt.Printf("\n MSGPACK : %v \n", v)
 	return err
 }
 

@@ -58,12 +58,13 @@ func count(c *gin.Context) {
 		Nodes:         params.Nodes,
 	}
 
-	_, headers := ryftprim(ryftParams, &n)
-	m := (<-headers)[ryftprimKey]
-	value := m.(map[string]interface{})[matches]
-	matches, err := strconv.ParseUint(fmt.Sprintf("%v", value), 0, 64)
+	_, statistics := ryftprim(ryftParams, &n)
+	stats := (<-statistics)
+	//	value := m.(map[string]interface{})[matches]
+	matches, err := strconv.ParseUint(fmt.Sprintf("%v", stats["matches"]), 0, 64)
 	if err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
-	c.JSON(http.StatusOK, CountResponse{matches})
+	matches = matches
+	c.JSON(http.StatusOK, stats)
 }

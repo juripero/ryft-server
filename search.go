@@ -72,8 +72,9 @@ type SearchParams struct {
 	Format        string   `form:"format" json:"format"`
 	CaseSensitive bool     `form:"cs" json:"cs"`
 	Fields        string   `form:"fields" json:"fields"`
-	Local         bool     `form:"local" json:"local"`
 	Nodes         uint8    `form:"nodes" json:"nodes"`
+	Local         bool     `form:"local" json:"local"`
+	Stats         bool     `form:"stats" json:"stats"`
 }
 
 func search(c *gin.Context) {
@@ -122,7 +123,6 @@ func search(c *gin.Context) {
 		Nodes:         params.Nodes,
 	}
 	p, statistic := ryftprim(ryftParams, &n)
-	m := <-statistic
 
 	// read an index file
 	var idx, res *os.File
@@ -152,12 +152,16 @@ func search(c *gin.Context) {
 	_ = drop
 	if params.Local {
 		// setHeaders(c, m)
-		items <- m
+
+		if !params.Stats {
+			statistic = nil
+		}
+
 		if params.Format == "xml" && params.Fields != "" {
 			fields := strings.Split(params.Fields, sepSign)
-			streamSmplRecords(c, enc, items, fields)
+			streamSmplRecords(c, enc, items, fields, statistic)
 		} else {
-			streamAllRecords(c, enc, items)
+			streamAllRecords(c, enc, items, statistic)
 		}
 	} else {
 		c.Stream(func(w io.Writer) bool {
@@ -199,7 +203,8 @@ func logErrors(format string, errors chan error) {
 	}
 }
 
-func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}) {
+func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}, statistic chan map[string]interface{}) {
+
 	first := true
 	c.Stream(func(w io.Writer) bool {
 		if first {
@@ -215,13 +220,18 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 			}
 			return true
 		}
-		enc.End(w)
+		if statistic != nil {
+			stats := <-statistic
+			enc.EndWithStats(w, stats)
+		} else {
+			enc.End(w)
+		}
 		return false
 
 	})
 }
 
-func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}, sample []string) {
+func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}, sample []string, statistic chan map[string]interface{}) {
 	first := true
 
 	c.Stream(func(w io.Writer) bool {
@@ -249,7 +259,13 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 			return true
 
 		}
-		enc.End(w)
+
+		if statistic != nil {
+			stats := <-statistic
+			enc.EndWithStats(w, stats)
+		} else {
+			enc.End(w)
+		}
 		return false
 	})
 }

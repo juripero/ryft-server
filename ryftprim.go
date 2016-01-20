@@ -50,6 +50,8 @@ type RyftprimParams struct {
 	Nodes         uint8
 }
 
+//type RyftprimStats map[string]interface{}
+
 func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, statistic chan map[string]interface{}) {
 	ch = make(chan error, 1)
 	statistic = make(chan map[string]interface{})
@@ -112,8 +114,8 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, statistic chan 
 			return
 		}
 
-		m := make(map[string]interface{})
-		err = yaml.Unmarshal([]byte(output), m)
+		stats := make(map[string]interface{})
+		err = yaml.Unmarshal([]byte(output), stats)
 
 		if err != nil {
 			statistic <- nil
@@ -121,24 +123,19 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, statistic chan 
 			return
 		}
 
-		result := map[string]interface{}{}
-		result[ryftprimKey] = m
-
-		statistic <- result
 		ch <- nil
+		statistic <- createRyftprimStatistic(stats)
 	}()
 
 	return
 }
 
-func createRyftprimStatistic(m map[interface{}]interface{}) map[string]interface{} {
-	result := map[string]interface{}{}
-	result[ryftprimKey] = map[string]interface{}{
-		duration:       m[duration],
-		totalBytes:     m[totalBytes],
-		matches:        m[matches],
-		fabricDataRate: m[fabricDataRate],
-		dataRate:       m[dataRate],
+func createRyftprimStatistic(m map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"duration":       m[duration],
+		"totalBytes":     m[totalBytes],
+		"matches":        m[matches],
+		"fabricDataRate": m[fabricDataRate],
+		"dataRate":       m[dataRate],
 	}
-	return result
 }

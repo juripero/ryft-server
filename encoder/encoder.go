@@ -47,6 +47,7 @@ const (
 type Encoder interface {
 	Begin(w io.Writer) error
 	End(w io.Writer) error
+	EndWithStats(w io.Writer, stats map[string]interface{}) error
 	Write(w io.Writer, itm interface{}) error
 }
 
