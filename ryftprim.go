@@ -94,7 +94,6 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, statistic chan 
 		query, aErr := url.QueryUnescape(p.Query)
 
 		if aErr != nil {
-			// statistic <- nil
 			close(statistic)
 			ch <- srverr.New(http.StatusBadRequest, aErr.Error())
 			return
@@ -110,7 +109,6 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, statistic chan 
 		log.Printf("\r\n%s", output)
 
 		if err != nil {
-			// statistic <- nil
 			close(statistic)
 			ch <- srverr.NewWithDetails(http.StatusInternalServerError, err.Error(), string(output))
 			return
@@ -120,7 +118,7 @@ func ryftprim(p *RyftprimParams, n *names.Names) (ch chan error, statistic chan 
 		err = yaml.Unmarshal([]byte(output), stats)
 
 		if err != nil {
-			statistic <- nil
+			close(statistic)
 			ch <- srverr.NewWithDetails(http.StatusInternalServerError, "RYFTPRIM "+err.Error(), string(output))
 			return
 		}
