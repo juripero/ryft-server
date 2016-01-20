@@ -2,7 +2,7 @@ package main
 
 import "sync"
 
-func merge(cs ...<-chan interface{}) chan interface{} {
+func merge(cs []chan interface{}) chan interface{} {
 	var wg sync.WaitGroup
 	out := make(chan interface{})
 
@@ -18,7 +18,6 @@ func merge(cs ...<-chan interface{}) chan interface{} {
 	for _, c := range cs {
 		go output(c)
 	}
-
 	// Start a goroutine to close out once all the output goroutines are
 	// done.  This must start after the wg.Add call.
 	go func() {

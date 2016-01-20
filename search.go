@@ -165,72 +165,67 @@ func search(c *gin.Context) {
 			streamAllRecords(c, enc, items, statistic)
 		}
 	} else {
+		cnslSrvc, err := GetConsulInfo()
+		if err != nil {
+			panic(srverr.New(http.StatusInternalServerError, err.Error()))
+		}
+		var test []chan interface{}
+		test = append(test, items)
 
-		otherRecs, _ := testConsul(params)
-		ch := merge(items, otherRecs)
+		for _, i := range cnslSrvc {
+			recs, _ := searchInNode(params, i)
+			test = append(test, recs)
+		}
+		ch := merge(test)
 		streamAllRecords(c, enc, ch)
+
 	}
 }
 
-func multipexor(input1, input2 <-chan interface{}) chan interface{} {
-	mux := make(chan interface{})
-	go func() {
-		for {
-			mux <- input1
-		}
-	}()
-	go func() {
-		for {
-			mux <- input2
-		}
-	}()
-	return mux
-}
-
-func testConsul(params SearchParams) (recs chan interface{}, chanErr chan error) {
+func searchInNode(params SearchParams, service *api.CatalogService) (recs chan interface{}, chanErr chan error) {
 	recs = make(chan interface{})
-	chanErr = make(chan error, 1)
+	chanErr = make(chan error)
+
 	go func() {
-		cnslSrvc, err := GetConsulInfo()
+
+		if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
+			close(recs)
+			close(chanErr)
+			return
+		}
+		prms := &UrlParams{}
+		prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
+		prms.Path = "search"
+		fmt.Println(prms.host)
+		prms.Params = map[string]interface{}{
+			"query":       params.Query,
+			"files":       createFilesQuery(params.Files),
+			"surrounding": params.Surrounding,
+			"format":      params.Format,
+			"fuzziness":   params.Fuzziness,
+			"local":       true,
+		}
+		url := createClusterUrl(prms)
+		response, err := http.Get(url)
 		if err != nil {
 			close(recs)
 			chanErr <- err
 			return
 		}
-		for _, service := range cnslSrvc {
-			prms := &UrlParams{}
-			prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
-			prms.Path = "search"
-			prms.Params = map[string]interface{}{
-				"query":       params.Query,
-				"files":       createFilesQuery(params.Files),
-				"surrounding": params.Surrounding,
-				"format":      params.Format,
-				"fuzziness":   params.Fuzziness,
-				"local":       true,
-			}
 
-			url := createClusterUrl(prms)
-			response, err := http.Get(url)
-			if err != nil {
-				close(recs)
-				chanErr <- err
-				return
-			}
-			defer response.Body.Close()
-			dec := json.NewDecoder(response.Body)
-			var v interface{}
-			dec.Decode(&v)
-			recs <- v
-			m := map[string]string{
-				"address": prms.host,
-			}
-			recs <- m
-			// recs <- response.Body
-			chanErr <- nil
-			close(chanErr)
-			close(recs)
+		defer response.Body.Close()
+		dec := json.NewDecoder(response.Body)
+		var v interface{}
+		dec.Decode(&v)
+		recs <- v
+
+		m := map[string]string{
+			"address": prms.host,
 		}
+		recs <- m
+		// recs <- response.Body
+		defer close(chanErr)
+		defer close(recs)
 	}()
 	return
 }
