@@ -167,7 +167,7 @@ func search(c *gin.Context) {
 	} else {
 
 		otherRecs, _ := testConsul(params)
-		ch := multipexor(items, otherRecs)
+		ch := merge(items, otherRecs)
 		streamAllRecords(c, enc, ch)
 	}
 }
@@ -191,47 +191,46 @@ func testConsul(params SearchParams) (recs chan interface{}, chanErr chan error)
 	recs = make(chan interface{})
 	chanErr = make(chan error, 1)
 	go func() {
-		// _, err := GetConsulInfo()
-		// if err != nil {
-		// 	recs <- nil
-		// 	chanErr <- err
-		// 	return
-		// }
-		// for _, service := range cnslSrvc {
-		prms := &UrlParams{}
-		// prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
-		prms.SetHost("52.3.59.171", "8765")
-		prms.Path = "search"
-		prms.Params = map[string]interface{}{
-			"query":       params.Query,
-			"files":       createFilesQuery(params.Files),
-			"surrounding": params.Surrounding,
-			"format":      params.Format,
-			"fuzziness":   params.Fuzziness,
-			"local":       true,
-		}
-
-		url := createClusterUrl(prms)
-		response, err := http.Get(url)
+		cnslSrvc, err := GetConsulInfo()
 		if err != nil {
-			recs <- nil
-			chanErr <- err
 			close(recs)
+			chanErr <- err
 			return
 		}
-		defer response.Body.Close()
-		// for k := range response.Header {
-		// 	c.Header(k, response.Header.Get(k))
-		// }
-		// io.Copy(w, response.Body)
-		dec := json.NewDecoder(response.Body)
-		var v interface{}
-		dec.Decode(&v)
-		recs <- v
-		// recs <- response.Body
-		chanErr <- nil
-		close(recs)
-		// }
+		for _, service := range cnslSrvc {
+			prms := &UrlParams{}
+			prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
+			prms.Path = "search"
+			prms.Params = map[string]interface{}{
+				"query":       params.Query,
+				"files":       createFilesQuery(params.Files),
+				"surrounding": params.Surrounding,
+				"format":      params.Format,
+				"fuzziness":   params.Fuzziness,
+				"local":       true,
+			}
+
+			url := createClusterUrl(prms)
+			response, err := http.Get(url)
+			if err != nil {
+				close(recs)
+				chanErr <- err
+				return
+			}
+			defer response.Body.Close()
+			dec := json.NewDecoder(response.Body)
+			var v interface{}
+			dec.Decode(&v)
+			recs <- v
+			m := map[string]string{
+				"address": prms.host,
+			}
+			recs <- m
+			// recs <- response.Body
+			chanErr <- nil
+			close(chanErr)
+			close(recs)
+		}
 	}()
 	return
 }
