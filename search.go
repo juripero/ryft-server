@@ -80,8 +80,6 @@ type SearchParams struct {
 
 func search(c *gin.Context) {
 
-	defer srverr.DeferRecover(c)
-
 	var err error
 
 	// parse request parameters
@@ -91,23 +89,13 @@ func search(c *gin.Context) {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = encoder.MIMEJSON
-	}
-	// setting up encoder to respond with requested format
-	var enc encoder.Encoder
-	if enc, err = encoder.GetByMimeType(accept); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
-	}
-	c.Header("Content-Type", accept)
-
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
 	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
+
+	enc := encoder.FromContext(c)
 
 	// get a new unique search index
 	n := names.New()
@@ -135,7 +123,6 @@ func search(c *gin.Context) {
 		}
 	}
 	defer cleanup(idx)
-
 	//read a results file
 	if res, err = crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
 		if serr, ok := err.(*srverr.ServerError); ok {

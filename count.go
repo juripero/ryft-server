@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/gin-gonic/gin"
@@ -28,8 +27,6 @@ type CountResponse struct {
 }
 
 func count(c *gin.Context) {
-	defer srverr.DeferRecover(c)
-
 	var err error
 
 	// parse request parameters
@@ -38,13 +35,6 @@ func count(c *gin.Context) {
 		// panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = encoder.MIMEJSON
-	}
-
-	c.Header("Content-Type", accept)
 	// get a new unique search index
 	n := names.New()
 	defer os.Remove(names.ResultsDirPath(n.IdxFile))
@@ -57,8 +47,9 @@ func count(c *gin.Context) {
 		CaseSensitive: params.CaseSensitive,
 		Nodes:         params.Nodes,
 	}
-
+	fmt.Println(">> 1 ")
 	_, statistics := ryftprim(ryftParams, &n)
+	fmt.Println(">> 2 ")
 	stats := (<-statistics)
 	//	value := m.(map[string]interface{})[matches]
 	matches, err := strconv.ParseUint(fmt.Sprintf("%v", stats["matches"]), 0, 64)

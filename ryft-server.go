@@ -34,10 +34,12 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
+	"github.com/getryft/ryft-server/srverr"
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -112,9 +114,14 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	router := gin.Default()
+	// Create a rounter without any middleware by default
+	router := gin.New()
 
 	// Configure requred middlewares
+
+	// Logging & error recovery
+	router.Use(gin.Logger())
+	router.Use(srverr.Recovery())
 
 	// Allow CORS requests for * (all domains)
 	router.Use(cors.Cors("*"))
@@ -153,15 +160,16 @@ func main() {
 	})
 
 	// search method
-	router.GET("/search", search)
+	router.GET("/search", encoder.Detect, search)
 
 	// count method
-	router.GET("/count", count)
+	router.GET("/count", encoder.Detect, count)
 
 	// cluster members
 	router.GET("/cluster/members", members)
 
 	// Startup preparatory
+
 	// Clean previously created folder
 	names.Port = (*listenAddress).Port
 	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
