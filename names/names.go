@@ -76,7 +76,7 @@ func ResultsDirName() string {
 }
 
 func ResultsDirPath(filenames ...string) string {
-	return filepath.Join(append([]string{RyftoneMountPoint, ResultsDirName()}, filenames...)...)
+	return filepath.Join(append([]string{RyftoneMountPoint}, filenames...)...)
 }
 
 func PathInRyftoneForResultDir(filenames ...string) string {

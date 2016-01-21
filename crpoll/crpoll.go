@@ -31,6 +31,7 @@
 package crpoll
 
 import (
+	"fmt"
 	"os"
 	"time"
 )
@@ -47,6 +48,7 @@ func sleep(s chan error) (err error) {
 }
 
 func OpenFile(file string, s chan error) (f *os.File, err error) {
+	fmt.Println(file)
 	for {
 		if _, isExists := os.Stat(file); isExists == nil {
 			f, err = os.Open(file)

@@ -37,7 +37,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
@@ -119,12 +118,12 @@ func search(c *gin.Context) {
 	if !params.Stats {
 		results.Stats = nil
 	}
-	if params.Format == "xml" && params.Fields != "" {
-		fields := strings.Split(params.Fields, sepSign)
-		streamSmplRecords(c, enc, results, fields)
-	} else {
-		streamAllRecords(c, enc, results)
-	}
+	// if params.Format == "xml" && params.Fields != "" {
+	// fields := strings.Split(params.Fields, sepSign)
+	// streamSmplRecords(c, enc, results, fields)
+	// } else {
+	streamAllRecords(c, enc, items, results.Stats)
+	// }
 	//	} else {
 	//		cnslSrvc, err := GetConsulInfo()
 	//		if err != nil {
@@ -204,7 +203,7 @@ func logErrors(format string, errors chan error) {
 	}
 }
 
-func streamAllRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Result) {
+func streamAllRecords(c *gin.Context, enc encoder.Encoder, results chan interface{}, stats chan ryftprim.Statistics) {
 
 	first := true
 	c.Stream(func(w io.Writer) bool {
@@ -213,7 +212,7 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Resu
 			first = false
 		}
 
-		if record, ok := <-result.Results; ok {
+		if record, ok := <-results; ok {
 			if err := enc.Write(w, record); err != nil {
 				log.Panicln(err)
 			} else {
@@ -221,8 +220,8 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Resu
 			}
 			return true
 		}
-		if result.Stats != nil {
-			s := <-result.Stats
+		if stats != nil {
+			s := <-stats
 			enc.EndWithStats(w, s.AsMap())
 		} else {
 			enc.End(w)
@@ -232,41 +231,41 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Resu
 	})
 }
 
-func streamSmplRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Result, sample []string) {
-	first := true
-
-	c.Stream(func(w io.Writer) bool {
-		if first {
-			enc.Begin(w)
-			first = false
-		}
-
-		if record, ok := <-result.Results; ok {
-
-			rec := map[string]interface{}{}
-
-			for i := range sample {
-				value, ok := record.(map[string]interface{})[sample[i]]
-				if ok {
-					rec[sample[i]] = value
-				}
-			}
-			if err := enc.Write(w, rec); err != nil {
-				log.Panicln(err)
-			} else {
-				c.Writer.Flush()
-			}
-
-			return true
-
-		}
-
-		if result.Stats != nil {
-			stats := <-result.Stats
-			enc.EndWithStats(w, stats.AsMap())
-		} else {
-			enc.End(w)
-		}
-		return false
-	})
-}
+// func streamSmplRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Result, sample []string) {
+// first := true
+//
+// c.Stream(func(w io.Writer) bool {
+// 	if first {
+// 		enc.Begin(w)
+// 		first = false
+// 	}
+//
+// 	if record, ok := <-result.Results; ok {
+//
+// 		rec := map[string]interface{}{}
+//
+// 		for i := range sample {
+// 			value, ok := record.(map[string]interface{})[sample[i]]
+// 			if ok {
+// 				rec[sample[i]] = value
+// 			}
+// 		}
+// 		if err := enc.Write(w, rec); err != nil {
+// 			log.Panicln(err)
+// 		} else {
+// 			c.Writer.Flush()
+// 		}
+//
+// 		return true
+//
+// 	}
+//
+// 	if result.Stats != nil {
+// 		stats := <-result.Stats
+// 		enc.EndWithStats(w, stats.AsMap())
+// 	} else {
+// 		enc.End(w)
+// 	}
+// 	return false
+// })
+// }

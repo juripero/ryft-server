@@ -172,13 +172,13 @@ func main() {
 
 	// Clean previously created folder
 	names.Port = (*listenAddress).Port
-	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
+	if err := os.RemoveAll(names.ResultsDirPath(names.ResultsDirName())); err != nil {
 		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
 
 	// Create folder for results cache
-	if err := os.MkdirAll(names.ResultsDirPath(), 0777); err != nil {
+	if err := os.MkdirAll(names.ResultsDirPath(names.ResultsDirName()), 0777); err != nil {
 		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
