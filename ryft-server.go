@@ -27,6 +27,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
+
 package main
 
 import (
@@ -39,7 +40,6 @@ import (
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/srverr"
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -114,14 +114,14 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// Create a rounter without any middleware by default
-	router := gin.New()
+	// Create a rounter with default middleware: logger, recover
+	router := gin.Default()
 
 	// Configure requred middlewares
 
 	// Logging & error recovery
-	router.Use(gin.Logger())
-	router.Use(srverr.Recovery())
+	//	router.Use(gin.Logger())
+	//	router.Use(srverr.Recovery())
 
 	// Allow CORS requests for * (all domains)
 	router.Use(cors.Cors("*"))

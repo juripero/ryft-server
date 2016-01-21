@@ -39,8 +39,12 @@ import (
 	"time"
 )
 
-var Capacity = 64
-var PollingInterval = time.Millisecond * 50
+const (
+	// PollingInterval is a const for polling time
+	PollingInterval = time.Millisecond * 50
+	// PollBufferCapacity is a max buffer size
+	PollBufferCapacity = 64
+)
 
 type IdxRecord struct {
 	File      string `json:"file"`
@@ -134,7 +138,7 @@ func sleep(
 }
 
 func Poll(idx *os.File, errors chan error) (records chan IdxRecord, drop chan struct{}) {
-	records = make(chan IdxRecord, Capacity)
+	records = make(chan IdxRecord, PollBufferCapacity)
 	drop = make(chan struct{}, 1)
 	go func() {
 		loop := true
@@ -177,5 +181,32 @@ func Poll(idx *os.File, errors chan error) (records chan IdxRecord, drop chan st
 			)
 		}
 	}()
+	return
+}
+
+func DataPoll(input chan IdxRecord, dataFile *os.File) chan IdxRecord {
+	output := make(chan IdxRecord, PollBufferCapacity)
+	go func() {
+		for rec := range input {
+			rec.Data = nextData(dataFile, rec.Length)
+			output <- rec
+		}
+		close(output)
+	}()
+	return output
+}
+
+func nextData(res *os.File, length uint16) (result []byte) {
+	var total uint16
+	for total < length {
+		data := make([]byte, length-total)
+		n, _ := res.Read(data)
+		if n != 0 {
+			result = append(result, data...)
+			total = total + uint16(n)
+		} else {
+			time.Sleep(PollingInterval)
+		}
+	}
 	return
 }

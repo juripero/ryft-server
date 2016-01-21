@@ -36,29 +36,17 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
+	"net/url"
 	"strings"
-	"time"
 
-	"github.com/getryft/ryft-server/crpoll"
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/records"
+	"github.com/getryft/ryft-server/ryftprim"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/consul/api"
 )
-
-func cleanup(file *os.File) {
-	if file != nil {
-		log.Printf(" Close file %v", file.Name())
-		file.Close()
-		if !*KeepResults {
-			os.Remove(file.Name())
-		}
-	}
-}
 
 const sepSign string = ","
 
@@ -79,6 +67,8 @@ type SearchParams struct {
 }
 
 func search(c *gin.Context) {
+
+	defer srverr.Recover(c)
 
 	var err error
 
@@ -101,74 +91,53 @@ func search(c *gin.Context) {
 	n := names.New()
 	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
 
-	ryftParams := &RyftprimParams{
-		Query:         params.Query,
+	query, aErr := url.QueryUnescape(params.Query)
+
+	if aErr != nil {
+		panic(srverr.New(http.StatusBadRequest, aErr.Error()))
+	}
+
+	results := ryftprim.Search(&ryftprim.Params{
+		Query:         query,
 		Files:         params.Files,
 		Surrounding:   params.Surrounding,
 		Fuzziness:     params.Fuzziness,
 		Format:        params.Format,
 		CaseSensitive: params.CaseSensitive,
-		Fields:        params.Fields,
 		Nodes:         params.Nodes,
+		IndexFile:     n.FullIndexPath(),
+		ResultsFile:   n.FullResultsPath(),
+		KeepFiles:     *KeepResults,
+	})
+
+	// TODO: for cloud code get other ryftprim.Result objects and merge together
+	// [[[ ]]]]
+
+	items, _ := tcode.Transcode(results.Results)
+
+	//	if params.Local {
+	if !params.Stats {
+		results.Stats = nil
 	}
-	p, statistic := ryftprim(ryftParams, &n)
-
-	// read an index file
-	var idx, res *os.File
-	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
-		if serr, ok := err.(*srverr.ServerError); ok {
-			panic(serr)
-		} else {
-			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-		}
-	}
-	defer cleanup(idx)
-	//read a results file
-	if res, err = crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
-		if serr, ok := err.(*srverr.ServerError); ok {
-			panic(serr)
-		} else {
-			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-		}
-	}
-	defer cleanup(res)
-
-	indexes, drop := records.Poll(idx, p)
-	recs := dataPoll(indexes, res)
-	items, _ := tcode.Transcode(recs)
-
-	_ = drop
-	if params.Local {
-		// setHeaders(c, m)
-
-		if !params.Stats {
-			fmt.Println("CLOSED")
-			statistic = nil
-		}
-
-		if params.Format == "xml" && params.Fields != "" {
-			fields := strings.Split(params.Fields, sepSign)
-			streamSmplRecords(c, enc, items, fields, statistic)
-		} else {
-			streamAllRecords(c, enc, items, statistic)
-		}
+	if params.Format == "xml" && params.Fields != "" {
+		fields := strings.Split(params.Fields, sepSign)
+		streamSmplRecords(c, enc, results, fields)
 	} else {
-		cnslSrvc, err := GetConsulInfo()
-		if err != nil {
-			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-
-		}
-
-		ch := merge(items)
-
-		// time.Sleep(10 * time.Second)
-		for _, srv := range cnslSrvc {
-			recsChan, _ := searchInNode(params, srv)
-			ch = merge(ch, recsChan)
-		}
-		streamAllRecords(c, enc, ch, statistic)
-
+		streamAllRecords(c, enc, results)
 	}
+	//	} else {
+	//		cnslSrvc, err := GetConsulInfo()
+	//		if err != nil {
+	//			panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	//		}
+	//		ch := merge(items)
+	//		// time.Sleep(10 * time.Second)
+	//		for _, srv := range cnslSrvc {
+	//			recsChan, _ := searchInNode(params, srv)
+	//			ch = merge(ch, recsChan)
+	//		}
+	//		streamAllRecords(c, enc, ch, nil)
+	//	}
 }
 
 func searchInNode(params SearchParams, service *api.CatalogService) (recs chan interface{}, chanErr chan error) {
@@ -235,7 +204,7 @@ func logErrors(format string, errors chan error) {
 	}
 }
 
-func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}, statistic chan map[string]interface{}) {
+func streamAllRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Result) {
 
 	first := true
 	c.Stream(func(w io.Writer) bool {
@@ -244,7 +213,7 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 			first = false
 		}
 
-		if record, ok := <-recs; ok {
+		if record, ok := <-result.Results; ok {
 			if err := enc.Write(w, record); err != nil {
 				log.Panicln(err)
 			} else {
@@ -252,9 +221,9 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 			}
 			return true
 		}
-		if statistic != nil {
-			stats := <-statistic
-			enc.EndWithStats(w, stats)
+		if result.Stats != nil {
+			s := <-result.Stats
+			enc.EndWithStats(w, s.AsMap())
 		} else {
 			enc.End(w)
 		}
@@ -263,7 +232,7 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}
 	})
 }
 
-func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}, sample []string, statistic chan map[string]interface{}) {
+func streamSmplRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Result, sample []string) {
 	first := true
 
 	c.Stream(func(w io.Writer) bool {
@@ -272,7 +241,7 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 			first = false
 		}
 
-		if record, ok := <-recs; ok {
+		if record, ok := <-result.Results; ok {
 
 			rec := map[string]interface{}{}
 
@@ -292,46 +261,12 @@ func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{
 
 		}
 
-		if statistic != nil {
-			stats := <-statistic
-			enc.EndWithStats(w, stats)
+		if result.Stats != nil {
+			stats := <-result.Stats
+			enc.EndWithStats(w, stats.AsMap())
 		} else {
 			enc.End(w)
 		}
 		return false
 	})
-}
-
-const (
-	// PollingInterval is a const for polling time
-	PollingInterval = time.Millisecond * 50
-	// PollBufferCapacity is a max buffer size
-	PollBufferCapacity = 64
-)
-
-func dataPoll(input chan records.IdxRecord, dataFile *os.File) chan records.IdxRecord {
-	output := make(chan records.IdxRecord, PollBufferCapacity)
-	go func() {
-		for rec := range input {
-			rec.Data = nextData(dataFile, rec.Length)
-			output <- rec
-		}
-		close(output)
-	}()
-	return output
-}
-
-func nextData(res *os.File, length uint16) (result []byte) {
-	var total uint16
-	for total < length {
-		data := make([]byte, length-total)
-		n, _ := res.Read(data)
-		if n != 0 {
-			result = append(result, data...)
-			total = total + uint16(n)
-		} else {
-			time.Sleep(PollingInterval)
-		}
-	}
-	return
 }

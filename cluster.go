@@ -28,57 +28,20 @@
  * ============
  */
 
-package names
+package main
 
 import (
-	"fmt"
-	"path/filepath"
-	"strconv"
+	"github.com/getryft/ryft-server/srverr"
+	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
-var RyftoneMountPoint = "/ryftone"
-var ServerInstancePrefix = "RyftServer"
-var Port = 8765
+func members(c *gin.Context) {
+	srvc, err := GetConsulInfo()
 
-type Names struct {
-	Index               uint64
-	ResultFile, IdxFile string
-}
-
-var namesChan = make(chan Names, 256)
-
-func StartNamesGenerator() {
-	go func() {
-		var s string
-		for {
-			for i := uint64(0); i <= ^uint64(0); i++ {
-				s = strconv.FormatUint(i, 10)
-				namesChan <- Names{i, "result-" + s + ".bin", "idx-" + s + ".txt"}
-			}
-		}
-	}()
-}
-
-func New() Names {
-	return <-namesChan
-}
-
-func (n *Names) FullIndexPath() string {
-	return PathInRyftoneForResultDir(n.IdxFile)
-}
-
-func (n *Names) FullResultsPath() string {
-	return PathInRyftoneForResultDir(n.ResultFile)
-}
-
-func ResultsDirName() string {
-	return fmt.Sprintf("%s-%d", ServerInstancePrefix, Port)
-}
-
-func ResultsDirPath(filenames ...string) string {
-	return filepath.Join(append([]string{RyftoneMountPoint, ResultsDirName()}, filenames...)...)
-}
-
-func PathInRyftoneForResultDir(filenames ...string) string {
-	return filepath.Join(append([]string{ResultsDirName()}, filenames...)...)
+	if err != nil {
+		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	} else {
+		c.JSON(http.StatusOK, srvc)
+	}
 }
