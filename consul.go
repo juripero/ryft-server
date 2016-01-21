@@ -1,10 +1,6 @@
 package main
 
-import (
-	"fmt"
-
-	"github.com/hashicorp/consul/api"
-)
+import "github.com/hashicorp/consul/api"
 
 //type Service struct {
 //	Node           string   `json:"Node"`
@@ -16,20 +12,22 @@ import (
 //	ServicePort    string   `json:"ServicePort"`
 //}
 
-func GetConsulInfo() (interface{}, error) {
+func GetConsulInfo() (address []*api.CatalogService, err error) {
 
 	config := api.DefaultConfig()
 	config.Datacenter = "dc1"
 	client, err := api.NewClient(config)
 
 	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	} else {
-		catalog := client.Catalog()
-		srvc, _, _ := catalog.Service("ryft-rest-api", "", nil)
 
-		fmt.Println(srvc)
-		return srvc, nil
+		return nil, err
 	}
+
+	catalog := client.Catalog()
+	srvc, _, _ := catalog.Service("ryft-rest-api", "", nil)
+
+	// for _, value := range srvc {
+	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
+	// }
+	return srvc, err
 }

@@ -31,6 +31,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -43,10 +44,10 @@ import (
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/records"
-	//	"github.com/getryft/ryft-server/rol"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
+	"github.com/hashicorp/consul/api"
 )
 
 func cleanup(file *os.File) {
@@ -165,36 +166,78 @@ func search(c *gin.Context) {
 			streamAllRecords(c, enc, items, statistic)
 		}
 	} else {
-		_ = <-statistic
-		c.Stream(func(w io.Writer) bool {
-			prms := &UrlParams{}
-			prms.SetHost("52.3.59.171", "8765")
-			prms.Path = "search"
-			prms.Params = map[string]interface{}{
-				"query":       params.Query,
-				"files":       createFilesQuery(params.Files),
-				"surrounding": params.Surrounding,
-				"format":      params.Format,
-				"fuzziness":   params.Fuzziness,
-				"local":       true,
-			}
+		cnslSrvc, err := GetConsulInfo()
+		if err != nil {
+			panic(srverr.New(http.StatusInternalServerError, err.Error()))
 
-			url := createClusterUrl(prms)
-			response, err := http.Get(url)
-			if err != nil {
-				fmt.Printf("%s", err)
-				c.JSON(500, err)
-				return true
-			}
-			defer response.Body.Close()
-			for k := range response.Header {
-				c.Header(k, response.Header.Get(k))
-				// fmt.Printf("HEADER %v : %v", k, v)
-			}
-			io.Copy(w, response.Body)
-			return false
-		})
+		}
+
+		ch := merge(items)
+
+		// time.Sleep(10 * time.Second)
+		for _, srv := range cnslSrvc {
+			recsChan, _ := searchInNode(params, srv)
+			ch = merge(ch, recsChan)
+		}
+		streamAllRecords(c, enc, ch, statistic)
+
 	}
+}
+
+func searchInNode(params SearchParams, service *api.CatalogService) (recs chan interface{}, chanErr chan error) {
+	recs = make(chan interface{})
+	chanErr = make(chan error)
+
+	go func() {
+		if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
+			close(recs)
+			close(chanErr)
+			return
+		}
+
+		prms := &UrlParams{}
+		prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
+		prms.Path = "search"
+		prms.Params = map[string]interface{}{
+			"query":       params.Query,
+			"files":       createFilesQuery(params.Files),
+			"surrounding": params.Surrounding,
+			"format":      params.Format,
+			"fuzziness":   params.Fuzziness,
+			"local":       true,
+		}
+		url := createClusterUrl(prms)
+		response, err := http.Get(url)
+		if err != nil {
+			close(recs)
+			chanErr <- err
+			return
+		}
+
+		defer response.Body.Close()
+		dec := json.NewDecoder(response.Body)
+		var v map[string][]map[string]interface{}
+		dec.Decode(&v)
+
+		if i, ok := v["results"]; ok {
+			for _, v := range i {
+				if index, ok := v["_index"]; ok {
+					index.(map[string]interface{})["address"] = prms.host
+				}
+			}
+		}
+
+		recs <- v
+
+		// m := map[string]string{
+		// "address": prms.host,
+		// }
+		// recs <- m
+		// recs <- response.Body
+		defer close(chanErr)
+		defer close(recs)
+	}()
+	return
 }
 
 func logErrors(format string, errors chan error) {
