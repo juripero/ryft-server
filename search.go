@@ -31,6 +31,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -43,10 +44,10 @@ import (
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/records"
-	//	"github.com/getryft/ryft-server/rol"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
+	"github.com/hashicorp/consul/api"
 )
 
 func cleanup(file *os.File) {
@@ -178,7 +179,7 @@ func search(c *gin.Context) {
 			recsChan, _ := searchInNode(params, srv)
 			ch = merge(ch, recsChan)
 		}
-		streamAllRecords(c, enc, ch)
+		streamAllRecords(c, enc, ch, statistic)
 
 	}
 }
