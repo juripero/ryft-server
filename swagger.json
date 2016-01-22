@@ -1,16 +1,4 @@
 {
-    "consumes": [
-        "application/json",
-        "application/xml"
-    ],
-    "produces": [
-        "application/msgpack",
-        "application/json"
-    ],
-    "schemes": [
-        "http",
-        "https"
-    ],
     "swagger": "2.0",
     "info": {
         "description": "the purpose of this application is to create REST connector to the Ryft One hardware",
@@ -86,6 +74,13 @@
                         "schema": {
                             "type": "object",
                             "$ref": "#/definitions/CountResponse"
+                        }
+                    },
+                    "default": {
+                        "description": "Error responses",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/ErrorResponse"
                         }
                     }
                 }
@@ -200,6 +195,55 @@
                             "type": "object",
                             "$ref": "#/definitions/SearchResponse"
                         }
+                    },
+                    "default": {
+                        "description": "Error responses",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/files": {
+            "get": {
+                "tags": [
+                    "files"
+                ],
+                "summary": "Files",
+                "description": "Endpoint to query mode/cluster file system structure",
+                "operationId": "files",
+                "parameters": [
+                    {
+                        "name": "path",
+                        "type": "string",
+                        "description": "The folder path to return child items of",
+                        "required": true,
+                        "in": "query"
+                    },
+                    {
+                        "name": "local",
+                        "type": "boolean",
+                        "description": "Return file structure from local node only or whole cluster",
+                        "required": false,
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of files and directories for node/cluster",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/FilesResponse"
+                        }
+                    },
+                    "default": {
+                        "description": "Error responses",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
                     }
                 }
             }
@@ -268,6 +312,40 @@
                             "format": "int32"
                         }
                     }
+                }
+            }
+        },
+        "FilesResponse": {
+            "type": "object",
+            "properties": {
+                "folders": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
+        "ErrorResponse": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object"
+            },
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
                 }
             }
         }
