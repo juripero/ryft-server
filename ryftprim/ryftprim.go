@@ -108,10 +108,10 @@ type Result struct {
 
 func newResult() *Result {
 	return &Result{
-		make(chan error),
-		make(chan Statistics),
-		make(chan records.IdxRecord),
-		make(chan struct{}),
+		make(chan error, 1),
+		make(chan Statistics, 1),
+		make(chan records.IdxRecord, 256),
+		make(chan struct{}, 1),
 	}
 }
 
@@ -180,11 +180,13 @@ func Search(p *Params) (result *Result) {
 		command := exec.Command(cmd, testArgs...)
 		output, err := command.CombinedOutput()
 
+		defer close(result.Results)
 		defer close(result.Stats)
 		defer close(result.Errors)
 
 		outputstr := string(output)
 		log.Printf("\n%s\n", outputstr)
+		result.Errors <- nil // done
 
 		if err != nil {
 			result.Errors <- errors.New(fmt.Sprintf("%s (%s)", strings.TrimSpace(outputstr), err.Error()))

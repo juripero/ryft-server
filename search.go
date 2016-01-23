@@ -116,7 +116,7 @@ func search(c *gin.Context) {
 
 	//	if params.Local {
 	if !params.Stats {
-		results.Stats = nil
+		//results.Stats = nil
 	}
 	// if params.Format == "xml" && params.Fields != "" {
 	// fields := strings.Split(params.Fields, sepSign)
