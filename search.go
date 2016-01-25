@@ -135,7 +135,11 @@ func search(ctx *gin.Context) {
 		select {
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				err := enc.Write(w, rec)
+				xrec, err := tcode.Transcode1(rec)
+				if err != nil {
+					panic(err)
+				}
+				err = enc.Write(w, xrec)
 				if err != nil {
 					panic(err)
 				}

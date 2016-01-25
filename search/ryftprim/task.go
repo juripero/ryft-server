@@ -58,25 +58,25 @@ type Task struct {
 	tool_out  *bytes.Buffer // combined STDOUT and STDERR
 
 	// index & data
-	indexChan   chan search.Index
-	indexCancel chan interface{}
-	dataCancel  chan interface{}
-	subtasks    sync.WaitGroup
+	enableDataProcessing bool
+	indexChan            chan search.Index
+	indexCancel          chan interface{}
+	dataCancel           chan interface{}
+	subtasks             sync.WaitGroup
 }
 
 // NewTask creates new task.
-func NewTask(needFiles bool) *Task {
+func NewTask(enableProcessing bool) *Task {
 	id := atomic.AddUint64(&taskId, 1)
 
 	task := &Task{}
 	task.Identifier = fmt.Sprintf("%016x", id)
+	task.enableDataProcessing = enableProcessing
 
-	if needFiles {
-		// NOTE: index file should have 'txt' extension,
-		// otherwise `ryftprim` adds '.txt' anyway.
-		task.IndexFileName = fmt.Sprintf("idx-%s.txt", task.Identifier)
-		task.DataFileName = fmt.Sprintf("dat-%s.bin", task.Identifier)
-	}
+	// NOTE: index file should have 'txt' extension,
+	// otherwise `ryftprim` adds '.txt' anyway.
+	task.IndexFileName = fmt.Sprintf("idx-%s.txt", task.Identifier)
+	task.DataFileName = fmt.Sprintf("dat-%s.bin", task.Identifier)
 
 	return task
 }

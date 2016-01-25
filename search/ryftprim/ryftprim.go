@@ -211,7 +211,7 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 	}()
 
 	// start index&data processing
-	if len(task.IndexFileName) != 0 {
+	if task.enableDataProcessing {
 		task.indexChan = make(chan search.Index, 256) // TODO: capacity constant from engine?
 		task.indexCancel = make(chan interface{}, 1)
 		task.dataCancel = make(chan interface{}, 1)
@@ -257,7 +257,11 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	defer task.Close()
 
 	out_buf := task.tool_out.Bytes()
-	task.log().WithField("out", string(out_buf)).Debugf("[ryftprim]: combined output")
+	if err == nil {
+		task.log().Debugf("[ryftprim]: combined output: %s\n", string(out_buf))
+	} else {
+		task.log().Warnf("[ryftprim]: combined output: %s\n", string(out_buf))
+	}
 
 	// parse statistics from output
 	if err == nil {
