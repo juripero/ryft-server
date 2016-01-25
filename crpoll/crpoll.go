@@ -31,6 +31,7 @@
 package crpoll
 
 import (
+	"fmt"
 	"os"
 	"time"
 )
@@ -47,17 +48,13 @@ func sleep(s chan error) (err error) {
 }
 
 func OpenFile(file string, s chan error) (f *os.File, err error) {
+	fmt.Println(file)
 	for {
-		// log.Printf(" crpoll before isExists %+v", file)
 		if _, isExists := os.Stat(file); isExists == nil {
-			// log.Printf(" crpoll before os.Open %+v", file)
 			f, err = os.Open(file)
-			// log.Printf("After os.Open err = %v", err)
 			return
 		} else {
-			// log.Printf(" crpoll before sleep %+v", file)
 			if err = sleep(s); err != nil {
-				// log.Printf("After sleep err = %v", err)
 				return
 			}
 		}

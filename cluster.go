@@ -28,56 +28,20 @@
  * ============
  */
 
-package srverr
+package main
 
 import (
-	"fmt"
-	"log"
-	"net/http"
-	"runtime/debug"
-	"strings"
-
+	"github.com/getryft/ryft-server/srverr"
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
-type ServerError struct {
-	Status  int
-	Message string
-	Details string
-}
+func members(c *gin.Context) {
+	srvc, err := GetConsulInfo()
 
-func (err *ServerError) Error() string {
-	return fmt.Sprintf("%d %s", err.Status, err.Message)
-}
-
-func New(status int, message string) *ServerError {
-	return &ServerError{status, message, ""}
-}
-
-func NewWithDetails(status int, message string, details string) *ServerError {
-	return &ServerError{status, message, details}
-}
-
-func DeferRecover(c *gin.Context) {
-	if r := recover(); r != nil {
-		if err, ok := r.(*ServerError); ok {
-			log.Printf("Panic recovered server error: status=%d msg:%s => %+v", err.Status, err.Message, err)
-			if len(err.Details) > 0 {
-				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status, "details": err.Details})
-			} else {
-				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status})
-			}
-			return
-		}
-
-		if err, ok := r.(error); ok {
-			log.Printf("Panic recovered unknown error with msg:%s", err.Error())
-			debug.PrintStack()
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%v", err.Error()), "status": http.StatusInternalServerError})
-			return
-		}
-
-		log.Printf("Panic recovered with object:%+v", r)
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%+v", r), "status": http.StatusInternalServerError})
+	if err != nil {
+		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	} else {
+		c.JSON(http.StatusOK, srvc)
 	}
 }

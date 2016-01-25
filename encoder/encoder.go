@@ -33,7 +33,11 @@ package encoder
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"time"
+
+	"github.com/getryft/ryft-server/srverr"
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -42,6 +46,7 @@ const (
 	MIMEMSGPACK  = "application/msgpack"
 
 	WriteInterval = time.Second * 20
+	CTXKEY        = "encoder-detected"
 )
 
 type Encoder interface {
@@ -64,4 +69,25 @@ func GetByMimeType(mime string) (Encoder, error) {
 	default:
 		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
 	}
+}
+
+func Detect(c *gin.Context) {
+	accept := c.NegotiateFormat(GetSupportedMimeTypes()...)
+	// default to JSON
+	if accept == "" {
+		accept = MIMEJSON
+	}
+	c.Header("Content-Type", accept)
+
+	// setting up encoder to respond with requested format
+	if enc, err := GetByMimeType(accept); err != nil {
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	} else {
+		c.Set(CTXKEY, enc)
+	}
+}
+
+func FromContext(c *gin.Context) Encoder {
+	// TODO add handlers for null value and report 400 error
+	return c.MustGet(CTXKEY).(Encoder)
 }
