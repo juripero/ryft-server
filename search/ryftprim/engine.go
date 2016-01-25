@@ -34,16 +34,22 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Sirupsen/logrus"
+
 	"github.com/getryft/ryft-server/search"
+)
+
+var (
+	log = logrus.New()
 )
 
 // RyftPrim engine uses `ryftprim` utility as a backend.
 type Engine struct {
-	Instance   string // Server-1234 (i.e. server instance)
-	ExecPath   string // /usr/bin/ryftprim
-	MountPoint string // /ryftone
+	Instance   string // "" by default. might be some server instance name ".server-1234"
+	ExecPath   string // "/usr/bin/ryftprim" by default
+	MountPoint string // "/ryftone" by default
 
-	KeepResultFiles bool
+	KeepResultFiles bool // false by default
 
 	// poll timeouts
 	OpenFilePollTimeout time.Duration
@@ -62,12 +68,17 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftPrimEngine{instance:%q, ryftone: %q, ryftprim:%q}",
+	return fmt.Sprintf("RyftPrim{instance:%q, ryftone:%q, ryftprim:%q}",
 		engine.Instance, engine.MountPoint, engine.ExecPath)
 	// TODO: other parameters?
 }
 
-// factory function
+// log returns task related logger.
+func (task *Task) log() *logrus.Entry {
+	return log.WithField("task", task.Identifier)
+}
+
+// factory creates RyftPrim engine.
 func factory(opts map[string]interface{}) (search.Engine, error) {
 	engine, err := NewEngine(opts)
 	if err != nil {
@@ -79,4 +90,8 @@ func factory(opts map[string]interface{}) (search.Engine, error) {
 // package initialization
 func init() {
 	search.RegisterEngine("ryftprim", factory)
+
+	// initialize logging
+	log.Level = logrus.InfoLevel
+	//log.Level = logrus.DebugLevel
 }

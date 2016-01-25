@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
 
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
@@ -13,25 +14,27 @@ import (
 // just print of available search engines
 func test0() {
 	names := search.GetAvailableEngines()
-	log.Printf("engines: %s", names)
+	log.WithField("names", names).Infof("available search engines")
 
 	for _, name := range names {
 		engine, err := search.NewEngine(name, nil)
 		if err != nil {
-			log.Fatalf("%q: failed to create search engine: %s", name, err)
+			log.WithField("name", name).WithError(err).
+				Fatalf("failed to create search engine")
 		}
 
-		log.Printf("%q options: %+v", name, engine.Options())
+		log.WithField("name", name).Infof("actual options: %+v", engine.Options())
 	}
 }
 
 // run search locally
-func test1a(id string, engine search.Engine, cfg search.Config) {
-	log.Printf("%q search starting...: %s", id, cfg)
-	res := search.NewResult()
-	err := engine.Search(&cfg, res)
+func test1a(tag string, engine search.Engine, cfg search.Config) {
+	xlog := log.WithField("tag", tag)
+	xlog.Printf("start /search: %s", cfg)
+
+	res, err := engine.Search(&cfg)
 	if err != nil {
-		log.Fatalf("failed to start %q search: %s", id, err)
+		xlog.WithError(err).Fatalf("failed to start search")
 	}
 
 	var recordsReceived []*search.Record
@@ -39,26 +42,22 @@ func test1a(id string, engine search.Engine, cfg search.Config) {
 		select {
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
-				log.Printf("%q search error: %s", id, err)
+				xlog.WithError(err).Errorf("search error received")
 			}
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				_ = rec // log.Printf("%q result: %s", id, rec)
+				xlog.WithField("data", rec).Debugf("new record received")
 				recordsReceived = append(recordsReceived, rec)
 			}
 
 		case <-res.DoneChan:
-			// log.Printf("%q search done: no more records", id)
-			log.Printf("%q search statistics: %s", id, res.Stat)
+			xlog.WithField("stat", res.Stat).Infof("/search finished")
 			if uint64(len(recordsReceived)) != res.Stat.Matches {
-				log.Printf("%q WARN: %d matched but %d received",
-					id, res.Stat.Matches, len(recordsReceived))
-				for _, r := range recordsReceived {
-					log.Printf("%q: %s", id, r)
-				}
+				xlog.Warnf("%d matched but %d received",
+					res.Stat.Matches, len(recordsReceived))
 			}
-			return
+			return // stop
 		}
 	}
 }
@@ -77,7 +76,7 @@ func test1c(engine search.Engine, cfgs ...search.Config) {
 	// run each search in goroutine
 	for i, cfg := range cfgs {
 		wg.Add(1)
-		cfg.Surrounding = uint16(i + 1)
+		cfg.Surrounding = uint(i + 1)
 		go func(i int, cfg search.Config) {
 			defer wg.Done()
 			test1a(fmt.Sprintf("X%d", i+1), engine, cfg)
@@ -99,23 +98,13 @@ func test1(concurent bool) {
 	}
 	engine, err := search.NewEngine(backend, opts)
 	if err != nil {
-		log.Fatalf("failed to get search engine: %s", err)
+		log.WithError(err).Fatalf("failed to get search engine")
 	}
-	log.Printf("%q actual options: %+v", backend, engine.Options())
+	log.WithField("name", backend).Infof("actual options: %+v", engine.Options())
 
-	A := search.NewConfig(`(RAW_TEXT CONTAINS "10")`)
-	A.AddFiles("/regression/*.txt")
-	A.Surrounding = 0
-	A.Fuzziness = 0
-
-	B := search.NewConfig(`(RAW_TEXT CONTAINS "0")`)
-	B.AddFiles("/regression/*.txt")
-	B.Surrounding = 0
-	B.Fuzziness = 0
-
-	C := search.NewConfig(`(RAW_TEXT CONTAINS "555")`)
-	C.AddFiles("/regression/*.txt")
-	C.Surrounding = 0
+	A := search.NewConfig(`(RAW_TEXT CONTAINS "10")`, "/regression/*.txt")
+	B := search.NewConfig(`(RAW_TEXT CONTAINS "0")`, "/regression/*.txt")
+	C := search.NewConfig(`(RAW_TEXT CONTAINS "555")`, "/regression/*.txt")
 	C.Fuzziness = 1
 
 	cfgs := []search.Config{}

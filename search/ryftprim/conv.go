@@ -62,7 +62,7 @@ func asDuration(opt interface{}) (time.Duration, error) {
 		return time.Duration(0), nil
 	}
 
-	return time.Duration(0), fmt.Errorf("%v os not a time duration", opt)
+	return time.Duration(0), fmt.Errorf("%v is not a time duration", opt)
 }
 
 // convert custom value to uint64.
@@ -98,5 +98,5 @@ func asBool(opt interface{}) (bool, error) {
 		return false, nil
 	}
 
-	return false, fmt.Errorf("%v os not a bool", opt)
+	return false, fmt.Errorf("%v is not a bool", opt)
 }

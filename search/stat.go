@@ -35,14 +35,16 @@ import (
 )
 
 // Search processing statistics.
-// Contains set of search statistics.
+// Contains set of search statistics such as total processed bytes
+// and processing duration.
 type Statistics struct {
 	Matches    uint64 // total records matched
 	TotalBytes uint64 // total input bytes processed
 	Duration   uint64 // processing duration, milliseconds
+	// TODO: data rate?
 }
 
-// String gets string representation of Statistics.
+// String gets string representation of statistics.
 func (s Statistics) String() string {
 	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms}",
 		s.Matches, s.TotalBytes, s.Duration)

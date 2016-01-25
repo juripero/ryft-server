@@ -92,7 +92,7 @@ func parseStat(buf []byte) (stat search.Statistics, err error) {
 		return stat, fmt.Errorf("failed to parse ryftprim output: %s", err)
 	}
 
-	// log.Printf("parsed YML map: %+v", v)
+	log.WithField("stat", v).Debugf("ryftprim output as YML")
 
 	// Duration
 	stat.Duration, err = asUint64(v["Duration"])

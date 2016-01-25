@@ -34,19 +34,19 @@ import (
 	"fmt"
 )
 
-// Search index and data record.
+// Search INDEX and DATA combined.
 type Record struct {
 	Index Index
-	Data  interface{}
+	Data  interface{} // probably []byte
 }
 
-// String gets the string representation of Record.
+// String gets the string representation of record.
 func (r Record) String() string {
 	return fmt.Sprintf("Record{%s, data:%v}",
 		r.Index, r.Data)
 }
 
-// Search index record.
+// Search INDEX record.
 type Index struct {
 	File      string
 	Offset    uint64

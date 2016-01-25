@@ -36,15 +36,23 @@ import (
 
 // Abstract Search Engine interface
 type Engine interface {
+
+	// Get current engine options.
 	Options() map[string]interface{}
-	Search(cfg *Config, res *Result) error
+
+	// Run asynchronous "search" operation.
+	Search(cfg *Config) (*Result, error)
+
+	// Run asynchronous "count" operation.
+	Count(cfg *Config) (*Result, error)
 }
 
 // NewEngine creates new search engine by name.
-// To get list of supported options see corresponding backend.
+// To get list of available engines see GetAvailableEngines().
+// To get list of supported options see corresponding search engine.
 func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
 	// get appropriate factory
-	f, ok := engineFactories[name]
+	f, ok := factories[name]
 	if !ok {
 		return nil, fmt.Errorf("%q is unknown search engine", name)
 	}

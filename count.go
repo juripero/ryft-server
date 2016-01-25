@@ -52,21 +52,20 @@ func count(ctx *gin.Context) {
 	}
 
 	// search configuration
-	cfg := backend.NewConfig("")
+	cfg := backend.NewEmptyConfig()
 	if q, err := url.QueryUnescape(params.Query); err != nil {
 		panic(srverr.NewWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to unescape query"))
 	} else {
 		cfg.Query = q
 	}
-	cfg.AddFiles(params.Files...) // TODO: unescape?
+	cfg.AddFiles(params.Files) // TODO: unescape?
 	cfg.Surrounding = 0
-	cfg.Fuzziness = params.Fuzziness
+	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
-	cfg.Nodes = params.Nodes
+	cfg.Nodes = uint(params.Nodes)
 
-	res := backend.NewResult()
-	err = engine.Search(cfg, res) // TODO: replace with dedicated Count() method
+	res, err := engine.Count(cfg)
 	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))

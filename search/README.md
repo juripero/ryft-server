@@ -9,7 +9,8 @@ Search engine is one of:
 
 ## Import search backends
 
-Here is a trick how to register search engines:
+Here is a trick how to register search engines,
+just use unused import for side effects:
 
 ```
 import (
@@ -18,5 +19,5 @@ import (
 )
 ```
 
-We need to reference `ryftprim` package so it registers its factory
-in global search engine factory list.
+We need to reference `ryftprim` package so it registers
+its factory in global search engine factory list.

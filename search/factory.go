@@ -32,7 +32,7 @@ package search
 
 var (
 	// global engine factories
-	engineFactories = map[string]EngineFactory{}
+	factories = map[string]EngineFactory{}
 )
 
 // Engine factory function.
@@ -46,17 +46,17 @@ type EngineFactory func(map[string]interface{}) (Engine, error)
 func RegisterEngine(name string, f EngineFactory) {
 	if f != nil {
 		// register new or replace existing
-		engineFactories[name] = f
+		factories[name] = f
 	} else {
 		// deregister existing
-		delete(engineFactories, name)
+		delete(factories, name)
 	}
 }
 
 // GetAvailableEngines returns all the registered search engines.
 func GetAvailableEngines() []string {
-	names := make([]string, 0, len(engineFactories))
-	for k, _ := range engineFactories {
+	names := make([]string, 0, len(factories))
+	for k, _ := range factories {
 		names = append(names, k)
 	}
 	return names

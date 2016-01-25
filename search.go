@@ -101,21 +101,20 @@ func search(ctx *gin.Context) {
 	}
 
 	// search configuration
-	cfg := backend.NewConfig("")
+	cfg := backend.NewEmptyConfig()
 	if q, err := url.QueryUnescape(params.Query); err != nil {
 		panic(srverr.NewWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to unescape query"))
 	} else {
 		cfg.Query = q
 	}
-	cfg.AddFiles(params.Files...) // TODO: unescape?
-	cfg.Surrounding = params.Surrounding
-	cfg.Fuzziness = params.Fuzziness
+	cfg.AddFiles(params.Files) // TODO: unescape?
+	cfg.Surrounding = uint(params.Surrounding)
+	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
-	cfg.Nodes = params.Nodes
+	cfg.Nodes = uint(params.Nodes)
 
-	res := backend.NewResult()
-	err = engine.Search(cfg, res)
+	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))

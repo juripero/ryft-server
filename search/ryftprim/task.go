@@ -43,7 +43,7 @@ import (
 
 var (
 	// global identifier (zero for debugging)
-	globalTaskId = uint64(0 * time.Now().UnixNano())
+	taskId = uint64(0 * time.Now().UnixNano())
 )
 
 // RyftPrim task related data.
@@ -53,9 +53,9 @@ type Task struct {
 	DataFileName  string
 
 	// ryftprim process & output
-	tool_args []string
-	tool_cmd  *exec.Cmd
-	tool_out  *bytes.Buffer
+	tool_args []string      // command line arguments
+	tool_cmd  *exec.Cmd     // ryftprim executable process
+	tool_out  *bytes.Buffer // combined STDOUT and STDERR
 
 	// index & data
 	indexChan   chan search.Index
@@ -66,13 +66,13 @@ type Task struct {
 
 // NewTask creates new task.
 func NewTask(needFiles bool) *Task {
-	id := atomic.AddUint64(&globalTaskId, 1)
+	id := atomic.AddUint64(&taskId, 1)
 
 	task := &Task{}
 	task.Identifier = fmt.Sprintf("%016x", id)
 
 	if needFiles {
-		// Note, index file should have 'txt' extension,
+		// NOTE: index file should have 'txt' extension,
 		// otherwise `ryftprim` adds '.txt' anyway.
 		task.IndexFileName = fmt.Sprintf("idx-%s.txt", task.Identifier)
 		task.DataFileName = fmt.Sprintf("dat-%s.bin", task.Identifier)
@@ -81,11 +81,13 @@ func NewTask(needFiles bool) *Task {
 	return task
 }
 
-// finish closes some channels.
-func (task *Task) finish() {
+// Close closes some channels.
+func (task *Task) Close() {
+	// NOTE: index channel is closed in INDEX processing goroutine!
 	//	if task.indexChan != nil {
 	//		close(task.indexChan)
 	//	}
+
 	if task.indexCancel != nil {
 		close(task.indexCancel)
 	}

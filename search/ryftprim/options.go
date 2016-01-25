@@ -68,7 +68,11 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	} else {
 		engine.ExecPath = "/usr/bin/ryftprim"
 	}
-	// TODO: check ExecPath exists
+	// check ExecPath exists
+	if _, err := os.Stat(engine.ExecPath); err != nil {
+		return fmt.Errorf("failed to locate %q ryftprim executable: %s",
+			engine.ExecPath, err)
+	}
 
 	// `ryftone` mount point
 	if v, ok := opts["ryftone-mount"]; ok {
@@ -79,10 +83,15 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	} else {
 		engine.MountPoint = "/ryftone"
 	}
-	// TODO: check MountPoint exists
+	// check MountPoint exists
+	if info, err := os.Stat(engine.MountPoint); err != nil || !info.IsDir() {
+		return fmt.Errorf("failed to locate %q mount point: %s",
+			engine.MountPoint, err)
+	}
 
 	// create working directory
 	work_dir := filepath.Join(engine.MountPoint, engine.Instance)
+	// TODO: option to clear working dir before start?
 	err = os.MkdirAll(work_dir, os.ModeDir)
 	if err != nil {
 		return fmt.Errorf("failed to create instance directory: %s", err)
@@ -114,8 +123,6 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		if err != nil {
 			return fmt.Errorf(`failed to convert "keep-files" option: %s`, err)
 		}
-	} else {
-		engine.KeepResultFiles = false
 	}
 
 	return nil // OK

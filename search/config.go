@@ -39,27 +39,34 @@ import (
 type Config struct {
 	Query         string
 	Files         []string
-	Surrounding   uint16
-	Fuzziness     uint8
+	Surrounding   uint
+	Fuzziness     uint
 	CaseSensitive bool
-	Nodes         uint8
+	Nodes         uint
+}
+
+// NewEmptyConfig creates new empty search configuration.
+func NewEmptyConfig() *Config {
+	return &Config{Files: []string{}} // no files by default
 }
 
 // NewConfig creates new search configuration.
-func NewConfig(query string) *Config {
-	cfg := &Config{Query: query}
-	cfg.Files = []string{} // no files by default
-	return cfg
+func NewConfig(query string, files ...string) *Config {
+	return &Config{Query: query, Files: files}
 }
 
-// AddFiles adds one or more files to the search configuration
-func (cfg *Config) AddFiles(files ...string) {
+// AddFile adds one or more files to the search configuration.
+func (cfg *Config) AddFile(files ...string) {
+	cfg.AddFiles(files)
+}
+
+// AddFiles adds one or more files to the search configuration.
+func (cfg *Config) AddFiles(files []string) {
 	cfg.Files = append(cfg.Files, files...)
 }
 
-// String gets the string representation of the configuration
+// String gets the string representation of the configuration.
 func (cfg Config) String() string {
-	return fmt.Sprintf("Config{query:%s, files:%q surr:%d, fuzz:%d}",
-		cfg.Query, cfg.Files, cfg.Surrounding, cfg.Fuzziness)
-	// TODO: more fields!?
+	return fmt.Sprintf("Config{query:%s, files:%q surr:%d, fuzz:%d, case-sens:%b, nodes:%d}",
+		cfg.Query, cfg.Files, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes)
 }

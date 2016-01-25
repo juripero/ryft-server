@@ -37,26 +37,32 @@ import (
 // Search result.
 // It's possible to cancel result (and stop futher processing).
 // All communication is done via channels (error, records, etc).
-// Once processing is done all channels are closed.
+// Need to read from Error and Record channels to prevent blocking!
+// Once processing is done `nil` is sent to Done channel
+// and all channels are closed.
 type Result struct {
-	// Channel of processing errors (Engine -> user)
-	ErrorChan chan error
+	// Channel of processing errors (Engine -> client)
+	ErrorChan      chan error
+	errorsReceived uint64
 
-	// Channel of processed records (Engine -> user)
-	RecordChan chan *Record
+	// Channel of processed records (Engine -> client)
+	RecordChan      chan *Record
+	recordsReceived uint64
 
 	// Cancel channel is used to notify search engine
-	// to stop processing immideatelly (user -> Engine)
-	CancelChan chan interface{}
+	// to stop processing immideatelly (client -> Engine)
+	CancelChan  chan interface{}
+	isCancelled bool
 
-	// Done channel is used to notify suser earch is done (Engine -> user)
+	// Done channel is used to notify client search is done (Engine -> client)
 	DoneChan chan interface{}
+	isDone   bool
 
 	// Search processing statistics
 	Stat Statistics
 }
 
-// NewResult creates new search result structure.
+// NewResult creates new empty search results.
 func NewResult() *Result {
 	res := &Result{}
 
@@ -68,34 +74,40 @@ func NewResult() *Result {
 	return res
 }
 
-// String gets string representation of Result
-func (res *Result) String() string {
-	return fmt.Sprintf("Result{stat:%s}",
-		res.Stat)
+// String gets string representation of results.
+// actually prints statistics.
+func (res Result) String() string {
+	return fmt.Sprintf("Result{records:%d, errors:%d, done:%b, stat:%s}",
+		res.recordsReceived, res.errorsReceived, res.isDone, res.Stat)
 }
 
-// ReportError sends error to error channel.
+// ReportError sends error to Error channel.
 func (res *Result) ReportError(err error) {
+	res.errorsReceived += 1 // FIXME: use atomic?
 	res.ErrorChan <- err
 }
 
 // ReportRecord sends data record to records channel.
 func (res *Result) ReportRecord(rec *Record) {
+	res.recordsReceived += 1 // FIXME: use atomic?
 	res.RecordChan <- rec
 }
 
 // Cancel stops the search processing.
 func (res *Result) Cancel() {
+	res.isCancelled = true
 	res.CancelChan <- nil
 }
 
 // ReportDone sends 'done' notification.
 func (res *Result) ReportDone() {
+	res.isDone = true
 	res.DoneChan <- nil
 }
 
-// Finish closes all channels.
-func (res *Result) Finish() {
+// Close closes all channels.
+// Is called by search Engine.
+func (res *Result) Close() {
 	close(res.CancelChan)
 	close(res.RecordChan)
 	close(res.ErrorChan)
