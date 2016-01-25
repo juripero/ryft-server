@@ -171,7 +171,7 @@ func Search(p *Params) (result *Result) {
 		testArgs = append(testArgs, arg_fuzziness, fmt.Sprintf("%d", p.Fuzziness))
 	}
 
-	testArgs = append(testArgs, arg_query, p.Query)
+	testArgs = append(testArgs, arg_query, prepareQuery(p.Query))
 
 	log.Println(testArgs)
 
@@ -246,6 +246,16 @@ func Search(p *Params) (result *Result) {
 	}
 
 	return
+}
+
+// prepareQuery checks for plain queries
+// plain queries converted to (RAW_TEXT CONTAINS "query")
+func prepareQuery(query string) string {
+	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
+		return query
+	} else { // if no keywords - assume plain text query
+		return fmt.Sprintf(`(RAW_TEXT CONTAINS "%s")`, query)
+	}
 }
 
 func cleanup(file *os.File, keep bool) {
