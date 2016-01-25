@@ -1,12 +1,12 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"net/url"
-	"os"
 
-	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/ryftprim"
+	backend "github.com/getryft/ryft-server/search"
+
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/gin-gonic/gin"
 )
@@ -26,45 +26,78 @@ type CountResponse struct {
 	Mathces uint64 `json:"matches, string"`
 }
 
-func count(c *gin.Context) {
+// Handle /count endpoint.
+func count(ctx *gin.Context) {
+	// recover from panics if any
+	defer srverr.Recover(ctx)
 
-	defer srverr.Recover(c)
+	var err error
 
 	// parse request parameters
 	params := CountParams{}
-	if err := c.Bind(&params); err != nil {
-		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	if err := ctx.Bind(&params); err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to parse request parameters"))
 	}
 
-	// get a new unique search index
-	n := names.New()
-	defer os.Remove(names.ResultsDirPath(n.IdxFile))
-	defer os.Remove(names.ResultsDirPath(n.ResultFile))
-
-	query, aErr := url.QueryUnescape(params.Query)
-
-	if aErr != nil {
-		panic(srverr.New(http.StatusBadRequest, aErr.Error()))
+	// get search engine
+	opts := map[string]interface{}{
+		"keep-files": *KeepResults,
+		// TODO: more options
+	}
+	var engine backend.Engine
+	if engine, err = backend.NewEngine("ryftprim", opts); err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to get search engine"))
 	}
 
-	results := ryftprim.Search(&ryftprim.Params{
-		Query:         query,
-		Files:         params.Files,
-		Fuzziness:     params.Fuzziness,
-		CaseSensitive: params.CaseSensitive,
-		Nodes:         params.Nodes,
-		ResultsFile:   n.FullResultsPath(),
-	})
+	// search configuration
+	cfg := backend.NewConfig("")
+	if q, err := url.QueryUnescape(params.Query); err != nil {
+		panic(srverr.NewWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to unescape query"))
+	} else {
+		cfg.Query = q
+	}
+	cfg.AddFiles(params.Files...) // TODO: unescape?
+	cfg.Surrounding = 0
+	cfg.Fuzziness = params.Fuzziness
+	cfg.CaseSensitive = params.CaseSensitive
+	cfg.Nodes = params.Nodes
+
+	res := backend.NewResult()
+	err = engine.Search(cfg, res) // TODO: replace with dedicated Count() method
+	if err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to start search"))
+	}
 
 	// TODO: for cloud code get other ryftprim.Result objects and merge together
 	// [[[ ]]]]
 
-	select {
-	case stats := <-results.Stats:
-		c.JSON(http.StatusOK, stats)
+	for {
+		select {
+		case rec, ok := <-res.RecordChan:
+			if ok && rec != nil {
+				log.Printf("REC: %s", rec)
+				// ignore records
+			}
 
-	case err := <-results.Errors:
-		//		c.AbortWithError(http.StatusInternalServerError, err)
-		panic(err)
+		case err, ok := <-res.ErrorChan:
+			if ok && err != nil {
+				log.Printf("ERR: %s", err)
+				// TODO: report error
+			}
+
+		case <-res.DoneChan:
+			log.Printf("DONE: %s", res.Stat)
+			s := map[string]interface{}{
+				"matches":    res.Stat.Matches,
+				"totalBytes": res.Stat.TotalBytes,
+				"duration":   res.Stat.Duration,
+			}
+			ctx.JSON(http.StatusOK, s)
+			return
+		}
 	}
 }

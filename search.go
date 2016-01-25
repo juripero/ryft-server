@@ -142,6 +142,11 @@ func search(ctx *gin.Context) {
 				}
 			}
 
+		case err, ok := <-res.ErrorChan:
+			if ok && err != nil {
+				// TODO: report error
+			}
+
 		case <-res.DoneChan:
 			enc.End(w)
 			return false // stop
