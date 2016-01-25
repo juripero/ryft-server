@@ -1,4 +1,4 @@
-package files
+package main
 
 import (
 	"io/ioutil"
@@ -23,8 +23,8 @@ const (
 	foldersName string = "folders"
 )
 
-func Files(c *gin.Context) {
-	defer srverr.DeferRecover(c)
+func files(c *gin.Context) {
+	defer srverr.Recover(c)
 
 	var err error
 	params := FilesParams{}

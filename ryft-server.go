@@ -38,7 +38,6 @@ import (
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
-	"github.com/getryft/ryft-server/middleware/files"
 	"github.com/getryft/ryft-server/middleware/gzip"
 	"github.com/getryft/ryft-server/names"
 
@@ -170,7 +169,7 @@ func main() {
 	router.GET("/cluster/members", members)
 
 	// server/cluster files
-	router.GET("/files", files.Files)
+	router.GET("/files", files)
 
 	// Startup preparatory
 
