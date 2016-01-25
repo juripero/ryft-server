@@ -35,6 +35,8 @@ import (
 	"net/http"
 	"os"
 
+	_ "github.com/getryft/ryft-server/search/ryftprim"
+
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"

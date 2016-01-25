@@ -34,10 +34,12 @@ import (
 	"fmt"
 
 	"github.com/getryft/ryft-server/records"
+	"github.com/getryft/ryft-server/search"
 )
 
 type Transcoder interface {
 	Transcode(recs chan records.IdxRecord) (chan interface{}, chan error)
+	Transcode1(rec *search.Record) (interface{}, error)
 }
 
 const (
@@ -52,6 +54,14 @@ type Index struct {
 	Offset    uint64 `json:"offset"`
 	Length    uint16 `json:"length"`
 	Fuzziness uint8  `json:"fuzziness"`
+}
+
+func NewIndex(index search.Index) (result Index) {
+	result.File = index.File
+	result.Offset = index.Offset
+	result.Length = uint16(index.Length)
+	result.Fuzziness = index.Fuzziness
+	return
 }
 
 func GetByFormat(format string) (Transcoder, error) {

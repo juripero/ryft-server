@@ -37,6 +37,7 @@ import (
 
 	"github.com/clbanning/mxj"
 	"github.com/getryft/ryft-server/records"
+	"github.com/getryft/ryft-server/search"
 )
 
 type XmlTranscoder struct {
@@ -78,4 +79,8 @@ func (transcoder *XmlTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 	}()
 
 	return output, errors
+}
+
+func (transcoder *XmlTranscoder) Transcode1(rec *search.Record) (interface{}, error) {
+	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
 }

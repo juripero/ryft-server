@@ -32,6 +32,7 @@ package transcoder
 
 import (
 	"github.com/getryft/ryft-server/records"
+	"github.com/getryft/ryft-server/search"
 )
 
 type RawTranscoder struct {
@@ -39,15 +40,15 @@ type RawTranscoder struct {
 }
 
 type RawData struct {
-	Index     Index  `json:"_index"`
-	Data      []byte `json:"data"`
+	Index Index       `json:"_index"`
+	Data  interface{} `json:"data"`
 }
 
-func (transcoder *RawTranscoder) Transcode(recs chan records.IdxRecord) (chan interface{}, chan error){
+func (transcoder *RawTranscoder) Transcode(recs chan records.IdxRecord) (chan interface{}, chan error) {
 	output := make(chan interface{}, TranscodeBufferCapacity)
 	errors := make(chan error)
 
-	go func(){
+	go func() {
 		defer close(output)
 		defer close(errors)
 		for rec := range recs {
@@ -59,4 +60,8 @@ func (transcoder *RawTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 	}()
 
 	return output, errors
+}
+
+func (transcoder *RawTranscoder) Transcode1(rec *search.Record) (interface{}, error) {
+	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
 }

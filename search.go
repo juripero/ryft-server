@@ -38,8 +38,10 @@ import (
 	"net/http"
 	"net/url"
 
+	backend "github.com/getryft/ryft-server/search"
+
 	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/names"
+	//"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/ryftprim"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
@@ -49,9 +51,8 @@ import (
 
 const sepSign string = ","
 
-/*
-SearchParams contains all the bound params for the search operation
-*/
+// SearchParams contains all the bound parameters
+// for the /search endpoint.
 type SearchParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
 	Files         []string `form:"files" json:"files" binding:"required"`
@@ -65,78 +66,89 @@ type SearchParams struct {
 	Stats         bool     `form:"stats" json:"stats"`
 }
 
-func search(c *gin.Context) {
-
-	defer srverr.Recover(c)
+// Handle /search endpoint.
+func search(ctx *gin.Context) {
+	// recover from panics if any
+	defer srverr.Recover(ctx)
 
 	var err error
 
 	// parse request parameters
-	params := SearchParams{}
-	params.Format = transcoder.RAWTRANSCODER
-	if err = c.Bind(&params); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	params := SearchParams{Format: transcoder.RAWTRANSCODER}
+	if err := ctx.Bind(&params); err != nil {
+		panic(srverr.NewWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to parse request parameters"))
 	}
 
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
 	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+		panic(srverr.NewWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to get transcoder"))
 	}
 
-	enc := encoder.FromContext(c)
+	enc := encoder.FromContext(ctx)
 
-	// get a new unique search index
-	n := names.New()
-	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
-
-	query, aErr := url.QueryUnescape(params.Query)
-
-	if aErr != nil {
-		panic(srverr.New(http.StatusBadRequest, aErr.Error()))
+	// get search engine
+	opts := map[string]interface{}{
+		"keep-files": *KeepResults,
+		// TODO: more options
+	}
+	var engine backend.Engine
+	if engine, err = backend.NewEngine("ryftprim", opts); err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to get search engine"))
 	}
 
-	results := ryftprim.Search(&ryftprim.Params{
-		Query:         query,
-		Files:         params.Files,
-		Surrounding:   params.Surrounding,
-		Fuzziness:     params.Fuzziness,
-		Format:        params.Format,
-		CaseSensitive: params.CaseSensitive,
-		Nodes:         params.Nodes,
-		IndexFile:     n.FullIndexPath(),
-		ResultsFile:   n.FullResultsPath(),
-		KeepFiles:     *KeepResults,
-	})
+	// search configuration
+	cfg := backend.NewConfig("")
+	if q, err := url.QueryUnescape(params.Query); err != nil {
+		panic(srverr.NewWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to unescape query"))
+	} else {
+		cfg.Query = q
+	}
+	cfg.AddFiles(params.Files...) // TODO: unescape?
+	cfg.Surrounding = params.Surrounding
+	cfg.Fuzziness = params.Fuzziness
+	cfg.CaseSensitive = params.CaseSensitive
+	cfg.Nodes = params.Nodes
+
+	res := backend.NewResult()
+	err = engine.Search(cfg, res)
+	if err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to start search"))
+	}
 
 	// TODO: for cloud code get other ryftprim.Result objects and merge together
 	// [[[ ]]]]
 
-	items, _ := tcode.Transcode(results.Results)
+	_ = tcode // items, _ := tcode.Transcode(results.Results)
 
-	//	if params.Local {
-	if !params.Stats {
-		results.Stats = nil
-	}
-	// if params.Format == "xml" && params.Fields != "" {
-	// fields := strings.Split(params.Fields, sepSign)
-	// streamSmplRecords(c, enc, results, fields)
-	// } else {
-	streamAllRecords(c, enc, items, results.Stats)
-	// }
-	//	} else {
-	//		cnslSrvc, err := GetConsulInfo()
-	//		if err != nil {
-	//			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-	//		}
-	//		ch := merge(items)
-	//		// time.Sleep(10 * time.Second)
-	//		for _, srv := range cnslSrvc {
-	//			recsChan, _ := searchInNode(params, srv)
-	//			ch = merge(ch, recsChan)
-	//		}
-	//		streamAllRecords(c, enc, ch, nil)
-	//	}
+	first := true
+	ctx.Stream(func(w io.Writer) bool {
+		if first {
+			enc.Begin(w)
+			first = false
+		}
+
+		select {
+		case rec, ok := <-res.RecordChan:
+			if ok && rec != nil {
+				err := enc.Write(w, rec)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+		case <-res.DoneChan:
+			enc.End(w)
+			return false // stop
+		}
+
+		return true // continue
+	})
 }
 
 func searchInNode(params SearchParams, service *api.CatalogService) (recs chan interface{}, chanErr chan error) {
