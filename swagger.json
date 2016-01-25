@@ -218,8 +218,7 @@
                     {
                         "name": "path",
                         "type": "string",
-                        "description": "The folder path to return child items of",
-                        "required": true,
+                        "description": "The folder path to return child items of. Default '/'",
                         "in": "query"
                     },
                     {

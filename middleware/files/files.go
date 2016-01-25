@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/getryft/ryft-server/encoder"
@@ -12,15 +13,14 @@ import (
 )
 
 type FilesParams struct {
-	Path      string `form:"path" json:"path" `
-	Local     bool   `form:"local" json:"local"`
-	FilesOnly bool   `form:"fo" json:"fo"`
+	Path  string `form:"path" json:"path"`
+	Local bool   `form:"local" json:"local"`
 }
 
 const (
-	home      string = "/ryftone"
-	arrayName string = "names"
-	slash            = "/"
+	home        string = "/ryftone"
+	filesName   string = "files"
+	foldersName string = "folders"
 )
 
 func Files(c *gin.Context) {
@@ -41,71 +41,61 @@ func Files(c *gin.Context) {
 		c.JSON(http.StatusUnsupportedMediaType, "Message pack not implemented yet")
 		return
 	}
-	// var enc encoder.Encoder
-	// if enc, err = encoder.GetByMimeType(accept); err != nil {
-	// 	panic(srverr.New(http.StatusBadRequest, err.Error()))
-	// }
 
-	m, err := getNames(path, params.FilesOnly)
+	m, err := getNames(path)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, path)
-		return
+		panic(srverr.New(http.StatusNotFound, err.Error()))
 	}
 
 	c.JSON(http.StatusOK, m)
 
 }
 
-func getPath(path string) string {
-	if path == "" {
+func getPath(folderPath string) string {
+	if folderPath == "" {
 		return home
 	}
-	return home + slash + path
+	return path.Join(home, folderPath)
 }
 
-func getNames(path string, isAll bool) (map[string]interface{}, error) {
+func getNames(folderPath string) (map[string]interface{}, error) {
 
 	var err error
 	var items []os.FileInfo
 
-	items, err = ioutil.ReadDir(path)
+	items, err = ioutil.ReadDir(folderPath)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if isAll {
-		return getFilesOnly(items), nil
+	m := createNamesMap(items)
+	if folderPath == home {
+		m["path"] = "/"
+	} else {
+		m["path"] = strings.TrimPrefix(folderPath, home)
+
 	}
 
-	return getAll(items), nil
+	return m, nil
 }
 
-func getAll(items []os.FileInfo) map[string]interface{} {
+func createNamesMap(items []os.FileInfo) map[string]interface{} {
 	m := map[string]interface{}{}
-	var names []string
+	files := []string{}
+	folders := []string{}
 
 	for _, v := range items {
 		if strings.HasPrefix(v.Name(), ".") {
 			continue
 		}
-		names = append(names, v.Name())
-	}
-	m[arrayName] = names
-	return m
-}
-
-func getFilesOnly(items []os.FileInfo) map[string]interface{} {
-	m := map[string]interface{}{}
-	var names []string
-	for _, v := range items {
-		if strings.HasPrefix(v.Name(), ".") {
-			continue
-		}
-		if !v.IsDir() {
-			names = append(names, v.Name())
+		if v.IsDir() {
+			folders = append(folders, v.Name())
+		} else {
+			files = append(files, v.Name())
 		}
 	}
-	m[arrayName] = names
+	m[filesName] = files
+	m[foldersName] = folders
 	return m
 }
