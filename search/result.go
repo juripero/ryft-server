@@ -49,6 +49,9 @@ type Result struct {
 	// to stop processing immideatelly (user -> Engine)
 	CancelChan chan interface{}
 
+	// Done channel is used to notify suser earch is done (Engine -> user)
+	DoneChan chan interface{}
+
 	// Search processing statistics
 	Stat Statistics
 }
@@ -60,6 +63,7 @@ func NewResult() *Result {
 	res.ErrorChan = make(chan error, 1)
 	res.RecordChan = make(chan *Record, 256) // TODO: capacity constant?
 	res.CancelChan = make(chan interface{}, 1)
+	res.DoneChan = make(chan interface{}, 1)
 
 	return res
 }
@@ -85,9 +89,15 @@ func (res *Result) Cancel() {
 	res.CancelChan <- nil
 }
 
+// ReportDone sends 'done' notification.
+func (res *Result) ReportDone() {
+	res.DoneChan <- nil
+}
+
 // Finish closes all channels.
 func (res *Result) Finish() {
 	close(res.CancelChan)
 	close(res.RecordChan)
 	close(res.ErrorChan)
+	close(res.DoneChan)
 }

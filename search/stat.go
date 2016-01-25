@@ -43,8 +43,8 @@ type Statistics struct {
 }
 
 // String gets string representation of Statistics.
-func (s *Statistics) String() string {
-	return fmt.Sprintf("Stat{%u matches on %u byte(s) in %u ms}",
+func (s Statistics) String() string {
+	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms}",
 		s.Matches, s.TotalBytes, s.Duration)
 }
 

@@ -34,6 +34,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -60,28 +61,31 @@ type Task struct {
 	indexChan   chan search.Index
 	indexCancel chan interface{}
 	dataCancel  chan interface{}
+	subtasks    sync.WaitGroup
 }
 
 // NewTask creates new task.
-func NewTask() *Task {
+func NewTask(needFiles bool) *Task {
 	id := atomic.AddUint64(&globalTaskId, 1)
 
 	task := &Task{}
 	task.Identifier = fmt.Sprintf("%016x", id)
 
-	// Note, index file should have 'txt' extension,
-	// otherwise `ryftprim` adds '.txt' anyway.
-	task.IndexFileName = fmt.Sprintf("idx-%s.txt", task.Identifier)
-	task.DataFileName = fmt.Sprintf("dat-%s.bin", task.Identifier)
+	if needFiles {
+		// Note, index file should have 'txt' extension,
+		// otherwise `ryftprim` adds '.txt' anyway.
+		task.IndexFileName = fmt.Sprintf("idx-%s.txt", task.Identifier)
+		task.DataFileName = fmt.Sprintf("dat-%s.bin", task.Identifier)
+	}
 
 	return task
 }
 
 // finish closes some channels.
 func (task *Task) finish() {
-	if task.indexChan != nil {
-		close(task.indexChan)
-	}
+	//	if task.indexChan != nil {
+	//		close(task.indexChan)
+	//	}
 	if task.indexCancel != nil {
 		close(task.indexCancel)
 	}

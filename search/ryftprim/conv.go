@@ -28,32 +28,75 @@
  * ============
  */
 
-package search
+package ryftprim
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 )
 
-// Abstract Search Engine interface
-type Engine interface {
-	Options() map[string]interface{}
-	Search(cfg *Config, res *Result) error
+// convert custom value to string.
+func asString(opt interface{}) (string, error) {
+	switch v := opt.(type) {
+	// TODO: other types to string?
+	case string:
+		return v, nil
+	case nil:
+		return "", nil
+	}
+
+	return "", fmt.Errorf("%v is not a string", opt)
+	// return fmt.Sprintf("%s", opt), nil
 }
 
-// NewEngine creates new search engine by name.
-// To get list of supported options see corresponding backend.
-func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
-	// get appropriate factory
-	f, ok := engineFactories[name]
-	if !ok {
-		return nil, fmt.Errorf("%q is unknown search engine", name)
+// convert custom value to time duration.
+func asDuration(opt interface{}) (time.Duration, error) {
+	switch v := opt.(type) {
+	// TODO: other types to duration?
+	case string:
+		return time.ParseDuration(v)
+	case time.Duration:
+		return v, nil
+	case nil:
+		return time.Duration(0), nil
 	}
 
-	if opts == nil {
-		// no options by default
-		opts = map[string]interface{}{}
+	return time.Duration(0), fmt.Errorf("%v os not a time duration", opt)
+}
+
+// convert custom value to uint64.
+func asUint64(opt interface{}) (uint64, error) {
+	switch v := opt.(type) {
+	// TODO: other types to uint64?
+	case uint:
+		return uint64(v), nil
+	case int:
+		return uint64(v), nil
+	case uint64:
+		return v, nil
+	case int64:
+		return uint64(v), nil
+	case float64:
+		return uint64(v), nil
+	case string:
+		return strconv.ParseUint(v, 10, 64)
+	case nil:
+		return 0, nil
 	}
 
-	// create engine using factory
-	return f(opts)
+	return 0, fmt.Errorf("%v os not a uint64", opt)
+}
+
+// convert custom value to bool.
+func asBool(opt interface{}) (bool, error) {
+	switch v := opt.(type) {
+	// TODO: other types to bool?
+	case bool:
+		return v, nil
+	case nil:
+		return false, nil
+	}
+
+	return false, fmt.Errorf("%v os not a bool", opt)
 }

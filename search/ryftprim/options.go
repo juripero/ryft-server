@@ -37,6 +37,18 @@ import (
 	"time"
 )
 
+// Options gets all engine options.
+func (engine *Engine) Options() map[string]interface{} {
+	return map[string]interface{}{
+		"instance-name": engine.Instance,
+		"ryftprim-exec": engine.ExecPath,
+		"ryftone-mount": engine.MountPoint,
+		"open-poll":     engine.OpenFilePollTimeout.String(),
+		"read-poll":     engine.ReadFilePollTimeout.String(),
+		"keep-files":    engine.KeepResultFiles,
+	}
+}
+
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	// instance name
@@ -68,6 +80,8 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		engine.MountPoint = "/ryftone"
 	}
 	// TODO: check MountPoint exists
+
+	// create working directory
 	work_dir := filepath.Join(engine.MountPoint, engine.Instance)
 	err = os.MkdirAll(work_dir, os.ModeDir)
 	if err != nil {
@@ -105,44 +119,4 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	}
 
 	return nil // OK
-}
-
-// convert custom value to string.
-func asString(opt interface{}) (string, error) {
-	switch v := opt.(type) {
-	// TODO: other types to string?
-	case string:
-		return v, nil
-	case nil:
-		return "", nil
-	}
-
-	return "", fmt.Errorf("%v is not a string", opt)
-	// return fmt.Sprintf("%s", opt), nil
-}
-
-// convert custom value to time duration.
-func asDuration(opt interface{}) (time.Duration, error) {
-	switch v := opt.(type) {
-	// TODO: other types to duration?
-	case string:
-		return time.ParseDuration(v)
-	case nil:
-		return time.Duration(0), nil
-	}
-
-	return time.Duration(0), fmt.Errorf("%v os not a time duration", opt)
-}
-
-// convert custom value to bool.
-func asBool(opt interface{}) (bool, error) {
-	switch v := opt.(type) {
-	// TODO: other types to bool?
-	case bool:
-		return v, nil
-	case nil:
-		return false, nil
-	}
-
-	return false, fmt.Errorf("%v os not a bool", opt)
 }

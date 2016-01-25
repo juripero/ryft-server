@@ -41,9 +41,9 @@ type Record struct {
 }
 
 // String gets the string representation of Record.
-func (r *Record) String() string {
-	return fmt.Sprintf("Record{data:%v, %s}",
-		r.Data, r.Index)
+func (r Record) String() string {
+	return fmt.Sprintf("Record{%s, data:%v}",
+		r.Index, r.Data)
 }
 
 // Search index record.
@@ -55,7 +55,7 @@ type Index struct {
 }
 
 // String gets the string representation of Index.
-func (i *Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%u, length:%u, fuzziness:%d}",
+func (i Index) String() string {
+	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzziness:%d}",
 		i.File, i.Offset, i.Length, i.Fuzziness)
 }

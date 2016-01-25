@@ -58,7 +58,8 @@ func (cfg *Config) AddFiles(files ...string) {
 }
 
 // String gets the string representation of the configuration
-func (cfg *Config) String() string {
-	return fmt.Sprintf("Config{query:%q}", cfg.Query)
-	// TODO: more fields!
+func (cfg Config) String() string {
+	return fmt.Sprintf("Config{query:%s, files:%q surr:%d, fuzz:%d}",
+		cfg.Query, cfg.Files, cfg.Surrounding, cfg.Fuzziness)
+	// TODO: more fields!?
 }
