@@ -38,6 +38,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 // parseIndex parses Index record from custom line.
@@ -95,31 +96,31 @@ func parseStat(buf []byte) (stat search.Statistics, err error) {
 	log.WithField("stat", v).Debugf("ryftprim output as YML")
 
 	// Duration
-	stat.Duration, err = asUint64(v["Duration"])
+	stat.Duration, err = utils.AsUint64(v["Duration"])
 	if err != nil {
 		return stat, fmt.Errorf(`failed to parse "Duration" stat`)
 	}
 
 	// Total Bytes
-	stat.TotalBytes, err = asUint64(v["Total Bytes"])
+	stat.TotalBytes, err = utils.AsUint64(v["Total Bytes"])
 	if err != nil {
 		return stat, fmt.Errorf(`failed to parse "Total Bytes" stat`)
 	}
 
 	// Matches
-	stat.Matches, err = asUint64(v["Matches"])
+	stat.Matches, err = utils.AsUint64(v["Matches"])
 	if err != nil {
 		return stat, fmt.Errorf(`failed to parse "Matches" stat`)
 	}
 
 	// Fabric Data Rate
-	_, err = asString(v["Fabric Data Rate"])
+	_, err = utils.AsString(v["Fabric Data Rate"])
 	if err != nil {
 		return stat, fmt.Errorf(`failed to parse "Fabric Data Rate" stat`)
 	}
 
 	// Data Rate
-	_, err = asString(v["Data Rate"])
+	_, err = utils.AsString(v["Data Rate"])
 	if err != nil {
 		return stat, fmt.Errorf(`failed to parse "Data Rate" stat`)
 	}

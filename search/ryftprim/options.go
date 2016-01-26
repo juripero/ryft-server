@@ -35,6 +35,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 // Options gets all engine options.
@@ -53,7 +55,7 @@ func (engine *Engine) Options() map[string]interface{} {
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
-		engine.Instance, err = asString(v)
+		engine.Instance, err = utils.AsString(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "instance-name" option: %s`, err)
 		}
@@ -61,7 +63,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// `ryftprim` executable path
 	if v, ok := opts["ryftprim-exec"]; ok {
-		engine.ExecPath, err = asString(v)
+		engine.ExecPath, err = utils.AsString(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "ryftprim-exec" option: %s`, err)
 		}
@@ -76,7 +78,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// `ryftone` mount point
 	if v, ok := opts["ryftone-mount"]; ok {
-		engine.MountPoint, err = asString(v)
+		engine.MountPoint, err = utils.AsString(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "ryftone-mount" option: %s`, err)
 		}
@@ -99,7 +101,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// open-poll timeout
 	if v, ok := opts["open-poll"]; ok {
-		engine.OpenFilePollTimeout, err = asDuration(v)
+		engine.OpenFilePollTimeout, err = utils.AsDuration(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "open-poll" option: %s`, err)
 		}
@@ -109,7 +111,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// read poll timeout
 	if v, ok := opts["read-poll"]; ok {
-		engine.ReadFilePollTimeout, err = asDuration(v)
+		engine.ReadFilePollTimeout, err = utils.AsDuration(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "read-poll" option: %s`, err)
 		}
@@ -119,7 +121,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// keep result files
 	if v, ok := opts["keep-files"]; ok {
-		engine.KeepResultFiles, err = asBool(v)
+		engine.KeepResultFiles, err = utils.AsBool(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "keep-files" option: %s`, err)
 		}

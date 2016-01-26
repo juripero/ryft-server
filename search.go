@@ -94,7 +94,7 @@ func search(ctx *gin.Context) {
 		"keep-files": *KeepResults,
 		// TODO: more options
 	}
-	var engine backend.Engine
+	var engine backend.Engine // TODO: get backend name from configuration
 	if engine, err = backend.NewEngine("ryftprim", opts); err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))

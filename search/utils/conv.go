@@ -28,7 +28,7 @@
  * ============
  */
 
-package ryftprim
+package utils
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ import (
 )
 
 // convert custom value to string.
-func asString(opt interface{}) (string, error) {
+func AsString(opt interface{}) (string, error) {
 	switch v := opt.(type) {
 	// TODO: other types to string?
 	case string:
@@ -51,7 +51,7 @@ func asString(opt interface{}) (string, error) {
 }
 
 // convert custom value to time duration.
-func asDuration(opt interface{}) (time.Duration, error) {
+func AsDuration(opt interface{}) (time.Duration, error) {
 	switch v := opt.(type) {
 	// TODO: other types to duration?
 	case string:
@@ -66,7 +66,7 @@ func asDuration(opt interface{}) (time.Duration, error) {
 }
 
 // convert custom value to uint64.
-func asUint64(opt interface{}) (uint64, error) {
+func AsUint64(opt interface{}) (uint64, error) {
 	switch v := opt.(type) {
 	// TODO: other types to uint64?
 	case uint:
@@ -89,7 +89,7 @@ func asUint64(opt interface{}) (uint64, error) {
 }
 
 // convert custom value to bool.
-func asBool(opt interface{}) (bool, error) {
+func AsBool(opt interface{}) (bool, error) {
 	switch v := opt.(type) {
 	// TODO: other types to bool?
 	case bool:
