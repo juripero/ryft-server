@@ -33,6 +33,7 @@ package ryftprim
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -121,7 +122,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	}
 
 	// search query
-	args = append(args, "-q", cfg.Query)
+	args = append(args, "-q", engine.prepareQuery(cfg.Query))
 
 	// files
 	for _, file := range cfg.Files {
@@ -396,6 +397,19 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		} else {
 			return
 		}
+	}
+}
+
+// prepareQuery checks for plain queries
+// plain queries converted to (RAW_TEXT CONTAINS query_in_hex_format)
+func (engine *Engine) prepareQuery(query string) string {
+	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
+		return query // just use it "as is"
+	} else {
+		// if no keywords - assume plain text query
+		// use hexadecimal encoding here to avoid escaping problems
+		return fmt.Sprintf(`(RAW_TEXT CONTAINS %s)`,
+			hex.EncodeToString([]byte(query)))
 	}
 }
 
