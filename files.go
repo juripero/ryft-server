@@ -71,9 +71,9 @@ func getNames(dirPath string) (map[string]interface{}, error) {
 
 	m := createNamesMap(items)
 	if dirPath == home {
-		m["dirPath"] = "/"
+		m["dir"] = "/"
 	} else {
-		m["dirPath"] = strings.TrimPrefix(dirPath, home)
+		m["dir"] = strings.TrimPrefix(dirPath, home)
 
 	}
 

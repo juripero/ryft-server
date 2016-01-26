@@ -333,7 +333,7 @@
                         "type": "string"
                     }
                 },
-                "dirPath": {
+                "dir": {
                     "type": "string"
                 }
             }
