@@ -43,12 +43,24 @@ type JsonEncoder struct {
 }
 
 func (enc *JsonEncoder) Begin(w io.Writer) error {
-	_, err := w.Write([]byte("["))
+	_, err := w.Write([]byte("{\"results\":["))
 	return err
 }
 
 func (enc *JsonEncoder) End(w io.Writer) error {
-	_, err := w.Write([]byte("]"))
+	_, err := w.Write([]byte("]}"))
+	return err
+}
+
+func (enc *JsonEncoder) EndWithStats(w io.Writer, stats map[string]interface{}) error {
+	if _, err := w.Write([]byte("], \"stats\": ")); err != nil {
+		return err
+	}
+
+	wEncoder := json.NewEncoder(w)
+	wEncoder.Encode(stats)
+
+	_, err := w.Write([]byte("}"))
 	return err
 }
 

@@ -1,13 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
+	"net/url"
 	"os"
-	"strconv"
 
-	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/names"
+	"github.com/getryft/ryft-server/ryftprim"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/gin-gonic/gin"
 )
@@ -28,42 +27,44 @@ type CountResponse struct {
 }
 
 func count(c *gin.Context) {
-	defer srverr.DeferRecover(c)
 
-	var err error
+	defer srverr.Recover(c)
 
 	// parse request parameters
 	params := CountParams{}
-	if err = c.Bind(&params); err != nil {
-		// panic(srverr.New(http.StatusBadRequest, err.Error()))
+	if err := c.Bind(&params); err != nil {
+		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	}
 
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = encoder.MIMEJSON
-	}
-
-	c.Header("Content-Type", accept)
 	// get a new unique search index
 	n := names.New()
 	defer os.Remove(names.ResultsDirPath(n.IdxFile))
 	defer os.Remove(names.ResultsDirPath(n.ResultFile))
 
-	ryftParams := &RyftprimParams{
-		Query:         params.Query,
+	query, aErr := url.QueryUnescape(params.Query)
+
+	if aErr != nil {
+		panic(srverr.New(http.StatusBadRequest, aErr.Error()))
+	}
+
+	results := ryftprim.Search(&ryftprim.Params{
+		Query:         query,
 		Files:         params.Files,
 		Fuzziness:     params.Fuzziness,
 		CaseSensitive: params.CaseSensitive,
 		Nodes:         params.Nodes,
-	}
+		ResultsFile:   n.FullResultsPath(),
+	})
 
-	_, headers := ryftprim(ryftParams, &n)
-	m := <-headers
-	setHeaders(c, m)
-	matches, err := strconv.ParseUint(fmt.Sprintf("%v", m[matchesKey]), 0, 64)
-	if err != nil {
-		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	// TODO: for cloud code get other ryftprim.Result objects and merge together
+	// [[[ ]]]]
+
+	select {
+	case stats := <-results.Stats:
+		c.JSON(http.StatusOK, stats)
+
+	case err := <-results.Errors:
+		//		c.AbortWithError(http.StatusInternalServerError, err)
+		panic(err)
 	}
-	c.JSON(http.StatusOK, CountResponse{matches})
 }

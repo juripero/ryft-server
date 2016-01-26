@@ -27,14 +27,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
+
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
@@ -42,19 +43,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
-)
-
-const (
-	durationHeader       = "X-Duration"
-	durationKey          = "Duration"
-	totalBytesHeader     = "X-Total-Bytes"
-	totalBytesKey        = "Total Bytes"
-	matchesHeader        = "X-Matches"
-	matchesKey           = "Matches"
-	fabricDataRateHeader = "X-Fabric-Data-Rate"
-	fabricDataRateKey    = "Fabric Data Rate"
-	dataRateHeader       = "X-Data-Rate"
-	dataRateKey          = "Data Rate"
 )
 
 var (
@@ -114,25 +102,34 @@ func parseParams() {
 
 // RyftAPI include search, index, count
 func main() {
+
+	// set log timestamp format
 	log.SetFlags(log.Lmicroseconds)
+
+	// parse command line arguments
 	parseParams()
+
+	// be quiet and efficient in production
 	if !*debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := gin.Default()
-	r.Use(cors.Cors())
-	names.Port = (*listenAddress).Port
+	// Create a rounter with default middleware: logger, recover
+	router := gin.Default()
 
-	swaggerJSON, err := Asset("swagger.json")
-	if err != nil {
-		fmt.Println("No file swagger.json was found ")
-	}
+	// Configure requred middlewares
 
-	r.GET("/swagger.json", func(c *gin.Context) {
-		c.Data(http.StatusOK, http.DetectContentType(swaggerJSON), swaggerJSON)
-	})
+	// Logging & error recovery
+	//	router.Use(gin.Logger())
+	//	router.Use(srverr.Recovery())
 
+	// Allow CORS requests for * (all domains)
+	router.Use(cors.Cors("*"))
+
+	// Enable GZip compression support
+	router.Use(gzip.Gzip(gzip.DefaultCompression))
+
+	// Enable authentication if configured
 	switch *authType {
 	case "file":
 		auth, err := auth.AuthBasicFile(*authUsersFile)
@@ -140,53 +137,61 @@ func main() {
 			log.Printf("Error reading users file: %v", err)
 			os.Exit(1)
 		}
-		r.Use(auth)
+		router.Use(auth)
 		break
 	case "ldap":
-		r.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser, *authLdapPass, *authLdapQuery, *authLdapBase))
-
+		router.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
+			*authLdapPass, *authLdapQuery, *authLdapBase))
 		break
-
 	}
 
-	r.Use(gzip.Gzip(gzip.DefaultCompression))
+	// Configure routes
 
-	idxHTML, err := Asset("index.html")
-	if err != nil {
-		fmt.Println("No file index.html was found ")
-	}
-
-	r.GET("/", func(c *gin.Context) {
+	// index & help
+	idxHTML := MustAsset("index.html")
+	router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
 
-	r.GET("/search", search)
+	// swagger schema
+	swaggerJSON := MustAsset("swagger.json")
+	router.GET("/swagger.json", func(c *gin.Context) {
+		c.Data(http.StatusOK, http.DetectContentType(swaggerJSON), swaggerJSON)
+	})
 
-	r.GET("/count", count)
+	// search method
+	router.GET("/search", encoder.Detect, search)
+
+	// count method
+	router.GET("/count", encoder.Detect, count)
+
+	// cluster members
+	router.GET("/cluster/members", members)
+
+	// server/cluster files
+	router.GET("/files", files)
+
+	// Startup preparatory
+
 	// Clean previously created folder
-	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
+	names.Port = (*listenAddress).Port
+	if err := os.RemoveAll(names.ResultsDirPath(names.ResultsDirName())); err != nil {
 		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
 
 	// Create folder for results cache
-	if err := os.MkdirAll(names.ResultsDirPath(), 0777); err != nil {
+	if err := os.MkdirAll(names.ResultsDirPath(names.ResultsDirName()), 0777); err != nil {
 		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
 		os.Exit(1)
 	}
 
 	// Name Generator will produce unique file names for each new results files
 	names.StartNamesGenerator()
-	if *tlsEnabled {
-		go r.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
-	}
-	r.Run((*listenAddress).String())
-}
 
-func setHeaders(c *gin.Context, m map[interface{}]interface{}) {
-	c.Header(durationHeader, fmt.Sprintf("%+v", m[durationKey]))
-	c.Header(totalBytesHeader, fmt.Sprintf("%+v", m[totalBytesKey]))
-	c.Header(matchesHeader, fmt.Sprintf("%+v", m[matchesKey]))
-	c.Header(fabricDataRateHeader, fmt.Sprintf("%+v", m[fabricDataRateKey]))
-	c.Header(dataRateHeader, fmt.Sprintf("%+v", m[dataRateKey]))
+	// start listening on HTTP or HTTPS ports
+	if *tlsEnabled {
+		go router.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
+	}
+	router.Run((*listenAddress).String())
 }

@@ -39,8 +39,12 @@ import (
 	"time"
 )
 
-var Capacity = 64
-var PollingInterval = time.Millisecond * 50
+const (
+	// PollingInterval is a const for polling time
+	PollingInterval = time.Millisecond * 50
+	// PollBufferCapacity is a max buffer size
+	PollBufferCapacity = 64
+)
 
 type IdxRecord struct {
 	File      string `json:"file"`
@@ -134,14 +138,15 @@ func sleep(
 }
 
 func Poll(idx *os.File, errors chan error) (records chan IdxRecord, drop chan struct{}) {
-	records = make(chan IdxRecord, Capacity)
+	records = make(chan IdxRecord, PollBufferCapacity)
 	drop = make(chan struct{}, 1)
 	go func() {
+		defer close(records)
 		loop := true
 		for loop {
+			log.Println("Poll loop")
 			if err := scan(idx, drop, records); err != nil {
 				log.Printf("%s: READ WITH ERR: %s", idx.Name(), err.Error())
-				close(records)
 				return
 			}
 
@@ -156,7 +161,6 @@ func Poll(idx *os.File, errors chan error) (records chan IdxRecord, drop chan st
 				// Dropping connection or another external reason to stop records reading
 				func() bool {
 					log.Printf("%s: DROPPED CONNECTION.", idx.Name())
-					close(records)
 					return false
 				},
 
@@ -164,18 +168,44 @@ func Poll(idx *os.File, errors chan error) (records chan IdxRecord, drop chan st
 				func() bool {
 					log.Printf("%s: SEARCH COMPLETE.", idx.Name())
 					scan(idx, drop, records) // Connection can be dropped or not.
-					close(records)
 					return false
 				},
 
 				// Search complete with error
 				func(err error) bool {
 					log.Printf("%s: API ERROR: %s", idx.Name(), err.Error())
-					close(records)
 					return false
 				},
 			)
 		}
 	}()
+	return
+}
+
+func DataPoll(input chan IdxRecord, dataFile *os.File) chan IdxRecord {
+	output := make(chan IdxRecord, PollBufferCapacity)
+	go func() {
+		for rec := range input {
+			log.Println("DataPoll loop")
+			rec.Data = nextData(dataFile, rec.Length)
+			output <- rec
+		}
+		close(output)
+	}()
+	return output
+}
+
+func nextData(res *os.File, length uint16) (result []byte) {
+	var total uint16
+	for total < length {
+		data := make([]byte, length-total)
+		n, _ := res.Read(data)
+		if n != 0 {
+			result = append(result, data...)
+			total = total + uint16(n)
+		} else {
+			time.Sleep(PollingInterval)
+		}
+	}
 	return
 }

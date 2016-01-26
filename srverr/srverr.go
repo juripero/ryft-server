@@ -28,57 +28,58 @@
  * ============
  */
 
-package names
+package srverr
 
 import (
 	"fmt"
-	"path/filepath"
-	"strconv"
+	"log"
+	"net/http"
+	//	"runtimes/debug"
+	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
-var RyftoneMountPoint = "/ryftone"
-var ServerInstancePrefix = "RyftServer"
-var Port = 8765
-
-type Names struct {
-	Index               uint64
-	ResultFile, IdxFile string
+type ServerError struct {
+	Status  int
+	Message string
+	Details string
 }
 
-var namesChan = make(chan Names, 256)
+func (err *ServerError) Error() string {
+	return fmt.Sprintf("%d %s", err.Status, err.Message)
+}
 
-func StartNamesGenerator() {
-	go func() {
-		var s string
-		for {
-			for i := uint64(0); i <= ^uint64(0); i++ {
-				s = strconv.FormatUint(i, 10)
-				namesChan <- Names{i, "result-" + s + ".bin", "idx-" + s + ".txt"}
+func New(status int, message string) *ServerError {
+	return &ServerError{status, message, ""}
+}
+
+func NewWithDetails(status int, message string, details string) *ServerError {
+	return &ServerError{status, message, details}
+}
+
+func Recover(c *gin.Context) {
+	if r := recover(); r != nil {
+		if err, ok := r.(*ServerError); ok {
+			log.Printf("Panic recovered server error: status=%d msg:%s => %+v", err.Status, err.Message, err)
+			if len(err.Details) > 0 {
+				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status, "details": err.Details})
+			} else {
+				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status})
 			}
+
+			return
 		}
-	}()
-}
 
-func New() Names {
-	return <-namesChan
-}
+		if err, ok := r.(error); ok {
+			log.Printf("Panic recovered unknown error with msg:%s", err.Error())
+			//			debug.PrintStack()
+			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%v", err.Error()), "status": http.StatusInternalServerError})
+			return
+		}
 
-func (n *Names) FullIndexPath() string {
-	return PathInRyftoneForResultDir(n.IdxFile)
-}
+		log.Printf("Panic recovered with object:%+v", r)
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%+v", r), "status": http.StatusInternalServerError})
+	}
 
-func (n *Names) FullResultsPath() string {
-	return PathInRyftoneForResultDir(n.ResultFile)
-}
-
-func ResultsDirName() string {
-	return fmt.Sprintf("%s-%d", ServerInstancePrefix, Port)
-}
-
-func ResultsDirPath(filenames ...string) string {
-	return filepath.Join(append([]string{RyftoneMountPoint}, filenames...)...)
-}
-
-func PathInRyftoneForResultDir(filenames ...string) string {
-	return filepath.Join(append([]string{ResultsDirName()}, filenames...)...)
 }
