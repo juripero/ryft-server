@@ -31,17 +31,20 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/getryft/ryft-server/search"
+	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
-	"github.com/getryft/ryft-server/names"
+	"github.com/getryft/ryft-server/srverr"
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -73,6 +76,17 @@ func ensureDefault(flag *string, message string) {
 	if *flag == "" {
 		kingpin.FatalUsage(message)
 	}
+}
+
+// get search backend with options
+func getSearchEngine() (search.Engine, error) {
+	opts := map[string]interface{}{
+		"instance-name": fmt.Sprintf("RyftServer-%d", (*listenAddress).Port),
+		"keep-files":    *KeepResults,
+		// TODO: more options
+	}
+
+	return search.NewEngine("ryftprim", opts)
 }
 
 func parseParams() {
@@ -162,35 +176,44 @@ func main() {
 	})
 
 	// search method
-	router.GET("/search", encoder.Detect, search)
+	router.GET("/search", detectEncoder, doSearch)
 
 	// count method
-	router.GET("/count", encoder.Detect, count)
+	router.GET("/count", detectEncoder, doCount)
 
 	// cluster members
 	router.GET("/cluster/members", members)
 
 	// Startup preparatory
 
-	// Clean previously created folder
-	names.Port = (*listenAddress).Port
-	if err := os.RemoveAll(names.ResultsDirPath(names.ResultsDirName())); err != nil {
-		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
-		os.Exit(1)
-	}
-
-	// Create folder for results cache
-	if err := os.MkdirAll(names.ResultsDirPath(names.ResultsDirName()), 0777); err != nil {
-		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
-		os.Exit(1)
-	}
-
-	// Name Generator will produce unique file names for each new results files
-	names.StartNamesGenerator()
-
 	// start listening on HTTP or HTTPS ports
 	if *tlsEnabled {
 		go router.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	router.Run((*listenAddress).String())
+}
+
+const (
+	ENCODER_CONTEXT_KEY = "encoder-detected"
+)
+
+func detectEncoder(c *gin.Context) {
+	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
+	// default to JSON
+	if accept == "" {
+		accept = encoder.MIME_JSON
+	}
+	c.Header("Content-Type", accept)
+
+	// setting up encoder to respond with requested format
+	if enc, err := encoder.GetByMimeType(accept); err != nil {
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	} else {
+		c.Set(ENCODER_CONTEXT_KEY, enc)
+	}
+}
+
+func encoderFromContext(c *gin.Context) encoder.Encoder {
+	// TODO add handlers for null value and report 400 error
+	return c.MustGet(ENCODER_CONTEXT_KEY).(encoder.Encoder)
 }

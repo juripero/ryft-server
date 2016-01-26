@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	backend "github.com/getryft/ryft-server/search"
-
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/gin-gonic/gin"
 )
@@ -27,7 +26,7 @@ type CountResponse struct {
 }
 
 // Handle /count endpoint.
-func count(ctx *gin.Context) {
+func doCount(ctx *gin.Context) {
 	// recover from panics if any
 	defer srverr.Recover(ctx)
 
@@ -41,18 +40,14 @@ func count(ctx *gin.Context) {
 	}
 
 	// get search engine
-	opts := map[string]interface{}{
-		"keep-files": *KeepResults,
-		// TODO: more options
-	}
-	var engine backend.Engine
-	if engine, err = backend.NewEngine("ryftprim", opts); err != nil {
+	engine, err := getSearchEngine()
+	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
 	}
 
 	// search configuration
-	cfg := backend.NewEmptyConfig()
+	cfg := search.NewEmptyConfig()
 	if q, err := url.QueryUnescape(params.Query); err != nil {
 		panic(srverr.NewWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to unescape query"))

@@ -33,61 +33,39 @@ package encoder
 import (
 	"fmt"
 	"io"
-	"net/http"
-	"time"
-
-	"github.com/getryft/ryft-server/srverr"
-	"github.com/gin-gonic/gin"
 )
 
 const (
-	MIMEJSON     = "application/json"
-	MIMEMSGPACKX = "application/x-msgpack"
-	MIMEMSGPACK  = "application/msgpack"
-
-	WriteInterval = time.Second * 20
-	CTXKEY        = "encoder-detected"
+	MIME_JSON     = "application/json"
+	MIME_XMSGPACK = "application/x-msgpack"
+	MIME_MSGPACK  = "application/msgpack"
 )
 
+// abstract Encoder interface
 type Encoder interface {
 	Begin(w io.Writer) error
 	End(w io.Writer) error
-	EndWithStats(w io.Writer, stats map[string]interface{}) error
+	EndWithStats(w io.Writer, stat interface{}) error
 	Write(w io.Writer, itm interface{}) error
 }
 
+// get list of supported MIME types
 func GetSupportedMimeTypes() []string {
-	return []string{MIMEJSON, MIMEMSGPACK, MIMEMSGPACKX}
+	types := []string{}
+	types = append(types, MIME_JSON)
+	types = append(types, MIME_MSGPACK)
+	types = append(types, MIME_XMSGPACK)
+	return types
 }
 
+// get encoder instance by MIME type
 func GetByMimeType(mime string) (Encoder, error) {
 	switch mime {
-	case MIMEJSON:
+	case MIME_JSON:
 		return new(JsonEncoder), nil
-	case MIMEMSGPACKX, MIMEMSGPACK:
+	case MIME_XMSGPACK, MIME_MSGPACK:
 		return new(MsgPackEncoder), nil
 	default:
 		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
 	}
-}
-
-func Detect(c *gin.Context) {
-	accept := c.NegotiateFormat(GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = MIMEJSON
-	}
-	c.Header("Content-Type", accept)
-
-	// setting up encoder to respond with requested format
-	if enc, err := GetByMimeType(accept); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
-	} else {
-		c.Set(CTXKEY, enc)
-	}
-}
-
-func FromContext(c *gin.Context) Encoder {
-	// TODO add handlers for null value and report 400 error
-	return c.MustGet(CTXKEY).(Encoder)
 }

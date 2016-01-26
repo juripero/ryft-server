@@ -32,18 +32,16 @@ package encoder
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
-	"time"
 )
 
+// simple JSON encoder
 type JsonEncoder struct {
-	Encoder
 	needSeparator bool
 }
 
 func (enc *JsonEncoder) Begin(w io.Writer) error {
-	_, err := w.Write([]byte("{\"results\":["))
+	_, err := w.Write([]byte(`{"results":[`))
 	return err
 }
 
@@ -52,41 +50,27 @@ func (enc *JsonEncoder) End(w io.Writer) error {
 	return err
 }
 
-func (enc *JsonEncoder) EndWithStats(w io.Writer, stats map[string]interface{}) error {
-	if _, err := w.Write([]byte("], \"stats\": ")); err != nil {
+func (enc *JsonEncoder) EndWithStats(w io.Writer, stat interface{}) error {
+	if _, err := w.Write([]byte(`], "stats": `)); err != nil {
 		return err
 	}
 
-	wEncoder := json.NewEncoder(w)
-	wEncoder.Encode(stats)
+	e := json.NewEncoder(w)
+	e.Encode(stat)
 
 	_, err := w.Write([]byte("}"))
 	return err
 }
 
-func (enc *JsonEncoder) Write(w io.Writer, itm interface{}) error {
+func (enc *JsonEncoder) Write(w io.Writer, item interface{}) error {
 	if enc.needSeparator {
 		w.Write([]byte(","))
 		enc.needSeparator = false
 	}
-	wEncoder := json.NewEncoder(w)
-	err := jsonEncode(wEncoder, itm, WriteInterval)
+	e := json.NewEncoder(w) // FIXME: do not create encoder each time
+	err := e.Encode(item)
 	if err == nil {
 		enc.needSeparator = true
 	}
 	return err
-}
-
-func jsonEncode(enc *json.Encoder, obj interface{}, timeout time.Duration) (err error) {
-	ch := make(chan error, 1)
-	go func() {
-		ch <- enc.Encode(obj)
-	}()
-
-	select {
-	case err = <-ch:
-		return
-	case <-time.After(timeout):
-		return fmt.Errorf("Json encoding timeout")
-	}
 }

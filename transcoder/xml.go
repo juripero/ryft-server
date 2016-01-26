@@ -82,5 +82,11 @@ func (transcoder *XmlTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 }
 
 func (transcoder *XmlTranscoder) Transcode1(rec *search.Record) (interface{}, error) {
+	// TODO: replace with XML?
 	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
+}
+
+func (transcoder *XmlTranscoder) TranscodeStat(stat search.Statistics) (interface{}, error) {
+	// TODO: replace with XML?
+	return NewStat(stat), nil
 }

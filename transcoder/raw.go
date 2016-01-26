@@ -65,3 +65,27 @@ func (transcoder *RawTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 func (transcoder *RawTranscoder) Transcode1(rec *search.Record) (interface{}, error) {
 	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
 }
+
+func DecodeRawItem(item *RawData) (*search.Record, error) {
+	return &search.Record{
+		Index: search.Index{
+			File:      item.Index.File,
+			Offset:    item.Index.Offset,
+			Length:    uint64(item.Index.Length),
+			Fuzziness: item.Index.Fuzziness,
+		},
+		Data: item.Data,
+	}, nil
+}
+
+func DecodeRawStat(stat *Statistics) (search.Statistics, error) {
+	return search.Statistics{
+		Matches:    stat.Matches,
+		TotalBytes: stat.TotalBytes,
+		Duration:   stat.Duration,
+	}, nil
+}
+
+func (transcoder *RawTranscoder) TranscodeStat(stat search.Statistics) (interface{}, error) {
+	return NewStat(stat), nil
+}

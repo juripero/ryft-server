@@ -38,9 +38,8 @@ import (
 	"net/http"
 	"net/url"
 
-	backend "github.com/getryft/ryft-server/search"
-
 	"github.com/getryft/ryft-server/encoder"
+	"github.com/getryft/ryft-server/search"
 	//"github.com/getryft/ryft-server/names"
 	"github.com/getryft/ryft-server/ryftprim"
 	"github.com/getryft/ryft-server/srverr"
@@ -67,7 +66,7 @@ type SearchParams struct {
 }
 
 // Handle /search endpoint.
-func search(ctx *gin.Context) {
+func doSearch(ctx *gin.Context) {
 	// recover from panics if any
 	defer srverr.Recover(ctx)
 
@@ -87,21 +86,17 @@ func search(ctx *gin.Context) {
 			err.Error(), "failed to get transcoder"))
 	}
 
-	enc := encoder.FromContext(ctx)
+	enc := encoderFromContext(ctx)
 
 	// get search engine
-	opts := map[string]interface{}{
-		"keep-files": *KeepResults,
-		// TODO: more options
-	}
-	var engine backend.Engine // TODO: get backend name from configuration
-	if engine, err = backend.NewEngine("ryftprim", opts); err != nil {
+	engine, err := getSearchEngine()
+	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
 	}
 
 	// search configuration
-	cfg := backend.NewEmptyConfig()
+	cfg := search.NewEmptyConfig()
 	if q, err := url.QueryUnescape(params.Query); err != nil {
 		panic(srverr.NewWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to unescape query"))
@@ -151,7 +146,11 @@ func search(ctx *gin.Context) {
 			}
 
 		case <-res.DoneChan:
-			enc.End(w)
+			xstat, err := tcode.TranscodeStat(res.Stat)
+			if err != nil {
+				panic(err)
+			}
+			enc.EndWithStats(w, xstat)
 			return false // stop
 		}
 

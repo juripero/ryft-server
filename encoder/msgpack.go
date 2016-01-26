@@ -31,15 +31,15 @@
 package encoder
 
 import (
-	"fmt"
 	"io"
-	"time"
+	"log"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
+	// "github.com/ugorji/go/codec"
 )
 
+// MSGPACK encoder
 type MsgPackEncoder struct {
-	msgpack.Encoder
 	needSeparator bool
 }
 
@@ -48,34 +48,49 @@ func (enc *MsgPackEncoder) Begin(w io.Writer) error {
 }
 
 func (enc *MsgPackEncoder) End(w io.Writer) error {
+	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+	_ = e.EncodeUint8(TAG_MsgPackEOF)
 	return nil
 }
 
-func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stats map[string]interface{}) error {
-	return nil
-}
+const (
+	TAG_MsgPackEOF  uint8 = 0
+	TAG_MsgPackItem uint8 = 1
+	TAG_MsgPackStat uint8 = 2
+)
 
-func (enc *MsgPackEncoder) Write(w io.Writer, itm interface{}) error {
-	wEncoder := msgpack.NewEncoder(w)
-	err := msgpkEncode(wEncoder, &itm, WriteInterval)
-	b, _ := msgpack.Marshal(&itm)
-	//	fmt.Printf("\n MSGPACK : %v \n", b)
-	var v interface{}
-	msgpack.Unmarshal(b, v)
-	//	fmt.Printf("\n MSGPACK : %v \n", v)
+func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}) error {
+	log.Printf("[msgpack]: encode stat: %#v", stat)
+	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+	_ = e.EncodeUint8(TAG_MsgPackStat)
+	err := e.Encode(stat)
+	_ = e.EncodeUint8(TAG_MsgPackEOF)
 	return err
 }
 
-func msgpkEncode(enc *msgpack.Encoder, v *interface{}, timeout time.Duration) (err error) {
-	ch := make(chan error, 1)
-	go func() {
-		ch <- enc.Encode(v)
-	}()
+func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
+	log.Printf("[msgpack]: encode item: %#v", item)
+	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+	_ = e.EncodeUint8(TAG_MsgPackItem)
+	err := e.Encode(item)
+	return err
+}
 
-	select {
-	case err = <-ch:
-		return
-	case <-time.After(timeout):
-		return fmt.Errorf("Msgpk encoding timeout")
-	}
+// MSGPACK decoder
+type MsgPackDecoder struct {
+	dec *msgpack.Decoder
+}
+
+// NewMsgPackDecoder creates new MSGPACK decoder instance.
+func NewMsgPackDecoder(r io.Reader) *MsgPackDecoder {
+	return &MsgPackDecoder{dec: msgpack.NewDecoder(r)}
+}
+
+func (dec *MsgPackDecoder) NextTag() (uint8, error) {
+	return dec.dec.DecodeUint8()
+}
+
+// Read decodes next item from the stream.
+func (dec *MsgPackDecoder) Next(item interface{}) error {
+	return dec.dec.Decode(item)
 }
