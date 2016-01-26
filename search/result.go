@@ -77,7 +77,7 @@ func NewResult() *Result {
 // String gets string representation of results.
 // actually prints statistics.
 func (res Result) String() string {
-	return fmt.Sprintf("Result{records:%d, errors:%d, done:%b, stat:%s}",
+	return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, stat:%s}",
 		res.recordsReceived, res.errorsReceived, res.isDone, res.Stat)
 }
 
