@@ -86,16 +86,20 @@ type Params struct {
 }
 
 type Statistics struct {
-	Matches    uint32 `json:"matches"`
-	TotalBytes uint32 `json:"totalBytes"`
-	Duration   uint32 `json:"duration"`
+	Matches        uint32 `json:"matches"`
+	TotalBytes     uint32 `json:"totalBytes"`
+	Duration       uint32 `json:"duration"`
+	FabricDataRate string `json:"fabricDataRate"`
+	DataRate       string `json:"dataRate"`
 }
 
 func (s Statistics) AsMap() map[string]interface{} {
 	m := make(map[string]interface{})
-	m[duration] = s.Duration
-	m[totalBytes] = s.TotalBytes
-	m[matches] = s.Matches
+	m["duration"] = s.Duration
+	m["totalBytes"] = s.TotalBytes
+	m["matches"] = s.Matches
+	m["fabricDataRate"] = s.FabricDataRate
+	m["dataRate"] = s.DataRate
 	return m
 }
 
@@ -128,6 +132,8 @@ func StatisticsFromMap(m map[string]string) Statistics {
 		uintOrPanic(m[matches]),
 		uintOrPanic(m[totalBytes]),
 		uintOrPanic(m[duration]),
+		m[fabricDataRate],
+		m[dataRate],
 	}
 }
 

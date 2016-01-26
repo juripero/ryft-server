@@ -5,7 +5,7 @@
         "title": "Ryft REST.",
         "version": "1.0"
     },
-    "host": "192.168.57.101:8765",
+    "host": "52.3.59.171:8765",
     "paths": {
         "/count": {
             "get": {
@@ -309,7 +309,11 @@
                         "totalBytes": {
                             "type": "number",
                             "format": "int32"
-                        }
+                        },
+                        "matches": {
+                            "type": "number",
+                            "format": "int32"
+                        },
                     }
                 }
             }
