@@ -44,7 +44,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// Search starts asynchronous "search" with RyftPrim engine.
+// Search starts asynchronous "/search" with RyftPrim engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(true)
 	task.log().Printf("[ryftprim]: start /search")
@@ -65,7 +65,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return res, nil // OK
 }
 
-// Count starts asynchronous "count" with RyftPrim engine.
+// Count starts asynchronous "/count" with RyftPrim engine.
 func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(false)
 	task.log().Printf("[ryftprim]: start /count")
@@ -252,7 +252,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		task.log().Infof("[ryftprim]: finished")
 	}
 
-	// some cleanup
+	// some futher cleanup
 	defer res.Close()
 	defer res.ReportDone()
 	defer task.Close()

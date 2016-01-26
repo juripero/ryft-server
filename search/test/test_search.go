@@ -8,6 +8,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/getryft/ryft-server/search"
+	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 )
 
@@ -102,9 +103,9 @@ func test1(concurent bool) {
 	}
 	log.WithField("name", backend).Infof("actual options: %+v", engine.Options())
 
-	A := search.NewConfig(`(RAW_TEXT CONTAINS "10")`, "/regression/*.txt")
-	B := search.NewConfig(`(RAW_TEXT CONTAINS "0")`, "/regression/*.txt")
-	C := search.NewConfig(`(RAW_TEXT CONTAINS "555")`, "/regression/*.txt")
+	A := search.NewConfig(`10`, "/regression/*.txt")
+	B := search.NewConfig(`0`, "/regression/*.txt")
+	C := search.NewConfig(`555`, "/regression/*.txt")
 	C.Fuzziness = 1
 
 	cfgs := []search.Config{}
@@ -121,8 +122,25 @@ func test1(concurent bool) {
 	}
 }
 
+func test2() {
+	backend := "ryfthttp"
+	opts := map[string]interface{}{}
+	engine, err := search.NewEngine(backend, opts)
+	if err != nil {
+		log.WithError(err).Fatalf("failed to get search engine")
+	}
+	log.WithField("name", backend).Infof("actual options: %+v", engine.Options())
+
+	A := search.NewConfig(`"test"`, "/regression/*.txt")
+	A.Surrounding = 10
+	A.Fuzziness = 1
+
+	test1a("H1", engine, *A)
+}
+
 func main() {
 	//test0()
-	//test1(false)
-	test1(true) // concurent
+	//test1(false) // step-by-step
+	//test1(true) // concurent
+	test2()
 }
