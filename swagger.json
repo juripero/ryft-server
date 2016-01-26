@@ -216,7 +216,7 @@
                 "operationId": "files",
                 "parameters": [
                     {
-                        "name": "path",
+                        "name": "dir",
                         "type": "string",
                         "description": "The folder path to return child items of. Default '/'",
                         "in": "query"
@@ -333,7 +333,7 @@
                         "type": "string"
                     }
                 },
-                "path": {
+                "dirPath": {
                     "type": "string"
                 }
             }

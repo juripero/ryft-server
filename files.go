@@ -13,7 +13,7 @@ import (
 )
 
 type FilesParams struct {
-	Path  string `form:"path" json:"path"`
+	Dir   string `form:"dir" json:"dir"`
 	Local bool   `form:"local" json:"local"`
 }
 
@@ -32,7 +32,7 @@ func files(c *gin.Context) {
 		panic(srverr.New(http.StatusBadRequest, err.Error()))
 	}
 
-	path := getPath(params.Path)
+	dirPath := getDirPath(params.Dir)
 	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
 	// default to JSON
 	if accept == "" {
@@ -42,7 +42,7 @@ func files(c *gin.Context) {
 		return
 	}
 
-	m, err := getNames(path)
+	m, err := getNames(dirPath)
 	if err != nil {
 		panic(srverr.New(http.StatusNotFound, err.Error()))
 	}
@@ -51,29 +51,29 @@ func files(c *gin.Context) {
 
 }
 
-func getPath(folderPath string) string {
-	if folderPath == "" {
+func getDirPath(dirPath string) string {
+	if dirPath == "" {
 		return home
 	}
-	return path.Join(home, folderPath)
+	return path.Join(home, dirPath)
 }
 
-func getNames(folderPath string) (map[string]interface{}, error) {
+func getNames(dirPath string) (map[string]interface{}, error) {
 
 	var err error
 	var items []os.FileInfo
 
-	items, err = ioutil.ReadDir(folderPath)
+	items, err = ioutil.ReadDir(dirPath)
 
 	if err != nil {
 		return nil, err
 	}
 
 	m := createNamesMap(items)
-	if folderPath == home {
-		m["path"] = "/"
+	if dirPath == home {
+		m["dirPath"] = "/"
 	} else {
-		m["path"] = strings.TrimPrefix(folderPath, home)
+		m["dirPath"] = strings.TrimPrefix(dirPath, home)
 
 	}
 
