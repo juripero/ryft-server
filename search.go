@@ -149,10 +149,14 @@ func (s *Server) search(ctx *gin.Context) {
 			if ok && err != nil {
 				// TODO: report error
 				panic(srverr.New(http.StatusInternalServerError, err.Error()))
-
 			}
 
 		case <-res.DoneChan:
+			if first {
+				enc.Begin(w)
+				first = false
+			}
+
 			if params.Stats {
 				xstat, err := tcode.TranscodeStat(res.Stat)
 				if err != nil {
