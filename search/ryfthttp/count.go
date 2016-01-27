@@ -41,7 +41,7 @@ import (
 // Count starts asynchronous "/count" with RyftPrim engine.
 func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	// prepare request URL
-	url := engine.prepareUrl(cfg, "msgpack")
+	url := engine.prepareUrl(cfg, "raw")
 	url.Path += "/count"
 
 	// prepare request, TODO: authentication?

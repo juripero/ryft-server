@@ -39,7 +39,7 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
-	_ "github.com/getryft/ryft-server/search/ryftmux"
+	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
 	"github.com/getryft/ryft-server/encoder"
@@ -115,24 +115,74 @@ func ensureDefault(flag *string, message string) {
 }
 
 // get search backend with options
-func (s *Server) getSearchEngine() (search.Engine, error) {
-	opts := s.BackendOptions
+func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
+	if !localOnly {
+		// cluster search
 
-	// some auto-options
-	switch s.SearchBackend {
-	case "ryftprim":
-		// instance name
-		if _, ok := opts["instance-name"]; !ok {
-			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+		// for each service create corresponding search engine
+		backends := []search.Engine{}
+		info, err := GetConsulInfo()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get consul service info: %s", err)
+		}
+		for _, service := range info {
+			if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
+				// local node: just use normal backend
+				engine, err := s.getSearchEngine(true)
+				if err != nil {
+					return nil, err
+				}
+				backends = append(backends, engine)
+				continue // skip
+			}
+
+			// remote node: use RyftHTTP backend
+			port := service.ServicePort
+			scheme := "http"
+			var url string
+			if port == 0 { // TODO: review the URL building!
+				url = fmt.Sprintf("%s://%s:%s", scheme, service.Address, DefaultPort)
+			} else {
+				url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+			}
+
+			opts := map[string]interface{}{
+				"server-url": url,
+				"local-only": true,
+			}
+			engine, err := search.NewEngine("ryfthttp", opts)
+			if err != nil {
+				return nil, err
+			}
+			backends = append(backends, engine)
 		}
 
-		// keep-files
-		if _, ok := opts["keep-files"]; !ok {
-			opts["keep-files"] = *KeepResults
+		if len(backends) > 0 {
+			return ryftmux.NewEngine(backends...)
+		} else {
+			// no services from consule, just use local search as a fallback
+			return s.getSearchEngine(true)
 		}
+	} else {
+		// local node search
+		opts := s.BackendOptions
+
+		// some auto-options
+		switch s.SearchBackend {
+		case "ryftprim":
+			// instance name
+			if _, ok := opts["instance-name"]; !ok {
+				opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+			}
+
+			// keep-files
+			if _, ok := opts["keep-files"]; !ok {
+				opts["keep-files"] = *KeepResults
+			}
+		}
+
+		return search.NewEngine(s.SearchBackend, opts)
 	}
-
-	return search.NewEngine(s.SearchBackend, opts)
 }
 
 func parseParams() {
@@ -227,17 +277,10 @@ func main() {
 		c.Data(http.StatusOK, http.DetectContentType(swaggerJSON), swaggerJSON)
 	})
 
-	// search method
 	router.GET("/search", detectEncoder, server.search)
-
-	// count method
 	router.GET("/count", detectEncoder, server.count)
-
-	// cluster members
-	router.GET("/cluster/members", members)
-
-	// server/cluster files
-	router.GET("/files", files)
+	router.GET("/cluster/members", server.members)
+	router.GET("/files", server.files)
 
 	// Startup preparatory
 

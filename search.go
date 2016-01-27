@@ -89,7 +89,7 @@ func (s *Server) search(ctx *gin.Context) {
 	enc := encoderFromContext(ctx)
 
 	// get search engine
-	engine, err := s.getSearchEngine()
+	engine, err := s.getSearchEngine(params.Local)
 	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))

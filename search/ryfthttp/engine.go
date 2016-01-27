@@ -47,6 +47,7 @@ var (
 // RyftHTTP engine uses `ryft` HTTP server as a backend.
 type Engine struct {
 	ServerURL  string // "http://localhost:8765" by default
+	LocalOnly  bool   // add "local" query
 	httpClient *http.Client
 	// TODO: authentication?
 }
@@ -92,9 +93,9 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	if cfg.Nodes > 0 {
 		q.Set("nodes", fmt.Sprintf("%d", cfg.Nodes))
 	}
-	q.Set("local", "true") // perform local search!
+	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
 	// q.Set("fields", )
-	// q.Set("stats", )
+	q.Set("stats", "true")
 
 	u.RawQuery = q.Encode()
 	return u

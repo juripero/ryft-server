@@ -42,7 +42,7 @@ import (
 // Search starts asynchronous "/search" with RyftPrim engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	// prepare request URL
-	url := engine.prepareUrl(cfg, "msgpack")
+	url := engine.prepareUrl(cfg, "raw")
 	url.Path += "/search"
 
 	// prepare request, TODO: authentication?

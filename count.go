@@ -17,6 +17,7 @@ type CountParams struct {
 	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
 	CaseSensitive bool     `form:"cs" json:"cs"`
 	Nodes         uint8    `form:"nodes" json:"nodes"`
+	Local         bool     `form:"local" json:"local"`
 }
 
 // CountResponse returnes matches for query
@@ -40,7 +41,7 @@ func (s *Server) count(ctx *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine()
+	engine, err := s.getSearchEngine(params.Local)
 	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))

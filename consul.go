@@ -30,7 +30,11 @@
 
 package main
 
-import "github.com/hashicorp/consul/api"
+import (
+	"fmt"
+
+	consul "github.com/hashicorp/consul/api"
+)
 
 //type Service struct {
 //	Node           string   `json:"Node"`
@@ -42,22 +46,21 @@ import "github.com/hashicorp/consul/api"
 //	ServicePort    string   `json:"ServicePort"`
 //}
 
-func GetConsulInfo() (address []*api.CatalogService, err error) {
-
-	config := api.DefaultConfig()
+func GetConsulInfo() (address []*consul.CatalogService, err error) {
+	config := consul.DefaultConfig()
+	// TODO: get some data from server's configuration
 	config.Datacenter = "dc1"
-	client, err := api.NewClient(config)
+	client, err := consul.NewClient(config)
 
 	if err != nil {
-
-		return nil, err
+		return nil, fmt.Errorf("failed to get consul client", err)
 	}
 
 	catalog := client.Catalog()
-	srvc, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
 
-	// for _, value := range srvc {
+	// for _, value := range services {
 	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
 	// }
-	return srvc, err
+	return services, err
 }

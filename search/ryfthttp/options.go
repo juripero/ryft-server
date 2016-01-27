@@ -41,6 +41,7 @@ import (
 func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{
 		"server-url": engine.ServerURL,
+		"local-only": engine.LocalOnly,
 	}
 }
 
@@ -57,6 +58,14 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	}
 	if _, err := url.Parse(engine.ServerURL); err != nil {
 		return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
+	}
+
+	// local only flag
+	if v, ok := opts["local-only"]; ok {
+		engine.LocalOnly, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "local-only" option: %s`, err)
+		}
 	}
 
 	return nil // OK

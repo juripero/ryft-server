@@ -23,7 +23,7 @@ const (
 	foldersName string = "folders"
 )
 
-func files(c *gin.Context) {
+func (s *Server) files(c *gin.Context) {
 	defer srverr.Recover(c)
 
 	var err error
@@ -48,7 +48,6 @@ func files(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, m)
-
 }
 
 func getDirPath(dirPath string) string {
