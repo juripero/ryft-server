@@ -1,23 +1,11 @@
 {
-    "consumes": [
-        "application/json",
-        "application/xml"
-    ],
-    "produces": [
-        "application/msgpack",
-        "application/json"
-    ],
-    "schemes": [
-        "http",
-        "https"
-    ],
     "swagger": "2.0",
     "info": {
         "description": "the purpose of this application is to create REST connector to the Ryft One hardware",
         "title": "Ryft REST.",
         "version": "1.0"
     },
-    "host": "192.168.57.101:8765",
+    "host": "52.3.59.171:8765",
     "paths": {
         "/count": {
             "get": {
@@ -86,6 +74,13 @@
                         "schema": {
                             "type": "object",
                             "$ref": "#/definitions/CountResponse"
+                        }
+                    },
+                    "default": {
+                        "description": "Error responses",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/ErrorResponse"
                         }
                     }
                 }
@@ -200,6 +195,54 @@
                             "type": "object",
                             "$ref": "#/definitions/SearchResponse"
                         }
+                    },
+                    "default": {
+                        "description": "Error responses",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/files": {
+            "get": {
+                "tags": [
+                    "files"
+                ],
+                "summary": "Files",
+                "description": "Endpoint to query mode/cluster file system structure",
+                "operationId": "files",
+                "parameters": [
+                    {
+                        "name": "dir",
+                        "type": "string",
+                        "description": "The folder path to return child items of. Default '/'",
+                        "in": "query"
+                    },
+                    {
+                        "name": "local",
+                        "type": "boolean",
+                        "description": "Return file structure from local node only or whole cluster",
+                        "required": false,
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of files and directories for node/cluster",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/FilesResponse"
+                        }
+                    },
+                    "default": {
+                        "description": "Error responses",
+                        "schema": {
+                            "type": "object",
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
                     }
                 }
             }
@@ -266,8 +309,46 @@
                         "totalBytes": {
                             "type": "number",
                             "format": "int32"
-                        }
+                        },
+                        "matches": {
+                            "type": "number",
+                            "format": "int32"
+                        },
                     }
+                }
+            }
+        },
+        "FilesResponse": {
+            "type": "object",
+            "properties": {
+                "folders": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dir": {
+                    "type": "string"
+                }
+            }
+        },
+        "ErrorResponse": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object"
+            },
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
                 }
             }
         }

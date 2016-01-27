@@ -31,6 +31,7 @@
 package ryftprim
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -86,16 +87,20 @@ type Params struct {
 }
 
 type Statistics struct {
-	Matches    uint32 `json:"matches"`
-	TotalBytes uint32 `json:"totalBytes"`
-	Duration   uint32 `json:"duration"`
+	Matches        uint32 `json:"matches"`
+	TotalBytes     uint32 `json:"totalBytes"`
+	Duration       uint32 `json:"duration"`
+	FabricDataRate string `json:"fabricDataRate"`
+	DataRate       string `json:"dataRate"`
 }
 
 func (s Statistics) AsMap() map[string]interface{} {
 	m := make(map[string]interface{})
-	m[duration] = s.Duration
-	m[totalBytes] = s.TotalBytes
-	m[matches] = s.Matches
+	m["duration"] = s.Duration
+	m["totalBytes"] = s.TotalBytes
+	m["matches"] = s.Matches
+	m["fabricDataRate"] = s.FabricDataRate
+	m["dataRate"] = s.DataRate
 	return m
 }
 
@@ -108,10 +113,10 @@ type Result struct {
 
 func newResult() *Result {
 	return &Result{
-		make(chan error),
-		make(chan Statistics),
-		make(chan records.IdxRecord),
-		make(chan struct{}),
+		make(chan error, 1),
+		make(chan Statistics, 1),
+		make(chan records.IdxRecord, 256),
+		make(chan struct{}, 1),
 	}
 }
 
@@ -128,6 +133,8 @@ func StatisticsFromMap(m map[string]string) Statistics {
 		uintOrPanic(m[matches]),
 		uintOrPanic(m[totalBytes]),
 		uintOrPanic(m[duration]),
+		m[fabricDataRate],
+		m[dataRate],
 	}
 }
 
@@ -171,7 +178,7 @@ func Search(p *Params) (result *Result) {
 		testArgs = append(testArgs, arg_fuzziness, fmt.Sprintf("%d", p.Fuzziness))
 	}
 
-	testArgs = append(testArgs, arg_query, p.Query)
+	testArgs = append(testArgs, arg_query, prepareQuery(p.Query))
 
 	log.Println(testArgs)
 
@@ -180,11 +187,13 @@ func Search(p *Params) (result *Result) {
 		command := exec.Command(cmd, testArgs...)
 		output, err := command.CombinedOutput()
 
+		defer close(result.Results)
 		defer close(result.Stats)
 		defer close(result.Errors)
 
 		outputstr := string(output)
 		log.Printf("\n%s\n", outputstr)
+		result.Errors <- nil // done
 
 		if err != nil {
 			result.Errors <- errors.New(fmt.Sprintf("%s (%s)", strings.TrimSpace(outputstr), err.Error()))
@@ -244,6 +253,19 @@ func Search(p *Params) (result *Result) {
 	}
 
 	return
+}
+
+// prepareQuery checks for plain queries
+// plain queries converted to (RAW_TEXT CONTAINS query)
+func prepareQuery(query string) string {
+	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
+		return query
+	} else {
+		// if no keywords - assume plain text query
+		// use hexadecimal encoding here to avoid escaping problems
+		return fmt.Sprintf(`(RAW_TEXT CONTAINS %s)`,
+			hex.EncodeToString([]byte(query)))
+	}
 }
 
 func cleanup(file *os.File, keep bool) {

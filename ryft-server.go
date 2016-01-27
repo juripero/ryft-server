@@ -184,6 +184,9 @@ func main() {
 	// cluster members
 	router.GET("/cluster/members", members)
 
+	// server/cluster files
+	router.GET("/files", files)
+
 	// Startup preparatory
 
 	// start listening on HTTP or HTTPS ports
