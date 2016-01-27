@@ -115,10 +115,12 @@ func (s *Server) search(ctx *gin.Context) {
 			err.Error(), "failed to start search"))
 	}
 
-	// TODO: for cloud code get other ryftprim.Result objects and merge together
-	// [[[ ]]]]
-
-	_ = tcode // items, _ := tcode.Transcode(results.Results)
+	// if encoder is MsgPack we can use two formats:
+	// - with tags to report data records and the statistics in one stream
+	// - without tags to report just data records (this format is used by Spark)
+	if mp, ok := enc.(*encoder.MsgPackEncoder); ok {
+		mp.OmitTags = !params.Stats
+	}
 
 	first := true
 	ctx.Stream(func(w io.Writer) bool {
@@ -151,11 +153,15 @@ func (s *Server) search(ctx *gin.Context) {
 			}
 
 		case <-res.DoneChan:
-			xstat, err := tcode.TranscodeStat(res.Stat)
-			if err != nil {
-				panic(err)
+			if params.Stats {
+				xstat, err := tcode.TranscodeStat(res.Stat)
+				if err != nil {
+					panic(err)
+				}
+				enc.EndWithStats(w, xstat)
+			} else {
+				enc.End(w)
 			}
-			enc.EndWithStats(w, xstat)
 			return false // stop
 		}
 

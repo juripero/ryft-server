@@ -40,6 +40,7 @@ import (
 
 // MSGPACK encoder
 type MsgPackEncoder struct {
+	OmitTags      bool // if we report just data records we can omit tags
 	needSeparator bool
 }
 
@@ -48,8 +49,10 @@ func (enc *MsgPackEncoder) Begin(w io.Writer) error {
 }
 
 func (enc *MsgPackEncoder) End(w io.Writer) error {
-	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
-	_ = e.EncodeUint8(TAG_MsgPackEOF)
+	if !enc.OmitTags {
+		e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+		_ = e.EncodeUint8(TAG_MsgPackEOF)
+	}
 	return nil
 }
 
@@ -62,16 +65,22 @@ const (
 func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}) error {
 	log.Printf("[msgpack]: encode stat: %#v", stat)
 	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
-	_ = e.EncodeUint8(TAG_MsgPackStat)
+	if !enc.OmitTags {
+		_ = e.EncodeUint8(TAG_MsgPackStat)
+	}
 	err := e.Encode(stat)
-	_ = e.EncodeUint8(TAG_MsgPackEOF)
+	if !enc.OmitTags {
+		_ = e.EncodeUint8(TAG_MsgPackEOF)
+	}
 	return err
 }
 
 func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
 	log.Printf("[msgpack]: encode item: %#v", item)
 	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
-	_ = e.EncodeUint8(TAG_MsgPackItem)
+	if !enc.OmitTags {
+		_ = e.EncodeUint8(TAG_MsgPackItem)
+	}
 	err := e.Encode(item)
 	return err
 }
