@@ -32,12 +32,14 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
+	_ "github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
 	"github.com/getryft/ryft-server/encoder"
@@ -48,9 +50,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/yaml.v2"
 )
 
 var (
+	serverConfig = kingpin.Flag("config", "Server configuration in YML format.").String()
+
 	// KeepResults console flag for keeping results files
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
 	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
@@ -72,6 +77,37 @@ var (
 	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
 )
 
+// Server instance
+type Server struct {
+	SearchBackend  string                 `yaml:"searchBackend,omitempty"`
+	BackendOptions map[string]interface{} `yaml:"backendOptions,omitempty"`
+}
+
+// parse server configuration from YML file
+func (s *Server) parseConfig(fileName string) error {
+	// default configuration if no file provided
+	s.SearchBackend = "ryftprim"
+	s.BackendOptions = map[string]interface{}{}
+
+	if len(fileName) == 0 {
+		return nil // OK
+	}
+
+	// read full file content
+	buf, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return fmt.Errorf("failed to read configuration from %q: %s", fileName, err)
+	}
+
+	// TODO: parse ServerConfig dedicated structure
+	err = yaml.Unmarshal(buf, &s)
+	if err != nil {
+		return fmt.Errorf("failed to parse configuration from %q: %s", fileName, err)
+	}
+
+	return nil // OK
+}
+
 func ensureDefault(flag *string, message string) {
 	if *flag == "" {
 		kingpin.FatalUsage(message)
@@ -79,14 +115,24 @@ func ensureDefault(flag *string, message string) {
 }
 
 // get search backend with options
-func getSearchEngine() (search.Engine, error) {
-	opts := map[string]interface{}{
-		"instance-name": fmt.Sprintf("RyftServer-%d", (*listenAddress).Port),
-		"keep-files":    *KeepResults,
-		// TODO: more options
+func (s *Server) getSearchEngine() (search.Engine, error) {
+	opts := s.BackendOptions
+
+	// some auto-options
+	switch s.SearchBackend {
+	case "ryftprim":
+		// instance name
+		if _, ok := opts["instance-name"]; !ok {
+			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+		}
+
+		// keep-files
+		if _, ok := opts["keep-files"]; !ok {
+			opts["keep-files"] = *KeepResults
+		}
 	}
 
-	return search.NewEngine("ryftprim", opts)
+	return search.NewEngine(s.SearchBackend, opts)
 }
 
 func parseParams() {
@@ -133,7 +179,13 @@ func main() {
 	// Create a rounter with default middleware: logger, recover
 	router := gin.Default()
 
-	// Configure requred middlewares
+	// Configure required middlewares
+	var server Server
+	err := server.parseConfig(*serverConfig)
+	if err != nil {
+		log.Fatalf("Failed to read server configuration: %s", err)
+	}
+	log.Printf("CONFIG: %+v", server)
 
 	// Logging & error recovery
 	//	router.Use(gin.Logger())
@@ -176,10 +228,10 @@ func main() {
 	})
 
 	// search method
-	router.GET("/search", detectEncoder, doSearch)
+	router.GET("/search", detectEncoder, server.search)
 
 	// count method
-	router.GET("/count", detectEncoder, doCount)
+	router.GET("/count", detectEncoder, server.count)
 
 	// cluster members
 	router.GET("/cluster/members", members)

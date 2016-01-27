@@ -26,7 +26,7 @@ type CountResponse struct {
 }
 
 // Handle /count endpoint.
-func doCount(ctx *gin.Context) {
+func (s *Server) count(ctx *gin.Context) {
 	// recover from panics if any
 	defer srverr.Recover(ctx)
 
@@ -40,7 +40,7 @@ func doCount(ctx *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := getSearchEngine()
+	engine, err := s.getSearchEngine()
 	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))

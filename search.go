@@ -66,7 +66,7 @@ type SearchParams struct {
 }
 
 // Handle /search endpoint.
-func doSearch(ctx *gin.Context) {
+func (s *Server) search(ctx *gin.Context) {
 	// recover from panics if any
 	defer srverr.Recover(ctx)
 
@@ -89,7 +89,7 @@ func doSearch(ctx *gin.Context) {
 	enc := encoderFromContext(ctx)
 
 	// get search engine
-	engine, err := getSearchEngine()
+	engine, err := s.getSearchEngine()
 	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
