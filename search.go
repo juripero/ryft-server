@@ -122,18 +122,21 @@ func doSearch(ctx *gin.Context) {
 
 	first := true
 	ctx.Stream(func(w io.Writer) bool {
-		if first {
-			enc.Begin(w)
-			first = false
-		}
 
 		select {
 		case rec, ok := <-res.RecordChan:
+
 			if ok && rec != nil {
 				xrec, err := tcode.Transcode1(rec)
 				if err != nil {
-					panic(err)
+					panic(srverr.New(http.StatusInternalServerError, err.Error()))
 				}
+
+				if first {
+					enc.Begin(w)
+					first = false
+				}
+
 				err = enc.Write(w, xrec)
 				if err != nil {
 					panic(err)
@@ -143,6 +146,8 @@ func doSearch(ctx *gin.Context) {
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
 				// TODO: report error
+				panic(srverr.New(http.StatusInternalServerError, err.Error()))
+
 			}
 
 		case <-res.DoneChan:

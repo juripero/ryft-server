@@ -34,6 +34,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -274,7 +275,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// notify client about error
 	if err != nil {
-		res.ReportError(err)
+		s := string(out_buf)
+		res.ReportError(errors.New(s))
 	}
 
 	// stop subtasks
