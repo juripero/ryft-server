@@ -28,63 +28,31 @@
  * ============
  */
 
-package transcoder
+package ryftmux
 
 import (
-	"fmt"
+	// "fmt"
 
-	"github.com/getryft/ryft-server/records"
 	"github.com/getryft/ryft-server/search"
 )
 
-type Transcoder interface {
-	Transcode(recs chan records.IdxRecord) (chan interface{}, chan error)
-	Transcode1(rec *search.Record) (interface{}, error)
-	TranscodeStat(stat *search.Statistics) (interface{}, error)
-}
+// Count starts asynchronous "/count" with RyftMUX engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask()
+	mux := search.NewResult()
 
-const (
-	XMLTRANSCODER = "xml"
-	RAWTRANSCODER = "raw"
+	// prepare requests
+	for _, backend := range engine.Backends {
+		res, err := backend.Count(cfg)
+		if err != nil {
+			task.log().WithError(err).Errorf("failed to start /count subtask")
+			mux.ReportError(err)
+			continue
+		}
 
-	TranscodeBufferCapacity = 64
-)
-
-type Index struct {
-	File      string `json:"file"`
-	Offset    uint64 `json:"offset"`
-	Length    uint16 `json:"length"`
-	Fuzziness uint8  `json:"fuzziness"`
-}
-
-type Statistics struct {
-	Matches    uint64 `json:"matches"`
-	TotalBytes uint64 `json:"totalBytes"`
-	Duration   uint64 `json:"duration"`
-}
-
-func NewIndex(index search.Index) (result Index) {
-	result.File = index.File
-	result.Offset = index.Offset
-	result.Length = uint16(index.Length)
-	result.Fuzziness = index.Fuzziness
-	return
-}
-
-func NewStat(stat *search.Statistics) (result Statistics) {
-	result.Matches = stat.Matches
-	result.TotalBytes = stat.TotalBytes
-	result.Duration = stat.Duration
-	return
-}
-
-func GetByFormat(format string) (Transcoder, error) {
-	switch format {
-	case XMLTRANSCODER:
-		return new(XmlTranscoder), nil
-	case RAWTRANSCODER:
-		return new(RawTranscoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported transcoder format: %s", format)
+		task.add(res)
 	}
+
+	go task.run(mux)
+	return mux, nil // OK for now
 }

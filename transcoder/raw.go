@@ -78,14 +78,14 @@ func DecodeRawItem(item *RawData) (*search.Record, error) {
 	}, nil
 }
 
-func DecodeRawStat(stat *Statistics) (search.Statistics, error) {
-	return search.Statistics{
+func DecodeRawStat(stat *Statistics) (*search.Statistics, error) {
+	return &search.Statistics{
 		Matches:    stat.Matches,
 		TotalBytes: stat.TotalBytes,
 		Duration:   stat.Duration,
 	}, nil
 }
 
-func (transcoder *RawTranscoder) TranscodeStat(stat search.Statistics) (interface{}, error) {
+func (transcoder *RawTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
 	return NewStat(stat), nil
 }

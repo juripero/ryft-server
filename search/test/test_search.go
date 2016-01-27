@@ -9,6 +9,7 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
+	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 )
 
@@ -89,7 +90,7 @@ func test1c(engine search.Engine, cfgs ...search.Config) {
 	wg.Wait() // wait all goroutines to finish
 }
 
-func test1(concurent bool) {
+func newRyftPrim() search.Engine {
 	backend := "ryftprim"
 	opts := map[string]interface{}{
 		"instance-name": "server-test",
@@ -102,6 +103,12 @@ func test1(concurent bool) {
 		log.WithError(err).Fatalf("failed to get search engine")
 	}
 	log.WithField("name", backend).Infof("actual options: %+v", engine.Options())
+
+	return engine
+}
+
+func test1(concurent bool) {
+	engine := newRyftPrim()
 
 	A := search.NewConfig(`10`, "/regression/*.txt")
 	B := search.NewConfig(`0`, "/regression/*.txt")
@@ -122,7 +129,7 @@ func test1(concurent bool) {
 	}
 }
 
-func test2() {
+func newRyftHttp() search.Engine {
 	backend := "ryfthttp"
 	opts := map[string]interface{}{}
 	engine, err := search.NewEngine(backend, opts)
@@ -131,6 +138,12 @@ func test2() {
 	}
 	log.WithField("name", backend).Infof("actual options: %+v", engine.Options())
 
+	return engine
+}
+
+func test2() {
+	engine := newRyftHttp()
+
 	A := search.NewConfig(`"test"`, "/regression/*.txt")
 	A.Surrounding = 10
 	A.Fuzziness = 1
@@ -138,9 +151,28 @@ func test2() {
 	test1a("H1", engine, *A)
 }
 
+func test3() {
+	// tripple seach
+	engine, err := ryftmux.NewEngine(
+		newRyftPrim(),
+		newRyftPrim(),
+		newRyftPrim(),
+	)
+	if err != nil {
+		log.WithError(err).Fatalf("failed to get search engine")
+	}
+
+	A := search.NewConfig(`"test"`, "/regression/*.txt")
+	A.Surrounding = 10
+	A.Fuzziness = 1
+
+	test1a("M1", engine, *A)
+}
+
 func main() {
 	//test0()
 	//test1(false) // step-by-step
 	//test1(true) // concurent
-	test2()
+	//test2()
+	test3()
 }

@@ -86,7 +86,7 @@ func (transcoder *XmlTranscoder) Transcode1(rec *search.Record) (interface{}, er
 	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
 }
 
-func (transcoder *XmlTranscoder) TranscodeStat(stat search.Statistics) (interface{}, error) {
+func (transcoder *XmlTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
 	// TODO: replace with XML?
 	return NewStat(stat), nil
 }

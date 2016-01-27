@@ -85,7 +85,7 @@ func parseIndex(buf []byte) (index search.Index, err error) {
 }
 
 // parseStat parses statistics from ryftprim output.
-func parseStat(buf []byte) (stat search.Statistics, err error) {
+func parseStat(buf []byte) (stat *search.Statistics, err error) {
 	// parse as YML map first
 	v := map[string]interface{}{}
 	err = yaml.Unmarshal(buf, &v)
@@ -94,6 +94,7 @@ func parseStat(buf []byte) (stat search.Statistics, err error) {
 	}
 
 	log.WithField("stat", v).Debugf("ryftprim output as YML")
+	stat = &search.Statistics{}
 
 	// Duration
 	stat.Duration, err = utils.AsUint64(v["Duration"])

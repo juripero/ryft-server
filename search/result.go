@@ -59,17 +59,18 @@ type Result struct {
 	isDone   bool
 
 	// Search processing statistics
-	Stat Statistics
+	Stat *Statistics
 }
 
 // NewResult creates new empty search results.
 func NewResult() *Result {
 	res := &Result{}
 
-	res.ErrorChan = make(chan error, 1)
+	res.ErrorChan = make(chan error, 256)    // TODO: capacity constant?
 	res.RecordChan = make(chan *Record, 256) // TODO: capacity constant?
 	res.CancelChan = make(chan interface{}, 1)
 	res.DoneChan = make(chan interface{}, 1)
+	res.Stat = &Statistics{}
 
 	return res
 }

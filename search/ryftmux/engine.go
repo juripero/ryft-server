@@ -28,63 +28,66 @@
  * ============
  */
 
-package transcoder
+package ryftmux
 
 import (
 	"fmt"
 
-	"github.com/getryft/ryft-server/records"
+	"github.com/Sirupsen/logrus"
+
 	"github.com/getryft/ryft-server/search"
 )
 
-type Transcoder interface {
-	Transcode(recs chan records.IdxRecord) (chan interface{}, chan error)
-	Transcode1(rec *search.Record) (interface{}, error)
-	TranscodeStat(stat *search.Statistics) (interface{}, error)
-}
-
-const (
-	XMLTRANSCODER = "xml"
-	RAWTRANSCODER = "raw"
-
-	TranscodeBufferCapacity = 64
+var (
+	log = logrus.New()
 )
 
-type Index struct {
-	File      string `json:"file"`
-	Offset    uint64 `json:"offset"`
-	Length    uint16 `json:"length"`
-	Fuzziness uint8  `json:"fuzziness"`
+// RyftMUX engine uses set of abstract engines as backends.
+type Engine struct {
+	Backends []search.Engine
 }
 
-type Statistics struct {
-	Matches    uint64 `json:"matches"`
-	TotalBytes uint64 `json:"totalBytes"`
-	Duration   uint64 `json:"duration"`
+// NewEngine creates new RyftMUX search engine.
+func NewEngine(backends ...search.Engine) (*Engine, error) {
+	engine := &Engine{Backends: backends}
+	return engine, nil
 }
 
-func NewIndex(index search.Index) (result Index) {
-	result.File = index.File
-	result.Offset = index.Offset
-	result.Length = uint16(index.Length)
-	result.Fuzziness = index.Fuzziness
-	return
+// String gets string representation of the engine.
+func (engine *Engine) String() string {
+	return fmt.Sprintf("RyftMUX{backends:%d}",
+		len(engine.Backends))
+	// TODO: other parameters?
 }
 
-func NewStat(stat *search.Statistics) (result Statistics) {
-	result.Matches = stat.Matches
-	result.TotalBytes = stat.TotalBytes
-	result.Duration = stat.Duration
-	return
+// Options gets all engine options.
+func (engine *Engine) Options() map[string]interface{} {
+	return map[string]interface{}{}
 }
 
-func GetByFormat(format string) (Transcoder, error) {
-	switch format {
-	case XMLTRANSCODER:
-		return new(XmlTranscoder), nil
-	case RAWTRANSCODER:
-		return new(RawTranscoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported transcoder format: %s", format)
+// log returns task related logger.
+func (task *Task) log() *logrus.Entry {
+	return log.WithField("task", task.Identifier)
+}
+
+/*
+// factory creates RyftMUX engine.
+func factory(opts map[string]interface{}) (search.Engine, error) {
+	backends := parseOptions(opts)
+	engine, err := NewEngine(backends)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
 	}
+	return engine, nil
+}
+*/
+
+// package initialization
+func init() {
+	// should be created manually!
+	// search.RegisterEngine("ryftmux", factory)
+
+	// initialize logging
+	log.Level = logrus.InfoLevel
+	//log.Level = logrus.DebugLevel
 }

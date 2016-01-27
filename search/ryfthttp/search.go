@@ -82,6 +82,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// read response and report records and/or statistics
 		dec := encoder.NewMsgPackDecoder(resp.Body)
 
+		// TODO: task cancellation!!
+
 		for {
 			tag, _ := dec.NextTag()
 			switch tag {
