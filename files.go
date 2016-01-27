@@ -36,8 +36,8 @@ func files(c *gin.Context) {
 	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
 	// default to JSON
 	if accept == "" {
-		accept = encoder.MIMEJSON
-	} else if accept == encoder.MIMEMSGPACK || accept == encoder.MIMEMSGPACKX {
+		accept = encoder.MIME_JSON
+	} else if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
 		c.JSON(http.StatusUnsupportedMediaType, "Message pack not implemented yet")
 		return
 	}

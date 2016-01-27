@@ -81,9 +81,30 @@ func (transcoder *XmlTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 	return output, errors
 }
 
-func (transcoder *XmlTranscoder) Transcode1(rec *search.Record) (interface{}, error) {
+func (transcoder *XmlTranscoder) Transcode1(rec *search.Record) (res interface{}, err error) {
 	// TODO: replace with XML?
-	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
+	obj, err := mxj.NewMapXml(rec.Data.([]byte))
+
+	if err != nil {
+		return
+	}
+	for k := range obj {
+		item, ok := obj[k]
+		if ok {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Println("Recovered in parsing ", r)
+					debug.PrintStack()
+					log.Printf("PASRING XML: %s", rec.Data)
+				}
+			}()
+			item.(map[string]interface{})["_index"] = NewIndex(rec.Index)
+			res = item
+			break
+		}
+		break
+	}
+	return
 }
 
 func (transcoder *XmlTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
