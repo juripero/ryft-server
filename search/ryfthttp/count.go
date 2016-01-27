@@ -32,10 +32,11 @@ package ryfthttp
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
+	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/transcoder"
 )
 
 // Count starts asynchronous "/count" with RyftPrim engine.
@@ -74,13 +75,45 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 			return
 		}
 
-		// TODO: read response and report records and stat
-		buf, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			// TODO: report error
-		}
+		// read response and report records and/or statistics
+		dec := encoder.NewMsgPackDecoder(resp.Body)
 
-		task.log().Infof("response:\n%s", string(buf))
+		// TODO: task cancellation!!
+		// TODO: use simple JSON format here?
+
+		for {
+			tag, _ := dec.NextTag()
+			switch tag {
+			case encoder.TAG_MsgPackEOF:
+				task.log().Infof("end of response")
+				return // DONE
+
+			case encoder.TAG_MsgPackItem: // actually should be impossible!
+				var item transcoder.RawData
+				err := dec.Next(&item)
+				if err != nil {
+					task.log().WithError(err).Errorf("failed to decode record")
+					res.ReportError(err)
+					return
+				} else {
+					rec, _ := transcoder.DecodeRawItem(&item)
+					task.log().Infof("record received: %s", rec)
+					res.ReportRecord(rec)
+					// continue
+				}
+
+			case encoder.TAG_MsgPackStat:
+				var stat transcoder.Statistics
+				err := dec.Next(&stat)
+				if err == nil {
+					res.Stat, _ = transcoder.DecodeRawStat(&stat)
+					task.log().Infof("stat received: %s", res.Stat)
+				}
+
+			default:
+				task.log().WithField("tag", tag).Errorf("unknown tag, ignored")
+			}
+		}
 	}()
 
 	return res, nil // OK for now}

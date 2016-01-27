@@ -42,6 +42,7 @@ func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{
 		"server-url": engine.ServerURL,
 		"local-only": engine.LocalOnly,
+		"skip-stat":  engine.SkipStat,
 	}
 }
 
@@ -65,6 +66,14 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		engine.LocalOnly, err = utils.AsBool(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "local-only" option: %s`, err)
+		}
+	}
+
+	// skip stat flag
+	if v, ok := opts["skip-stat"]; ok {
+		engine.SkipStat, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "skip-stat" option: %s`, err)
 		}
 	}
 
