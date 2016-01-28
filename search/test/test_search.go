@@ -8,9 +8,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/getryft/ryft-server/search"
-	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
-	_ "github.com/getryft/ryft-server/search/ryftprim"
 )
 
 // just print of available search engines
@@ -90,23 +88,6 @@ func test1c(engine search.Engine, cfgs ...search.Config) {
 	wg.Wait() // wait all goroutines to finish
 }
 
-func newRyftPrim() search.Engine {
-	backend := "ryftprim"
-	opts := map[string]interface{}{
-		"instance-name": "server-test",
-		"keep-files":    true,
-		"open-poll":     "1s",
-		"read-poll":     "1s",
-	}
-	engine, err := search.NewEngine(backend, opts)
-	if err != nil {
-		log.WithError(err).Fatalf("failed to get search engine")
-	}
-	log.WithField("name", backend).Infof("actual options: %+v", engine.Options())
-
-	return engine
-}
-
 func test1(concurent bool) {
 	engine := newRyftPrim()
 
@@ -127,18 +108,6 @@ func test1(concurent bool) {
 	} else {
 		test1c(engine, cfgs...) // concurent
 	}
-}
-
-func newRyftHttp() search.Engine {
-	backend := "ryfthttp"
-	opts := map[string]interface{}{}
-	engine, err := search.NewEngine(backend, opts)
-	if err != nil {
-		log.WithError(err).Fatalf("failed to get search engine")
-	}
-	log.WithField("name", backend).Infof("actual options: %+v", engine.Options())
-
-	return engine
 }
 
 func test2() {
@@ -167,12 +136,4 @@ func test3() {
 	A.Fuzziness = 1
 
 	test1a("M1", engine, *A)
-}
-
-func main() {
-	//test0()
-	//test1(false) // step-by-step
-	//test1(true) // concurent
-	//test2()
-	test3()
 }
