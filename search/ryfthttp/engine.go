@@ -103,6 +103,21 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	return u
 }
 
+// prepareUrl formats proper /files URL based on directory name provided.
+func (engine *Engine) prepareFilesUrl(path string) *url.URL {
+	// server URL should be parsed in engine initialization
+	// so we can omit error checking here
+	u, _ := url.Parse(engine.ServerURL)
+
+	// prepare query
+	q := url.Values{}
+	q.Set("dir", path)
+	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
+
+	u.RawQuery = q.Encode()
+	return u
+}
+
 // log returns task related logger.
 func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)

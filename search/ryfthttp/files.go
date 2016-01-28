@@ -28,43 +28,67 @@
  * ============
  */
 
-package search
+package ryfthttp
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-// Abstract Search Engine interface
-type Engine interface {
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	// prepare request URL TODO: move to dedicated function
+	url := engine.prepareFilesUrl(path)
+	url.Path += "/files"
 
-	// Get current engine options.
-	Options() map[string]interface{}
+	task := NewTask()
 
-	// Run asynchronous "/search" operation.
-	Search(cfg *Config) (*Result, error)
-
-	// Run asynchronous "/count" operation.
-	Count(cfg *Config) (*Result, error)
-
-	// Run *synchronous* "/files" operation.
-	Files(path string) (*DirInfo, error)
-}
-
-// NewEngine creates new search engine by name.
-// To get list of available engines see GetAvailableEngines().
-// To get list of supported options see corresponding search engine.
-func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
-	// get appropriate factory
-	f, ok := factories[name]
-	if !ok {
-		return nil, fmt.Errorf("%q is unknown search engine", name)
+	// prepare request, TODO: authentication?
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		task.log().WithError(err).Errorf("failed to create HTTP request")
+		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
-	if opts == nil {
-		// no options by default
-		opts = map[string]interface{}{}
+	// we expect JSON format
+	req.Header.Set("Accept", "application/json")
+
+	// do HTTP request
+	resp, err := engine.httpClient.Do(req)
+	if err != nil {
+		task.log().WithError(err).Errorf("failed to send HTTP request")
+		return nil, fmt.Errorf("failed to send HTTP request: %s", err)
 	}
 
-	// create engine using factory
-	return f(opts)
+	defer resp.Body.Close() // close it later
+
+	// check status code
+	if resp.StatusCode != http.StatusOK {
+		task.log().WithField("status", resp.StatusCode).Errorf("invalid HTTP response status")
+		return nil, fmt.Errorf("invalid HTTP response status: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	// TODO: use dedicated structure from transcode here!
+	var info struct {
+		Path  string   `json:"dir"`
+		Files []string `json:"files,omitempty"`
+		Dirs  []string `json:"folders,omitempty"`
+	}
+
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&info)
+	if err != nil {
+		task.log().WithError(err).Errorf("failed to decode HTTP response")
+		return nil, fmt.Errorf("failed to decode HTTP response: %s", err)
+	}
+
+	res := &search.DirInfo{}
+	res.Path = info.Path
+	res.Files = info.Files
+	res.Dirs = info.Dirs
+
+	return res, nil // OK
 }

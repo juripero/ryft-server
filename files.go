@@ -1,11 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
 	"net/http"
-	"os"
-	"path"
-	"strings"
 
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/srverr"
@@ -17,84 +13,47 @@ type FilesParams struct {
 	Local bool   `form:"local" json:"local"`
 }
 
-const (
-	home        string = "/ryftone"
-	filesName   string = "files"
-	foldersName string = "folders"
-)
-
 func (s *Server) files(c *gin.Context) {
+	// recover from panics if any
 	defer srverr.Recover(c)
 
 	var err error
+
+	// parse request parameters
 	params := FilesParams{}
 	if err = c.Bind(&params); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to parse request parameters"))
 	}
 
-	dirPath := getDirPath(params.Dir)
+	// get search engine
+	engine, err := s.getSearchEngine(params.Local)
+	if err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to get search engine"))
+	}
+
 	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
 	// default to JSON
 	if accept == "" {
 		accept = encoder.MIME_JSON
-	} else if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
-		c.JSON(http.StatusUnsupportedMediaType, "Message pack not implemented yet")
-		return
+	}
+	if accept != encoder.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
+		panic(srverr.New(http.StatusUnsupportedMediaType,
+			"Only JSON format is supported for now"))
 	}
 
-	m, err := getNames(dirPath)
+	info, err := engine.Files(params.Dir)
 	if err != nil {
+		// TODO: detail description?
 		panic(srverr.New(http.StatusNotFound, err.Error()))
 	}
 
-	c.JSON(http.StatusOK, m)
-}
-
-func getDirPath(dirPath string) string {
-	if dirPath == "" {
-		return home
+	// TODO: use transcoder/dedicated structure instead of simple map!
+	json := map[string]interface{}{
+		"dir":     info.Path,
+		"files":   info.Files,
+		"folders": info.Dirs,
 	}
-	return path.Join(home, dirPath)
-}
-
-func getNames(dirPath string) (map[string]interface{}, error) {
-
-	var err error
-	var items []os.FileInfo
-
-	items, err = ioutil.ReadDir(dirPath)
-
-	if err != nil {
-		return nil, err
-	}
-
-	m := createNamesMap(items)
-	if dirPath == home {
-		m["dir"] = "/"
-	} else {
-		m["dir"] = strings.TrimPrefix(dirPath, home)
-
-	}
-
-	return m, nil
-}
-
-func createNamesMap(items []os.FileInfo) map[string]interface{} {
-	m := map[string]interface{}{}
-	files := []string{}
-	folders := []string{}
-
-	for _, v := range items {
-		if strings.HasPrefix(v.Name(), ".") {
-			continue
-		}
-		if v.IsDir() {
-			folders = append(folders, v.Name())
-		} else {
-			files = append(files, v.Name())
-		}
-	}
-	m[filesName] = files
-	m[foldersName] = folders
-	return m
+	c.JSON(http.StatusOK, json)
 }

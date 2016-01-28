@@ -28,43 +28,76 @@
  * ============
  */
 
-package search
+package ryftmux
 
 import (
 	"fmt"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-// Abstract Search Engine interface
-type Engine interface {
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	task := NewTask()
 
-	// Get current engine options.
-	Options() map[string]interface{}
+	ch := make(chan *search.DirInfo, len(engine.Backends))
 
-	// Run asynchronous "/search" operation.
-	Search(cfg *Config) (*Result, error)
-
-	// Run asynchronous "/count" operation.
-	Count(cfg *Config) (*Result, error)
-
-	// Run *synchronous* "/files" operation.
-	Files(path string) (*DirInfo, error)
-}
-
-// NewEngine creates new search engine by name.
-// To get list of available engines see GetAvailableEngines().
-// To get list of supported options see corresponding search engine.
-func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
-	// get appropriate factory
-	f, ok := factories[name]
-	if !ok {
-		return nil, fmt.Errorf("%q is unknown search engine", name)
+	// prepare requests
+	for _, backend := range engine.Backends {
+		// do search in goroutine
+		go func(backend search.Engine) {
+			res, err := backend.Files(path)
+			if err != nil {
+				task.log().WithError(err).Errorf("failed to start /files subtask")
+				// TODO: report as multiplexed error
+				ch <- nil
+			} else {
+				ch <- res
+			}
+		}(backend)
 	}
 
-	if opts == nil {
-		// no options by default
-		opts = map[string]interface{}{}
+	// wait for all subtasks and merge results
+	muxPath := ""
+	muxFiles := map[string]int{}
+	muxDirs := map[string]int{}
+	for _ = range engine.Backends {
+		select {
+		case res, ok := <-ch:
+			if ok && res != nil {
+				// check directory path is consistent
+				if len(muxPath) == 0 {
+					muxPath = res.Path
+				}
+				if muxPath != res.Path {
+					return nil, fmt.Errorf("inconsistent directory %q != %q",
+						muxPath, res.Path)
+				}
+
+				// merge files
+				for _, f := range res.Files {
+					muxFiles[f] += 1
+				}
+
+				// merge dirs
+				for _, d := range res.Dirs {
+					muxDirs[d] += 1
+				}
+			}
+		}
 	}
 
-	// create engine using factory
-	return f(opts)
+	// prepare results
+	mux := &search.DirInfo{}
+	mux.Path = muxPath
+	mux.Files = make([]string, 0, len(muxFiles))
+	mux.Dirs = make([]string, 0, len(muxDirs))
+	for f, _ := range muxFiles {
+		mux.Files = append(mux.Files, f)
+	}
+	for d, _ := range muxDirs {
+		mux.Dirs = append(mux.Dirs, d)
+	}
+
+	return mux, nil // OK
 }

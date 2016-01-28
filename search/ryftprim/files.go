@@ -28,43 +28,48 @@
  * ============
  */
 
-package search
+package ryftprim
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-// Abstract Search Engine interface
-type Engine interface {
-
-	// Get current engine options.
-	Options() map[string]interface{}
-
-	// Run asynchronous "/search" operation.
-	Search(cfg *Config) (*Result, error)
-
-	// Run asynchronous "/count" operation.
-	Count(cfg *Config) (*Result, error)
-
-	// Run *synchronous* "/files" operation.
-	Files(path string) (*DirInfo, error)
-}
-
-// NewEngine creates new search engine by name.
-// To get list of available engines see GetAvailableEngines().
-// To get list of supported options see corresponding search engine.
-func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
-	// get appropriate factory
-	f, ok := factories[name]
-	if !ok {
-		return nil, fmt.Errorf("%q is unknown search engine", name)
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	// read directory content
+	fullPath := filepath.Join(engine.MountPoint, path)
+	items, err := ioutil.ReadDir(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory content: %s", err)
 	}
 
-	if opts == nil {
-		// no options by default
-		opts = map[string]interface{}{}
+	res := &search.DirInfo{}
+	if len(path) != 0 {
+		res.Path = path
+	} else {
+		res.Path = "/"
+	}
+	res.Files = []string{}
+	res.Dirs = []string{}
+
+	// process directory content
+	for _, item := range items {
+		// skip ".", ".." and all hidden files
+		if strings.HasPrefix(item.Name(), ".") {
+			continue
+		}
+
+		if item.IsDir() {
+			res.Dirs = append(res.Dirs, item.Name())
+		} else {
+			res.Files = append(res.Files, item.Name())
+		}
 	}
 
-	// create engine using factory
-	return f(opts)
+	return res, nil // OK
 }

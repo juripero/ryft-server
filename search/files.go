@@ -34,37 +34,18 @@ import (
 	"fmt"
 )
 
-// Abstract Search Engine interface
-type Engine interface {
+// TODO: replace with NodeInfo struct to support trees
 
-	// Get current engine options.
-	Options() map[string]interface{}
+// Directory content.
+type DirInfo struct {
+	Path string
 
-	// Run asynchronous "/search" operation.
-	Search(cfg *Config) (*Result, error)
-
-	// Run asynchronous "/count" operation.
-	Count(cfg *Config) (*Result, error)
-
-	// Run *synchronous* "/files" operation.
-	Files(path string) (*DirInfo, error)
+	Files []string
+	Dirs  []string // subdirectories
 }
 
-// NewEngine creates new search engine by name.
-// To get list of available engines see GetAvailableEngines().
-// To get list of supported options see corresponding search engine.
-func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
-	// get appropriate factory
-	f, ok := factories[name]
-	if !ok {
-		return nil, fmt.Errorf("%q is unknown search engine", name)
-	}
-
-	if opts == nil {
-		// no options by default
-		opts = map[string]interface{}{}
-	}
-
-	// create engine using factory
-	return f(opts)
+// String gets string representation of directory content.
+func (dir *DirInfo) String() string {
+	return fmt.Sprintf("Dir{path:%q, files:%q, dirs:%q}",
+		dir.Path, dir.Files, dir.Dirs)
 }
