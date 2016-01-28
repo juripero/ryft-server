@@ -68,7 +68,7 @@ func (transcoder *XmlTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 							log.Printf("PASRING XML: %s", rec.Data)
 						}
 					}()
-					item.(map[string]interface{})["_index"] = Index{rec.File, rec.Offset, rec.Length, rec.Fuzziness}
+					item.(map[string]interface{})["_index"] = Index{rec.File, rec.Offset, rec.Length, rec.Fuzziness, ""}
 					output <- item
 
 				} else {

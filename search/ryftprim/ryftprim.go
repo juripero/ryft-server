@@ -259,9 +259,9 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	out_buf := task.tool_out.Bytes()
 	if err == nil {
-		task.log().Debugf("[ryftprim]: combined output: %s", out_buf)
+		task.log().Debugf("[ryftprim]: combined output:\n%s", out_buf)
 	} else {
-		task.log().Warnf("[ryftprim]: combined output: %s", out_buf)
+		task.log().Warnf("[ryftprim]: combined output:\n%s", out_buf)
 	}
 
 	// parse statistics from output

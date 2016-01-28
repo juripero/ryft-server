@@ -49,6 +49,7 @@ type Engine struct {
 	ServerURL string // "http://localhost:8765" by default
 	LocalOnly bool   // "local" query boolean flag
 	SkipStat  bool   // !"stat" query boolean flag
+	IndexHost string // optional host in cluster mode
 
 	httpClient *http.Client
 	// TODO: authentication?

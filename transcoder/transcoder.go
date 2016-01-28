@@ -55,6 +55,7 @@ type Index struct {
 	Offset    uint64 `json:"offset"`
 	Length    uint16 `json:"length"`
 	Fuzziness uint8  `json:"fuzziness"`
+	Host      string `json:"host,omitempty"`
 }
 
 type Statistics struct {
@@ -68,6 +69,7 @@ func NewIndex(index search.Index) (result Index) {
 	result.Offset = index.Offset
 	result.Length = uint16(index.Length)
 	result.Fuzziness = index.Fuzziness
+	result.Host = index.Host
 	return
 }
 

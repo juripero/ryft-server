@@ -53,7 +53,7 @@ func (transcoder *RawTranscoder) Transcode(recs chan records.IdxRecord) (chan in
 		defer close(errors)
 		for rec := range recs {
 			output <- RawData{
-				Index{rec.File, rec.Offset, rec.Length, rec.Fuzziness},
+				Index{rec.File, rec.Offset, rec.Length, rec.Fuzziness, ""},
 				rec.Data,
 			}
 		}
@@ -73,6 +73,7 @@ func DecodeRawItem(item *RawData) (*search.Record, error) {
 			Offset:    item.Index.Offset,
 			Length:    uint64(item.Index.Length),
 			Fuzziness: item.Index.Fuzziness,
+			Host:      item.Index.Host,
 		},
 		Data: item.Data,
 	}, nil

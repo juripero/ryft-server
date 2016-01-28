@@ -43,6 +43,7 @@ func (engine *Engine) Options() map[string]interface{} {
 		"server-url": engine.ServerURL,
 		"local-only": engine.LocalOnly,
 		"skip-stat":  engine.SkipStat,
+		"index-host": engine.IndexHost,
 	}
 }
 
@@ -74,6 +75,14 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		engine.SkipStat, err = utils.AsBool(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "skip-stat" option: %s`, err)
+		}
+	}
+
+	// index host
+	if v, ok := opts["index-host"]; ok {
+		engine.IndexHost, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "index-host" option: %s`, err)
 		}
 	}
 

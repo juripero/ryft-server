@@ -52,6 +52,7 @@ type Index struct {
 	Offset    uint64
 	Length    uint64
 	Fuzziness uint8
+	Host      string // optional host address (used in cluster mode)
 }
 
 // String gets the string representation of Index.
