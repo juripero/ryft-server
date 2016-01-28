@@ -36,6 +36,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
@@ -49,6 +50,7 @@ import (
 	"github.com/getryft/ryft-server/srverr"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thoas/stats"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/yaml.v2"
 )
@@ -218,6 +220,8 @@ func parseParams() {
 	}
 }
 
+var Stats = stats.New()
+
 // RyftAPI include search, index, count
 func main() {
 
@@ -246,6 +250,15 @@ func main() {
 	// Logging & error recovery
 	//	router.Use(gin.Logger())
 	//	router.Use(srverr.Recovery())
+
+	// Setting up Stats measirment middleware
+	router.Use(func() gin.HandlerFunc {
+		return func(c *gin.Context) {
+			beginning := time.Now()
+			c.Next()
+			Stats.End(beginning, c.Writer)
+		}
+	}())
 
 	// Allow CORS requests for * (all domains)
 	router.Use(cors.Cors("*"))
@@ -281,6 +294,11 @@ func main() {
 	swaggerJSON := MustAsset("swagger.json")
 	router.GET("/swagger.json", func(c *gin.Context) {
 		c.Data(http.StatusOK, http.DetectContentType(swaggerJSON), swaggerJSON)
+	})
+
+	// stats page
+	router.GET("/about", func(c *gin.Context) {
+		c.JSON(http.StatusOK, Stats.Data())
 	})
 
 	router.GET("/search", detectEncoder, server.search)
