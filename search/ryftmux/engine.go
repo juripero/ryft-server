@@ -45,6 +45,8 @@ var (
 // RyftMUX engine uses set of abstract engines as backends.
 type Engine struct {
 	Backends []search.Engine
+
+	IndexHost string // optional host in cluster mode
 }
 
 // NewEngine creates new RyftMUX search engine.
@@ -62,7 +64,9 @@ func (engine *Engine) String() string {
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{}
+	return map[string]interface{}{
+		"index-host": engine.IndexHost,
+	}
 }
 
 // log returns task related logger.

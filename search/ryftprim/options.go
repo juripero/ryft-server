@@ -48,6 +48,7 @@ func (engine *Engine) Options() map[string]interface{} {
 		"open-poll":     engine.OpenFilePollTimeout.String(),
 		"read-poll":     engine.ReadFilePollTimeout.String(),
 		"keep-files":    engine.KeepResultFiles,
+		"index-host":    engine.IndexHost,
 	}
 }
 
@@ -124,6 +125,22 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		engine.KeepResultFiles, err = utils.AsBool(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "keep-files" option: %s`, err)
+		}
+	}
+
+	// index host
+	if v, ok := opts["index-host"]; ok {
+		engine.IndexHost, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "index-host" option: %s`, err)
+		}
+	}
+
+	// index host
+	if v, ok := opts["index-host"]; ok {
+		engine.IndexHost, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "index-host" option: %s`, err)
 		}
 	}
 

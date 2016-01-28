@@ -53,6 +53,6 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		task.add(res)
 	}
 
-	go task.run(mux)
+	go engine.run(task, mux)
 	return mux, nil // OK for now
 }

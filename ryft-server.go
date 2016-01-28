@@ -180,6 +180,11 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 			if _, ok := opts["keep-files"]; !ok {
 				opts["keep-files"] = *KeepResults
 			}
+
+			// index-host
+			if _, ok := opts["index-host"]; !ok {
+				opts["index-host"] = fmt.Sprintf("http://localhost:%d", (*listenAddress).Port)
+			}
 		}
 
 		return search.NewEngine(s.SearchBackend, opts)

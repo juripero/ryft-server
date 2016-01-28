@@ -69,7 +69,7 @@ func (task *Task) add(res *search.Result) {
 }
 
 // process and wait all subtasks
-func (task *Task) run(mux *search.Result) {
+func (engine *Engine) run(task *Task, mux *search.Result) {
 	// some futher cleanup
 	defer mux.Close()
 	defer mux.ReportDone()
@@ -96,6 +96,7 @@ func (task *Task) run(mux *search.Result) {
 
 				case rec, ok := <-res.RecordChan:
 					if ok && rec != nil {
+						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 						mux.ReportRecord(rec)
 					}
 

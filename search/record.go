@@ -55,6 +55,14 @@ type Index struct {
 	Host      string // optional host address (used in cluster mode)
 }
 
+// UpdateHost updates the index's host.
+// Host is updates only once, if it was set before.
+func (i *Index) UpdateHost(host string) {
+	if len(i.Host) == 0 && len(host) != 0 {
+		i.Host = host
+	}
+}
+
 // String gets the string representation of Index.
 func (i Index) String() string {
 	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzziness:%d}",

@@ -54,6 +54,8 @@ type Engine struct {
 	// poll timeouts
 	OpenFilePollTimeout time.Duration
 	ReadFilePollTimeout time.Duration
+
+	IndexHost string // optional host in cluster mode
 }
 
 // NewEngine creates new RyftPrim search engine.

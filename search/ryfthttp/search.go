@@ -101,7 +101,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				} else {
 					rec, _ := transcoder.DecodeRawItem(&item)
 					task.log().Infof("record received: %s", rec)
-					rec.Index.Host = engine.IndexHost // cluster mode!
+					rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 					res.ReportRecord(rec)
 					// continue
 				}

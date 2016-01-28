@@ -393,6 +393,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		if err != nil {
 			res.ReportError(err)
 		} else if !cancelled {
+			rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 			res.ReportRecord(rec)
 		} else {
 			return
