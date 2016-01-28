@@ -101,6 +101,17 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					}
 
 				case <-res.DoneChan:
+					// drain the error channel
+					for err := range res.ErrorChan {
+						mux.ReportError(err)
+					}
+
+					// drain the record channel
+					for rec := range res.RecordChan {
+						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+						mux.ReportRecord(rec)
+					}
+
 					return // done!
 				}
 			}

@@ -32,7 +32,6 @@ package encoder
 
 import (
 	"io"
-	"log"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 	// "github.com/ugorji/go/codec"
@@ -63,7 +62,7 @@ const (
 )
 
 func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}) error {
-	log.Printf("[msgpack]: encode stat: %#v", stat)
+	//log.Printf("[msgpack]: encode stat: %#v", stat)
 	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
 	if !enc.OmitTags {
 		_ = e.EncodeUint8(TAG_MsgPackStat)
@@ -76,7 +75,7 @@ func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}) error {
 }
 
 func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
-	log.Printf("[msgpack]: encode item: %#v", item)
+	// log.Printf("[msgpack]: encode item: %#v", item)
 	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
 	if !enc.OmitTags {
 		_ = e.EncodeUint8(TAG_MsgPackItem)

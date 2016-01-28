@@ -392,11 +392,10 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 			engine.ReadFilePollTimeout, task.dataCancel)
 		if err != nil {
 			res.ReportError(err)
-		} else if !cancelled {
+		} else { // NOTE, do not stop processing even if it's cancelled!
+			// task.log().Debugf("[ryftprim]: report record: %s", rec.Index)
 			rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 			res.ReportRecord(rec)
-		} else {
-			return
 		}
 	}
 }

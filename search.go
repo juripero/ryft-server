@@ -123,26 +123,30 @@ func (s *Server) search(ctx *gin.Context) {
 	}
 
 	first := true
+
+	putRec := func(w io.Writer, rec *search.Record) {
+		xrec, err := tcode.Transcode1(rec)
+		if err != nil {
+			panic(srverr.New(http.StatusInternalServerError, err.Error()))
+		}
+
+		if first {
+			enc.Begin(w)
+			first = false
+		}
+
+		err = enc.Write(w, xrec)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	ctx.Stream(func(w io.Writer) bool {
 
 		select {
 		case rec, ok := <-res.RecordChan:
-
 			if ok && rec != nil {
-				xrec, err := tcode.Transcode1(rec)
-				if err != nil {
-					panic(srverr.New(http.StatusInternalServerError, err.Error()))
-				}
-
-				if first {
-					enc.Begin(w)
-					first = false
-				}
-
-				err = enc.Write(w, xrec)
-				if err != nil {
-					panic(err)
-				}
+				putRec(w, rec)
 			}
 
 		case err, ok := <-res.ErrorChan:
@@ -152,6 +156,11 @@ func (s *Server) search(ctx *gin.Context) {
 			}
 
 		case <-res.DoneChan:
+			// drain the channel
+			for r := range res.RecordChan {
+				putRec(w, r)
+			}
+
 			if first {
 				enc.Begin(w)
 				first = false

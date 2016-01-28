@@ -53,6 +53,14 @@ func test1a(tag string, engine search.Engine, cfg search.Config) {
 
 		case <-res.DoneChan:
 			xlog.WithField("stat", res.Stat).Infof("/search finished")
+
+			for rec := range res.RecordChan {
+				if rec != nil {
+					xlog.WithField("data", rec).Infof("*new record received")
+					recordsReceived = append(recordsReceived, rec)
+				}
+			}
+
 			if uint64(len(recordsReceived)) != res.Stat.Matches {
 				xlog.Warnf("%d matched but %d received",
 					res.Stat.Matches, len(recordsReceived))
