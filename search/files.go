@@ -44,6 +44,25 @@ type DirInfo struct {
 	Dirs  []string // subdirectories
 }
 
+// NewDirInfo creates empty directory content.
+func NewDirInfo(path string) *DirInfo {
+	res := new(DirInfo)
+
+	// path cannot be empty
+	// so replace "" with "/"
+	if len(path) != 0 {
+		res.Path = path
+	} else {
+		res.Path = "/"
+	}
+
+	// no files/dirs
+	res.Files = []string{}
+	res.Dirs = []string{}
+
+	return res
+}
+
 // String gets string representation of directory content.
 func (dir *DirInfo) String() string {
 	return fmt.Sprintf("Dir{path:%q, files:%q, dirs:%q}",

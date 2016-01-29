@@ -93,37 +93,37 @@ func parseStat(buf []byte) (stat *search.Statistics, err error) {
 		return stat, fmt.Errorf("failed to parse ryftprim output: %s", err)
 	}
 
-	log.WithField("stat", v).Debugf("ryftprim output as YML")
-	stat = &search.Statistics{}
+	log.WithField("stat", v).Debugf("[%s] output as YML", TAG)
+	stat = search.NewStat()
 
 	// Duration
 	stat.Duration, err = utils.AsUint64(v["Duration"])
 	if err != nil {
-		return stat, fmt.Errorf(`failed to parse "Duration" stat`)
+		return nil, fmt.Errorf(`failed to parse "Duration" stat`)
 	}
 
 	// Total Bytes
 	stat.TotalBytes, err = utils.AsUint64(v["Total Bytes"])
 	if err != nil {
-		return stat, fmt.Errorf(`failed to parse "Total Bytes" stat`)
+		return nil, fmt.Errorf(`failed to parse "Total Bytes" stat`)
 	}
 
 	// Matches
 	stat.Matches, err = utils.AsUint64(v["Matches"])
 	if err != nil {
-		return stat, fmt.Errorf(`failed to parse "Matches" stat`)
+		return nil, fmt.Errorf(`failed to parse "Matches" stat`)
 	}
 
 	// Fabric Data Rate
 	_, err = utils.AsString(v["Fabric Data Rate"])
 	if err != nil {
-		return stat, fmt.Errorf(`failed to parse "Fabric Data Rate" stat`)
+		return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat`)
 	}
 
 	// Data Rate
 	_, err = utils.AsString(v["Data Rate"])
 	if err != nil {
-		return stat, fmt.Errorf(`failed to parse "Data Rate" stat`)
+		return nil, fmt.Errorf(`failed to parse "Data Rate" stat`)
 	}
 
 	return stat, nil // OK

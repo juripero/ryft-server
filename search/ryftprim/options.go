@@ -47,6 +47,7 @@ func (engine *Engine) Options() map[string]interface{} {
 		"ryftone-mount": engine.MountPoint,
 		"open-poll":     engine.OpenFilePollTimeout.String(),
 		"read-poll":     engine.ReadFilePollTimeout.String(),
+		"read-limit":    engine.ReadFilePollLimit,
 		"keep-files":    engine.KeepResultFiles,
 		"index-host":    engine.IndexHost,
 	}
@@ -97,7 +98,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	// TODO: option to clear working dir before start?
 	err = os.MkdirAll(work_dir, os.ModeDir)
 	if err != nil {
-		return fmt.Errorf("failed to create instance directory: %s", err)
+		return fmt.Errorf("failed to create working directory: %s", err)
 	}
 
 	// open-poll timeout
@@ -120,19 +121,22 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		engine.ReadFilePollTimeout = 50 * time.Millisecond
 	}
 
+	// read poll limit
+	if v, ok := opts["read-limit"]; ok {
+		vv, err := utils.AsUint64(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "read-limit" option: %s`, err)
+		}
+		engine.ReadFilePollLimit = int(vv)
+	} else {
+		engine.ReadFilePollTimeout = 100
+	}
+
 	// keep result files
 	if v, ok := opts["keep-files"]; ok {
 		engine.KeepResultFiles, err = utils.AsBool(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "keep-files" option: %s`, err)
-		}
-	}
-
-	// index host
-	if v, ok := opts["index-host"]; ok {
-		engine.IndexHost, err = utils.AsString(v)
-		if err != nil {
-			return fmt.Errorf(`failed to convert "index-host" option: %s`, err)
 		}
 	}
 

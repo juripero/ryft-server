@@ -32,6 +32,8 @@ package search
 
 import (
 	"fmt"
+
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 // Search INDEX and DATA combined.
@@ -42,8 +44,8 @@ type Record struct {
 
 // String gets the string representation of record.
 func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%v}",
-		r.Index, r.Data)
+	return fmt.Sprintf("Record{%s, data:%q}",
+		r.Index, utils.DumpAsString(r.Data))
 }
 
 // Search INDEX record.
@@ -65,6 +67,6 @@ func (i *Index) UpdateHost(host string) {
 
 // String gets the string representation of Index.
 func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzziness:%d}",
+	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
 		i.File, i.Offset, i.Length, i.Fuzziness)
 }

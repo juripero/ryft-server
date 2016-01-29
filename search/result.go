@@ -39,15 +39,16 @@ import (
 // All communication is done via channels (error, records, etc).
 // Need to read from Error and Record channels to prevent blocking!
 // Once processing is done `nil` is sent to Done channel
-// and all channels are closed.
+// and all channels are closed. Note, after Done is sent
+// client still need to drain Error and Record channels!
 type Result struct {
 	// Channel of processing errors (Engine -> client)
 	ErrorChan      chan error
-	errorsReceived uint64
+	errorsReceived uint64 // statistics
 
 	// Channel of processed records (Engine -> client)
 	RecordChan      chan *Record
-	recordsReceived uint64
+	recordsReceived uint64 // statistics
 
 	// Cancel channel is used to notify search engine
 	// to stop processing immideatelly (client -> Engine)
@@ -64,13 +65,12 @@ type Result struct {
 
 // NewResult creates new empty search results.
 func NewResult() *Result {
-	res := &Result{}
+	res := new(Result)
 
 	res.ErrorChan = make(chan error, 256)    // TODO: capacity constant?
 	res.RecordChan = make(chan *Record, 256) // TODO: capacity constant?
 	res.CancelChan = make(chan interface{}, 1)
 	res.DoneChan = make(chan interface{}, 1)
-	res.Stat = &Statistics{}
 
 	return res
 }
@@ -78,8 +78,13 @@ func NewResult() *Result {
 // String gets string representation of results.
 // actually prints statistics.
 func (res Result) String() string {
-	return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, stat:%s}",
-		res.recordsReceived, res.errorsReceived, res.isDone, res.Stat)
+	if res.Stat != nil {
+		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, stat:%s}",
+			res.recordsReceived, res.errorsReceived, res.isDone, res.Stat)
+	} else {
+		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, no stat}",
+			res.recordsReceived, res.errorsReceived, res.isDone)
+	}
 }
 
 // ReportError sends error to Error channel.

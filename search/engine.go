@@ -36,7 +36,6 @@ import (
 
 // Abstract Search Engine interface
 type Engine interface {
-
 	// Get current engine options.
 	Options() map[string]interface{}
 

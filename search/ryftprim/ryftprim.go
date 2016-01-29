@@ -44,48 +44,6 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// Search starts asynchronous "/search" with RyftPrim engine.
-func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(true)
-	task.log().Printf("[ryftprim]: start /search")
-
-	// prepare command line arguments
-	err := engine.prepare(task, cfg)
-	if err != nil {
-		task.log().Errorf("failed to prepare ryftprim /search: %s", err)
-		return nil, fmt.Errorf("failed to prepare ryftprim /search: %s", err)
-	}
-
-	res := search.NewResult()
-	err = engine.run(task, res)
-	if err != nil {
-		task.log().Errorf("failed to run ryftprim /search: %s", err)
-		return nil, err
-	}
-	return res, nil // OK
-}
-
-// Count starts asynchronous "/count" with RyftPrim engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(false)
-	task.log().Printf("[ryftprim]: start /count")
-
-	// prepare command line arguments
-	err := engine.prepare(task, cfg)
-	if err != nil {
-		task.log().Errorf("failed to prepare ryftprim /count: %s", err)
-		return nil, fmt.Errorf("failed to prepare ryftprim /count: %s", err)
-	}
-
-	res := search.NewResult()
-	err = engine.run(task, res)
-	if err != nil {
-		task.log().Errorf("failed to run ryftprim /count: %s", err)
-		return nil, err
-	}
-	return res, nil // OK
-}
-
 // Prepare `ryftprim` command line arguments.
 // This function converts search configuration to `ryftprim` command line arguments.
 // See `ryftprim -h` for option description.
@@ -98,7 +56,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// disable data separator
 	args = append(args, "-e", "")
 
-	// enable verbose mode
+	// enable verbose mode to grab statistics
 	args = append(args, "-v")
 
 	// case sensitivity
@@ -129,14 +87,14 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-f", file)
 	}
 
-	// index results file
+	// INDEX results file
 	if len(task.IndexFileName) != 0 {
 		// file path relative to `ryftone` mountpoint (including just instance)
 		file := filepath.Join(engine.Instance, task.IndexFileName)
 		args = append(args, "-oi", file)
 	}
 
-	// data results file
+	// DATA results file
 	if len(task.DataFileName) != 0 {
 		// file path relative to `ryftone` mountpoint (including just instance)
 		file := filepath.Join(engine.Instance, task.DataFileName)
@@ -151,27 +109,17 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 // Run the `ryftprim` tool in background and parse results.
 func (engine *Engine) run(task *Task, res *search.Result) error {
-	// clear old INDEX file before start
-	if len(task.IndexFileName) != 0 {
-		path := filepath.Join(engine.MountPoint,
-			engine.Instance, task.IndexFileName)
-		err := os.RemoveAll(path)
-		if err != nil {
-			return fmt.Errorf("failed to remove old INDEX file: %s", err)
-		}
+	// clear old INDEX&DATA files before start
+	if err := engine.removeFile(task.IndexFileName); err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to remove old INDEX file", TAG)
+		return fmt.Errorf("failed to remove old INDEX file: %s", err)
+	}
+	if err := engine.removeFile(task.DataFileName); err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to remove old DATA file", TAG)
+		return fmt.Errorf("failed to remove old DATA file: %s", err)
 	}
 
-	// clear old DATA file before start
-	if len(task.DataFileName) != 0 {
-		path := filepath.Join(engine.MountPoint,
-			engine.Instance, task.DataFileName)
-		err := os.RemoveAll(path)
-		if err != nil {
-			return fmt.Errorf("failed to remove old DATA file: %s", err)
-		}
-	}
-
-	task.log().WithField("args", task.tool_args).Infof("[ryftprim]: executing...")
+	task.log().WithField("args", task.tool_args).Infof("[%s]: executing tool", TAG)
 	cmd := exec.Command(engine.ExecPath, task.tool_args...)
 
 	// prepare combined STDERR&STDOUT output
@@ -181,40 +129,43 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 
 	err := cmd.Start()
 	if err != nil {
-		return fmt.Errorf("failed to start ryftprim: %s", err)
+		task.log().WithError(err).Warnf("[%s]: failed to start tool", TAG)
+		return fmt.Errorf("failed to start tool: %s", err)
 	}
 	task.tool_cmd = cmd
 
-	// processing in background
+	// do processing in background
 	go engine.process(task, res)
 
 	return nil // OK for now
 }
 
 // Process the `ryftprim` tool output.
+// engine.finish() will be called anyway at the end of processing.
 func (engine *Engine) process(task *Task, res *search.Result) {
-	defer task.log().Debugf("[ryftprim]: end TASK processing")
-	task.log().Debugf("[ryftprim]: start TASK processing...")
+	defer task.log().Debugf("[%s]: end TASK processing", TAG)
+	task.log().Debugf("[%s]: start TASK processing...", TAG)
 
 	// wait for process done
 	cmd_done := make(chan error, 1)
 	go func() {
-		task.log().Debugf("[ryftprim]: waiting for process finished...")
+		task.log().Debugf("[%s]: waiting for tool finished...", TAG)
 		defer close(cmd_done) // close channel once process is finished
 
 		err := task.tool_cmd.Wait()
 		cmd_done <- err
 		if err != nil {
-			task.log().WithError(err).Warnf("[ryftprim]: process FAILED")
+			// error will be reported later as warning or error!
+			task.log().WithError(err).Debugf("[%s]: tool FAILED", TAG)
 		} else {
-			task.log().Debugf("[ryftprim]: process finished")
+			task.log().Debugf("[%s]: tool finished", TAG)
 		}
 	}()
 
-	// start index&data processing
+	// start INDEX&DATA processing
 	if task.enableDataProcessing {
-		task.indexChan = make(chan search.Index, 256) // TODO: capacity constant from engine?
-		task.indexCancel = make(chan interface{}, 1)
+		task.indexChan = make(chan search.Index, 1024) // TODO: capacity constant from engine?
+		task.indexCancel = make(chan interface{}, 2)
 		task.dataCancel = make(chan interface{}, 1)
 
 		task.subtasks.Add(2)
@@ -229,82 +180,98 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 		engine.finish(err, task, res)
 
 	case <-res.CancelChan: // client wants to stop all processing
-		task.log().Warnf("[ryftprim]: cancelling...")
+		task.log().Warnf("[%s]: cancelling by client", TAG)
+
+		if task.enableDataProcessing {
+			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
+			task.indexCancel <- nil
+			task.dataCancel <- nil
+		}
 
 		// kill `ryftprim` tool
 		err := task.tool_cmd.Process.Kill()
 		if err != nil {
-			task.log().WithError(err).Warnf("[ryftprim]: killing process FAILED")
+			task.log().WithError(err).Warnf("[%s]: killing tool FAILED", TAG)
 			// WARN: error actually ignored!
 		} else {
-			task.log().Debugf("[ryftprim]: task killed")
+			task.log().Debugf("[%s]: tool killed", TAG)
 		}
 
 		engine.finish(fmt.Errorf("cancelled"), task, res)
 	}
 }
 
-// Finish the `ryftprim` tool processing
+// Finish the `ryftprim` tool processing.
 func (engine *Engine) finish(err error, task *Task, res *search.Result) {
-	if err != nil {
-		task.log().WithError(err).Infof("[ryftprim]: failed")
-	} else {
-		task.log().Infof("[ryftprim]: finished")
-	}
-
 	// some futher cleanup
 	defer res.Close()
 	defer res.ReportDone()
-	defer task.Close()
 
+	// tool output
 	out_buf := task.tool_out.Bytes()
-	if err == nil {
-		task.log().Debugf("[ryftprim]: combined output:\n%s", out_buf)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed", TAG)
+		task.log().Warnf("[%s]: tool output:\n%s", TAG, string(out_buf))
 	} else {
-		task.log().Warnf("[ryftprim]: combined output:\n%s", out_buf)
+		task.log().Infof("[%s]: finished", TAG)
+		task.log().Debugf("[%s]: tool output:\n%s", TAG, out_buf)
 	}
 
 	// parse statistics from output
 	if err == nil {
 		res.Stat, err = parseStat(out_buf)
 		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
 			err = fmt.Errorf("failed to parse statistics: %s", err)
+		} else {
+			task.log().WithField("stat", res.Stat).
+				Infof("[%s]: parsed statistics", TAG)
 		}
 	}
 
 	// notify client about error
 	if err != nil {
-		res.ReportError(fmt.Errorf("ryftprim failed with %s\n%s", err, out_buf))
+		res.ReportError(fmt.Errorf("%s failed with %s\n%s", TAG, err, string(out_buf)))
 	}
 
-	// stop subtasks
-	task.log().Debugf("[ryftprim]: stopping INDEX&DATA processing...")
-	if task.indexCancel != nil {
+	// stop subtasks if processing enabled
+	if task.enableDataProcessing {
+		task.log().Debugf("[%s]: stopping INDEX&DATA processing...", TAG)
 		task.indexCancel <- nil
-	}
-	if task.dataCancel != nil {
-		task.dataCancel <- nil
+		// task.dataCancel <- nil // will be stopped once INDEX is finished
+
+		task.log().Debugf("[%s]: waiting INDEX&DATA...", TAG)
+		task.subtasks.Wait()
+
+		task.log().Debugf("[%s]: INDEX&DATA finished", TAG)
 	}
 
-	task.log().Debugf("[ryftprim]: waiting INDEX&DATA...")
-	task.subtasks.Wait()
-
-	task.log().Debugf("[ryftprim]: INDEX&DATA goroutines finished")
+	// cleanup: remove INDEX&DATA files at the end of processing
+	if !engine.KeepResultFiles {
+		if err := engine.removeFile(task.IndexFileName); err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to remove INDEX file", TAG)
+			// WARN: error actually ignored!
+		}
+		if err := engine.removeFile(task.DataFileName); err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to remove DATA file", TAG)
+			// WARN: error actually ignored!
+		}
+	}
 }
 
 // Process the `ryftprim` INDEX results file.
 func (engine *Engine) processIndex(task *Task, res *search.Result) {
 	defer task.subtasks.Done()
 
-	defer task.log().Debugf("[ryftprim]: end INDEX processing")
-	task.log().Debugf("[ryftprim]: start INDEX processing...")
+	defer task.log().Debugf("[%s]: end INDEX processing", TAG)
+	task.log().Debugf("[%s]: start INDEX processing...", TAG)
 
 	// try to open index file: if operation is cancelled, error is nil
 	path := filepath.Join(engine.MountPoint, engine.Instance, task.IndexFileName)
-	file, err, cancelled := openFile(path, engine.OpenFilePollTimeout, task.indexCancel)
+	file, err, cancelled := task.openFile(path, engine.OpenFilePollTimeout, task.indexCancel)
 	if err != nil {
 		task.log().WithError(err).WithField("path", path).
-			Errorf("[ryftprim]: failed to open INDEX file", path, err)
+			Warnf("[%s]: failed to open INDEX file", TAG)
 		res.ReportError(err)
 		return
 	}
@@ -312,10 +279,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 		return // no file means task is cancelled, do nothing
 	}
 
-	// close and remove at the end
-	if !engine.KeepResultFiles {
-		defer os.Remove(path)
-	}
+	// close at the end
 	defer file.Close()
 
 	// try to read all index records
@@ -324,9 +288,10 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 		// read line by line
 		line, err := r.ReadBytes('\n')
 		if err != nil {
-			//task.log().WithError(err).Debugf("[ryftprim]: failed to read line from INDEX file") // FIXME: DEBUG mode
+			// task.log().WithError(err).Debugf("[%s]: failed to read line from INDEX file", TAG) // FIXME: DEBUG
 		} else {
-			//task.log().Debugf("[ryftprim]: new INDEX line: %s", string(line)) // FIXME: DEBUG mode
+			// task.log().WithField("line", string(bytes.TrimSpace(line))).
+			// 	Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
 
 			index, err := parseIndex(line)
 			if err != nil {
@@ -334,6 +299,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 				res.ReportError(fmt.Errorf("failed to parse index: %s", err))
 			} else {
 				// put index to data processing
+				task.totalDataLength += index.Length
 				task.indexChan <- index
 			}
 
@@ -342,14 +308,16 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 
 		// no data available or failed to read
 		// just sleep a while and try again
-		// log.Printf("[ryftprim]: %q INDEX poll...", task.Identifier)
+		// task.log().Debugf("[%s]: INDEX poll...", TAG) // FIXME: DEBUG
 		select {
 		case <-time.After(engine.ReadFilePollTimeout):
 			// continue
 
 		case <-task.indexCancel:
-			task.log().Debugf("[ryftprim]: INDEX processing cancelled")
+			task.log().Debugf("[%s]: INDEX processing cancelled", TAG)
 			close(task.indexChan) // no more indexes - also stops DATA processing
+			task.log().WithField("data_len", task.totalDataLength).
+				Infof("[%s]: total DATA length expected", TAG)
 			return
 		}
 	}
@@ -359,15 +327,15 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 func (engine *Engine) processData(task *Task, res *search.Result) {
 	defer task.subtasks.Done()
 
-	defer task.log().Debugf("[ryftprim]: end DATA processing")
-	task.log().Debugf("[ryftprim]: start DATA processing...")
+	defer task.log().Debugf("[%s]: end DATA processing", TAG)
+	task.log().Debugf("[%s]: start DATA processing...", TAG)
 
 	// try to open data file: if operation is cancelled, error is nil
 	path := filepath.Join(engine.MountPoint, engine.Instance, task.DataFileName)
-	file, err, cancelled := openFile(path, engine.OpenFilePollTimeout, task.dataCancel)
+	file, err, cancelled := task.openFile(path, engine.OpenFilePollTimeout, task.dataCancel)
 	if err != nil {
 		task.log().WithError(err).WithField("path", path).
-			Errorf("[ryftprim]: failed to open DATA file", path, err)
+			Warnf("[%s]: failed to open DATA file", TAG)
 		res.ReportError(err)
 		return
 	}
@@ -375,27 +343,30 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		return // no file means task is cancelled, do nothing
 	}
 
-	// close and remove at the end
-	if !engine.KeepResultFiles {
-		defer os.Remove(path)
-	}
+	// close at the end
 	defer file.Close()
 
-	// try to process all index records
+	// try to process all INDEX records
 	r := bufio.NewReader(file)
 	for index := range task.indexChan {
 		// trim mount point from file name! TODO: special option for this?
 		index.File = strings.TrimPrefix(index.File, engine.MountPoint)
 
-		rec := &search.Record{Index: index}
-		rec.Data, err, cancelled = readFile(task.Identifier, r, index.Length,
-			engine.ReadFilePollTimeout, task.dataCancel)
+		rec := new(search.Record)
+		rec.Index = index
+		rec.Data, err, cancelled = task.readFile(r, index.Length, task.dataCancel,
+			engine.ReadFilePollTimeout, engine.ReadFilePollLimit)
 		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to read DATA", TAG)
 			res.ReportError(err)
-		} else { // NOTE, do not stop processing even if it's cancelled!
-			// task.log().Debugf("[ryftprim]: report record: %s", rec.Index)
+		}
+		if !cancelled {
+			// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 			rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 			res.ReportRecord(rec)
+		} else {
+			task.log().Debugf("[%s]: DATA processing cancelled", TAG)
+			return
 		}
 	}
 }
@@ -408,15 +379,29 @@ func (engine *Engine) prepareQuery(query string) string {
 	} else {
 		// if no keywords - assume plain text query
 		// use hexadecimal encoding here to avoid escaping problems
-		return fmt.Sprintf(`(RAW_TEXT CONTAINS %s)`,
+		return fmt.Sprintf("(RAW_TEXT CONTAINS %s)",
 			hex.EncodeToString([]byte(query)))
 	}
 }
 
+// removeFile removes INDEX or DATA file.
+func (engine *Engine) removeFile(name string) error {
+	if len(name) != 0 {
+		path := filepath.Join(engine.MountPoint,
+			engine.Instance, name) // full path
+		err := os.RemoveAll(path)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil // OK
+}
+
 // openFile tries to open file until it's open
 // or until operation is cancelled by calling code
-func openFile(path string, poll time.Duration, cancel chan interface{}) (*os.File, error, bool) {
-	// log.Printf("[ryftprim] trying to open %q file...", path)
+func (task *Task) openFile(path string, poll time.Duration, cancel chan interface{}) (*os.File, error, bool) {
+	// task.log().Debugf("[%s] trying to open %q file...", TAG, path) // FIXME: DEBUG
 
 	for {
 		// wait until file will be created by `ryftone`
@@ -426,10 +411,10 @@ func openFile(path string, poll time.Duration, cancel chan interface{}) (*os.Fil
 			if err == nil {
 				return f, nil, false // OK
 			} else {
-				//log.Printf("[ryftprim] failed to open %q file: %s", path, err) // FIXME: DEBUG mode
+				// task.log().WithError(err).Warnf("[%s] failed to open file", TAG) // FIXME: DEBUG
 			}
 		} else {
-			//log.Printf("[ryftprim] failed to stat %q file: %s", path, err) // FIXME: DEBUG mode
+			// task.log().WithError(err).Warnf("[%s] failed to stat file", TAG) // FIXME: DEBUG
 		}
 
 		// file doesn't exist or failed to open
@@ -439,31 +424,40 @@ func openFile(path string, poll time.Duration, cancel chan interface{}) (*os.Fil
 			// continue
 
 		case <-cancel:
-			// log.Printf("[ryftprim] open %q file cancelled", path)
+			// task.log().Warnf("[%s] open %q file cancelled", TAG, path)
 			return nil, nil, true // fmt.Errorf("cancelled")
 		}
 	}
-
-	return nil, nil, true // impossible
 }
 
 // readFile tries to read file until all data is read
 // or until operation is cancelled by calling code
-func readFile(id string, file *bufio.Reader, length uint64, poll time.Duration, cancel chan interface{}) ([]byte, error, bool) {
-	// log.Printf("[ryftprim]: %q start reading %d byte(s)...", id, index.Length)
+// providing `limit` we can limit the overall number of attempts to poll.
+func (task *Task) readFile(file *bufio.Reader, length uint64, cancel chan interface{}, poll time.Duration, limit int) ([]byte, error, bool) {
+	// task.log().Debugf("[%s]: start reading %d byte(s)...", TAG, length) // FIXME: DEBUG
 
 	buf := make([]byte, length)
 	pos := uint64(0) // actual number of bytes read
 
-	for {
+	for attempt := 0; attempt < limit; attempt++ {
 		n, err := file.Read(buf[pos:])
-		// log.Printf("[ryftprim]: read %d byte(s) from data file", n) // FIXME: DEBUG mode
+		// task.log().Debugf("[%s]: read %d DATA byte(s)", TAG, n) // FIXME: DEBUG
+		if n > 0 {
+			// if we got something
+			// reset attempt count
+			attempt = 0
+		}
 		pos += uint64(n)
 		if err != nil {
-			// log.Printf("[ryftprim]: %q failed to read data file (%d of %d): %s", id, pos, length, err) // FIXME: DEBUG mode
-		}
-		if pos >= length {
-			return buf, nil, false // OK
+			// task.log().WithError(err).Debugf("[%s]: failed to read data file (%d of %d)", TAG, pos, length) // FIXME: DEBUG
+		} else {
+			if pos >= length {
+				return buf, nil, false // OK
+			}
+
+			// no errors, just not all data read
+			// need to do next attemt ASAP
+			continue
 		}
 
 		// no data available or failed to read
@@ -473,10 +467,11 @@ func readFile(id string, file *bufio.Reader, length uint64, poll time.Duration, 
 			// continue
 
 		case <-cancel:
-			// log.Printf("[ryftprim]: %q read file cancelled", id)
+			task.log().Warnf("[%s]: read file cancelled", TAG)
 			return nil, nil, true // fmt.Errorf("cancelled")
 		}
 	}
 
-	return nil, nil, true // impossible
+	return buf[0:pos], fmt.Errorf("cancelled by attempt limit %s (%d x %s)",
+		poll*time.Duration(limit), limit, poll), true
 }

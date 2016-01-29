@@ -44,6 +44,12 @@ type Statistics struct {
 	// TODO: data rate?
 }
 
+// NewStat creates empty statistics.
+func NewStat() *Statistics {
+	stat := new(Statistics)
+	return stat
+}
+
 // String gets string representation of statistics.
 func (s Statistics) String() string {
 	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms}",

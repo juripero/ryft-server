@@ -47,12 +47,17 @@ type Config struct {
 
 // NewEmptyConfig creates new empty search configuration.
 func NewEmptyConfig() *Config {
-	return &Config{Files: []string{}} // no files by default
+	cfg := new(Config)
+	cfg.Files = []string{} // no files by default
+	return cfg
 }
 
 // NewConfig creates new search configuration.
 func NewConfig(query string, files ...string) *Config {
-	return &Config{Query: query, Files: files}
+	cfg := new(Config)
+	cfg.Query = query
+	cfg.Files = files
+	return cfg
 }
 
 // AddFile adds one or more files to the search configuration.

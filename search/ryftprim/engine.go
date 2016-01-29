@@ -37,35 +37,54 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 var (
+	// package logger instance
 	log = logrus.New()
+
+	TAG = "ryftprim"
 )
 
 // RyftPrim engine uses `ryftprim` utility as a backend.
 type Engine struct {
-	Instance   string // "" by default. might be some server instance name ".server-1234"
+	Instance   string // empty by default. might be some server instance name like ".server-1234"
 	ExecPath   string // "/usr/bin/ryftprim" by default
 	MountPoint string // "/ryftone" by default
 
 	KeepResultFiles bool // false by default
 
-	// poll timeouts
+	// poll timeouts & limits
 	OpenFilePollTimeout time.Duration
 	ReadFilePollTimeout time.Duration
+	ReadFilePollLimit   int
 
-	IndexHost string // optional host in cluster mode
+	IndexHost string // optional host (cluster mode)
 }
 
 // NewEngine creates new RyftPrim search engine.
 func NewEngine(opts map[string]interface{}) (*Engine, error) {
-	engine := &Engine{}
+	engine := new(Engine)
 	err := engine.update(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse options: %s", err)
 	}
-	return engine, nil
+
+	// update package log level
+	if v, ok := opts["log-level"]; ok {
+		s, err := utils.AsString(v)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to convert "log-level" option: %s`, err)
+		}
+
+		log.Level, err = logrus.ParseLevel(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update log level: %s", err)
+		}
+	}
+
+	return engine, nil // OK
 }
 
 // String gets string representation of the engine.
@@ -75,25 +94,66 @@ func (engine *Engine) String() string {
 	// TODO: other parameters?
 }
 
-// log returns task related logger.
+// Search starts asynchronous "/search" with RyftPrim engine.
+func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(true) // enable INDEX&DATA processing
+	task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
+
+	// prepare command line arguments
+	err := engine.prepare(task, cfg)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to prepare /search", TAG)
+		return nil, fmt.Errorf("failed to prepare %s /search: %s", TAG, err)
+	}
+
+	res := search.NewResult()
+	err = engine.run(task, res)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to run /search", TAG)
+		return nil, fmt.Errorf("failed to run %s /search: %s", TAG, err)
+	}
+	return res, nil // OK
+}
+
+// Count starts asynchronous "/count" with RyftPrim engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(false) // disable INDEX&DATA processing
+	task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
+
+	// prepare command line arguments
+	err := engine.prepare(task, cfg)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to prepare /count", TAG)
+		return nil, fmt.Errorf("failed to prepare %s /count: %s", TAG, err)
+	}
+
+	res := search.NewResult()
+	err = engine.run(task, res)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to run /count", TAG)
+		return nil, fmt.Errorf("failed to run %s /count: %s", TAG, err)
+	}
+	return res, nil // OK
+}
+
+// log returns task related log entry.
 func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
 }
 
-// factory creates RyftPrim engine.
+// factory creates new RyftPrim engine.
 func factory(opts map[string]interface{}) (search.Engine, error) {
 	engine, err := NewEngine(opts)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftPrim engine: %s", err)
+		return nil, fmt.Errorf("Failed to create %s engine: %s", TAG, err)
 	}
 	return engine, nil
 }
 
 // package initialization
 func init() {
-	search.RegisterEngine("ryftprim", factory)
+	search.RegisterEngine(TAG, factory)
 
-	// initialize logging
-	log.Level = logrus.InfoLevel
-	//log.Level = logrus.DebugLevel
+	// be silent by default
+	log.Level = logrus.WarnLevel
 }
