@@ -48,8 +48,8 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 		go func(backend search.Engine) {
 			res, err := backend.Files(path)
 			if err != nil {
-				task.log().WithError(err).Errorf("failed to start /files subtask")
-				// TODO: report as multiplexed error
+				task.log().WithError(err).Warnf("failed to start /files subtask")
+				// TODO: report as multiplexed error?
 				ch <- nil
 			} else {
 				ch <- res
@@ -70,6 +70,9 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 					muxPath = res.Path
 				}
 				if muxPath != res.Path {
+					task.log().WithField("path1", muxPath).
+						WithField("path2", res.Path).
+						Warnf("failed to start /files subtask")
 					return nil, fmt.Errorf("inconsistent directory %q != %q",
 						muxPath, res.Path)
 				}
@@ -88,8 +91,7 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	}
 
 	// prepare results
-	mux := &search.DirInfo{}
-	mux.Path = muxPath
+	mux := search.NewDirInfo(muxPath)
 	mux.Files = make([]string, 0, len(muxFiles))
 	mux.Dirs = make([]string, 0, len(muxDirs))
 	for f, _ := range muxFiles {

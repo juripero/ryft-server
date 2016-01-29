@@ -50,8 +50,8 @@ type Task struct {
 func NewTask() *Task {
 	id := atomic.AddUint64(&taskId, 1)
 
-	task := &Task{}
-	task.Identifier = fmt.Sprintf("http-%016x", id)
+	task := new(Task)
+	task.Identifier = fmt.Sprintf("http-%08x", id)
 
 	return task
 }

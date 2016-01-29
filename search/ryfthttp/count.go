@@ -31,29 +31,37 @@
 package ryfthttp
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/transcoder"
 )
 
 // Count starts asynchronous "/count" with RyftPrim engine.
 func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask()
+	task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
+
 	// prepare request URL
 	url := engine.prepareUrl(cfg, "raw")
 	url.Path += "/count"
 
 	// prepare request, TODO: authentication?
+	task.log().WithField("url", url.String()).Debugf("[%s]: sending GET", TAG)
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to create request", TAG)
 		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
-	task := NewTask()
+	// we expect JSON format, no streaming required
+	req.Header.Set("Accept", "application/json")
+
 	res := search.NewResult()
 
+	// handle GET response
 	go func() {
 		// some futher cleanup
 		defer res.Close()
@@ -62,7 +70,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		// do HTTP request
 		resp, err := engine.httpClient.Do(req)
 		if err != nil {
-			task.log().WithError(err).Errorf("failed to send HTTP request")
+			task.log().WithError(err).Warnf("[%s]: failed to send HTTP request", TAG)
 			res.ReportError(fmt.Errorf("failed to send HTTP request: %s", err))
 			return
 		}
@@ -70,50 +78,24 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		defer resp.Body.Close() // close it later
 
 		if resp.StatusCode != http.StatusOK {
-			task.log().WithField("status", resp.StatusCode).Errorf("invalid HTTP response status")
-			res.ReportError(fmt.Errorf("invalid HTTP response status: %d %s", resp.StatusCode, resp.Status))
+			task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid HTTP response status", TAG)
+			res.ReportError(fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status))
 			return
 		}
 
-		// read response and report records and/or statistics
-		dec := encoder.NewMsgPackDecoder(resp.Body)
-
 		// TODO: task cancellation!!
-		// TODO: use simple JSON format here?
 
-		for {
-			tag, _ := dec.NextTag()
-			switch tag {
-			case encoder.TAG_MsgPackEOF:
-				task.log().Infof("end of response")
-				return // DONE
-
-			case encoder.TAG_MsgPackItem: // actually should be impossible!
-				var item transcoder.RawData
-				err := dec.Next(&item)
-				if err != nil {
-					task.log().WithError(err).Errorf("failed to decode record")
-					res.ReportError(err)
-					return
-				} else {
-					rec, _ := transcoder.DecodeRawItem(&item)
-					task.log().Infof("record received: %s", rec)
-					res.ReportRecord(rec)
-					// continue
-				}
-
-			case encoder.TAG_MsgPackStat:
-				var stat transcoder.Statistics
-				err := dec.Next(&stat)
-				if err == nil {
-					res.Stat, _ = transcoder.DecodeRawStat(&stat)
-					task.log().Infof("stat received: %s", res.Stat)
-				}
-
-			default:
-				task.log().WithField("tag", tag).Errorf("unknown tag, ignored")
-			}
+		decoder := json.NewDecoder(resp.Body)
+		var stat transcoder.Statistics
+		err = decoder.Decode(&stat)
+		if err != nil {
+			task.log().WithError(err).Errorf("[%s]: failed to decode response", TAG)
+			res.ReportError(fmt.Errorf("failed to decode JSON respose: %s", err))
 		}
+
+		res.Stat, _ = transcoder.DecodeRawStat(&stat)
+		task.log().WithField("stat", res.Stat).
+			Infof("[%s]: statistics received", TAG)
 	}()
 
 	return res, nil // OK for now}

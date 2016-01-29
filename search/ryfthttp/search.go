@@ -41,22 +41,27 @@ import (
 
 // Search starts asynchronous "/search" with RyftPrim engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
+	task := NewTask()
+	task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
+
 	// prepare request URL
 	url := engine.prepareUrl(cfg, "raw")
 	url.Path += "/search"
 
 	// prepare request, TODO: authentication?
+	task.log().WithField("url", url.String()).Debugf("[%s]: sending GET", TAG)
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to create request", TAG)
 		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
 	// we expect MSGPACK format for streaming
 	req.Header.Set("Accept", "application/msgpack")
 
-	task := NewTask()
 	res := search.NewResult()
 
+	// handle GET response
 	go func() {
 		// some futher cleanup
 		defer res.Close()
@@ -65,7 +70,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// do HTTP request
 		resp, err := engine.httpClient.Do(req)
 		if err != nil {
-			task.log().WithError(err).Errorf("failed to send HTTP request")
+			task.log().WithError(err).Warnf("[%s]: failed to send HTTP request", TAG)
 			res.ReportError(fmt.Errorf("failed to send HTTP request: %s", err))
 			return
 		}
@@ -74,8 +79,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		// check status code
 		if resp.StatusCode != http.StatusOK {
-			task.log().WithField("status", resp.StatusCode).Errorf("invalid HTTP response status")
-			res.ReportError(fmt.Errorf("invalid HTTP response status: %d %s", resp.StatusCode, resp.Status))
+			task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid HTTP response status", TAG)
+			res.ReportError(fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status))
 			return
 		}
 
@@ -88,21 +93,35 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			tag, _ := dec.NextTag()
 			switch tag {
 			case encoder.TAG_MsgPackEOF:
-				task.log().Infof("end of response")
+				task.log().Infof("[%s]: got end of response", TAG)
 				return // DONE
 
 			case encoder.TAG_MsgPackItem:
 				var item transcoder.RawData
 				err := dec.Next(&item)
 				if err != nil {
-					task.log().WithError(err).Errorf("failed to decode record")
+					task.log().WithError(err).Warnf("[%s]: failed to decode record", TAG)
 					res.ReportError(err)
-					return
+					return // stop processing
 				} else {
 					rec, _ := transcoder.DecodeRawItem(&item)
-					task.log().Infof("record received: %s", rec)
+					task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
 					rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 					res.ReportRecord(rec)
+					// continue
+				}
+
+			case encoder.TAG_MsgPackError:
+				var msg string
+				err := dec.Next(&msg)
+				if err != nil {
+					task.log().WithError(err).Warnf("[%s]: failed to decode error", TAG)
+					res.ReportError(err)
+					return // stop processing
+				} else {
+					err := fmt.Errorf("%s", msg)
+					task.log().WithError(err).Debugf("[%s]: new error received", TAG)
+					res.ReportError(err)
 					// continue
 				}
 
@@ -111,7 +130,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				err := dec.Next(&stat)
 				if err == nil {
 					res.Stat, _ = transcoder.DecodeRawStat(&stat)
-					task.log().Infof("stat received: %s", res.Stat)
+					task.log().WithField("stat", res.Stat).
+						Infof("[%s]: statistics received", TAG)
 				}
 
 			default:

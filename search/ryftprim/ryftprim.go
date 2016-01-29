@@ -358,7 +358,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 			engine.ReadFilePollTimeout, engine.ReadFilePollLimit)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to read DATA", TAG)
-			res.ReportError(err)
+			res.ReportError(fmt.Errorf("failed to read DATA: %s", err))
 		}
 		if !cancelled {
 			// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG

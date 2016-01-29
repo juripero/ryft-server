@@ -39,7 +39,10 @@ import (
 )
 
 var (
+	// package logger instance
 	log = logrus.New()
+
+	TAG = "ryftmux"
 )
 
 // RyftMUX engine uses set of abstract engines as backends.
@@ -51,7 +54,8 @@ type Engine struct {
 
 // NewEngine creates new RyftMUX search engine.
 func NewEngine(backends ...search.Engine) (*Engine, error) {
-	engine := &Engine{Backends: backends}
+	engine := new(Engine)
+	engine.Backends = backends
 	return engine, nil
 }
 
@@ -89,9 +93,8 @@ func factory(opts map[string]interface{}) (search.Engine, error) {
 // package initialization
 func init() {
 	// should be created manually!
-	// search.RegisterEngine("ryftmux", factory)
+	// search.RegisterEngine(TAG, factory)
 
-	// initialize logging
-	log.Level = logrus.InfoLevel
-	//log.Level = logrus.DebugLevel
+	// be silent by default
+	log.Level = logrus.WarnLevel
 }

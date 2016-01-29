@@ -40,25 +40,27 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	ryftprimLogLevel = "debug"
-	ryfthttpLogLevel = "debug"
+	// printReceivedRecords = true
+	// ryftprimLogLevel = "debug"
+	// ryfthttpLogLevel = "debug"
 
 	// printSearchEngines()
 
-	search1(false) // step-by-step
-	//search1(true) // concurent
-	// test2() // HTTP
-	//test3() // MUX
+	//search1(false) // ryftprim
+	//search2(false) // HTTP
+	//search3(false) // MUX
 
-	//files1(false) // step-by-step
-	//files2() // HTTP
-	//files3() // MUX
+	//count1(false) // ryftprim
+	//count2(false) // HTTP
+	//count3(false) // MUX
+
+	//files1(false) // ryftprim
+	//files2(false) // HTTP
+	files3(false) // MUX
 }
 
-// ryftprim seach
-func search1(concurent bool) {
-	engine := newRyftPrim(log)
-
+// abstract seach
+func search0(concurent bool, engine search.Engine) {
 	// plain texts
 	A := search.NewConfig(`10`, "/regression/passengers.txt")
 	B := search.NewConfig(`20`, "/regression/passengers.txt")
@@ -72,13 +74,11 @@ func search1(concurent bool) {
 
 	_, _, _, _, _, _ = A, B, C, D, E, F
 
-	cfgs := []search.Config{*D}
+	cfgs := []search.Config{}
+	cfgs = append(cfgs, *A, *B, *C)
+	cfgs = append(cfgs, *D, *E, *F)
 	//cfgs = append(cfgs, *A, *B, *C)
 	//cfgs = append(cfgs, *D, *E, *F)
-	//cfgs = append(cfgs, *A, *B, *C)
-	//cfgs = append(cfgs, *A, *B, *C)
-	//cfgs = append(cfgs, *A, *B, *C)
-	//cfgs = append(cfgs, *A, *B, *C)
 
 	if !concurent {
 		runSearchOneByOne(log, engine, cfgs...)
@@ -87,20 +87,18 @@ func search1(concurent bool) {
 	}
 }
 
+// ryftprim seach
+func search1(concurent bool) {
+	search0(concurent, newRyftPrim(log))
+}
+
 // ryfthttp search
-func search2() {
-	engine := newRyftHttp(log)
-
-	//A := search.NewConfig(`"test"`, "/regression/*.txt")
-	A := search.NewConfig(`(RECORD.desc CONTAINS "VEHICLE")`, "*.pcrime")
-	A.Surrounding = 10
-	A.Fuzziness = 0
-
-	runSearch1(log, "H1", engine, A)
+func search2(concurent bool) {
+	search0(concurent, newRyftHttp(log))
 }
 
 // ryftmux search
-func search3() {
+func search3(concurent bool) {
 	// tripple seach
 	engine := newRyftMux(log,
 		newRyftPrim(log),
@@ -108,20 +106,65 @@ func search3() {
 		newRyftPrim(log),
 	)
 
-	A := search.NewConfig(`"test"`, "/regression/*.txt")
-	A.Surrounding = 10
-	A.Fuzziness = 1
+	search0(concurent, engine)
+}
 
-	runSearch1(log, "M1", engine, A)
+// abstract count
+func count0(concurent bool, engine search.Engine) {
+	// plain texts
+	A := search.NewConfig(`10`, "/regression/passengers.txt")
+	B := search.NewConfig(`20`, "/regression/passengers.txt")
+	C := search.NewConfig(`555`, "/regression/passengers.txt")
+	C.Fuzziness = 1
+
+	// XML records
+	D := search.NewConfig(`(RECORD.id CONTAINS "1003")`, "/regression/*.pcrime")
+	E := search.NewConfig(`(RECORD.id CONTAINS "1003100")`, "/regression/*.pcrime")
+	F := search.NewConfig(`(RECORD.desc CONTAINS "VEHICLE")`, "/regression/*.pcrime")
+
+	_, _, _, _, _, _ = A, B, C, D, E, F
+
+	cfgs := []search.Config{}
+	cfgs = append(cfgs, *A, *B, *C)
+	cfgs = append(cfgs, *D, *E, *F)
+	//cfgs = append(cfgs, *A, *B, *C)
+	//cfgs = append(cfgs, *D, *E, *F)
+
+	if !concurent {
+		runCountOneByOne(log, engine, cfgs...)
+	} else {
+		runCountConcurent(log, engine, cfgs...)
+	}
+}
+
+// ryftprim count
+func count1(concurent bool) {
+	count0(concurent, newRyftPrim(log))
+}
+
+// ryfthttp count
+func count2(concurent bool) {
+	count0(concurent, newRyftHttp(log))
+}
+
+// ryftmux count
+func count3(concurent bool) {
+	// tripple seach
+	engine := newRyftMux(log,
+		newRyftPrim(log),
+		newRyftPrim(log),
+		newRyftPrim(log),
+	)
+
+	count0(concurent, engine)
 }
 
 // ryftprim files
-func files1(concurent bool) {
-	engine := newRyftPrim(log)
-
+func files0(concurent bool, engine search.Engine) {
 	paths := []string{}
 	paths = append(paths, "/")
 	paths = append(paths, "/regression")
+	//paths = append(paths, "/not-found")
 
 	if !concurent {
 		runFilesStepByStep(log, engine, paths...) // one-by-one
@@ -130,15 +173,18 @@ func files1(concurent bool) {
 	}
 }
 
-// ryfthttp files
-func files2() {
-	engine := newRyftHttp(log)
+// ryftprim files
+func files1(concurent bool) {
+	files0(concurent, newRyftPrim(log))
+}
 
-	runFiles1(log, "H1", engine, "/")
+// ryfthttp files
+func files2(concurent bool) {
+	files0(concurent, newRyftHttp(log))
 }
 
 // ryftmux files
-func files3() {
+func files3(concurent bool) {
 	// tripple seach
 	engine := newRyftMux(log,
 		newRyftPrim(log),
@@ -146,5 +192,5 @@ func files3() {
 		newRyftPrim(log),
 	)
 
-	runFiles1(log, "M1", engine, "/")
+	files0(concurent, engine)
 }

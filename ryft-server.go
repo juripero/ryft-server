@@ -151,6 +151,7 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 			opts := map[string]interface{}{
 				"server-url": url,
 				"local-only": true,
+				"skip-stat":  false,
 				"index-host": url,
 			}
 			// log level

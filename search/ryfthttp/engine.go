@@ -38,17 +38,21 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 var (
+	// package logger instance
 	log = logrus.New()
+
+	TAG = "ryfthttp"
 )
 
 // RyftHTTP engine uses `ryft` HTTP server as a backend.
 type Engine struct {
 	ServerURL string // "http://localhost:8765" by default
 	LocalOnly bool   // "local" query boolean flag
-	SkipStat  bool   // !"stat" query boolean flag
+	SkipStat  bool   // !"stats" query boolean flag
 	IndexHost string // optional host in cluster mode
 
 	httpClient *http.Client
@@ -57,12 +61,26 @@ type Engine struct {
 
 // NewEngine creates new RyftHTTP search engine.
 func NewEngine(opts map[string]interface{}) (*Engine, error) {
-	engine := &Engine{}
-	engine.httpClient = &http.Client{}
+	engine := new(Engine)
+	engine.httpClient = new(http.Client)
 	err := engine.update(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse options: %s", err)
 	}
+
+	// update package log level
+	if v, ok := opts["log-level"]; ok {
+		s, err := utils.AsString(v)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to convert "log-level" option: %s`, err)
+		}
+
+		log.Level, err = logrus.ParseLevel(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update log level: %s", err)
+		}
+	}
+
 	return engine, nil
 }
 
@@ -81,7 +99,7 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 
 	// prepare query
 	q := url.Values{}
-	//q.Set("format", format)
+	q.Set("format", format)
 	q.Set("query", cfg.Query)
 	for _, file := range cfg.Files {
 		q.Add("files", file)
@@ -128,16 +146,15 @@ func (task *Task) log() *logrus.Entry {
 func factory(opts map[string]interface{}) (search.Engine, error) {
 	engine, err := NewEngine(opts)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftHTTP engine: %s", err)
+		return nil, fmt.Errorf("Failed to create %s engine: %s", TAG, err)
 	}
 	return engine, nil
 }
 
 // package initialization
 func init() {
-	search.RegisterEngine("ryfthttp", factory)
+	search.RegisterEngine(TAG, factory)
 
-	// initialize logging
-	log.Level = logrus.InfoLevel
-	//log.Level = logrus.DebugLevel
+	// be silent by default
+	log.Level = logrus.WarnLevel
 }

@@ -56,8 +56,8 @@ type Task struct {
 func NewTask() *Task {
 	id := atomic.AddUint64(&taskId, 1)
 
-	task := &Task{}
-	task.Identifier = fmt.Sprintf("mux-%016x", id)
+	task := new(Task)
+	task.Identifier = fmt.Sprintf("mux-%08x", id)
 
 	return task
 }
@@ -80,10 +80,12 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 
 	// start multiplexing results and errors
 	for _, res := range task.results {
-		task.log().Debugf("subtask in progress")
+		task.log().Debugf("[%s]: subtask in progress", TAG)
 		go func(res *search.Result) {
-			defer task.subtasks.Done()
-			defer func() { ch <- res }()
+			defer func() {
+				task.subtasks.Done()
+				ch <- res
+			}()
 
 			// handle subtask's results and errors
 			for {
@@ -91,11 +93,13 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 				case err, ok := <-res.ErrorChan:
 					if ok && err != nil {
 						// TODO: mark error with subtask's tag?
+						task.log().WithError(err).Debugf("[%s]: new error received", TAG)
 						mux.ReportError(err)
 					}
 
 				case rec, ok := <-res.RecordChan:
 					if ok && rec != nil {
+						task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
 						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 						mux.ReportRecord(rec)
 					}
@@ -103,11 +107,13 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 				case <-res.DoneChan:
 					// drain the error channel
 					for err := range res.ErrorChan {
+						task.log().WithError(err).Debugf("[%s]: *** new error received", TAG)
 						mux.ReportError(err)
 					}
 
 					// drain the record channel
 					for rec := range res.RecordChan {
+						task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG)
 						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 						mux.ReportRecord(rec)
 					}
@@ -126,7 +132,11 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 		case res, ok := <-ch:
 			if ok && res != nil {
 				// once subtask is finished combine statistics
-				task.log().Infof("subtask is finished, stat:%s", res.Stat)
+				task.log().WithField("stat", res.Stat).
+					Infof("[%s]: subtask is finished", TAG)
+				if mux.Stat == nil {
+					mux.Stat = search.NewStat()
+				}
 				mux.Stat.Merge(res.Stat)
 				finished[res] = true
 			}
@@ -134,7 +144,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 
 		case <-mux.CancelChan:
 			// cancel all unfinished tasks
-			task.log().Infof("cancell all unfinished subtasks")
+			task.log().Infof("[%s]: cancel all unfinished subtasks", TAG)
 			for _, r := range task.results {
 				if !finished[r] {
 					r.Cancel()

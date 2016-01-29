@@ -64,7 +64,8 @@ func newRyftPrim(log Logger) search.Engine {
 // create new ryfthttp search engine
 func newRyftHttp(log Logger) search.Engine {
 	opts := map[string]interface{}{
-		"log-level": ryfthttpLogLevel,
+		"local-only": true,
+		"log-level":  ryfthttpLogLevel,
 	}
 
 	return newEngine(log, "ryfthttp", opts)
@@ -91,7 +92,7 @@ type SearchResult struct {
 }
 
 // collect all results from the search engine
-func grabResults(log Logger, tag string, res *search.Result) (r SearchResult) {
+func grabResults(log Logger, tag string, res *search.Result, checkRecords bool) (r SearchResult) {
 	start := time.Now()
 	defer func() {
 		stop := time.Now()
@@ -137,7 +138,7 @@ func grabResults(log Logger, tag string, res *search.Result) (r SearchResult) {
 				r.Records = append(r.Records, rec)
 			}
 
-			if res.Stat != nil && uint64(len(r.Records)) != res.Stat.Matches {
+			if checkRecords && res.Stat != nil && uint64(len(r.Records)) != res.Stat.Matches {
 				log("[%s] WARNING: %d matched but %d received",
 					tag, res.Stat.Matches, len(r.Records))
 			}
@@ -157,7 +158,7 @@ func runSearch1(log Logger, tag string, engine search.Engine, cfg *search.Config
 		panic(err)
 	}
 
-	return grabResults(log, tag, res)
+	return grabResults(log, tag, res, true)
 }
 
 // run multiple search: step-by-step
