@@ -153,6 +153,11 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 				"local-only": true,
 				"index-host": url,
 			}
+			// log level
+			if _, ok := opts["log-level"]; !ok && *debug {
+				opts["log-level"] = "debug"
+			}
+
 			engine, err := search.NewEngine("ryfthttp", opts)
 			if err != nil {
 				return nil, err
@@ -186,6 +191,11 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 			// index-host
 			if _, ok := opts["index-host"]; !ok {
 				opts["index-host"] = fmt.Sprintf("http://localhost:%d", (*listenAddress).Port)
+			}
+
+			// log level
+			if _, ok := opts["log-level"]; !ok && *debug {
+				opts["log-level"] = "debug"
 			}
 		}
 

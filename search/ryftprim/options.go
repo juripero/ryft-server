@@ -129,7 +129,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 		engine.ReadFilePollLimit = int(vv)
 	} else {
-		engine.ReadFilePollTimeout = 100
+		engine.ReadFilePollLimit = 100
 	}
 
 	// keep result files

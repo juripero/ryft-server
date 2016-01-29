@@ -44,9 +44,12 @@ const (
 // abstract Encoder interface
 type Encoder interface {
 	Begin(w io.Writer) error
-	End(w io.Writer) error
-	EndWithStats(w io.Writer, stat interface{}) error
+	End(w io.Writer, errors []error) error
+	EndWithStats(w io.Writer, stat interface{}, errors []error) error
 	Write(w io.Writer, itm interface{}) error
+
+	// if stream errors are not supported, return `false`
+	WriteStreamError(w io.Writer, err error) bool
 }
 
 // get list of supported MIME types

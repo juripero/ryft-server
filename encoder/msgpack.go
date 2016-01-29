@@ -43,35 +43,45 @@ type MsgPackEncoder struct {
 	needSeparator bool
 }
 
+const (
+	TAG_MsgPackEOF uint8 = iota
+	TAG_MsgPackItem
+	TAG_MsgPackStat
+	TAG_MsgPackError
+)
+
 func (enc *MsgPackEncoder) Begin(w io.Writer) error {
 	return nil
 }
 
-func (enc *MsgPackEncoder) End(w io.Writer) error {
+func (enc *MsgPackEncoder) End(w io.Writer, errors []error) error {
+	return enc.EndWithStats(w, nil, errors)
+}
+
+func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}, errors []error) error {
+	//log.Printf("[msgpack]: encode stat: %#v", stat)
+	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+
+	if len(errors) > 0 {
+		for _, err := range errors {
+			if !enc.OmitTags {
+				_ = e.EncodeUint8(TAG_MsgPackError)
+			}
+			_ = e.EncodeString(err.Error())
+		}
+	}
+
+	if stat != nil {
+		if !enc.OmitTags {
+			_ = e.EncodeUint8(TAG_MsgPackStat)
+		}
+		_ = e.Encode(stat)
+	}
+
 	if !enc.OmitTags {
-		e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
 		_ = e.EncodeUint8(TAG_MsgPackEOF)
 	}
 	return nil
-}
-
-const (
-	TAG_MsgPackEOF  uint8 = 0
-	TAG_MsgPackItem uint8 = 1
-	TAG_MsgPackStat uint8 = 2
-)
-
-func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}) error {
-	//log.Printf("[msgpack]: encode stat: %#v", stat)
-	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
-	if !enc.OmitTags {
-		_ = e.EncodeUint8(TAG_MsgPackStat)
-	}
-	err := e.Encode(stat)
-	if !enc.OmitTags {
-		_ = e.EncodeUint8(TAG_MsgPackEOF)
-	}
-	return err
 }
 
 func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
@@ -82,6 +92,16 @@ func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
 	}
 	err := e.Encode(item)
 	return err
+}
+
+func (enc *MsgPackEncoder) WriteStreamError(w io.Writer, err error) bool {
+	if !enc.OmitTags {
+		e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+		_ = e.EncodeUint8(TAG_MsgPackError)
+		_ = e.EncodeString(err.Error())
+		return true
+	}
+	return false
 }
 
 // MSGPACK decoder

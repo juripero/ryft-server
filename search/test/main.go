@@ -29,7 +29,7 @@ func main() {
 	}()
 
 	// enable profiling
-	if true {
+	if false {
 		f, err := os.Create("search.prof")
 		if err != nil {
 			log("failed to create profile file: %s", err)

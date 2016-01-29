@@ -95,7 +95,7 @@ func grabResults(log Logger, tag string, res *search.Result) (r SearchResult) {
 	start := time.Now()
 	defer func() {
 		stop := time.Now()
-		log("[%s]: done in %s", tag, stop.Sub(start))
+		log("[%s]: processing time: %s", tag, stop.Sub(start))
 	}()
 
 	// preallocate buffer

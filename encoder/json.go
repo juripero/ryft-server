@@ -45,18 +45,41 @@ func (enc *JsonEncoder) Begin(w io.Writer) error {
 	return err
 }
 
-func (enc *JsonEncoder) End(w io.Writer) error {
-	_, err := w.Write([]byte("]}"))
-	return err
+func (enc *JsonEncoder) End(w io.Writer, errors []error) error {
+	return enc.EndWithStats(w, nil, errors)
 }
 
-func (enc *JsonEncoder) EndWithStats(w io.Writer, stat interface{}) error {
-	if _, err := w.Write([]byte(`], "stats": `)); err != nil {
+func (enc *JsonEncoder) EndWithStats(w io.Writer, stat interface{}, errors []error) error {
+	if _, err := w.Write([]byte(`]`)); err != nil {
 		return err
 	}
-
 	e := json.NewEncoder(w)
-	e.Encode(stat)
+
+	// errors
+	if len(errors) > 0 {
+		// convert errors to strings
+		messages := make([]string, 0, len(errors))
+		for _, e := range errors {
+			messages = append(messages, e.Error())
+		}
+
+		if _, err := w.Write([]byte(`,"errors":`)); err != nil {
+			return err
+		}
+		if err := e.Encode(messages); err != nil {
+			return err
+		}
+	}
+
+	// statistics
+	if stat != nil {
+		if _, err := w.Write([]byte(`,"stats":`)); err != nil {
+			return err
+		}
+		if err := e.Encode(stat); err != nil {
+			return err
+		}
+	}
 
 	_, err := w.Write([]byte("}"))
 	return err
@@ -73,4 +96,9 @@ func (enc *JsonEncoder) Write(w io.Writer, item interface{}) error {
 		enc.needSeparator = true
 	}
 	return err
+}
+
+func (enc *JsonEncoder) WriteStreamError(w io.Writer, err error) bool {
+	// JSON fromat doesn't support stream errors
+	return false
 }

@@ -101,8 +101,10 @@ func (res *Result) ReportRecord(rec *Record) {
 
 // Cancel stops the search processing.
 func (res *Result) Cancel() {
-	res.isCancelled = true
-	res.CancelChan <- nil
+	if !res.isDone {
+		res.isCancelled = true
+		res.CancelChan <- nil
+	}
 }
 
 // ReportDone sends 'done' notification.

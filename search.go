@@ -122,64 +122,90 @@ func (s *Server) search(ctx *gin.Context) {
 		mp.OmitTags = !params.Stats
 	}
 
+	var errors []error // list of received errors
 	first := true
 
-	putRec := func(w io.Writer, rec *search.Record) {
-		xrec, err := tcode.Transcode1(rec)
-		if err != nil {
-			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-		}
+	// ctx.Stream() logic
+	writer := ctx.Writer
+	gone := writer.CloseNotify()
 
-		if first {
-			enc.Begin(w)
-			first = false
-		}
-
-		err = enc.Write(w, xrec)
-		if err != nil {
-			panic(err)
+	// put error to stream
+	putErr := func(err error) {
+		if !enc.WriteStreamError(writer, err) {
+			// unable to send error in response stream
+			// just save it and report later
+			errors = append(errors, err)
 		}
 	}
 
-	ctx.Stream(func(w io.Writer) bool {
+	// put record to stream
+	putRec := func(rec *search.Record) {
+		xrec, err := tcode.Transcode1(rec)
+		if err != nil {
+			//panic(srverr.New(http.StatusInternalServerError, err.Error()))
+			putErr(err)
+			return
+		}
 
+		if first {
+			enc.Begin(writer)
+			first = false
+		}
+
+		err = enc.Write(writer, xrec)
+		if err != nil {
+			panic(err)
+		}
+
+		writer.Flush()
+	}
+
+	// process results!
+	for {
 		select {
+		case <-gone:
+			res.Cancel() // cancel processing
+			return
+
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				putRec(w, rec)
+				putRec(rec)
 			}
 
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
-				// TODO: report error
-				panic(srverr.New(http.StatusInternalServerError, err.Error()))
+				// panic(srverr.New(http.StatusInternalServerError, err.Error()))
+				putErr(err)
 			}
 
 		case <-res.DoneChan:
-			// drain the channel
-			for r := range res.RecordChan {
-				putRec(w, r)
+			// drain the channels
+			for rec := range res.RecordChan {
+				putRec(rec)
+			}
+			for err := range res.ErrorChan {
+				putErr(err)
 			}
 
 			if first {
-				enc.Begin(w)
+				enc.Begin(writer)
 				first = false
 			}
 
 			if params.Stats {
 				xstat, err := tcode.TranscodeStat(res.Stat)
 				if err != nil {
-					panic(err)
+					putErr(err)
 				}
-				enc.EndWithStats(w, xstat)
+				enc.EndWithStats(writer, xstat, errors)
 			} else {
-				enc.End(w)
+				enc.End(writer, errors)
 			}
-			return false // stop
-		}
 
-		return true // continue
-	})
+			log.Printf("done: %s", res)
+			return // stop
+		}
+	}
 }
 
 func searchInNode(params SearchParams, service *api.CatalogService) (recs chan interface{}, chanErr chan error) {
@@ -265,9 +291,9 @@ func streamAllRecords(c *gin.Context, enc encoder.Encoder, results chan interfac
 		}
 		if stats != nil {
 			s := <-stats
-			enc.EndWithStats(w, s.AsMap())
+			enc.EndWithStats(w, s.AsMap(), nil)
 		} else {
-			enc.End(w)
+			enc.End(w, nil)
 		}
 		return false
 
