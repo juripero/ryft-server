@@ -31,24 +31,16 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/search"
-	//"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/ryftprim"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
-	"github.com/hashicorp/consul/api"
 )
-
-const sepSign string = ","
 
 // SearchParams contains all the bound parameters
 // for the /search endpoint.
@@ -207,134 +199,3 @@ func (s *Server) search(ctx *gin.Context) {
 		}
 	}
 }
-
-func searchInNode(params SearchParams, service *api.CatalogService) (recs chan interface{}, chanErr chan error) {
-	recs = make(chan interface{})
-	chanErr = make(chan error)
-
-	go func() {
-		if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
-			close(recs)
-			close(chanErr)
-			return
-		}
-
-		prms := &UrlParams{}
-		prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
-		prms.Path = "search"
-		prms.Params = map[string]interface{}{
-			"query":       params.Query,
-			"files":       createFilesQuery(params.Files),
-			"surrounding": params.Surrounding,
-			"format":      params.Format,
-			"fuzziness":   params.Fuzziness,
-			"local":       true,
-		}
-		url := createClusterUrl(prms)
-		response, err := http.Get(url)
-		if err != nil {
-			close(recs)
-			chanErr <- err
-			return
-		}
-
-		defer response.Body.Close()
-		dec := json.NewDecoder(response.Body)
-		var v map[string][]map[string]interface{}
-		dec.Decode(&v)
-
-		if i, ok := v["results"]; ok {
-			for _, v := range i {
-				if index, ok := v["_index"]; ok {
-					index.(map[string]interface{})["address"] = prms.host
-				}
-			}
-		}
-
-		recs <- v
-
-		// m := map[string]string{
-		// "address": prms.host,
-		// }
-		// recs <- m
-		// recs <- response.Body
-		defer close(chanErr)
-		defer close(recs)
-	}()
-	return
-}
-
-func logErrors(format string, errors chan error) {
-	for err := range errors {
-		if err != nil {
-			log.Printf(format, err.Error())
-		}
-	}
-}
-
-func streamAllRecords(c *gin.Context, enc encoder.Encoder, results chan interface{}, stats chan ryftprim.Statistics) {
-
-	first := true
-	c.Stream(func(w io.Writer) bool {
-		if first {
-			enc.Begin(w)
-			first = false
-		}
-
-		if record, ok := <-results; ok {
-			if err := enc.Write(w, record); err != nil {
-				log.Panicln(err)
-			} else {
-				c.Writer.Flush()
-			}
-			return true
-		}
-		if stats != nil {
-			s := <-stats
-			enc.EndWithStats(w, s.AsMap(), nil)
-		} else {
-			enc.End(w, nil)
-		}
-		return false
-
-	})
-}
-
-// func streamSmplRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Result, sample []string) {
-// first := true
-//
-// c.Stream(func(w io.Writer) bool {
-// 	if first {
-// 		enc.Begin(w)
-// 		first = false
-// 	}
-//
-// 	if record, ok := <-result.Results; ok {
-//
-// 		rec := map[string]interface{}{}
-//
-// 		for i := range sample {
-// 			value, ok := record.(map[string]interface{})[sample[i]]
-// 			if ok {
-// 				rec[sample[i]] = value
-// 			}
-// 		}
-// 		if err := enc.Write(w, rec); err != nil {
-// 			log.Panicln(err)
-// 		} else {
-// 			c.Writer.Flush()
-// 		}
-//
-// 		return true
-//
-// 	}
-//
-// 	if result.Stats != nil {
-// 		stats := <-result.Stats
-// 		enc.EndWithStats(w, stats.AsMap())
-// 	} else {
-// 		enc.End(w)
-// 	}
-// 	return false
-// })
-// }

@@ -33,12 +33,10 @@ package transcoder
 import (
 	"fmt"
 
-	"github.com/getryft/ryft-server/records"
 	"github.com/getryft/ryft-server/search"
 )
 
 type Transcoder interface {
-	Transcode(recs chan records.IdxRecord) (chan interface{}, chan error)
 	Transcode1(rec *search.Record) (interface{}, error)
 	TranscodeStat(stat *search.Statistics) (interface{}, error)
 }
