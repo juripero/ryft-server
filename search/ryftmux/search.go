@@ -28,39 +28,31 @@
  * ============
  */
 
-package main
+package ryftmux
 
 import (
-	"fmt"
+	// "fmt"
 
-	consul "github.com/hashicorp/consul/api"
+	"github.com/getryft/ryft-server/search"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// Search starts asynchronous "/search" with RyftMUX engine.
+func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
+	task := NewTask()
+	mux := search.NewResult()
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+	// prepare requests
+	for _, backend := range engine.Backends {
+		res, err := backend.Search(cfg)
+		if err != nil {
+			task.log().WithError(err).Errorf("failed to start /search subtask")
+			mux.ReportError(err)
+			continue
+		}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+		task.add(res)
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
-
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+	go engine.run(task, mux)
+	return mux, nil // OK for now
 }

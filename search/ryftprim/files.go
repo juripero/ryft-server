@@ -28,39 +28,46 @@
  * ============
  */
 
-package main
+package ryftprim
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 
-	consul "github.com/hashicorp/consul/api"
+	"github.com/getryft/ryft-server/search"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	log.WithField("path", path).Infof("[%s]: start /files", TAG)
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
-
+	// read directory content
+	fullPath := filepath.Join(engine.MountPoint, path)
+	items, err := ioutil.ReadDir(fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
+		return nil, fmt.Errorf("failed to read directory content: %s", err)
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	// process directory content
+	res := search.NewDirInfo(path)
+	for _, item := range items {
+		name := item.Name()
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+		// skip ".", ".." and all hidden files
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+
+		if item.IsDir() {
+			res.Dirs = append(res.Dirs, name)
+		} else {
+			res.Files = append(res.Files, name)
+		}
+	}
+
+	log.WithField("info", res).Debugf("[%s] done /files", TAG)
+	return res, nil // OK
 }

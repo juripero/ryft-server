@@ -28,35 +28,31 @@
  * ============
  */
 
-package crpoll
+package ryftmux
 
 import (
-	"fmt"
-	"os"
-	"time"
+	// "fmt"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-var Interval = 50 * time.Millisecond
+// Count starts asynchronous "/count" with RyftMUX engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask()
+	mux := search.NewResult()
 
-func sleep(s chan error) (err error) {
-	select {
-	case <-time.After(Interval):
-		return
-	case err = <-s:
-		return
-	}
-}
-
-func OpenFile(file string, s chan error) (f *os.File, err error) {
-	fmt.Println(file)
-	for {
-		if _, isExists := os.Stat(file); isExists == nil {
-			f, err = os.Open(file)
-			return
-		} else {
-			if err = sleep(s); err != nil {
-				return
-			}
+	// prepare requests
+	for _, backend := range engine.Backends {
+		res, err := backend.Count(cfg)
+		if err != nil {
+			task.log().WithError(err).Errorf("failed to start /count subtask")
+			mux.ReportError(err)
+			continue
 		}
+
+		task.add(res)
 	}
+
+	go engine.run(task, mux)
+	return mux, nil // OK for now
 }

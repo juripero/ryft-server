@@ -28,39 +28,36 @@
  * ============
  */
 
-package main
+package search
 
-import (
-	"fmt"
-
-	consul "github.com/hashicorp/consul/api"
+var (
+	// global engine factories
+	factories = map[string]EngineFactory{}
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// Engine factory function.
+// Returns new engine and possible error.
+// Underlying engine can use custom options.
+type EngineFactory func(map[string]interface{}) (Engine, error)
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+// RegisterEngine registers search engine factory.
+// If engine factory with that name already exists it will be replaced.
+// To unregister engine factory just pass `nil` as the factory function.
+func RegisterEngine(name string, f EngineFactory) {
+	if f != nil {
+		// register new or replace existing
+		factories[name] = f
+	} else {
+		// deregister existing
+		delete(factories, name)
 	}
+}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
-
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+// GetAvailableEngines returns all the registered search engines.
+func GetAvailableEngines() []string {
+	names := make([]string, 0, len(factories))
+	for k, _ := range factories {
+		names = append(names, k)
+	}
+	return names
 }

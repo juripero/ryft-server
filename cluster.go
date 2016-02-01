@@ -31,17 +31,21 @@
 package main
 
 import (
+	"log"
+	"net/http"
+
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
-func members(c *gin.Context) {
-	srvc, err := GetConsulInfo()
+// handle /cluster/members endpoint: information about cluster's nodes
+func (s *Server) members(c *gin.Context) {
+	info, err := GetConsulInfo()
 
 	if err != nil {
 		panic(srverr.New(http.StatusInternalServerError, err.Error()))
 	} else {
-		c.JSON(http.StatusOK, srvc)
+		log.Printf("consul info: %#v", info)
+		c.JSON(http.StatusOK, info)
 	}
 }

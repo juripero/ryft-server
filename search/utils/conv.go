@@ -28,39 +28,75 @@
  * ============
  */
 
-package main
+package utils
 
 import (
 	"fmt"
-
-	consul "github.com/hashicorp/consul/api"
+	"strconv"
+	"time"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
-
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+// convert custom value to string.
+func AsString(opt interface{}) (string, error) {
+	switch v := opt.(type) {
+	// TODO: other types to string?
+	case string:
+		return v, nil
+	case nil:
+		return "", nil
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	return "", fmt.Errorf("%v is not a string", opt)
+	// return fmt.Sprintf("%s", opt), nil
+}
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+// convert custom value to time duration.
+func AsDuration(opt interface{}) (time.Duration, error) {
+	switch v := opt.(type) {
+	// TODO: other types to duration?
+	case string:
+		return time.ParseDuration(v)
+	case time.Duration:
+		return v, nil
+	case nil:
+		return time.Duration(0), nil
+	}
+
+	return time.Duration(0), fmt.Errorf("%v is not a time duration", opt)
+}
+
+// convert custom value to uint64.
+func AsUint64(opt interface{}) (uint64, error) {
+	switch v := opt.(type) {
+	// TODO: other types to uint64?
+	case uint:
+		return uint64(v), nil
+	case int:
+		return uint64(v), nil
+	case uint64:
+		return v, nil
+	case int64:
+		return uint64(v), nil
+	case float64:
+		return uint64(v), nil
+	case string:
+		return strconv.ParseUint(v, 10, 64)
+	case nil:
+		return 0, nil
+	}
+
+	return 0, fmt.Errorf("%v os not a uint64", opt)
+}
+
+// convert custom value to bool.
+func AsBool(opt interface{}) (bool, error) {
+	switch v := opt.(type) {
+	// TODO: other types to bool?
+	case bool:
+		return v, nil
+	case nil:
+		return false, nil
+	}
+
+	return false, fmt.Errorf("%v is not a bool", opt)
 }

@@ -28,39 +28,50 @@
  * ============
  */
 
-package main
+package search
 
 import (
 	"fmt"
-
-	consul "github.com/hashicorp/consul/api"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// Search configuration.
+// Contains all query related parameters.
+type Config struct {
+	Query         string
+	Files         []string
+	Surrounding   uint
+	Fuzziness     uint
+	CaseSensitive bool
+	Nodes         uint
+}
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+// NewEmptyConfig creates new empty search configuration.
+func NewEmptyConfig() *Config {
+	cfg := new(Config)
+	cfg.Files = []string{} // no files by default
+	return cfg
+}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
-	}
+// NewConfig creates new search configuration.
+func NewConfig(query string, files ...string) *Config {
+	cfg := new(Config)
+	cfg.Query = query
+	cfg.Files = files
+	return cfg
+}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+// AddFile adds one or more files to the search configuration.
+func (cfg *Config) AddFile(files ...string) {
+	cfg.AddFiles(files)
+}
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+// AddFiles adds one or more files to the search configuration.
+func (cfg *Config) AddFiles(files []string) {
+	cfg.Files = append(cfg.Files, files...)
+}
+
+// String gets the string representation of the configuration.
+func (cfg Config) String() string {
+	return fmt.Sprintf("Config{query:%s, files:%q surr:%d, fuzz:%d, case-sens:%t, nodes:%d}",
+		cfg.Query, cfg.Files, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes)
 }

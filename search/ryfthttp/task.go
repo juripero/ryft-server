@@ -28,39 +28,30 @@
  * ============
  */
 
-package main
+package ryfthttp
 
 import (
 	"fmt"
-
-	consul "github.com/hashicorp/consul/api"
+	"sync/atomic"
+	"time"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+var (
+	// global identifier (zero for debugging)
+	taskId = uint64(0 * time.Now().UnixNano())
+)
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+// RyftPrim task related data.
+type Task struct {
+	Identifier string // unique
+}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
-	}
+// NewTask creates new task.
+func NewTask() *Task {
+	id := atomic.AddUint64(&taskId, 1)
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	task := new(Task)
+	task.Identifier = fmt.Sprintf("http-%08x", id)
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+	return task
 }

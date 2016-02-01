@@ -31,51 +31,94 @@
 package encoder
 
 import (
-	"fmt"
 	"io"
-	"time"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
+	// "github.com/ugorji/go/codec"
 )
 
+// MSGPACK encoder
 type MsgPackEncoder struct {
-	msgpack.Encoder
+	OmitTags      bool // if we report just data records we can omit tags
 	needSeparator bool
 }
+
+const (
+	TAG_MsgPackEOF uint8 = iota
+	TAG_MsgPackItem
+	TAG_MsgPackStat
+	TAG_MsgPackError
+)
 
 func (enc *MsgPackEncoder) Begin(w io.Writer) error {
 	return nil
 }
 
-func (enc *MsgPackEncoder) End(w io.Writer) error {
+func (enc *MsgPackEncoder) End(w io.Writer, errors []error) error {
+	return enc.EndWithStats(w, nil, errors)
+}
+
+func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}, errors []error) error {
+	//log.Printf("[msgpack]: encode stat: %#v", stat)
+	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+
+	if len(errors) > 0 {
+		for _, err := range errors {
+			if !enc.OmitTags {
+				_ = e.EncodeUint8(TAG_MsgPackError)
+			}
+			_ = e.EncodeString(err.Error())
+		}
+	}
+
+	if stat != nil {
+		if !enc.OmitTags {
+			_ = e.EncodeUint8(TAG_MsgPackStat)
+		}
+		_ = e.Encode(stat)
+	}
+
+	if !enc.OmitTags {
+		_ = e.EncodeUint8(TAG_MsgPackEOF)
+	}
 	return nil
 }
 
-func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stats map[string]interface{}) error {
-	return nil
-}
-
-func (enc *MsgPackEncoder) Write(w io.Writer, itm interface{}) error {
-	wEncoder := msgpack.NewEncoder(w)
-	err := msgpkEncode(wEncoder, &itm, WriteInterval)
-	b, _ := msgpack.Marshal(&itm)
-	//	fmt.Printf("\n MSGPACK : %v \n", b)
-	var v interface{}
-	msgpack.Unmarshal(b, v)
-	//	fmt.Printf("\n MSGPACK : %v \n", v)
+func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
+	// log.Printf("[msgpack]: encode item: %#v", item)
+	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+	if !enc.OmitTags {
+		_ = e.EncodeUint8(TAG_MsgPackItem)
+	}
+	err := e.Encode(item)
 	return err
 }
 
-func msgpkEncode(enc *msgpack.Encoder, v *interface{}, timeout time.Duration) (err error) {
-	ch := make(chan error, 1)
-	go func() {
-		ch <- enc.Encode(v)
-	}()
-
-	select {
-	case err = <-ch:
-		return
-	case <-time.After(timeout):
-		return fmt.Errorf("Msgpk encoding timeout")
+func (enc *MsgPackEncoder) WriteStreamError(w io.Writer, err error) bool {
+	if !enc.OmitTags {
+		e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+		_ = e.EncodeUint8(TAG_MsgPackError)
+		_ = e.EncodeString(err.Error())
+		return true
 	}
+	return false
+}
+
+// MSGPACK decoder
+type MsgPackDecoder struct {
+	dec *msgpack.Decoder
+}
+
+// NewMsgPackDecoder creates new MSGPACK decoder instance.
+func NewMsgPackDecoder(r io.Reader) *MsgPackDecoder {
+	return &MsgPackDecoder{dec: msgpack.NewDecoder(r)}
+}
+
+func (dec *MsgPackDecoder) NextTag() (uint8, error) {
+	return dec.dec.DecodeUint8()
+}
+
+// Read decodes next item from the stream.
+func (dec *MsgPackDecoder) Next(item interface{}) error {
+	return dec.dec.Decode(item)
 }

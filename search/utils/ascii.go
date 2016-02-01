@@ -28,39 +28,38 @@
  * ============
  */
 
-package main
+package utils
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
-
-	consul "github.com/hashicorp/consul/api"
+	"unicode"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// DumpAsString get data as ASCII or HEX.
+func DumpAsString(v interface{}) string {
+	if b, ok := v.([]byte); ok {
+		if isAsciiPrintable(b) {
+			return string(b)
+		} else {
+			return "hex:" + hex.EncodeToString(b)
+		}
+	} else {
+		return fmt.Sprintf("%v", v)
+	}
+}
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+// check if data is printable ASCII
+func isAsciiPrintable(v []byte) bool {
+	for _, r := range bytes.Runes(v) {
+		if r > unicode.MaxASCII {
+			return false
+		}
+		if !unicode.IsPrint(r) {
+			return false
+		}
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
-
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+	return true // printable
 }

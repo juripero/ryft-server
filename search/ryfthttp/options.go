@@ -28,39 +28,63 @@
  * ============
  */
 
-package main
+package ryfthttp
 
 import (
 	"fmt"
+	"net/url"
 
-	consul "github.com/hashicorp/consul/api"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// Options gets all engine options.
+func (engine *Engine) Options() map[string]interface{} {
+	return map[string]interface{}{
+		"server-url": engine.ServerURL,
+		"local-only": engine.LocalOnly,
+		"skip-stat":  engine.SkipStat,
+		"index-host": engine.IndexHost,
+	}
+}
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+// update engine options.
+func (engine *Engine) update(opts map[string]interface{}) (err error) {
+	// server URL
+	if v, ok := opts["server-url"]; ok {
+		engine.ServerURL, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "server-url" option: %s`, err)
+		}
+	} else {
+		engine.ServerURL = "http://localhost:8765"
+	}
+	if _, err := url.Parse(engine.ServerURL); err != nil {
+		return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	// local only flag
+	if v, ok := opts["local-only"]; ok {
+		engine.LocalOnly, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "local-only" option: %s`, err)
+		}
+	}
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+	// skip stat flag
+	if v, ok := opts["skip-stat"]; ok {
+		engine.SkipStat, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "skip-stat" option: %s`, err)
+		}
+	}
+
+	// index host
+	if v, ok := opts["index-host"]; ok {
+		engine.IndexHost, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "index-host" option: %s`, err)
+		}
+	}
+
+	return nil // OK
 }

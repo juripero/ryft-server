@@ -28,39 +28,37 @@
  * ============
  */
 
-package main
+package search
 
 import (
 	"fmt"
-
-	consul "github.com/hashicorp/consul/api"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// Search processing statistics.
+// Contains set of search statistics such as total processed bytes
+// and processing duration.
+type Statistics struct {
+	Matches    uint64 // total records matched
+	TotalBytes uint64 // total input bytes processed
+	Duration   uint64 // processing duration, milliseconds
+	// TODO: data rate?
+}
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+// NewStat creates empty statistics.
+func NewStat() *Statistics {
+	stat := new(Statistics)
+	return stat
+}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
-	}
+// String gets string representation of statistics.
+func (s Statistics) String() string {
+	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms}",
+		s.Matches, s.TotalBytes, s.Duration)
+}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
-
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+// Merge merges statistics from another node.
+func (s *Statistics) Merge(a *Statistics) {
+	s.Matches += a.Matches
+	s.TotalBytes += a.TotalBytes
+	s.Duration += a.Duration // TODO: just max?
 }

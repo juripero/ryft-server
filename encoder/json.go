@@ -28,77 +28,77 @@
  * ============
  */
 
-package fsobserver
+package encoder
 
 import (
-	"log"
-
-	"github.com/go-fsnotify/fsnotify"
+	"encoding/json"
+	"io"
 )
 
-type Observer struct {
-	w *fsnotify.Watcher
-	m map[string]chan fsnotify.Op
-	c chan control
+// simple JSON encoder
+type JsonEncoder struct {
+	needSeparator bool
 }
 
-type control struct {
-	name string
-	ch   chan fsnotify.Op
+func (enc *JsonEncoder) Begin(w io.Writer) error {
+	_, err := w.Write([]byte(`{"results":[`))
+	return err
 }
 
-func NewObserver(dir string) (o *Observer, err error) {
-	var w *fsnotify.Watcher
-	if w, err = fsnotify.NewWatcher(); err != nil {
-		return nil, err
+func (enc *JsonEncoder) End(w io.Writer, errors []error) error {
+	return enc.EndWithStats(w, nil, errors)
+}
+
+func (enc *JsonEncoder) EndWithStats(w io.Writer, stat interface{}, errors []error) error {
+	if _, err := w.Write([]byte(`]`)); err != nil {
+		return err
 	}
+	e := json.NewEncoder(w)
 
-	if err = w.Add(dir); err != nil {
-		return nil, err
-	}
+	// errors
+	if len(errors) > 0 {
+		// convert errors to strings
+		messages := make([]string, 0, len(errors))
+		for _, e := range errors {
+			messages = append(messages, e.Error())
+		}
 
-	o = &Observer{}
-	o.m = make(map[string]chan fsnotify.Op)
-	o.c = make(chan control, 256)
-	o.w = w
-
-	go o.process()
-
-	return o, nil
-}
-
-func (o *Observer) Follow(name string, size int) (ch chan fsnotify.Op) {
-	if size == 0 {
-		ch = make(chan fsnotify.Op)
-	} else {
-		ch = make(chan fsnotify.Op, size)
-	}
-
-	o.c <- control{name: name, ch: ch}
-	return ch
-}
-
-func (o *Observer) Unfollow(name string) {
-	o.c <- control{name: name, ch: nil}
-}
-
-func (o *Observer) process() {
-	for {
-		select {
-		case c := <-o.c:
-			if c.ch != nil {
-				o.m[c.name] = c.ch
-			} else {
-				delete(o.m, c.name)
-			}
-		case e := <-o.w.Events:
-			if ch, ok := o.m[e.Name]; ok {
-				go func() {
-					ch <- e.Op
-				}()
-			}
-		case err := <-o.w.Errors:
-			log.Printf("PROC: error:%s", err.Error())
+		if _, err := w.Write([]byte(`,"errors":`)); err != nil {
+			return err
+		}
+		if err := e.Encode(messages); err != nil {
+			return err
 		}
 	}
+
+	// statistics
+	if stat != nil {
+		if _, err := w.Write([]byte(`,"stats":`)); err != nil {
+			return err
+		}
+		if err := e.Encode(stat); err != nil {
+			return err
+		}
+	}
+
+	_, err := w.Write([]byte("}"))
+	return err
+}
+
+func (enc *JsonEncoder) Write(w io.Writer, item interface{}) error {
+	if enc.needSeparator {
+		w.Write([]byte(","))
+		enc.needSeparator = false
+	}
+	e := json.NewEncoder(w) // FIXME: do not create encoder each time
+	err := e.Encode(item)
+	if err == nil {
+		enc.needSeparator = true
+	}
+	return err
+}
+
+func (enc *JsonEncoder) WriteStreamError(w io.Writer, err error) bool {
+	// JSON fromat doesn't support stream errors
+	return false
 }

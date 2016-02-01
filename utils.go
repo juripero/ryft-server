@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/url"
 )
 
 type AddressMaker interface {
@@ -37,38 +36,6 @@ const (
 	DefaultPort = "8765"
 	HostPortSep = ":"
 )
-
-func createClusterUrl(params *UrlParams) string {
-	if params.host == "" {
-		log.Fatal("Host coudn't be empty" + params.host)
-	}
-	if params.Scheme == "" {
-		params.Scheme = HTTP
-		log.Println("Empty scheme. HTTP scheme will be used by default")
-	}
-	u := &url.URL{}
-	u.Host = params.host
-	u.Scheme = params.Scheme
-	u.Path = params.Path
-	q := u.Query()
-	for k, v := range params.Params {
-		q.Set(k, fmt.Sprintf("%v", v))
-	}
-	u.RawQuery = q.Encode()
-	return u.String()
-}
-
-func createFilesQuery(files []string) string {
-	result := ""
-	for i, v := range files {
-		if i != len(files)-1 {
-			result = fmt.Sprintf("%s%s,", result, v)
-		} else {
-			result = fmt.Sprintf("%s%s", result, v)
-		}
-	}
-	return result
-}
 
 func compareIP(inIP string) bool {
 	addrs, err := net.InterfaceAddrs()

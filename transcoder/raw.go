@@ -31,7 +31,7 @@
 package transcoder
 
 import (
-	"github.com/getryft/ryft-server/records"
+	"github.com/getryft/ryft-server/search"
 )
 
 type RawTranscoder struct {
@@ -39,24 +39,35 @@ type RawTranscoder struct {
 }
 
 type RawData struct {
-	Index     Index  `json:"_index"`
-	Data      []byte `json:"data"`
+	Index Index       `json:"_index"`
+	Data  interface{} `json:"data"`
 }
 
-func (transcoder *RawTranscoder) Transcode(recs chan records.IdxRecord) (chan interface{}, chan error){
-	output := make(chan interface{}, TranscodeBufferCapacity)
-	errors := make(chan error)
+func (transcoder *RawTranscoder) Transcode1(rec *search.Record) (interface{}, error) {
+	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
+}
 
-	go func(){
-		defer close(output)
-		defer close(errors)
-		for rec := range recs {
-			output <- RawData{
-				Index{rec.File, rec.Offset, rec.Length, rec.Fuzziness},
-				rec.Data,
-			}
-		}
-	}()
+func DecodeRawItem(item *RawData) (*search.Record, error) {
+	return &search.Record{
+		Index: search.Index{
+			File:      item.Index.File,
+			Offset:    item.Index.Offset,
+			Length:    uint64(item.Index.Length),
+			Fuzziness: item.Index.Fuzziness,
+			Host:      item.Index.Host,
+		},
+		Data: item.Data,
+	}, nil
+}
 
-	return output, errors
+func DecodeRawStat(stat *Statistics) (*search.Statistics, error) {
+	return &search.Statistics{
+		Matches:    stat.Matches,
+		TotalBytes: stat.TotalBytes,
+		Duration:   stat.Duration,
+	}, nil
+}
+
+func (transcoder *RawTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
+	return NewStat(stat), nil
 }

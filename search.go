@@ -31,27 +31,19 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/ryftprim"
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
-	"github.com/hashicorp/consul/api"
 )
 
-const sepSign string = ","
-
-/*
-SearchParams contains all the bound params for the search operation
-*/
+// SearchParams contains all the bound parameters
+// for the /search endpoint.
 type SearchParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
 	Files         []string `form:"files" json:"files" binding:"required"`
@@ -65,207 +57,145 @@ type SearchParams struct {
 	Stats         bool     `form:"stats" json:"stats"`
 }
 
-func search(c *gin.Context) {
-
-	defer srverr.Recover(c)
+// Handle /search endpoint.
+func (s *Server) search(ctx *gin.Context) {
+	// recover from panics if any
+	defer srverr.Recover(ctx)
 
 	var err error
 
 	// parse request parameters
-	params := SearchParams{}
-	params.Format = transcoder.RAWTRANSCODER
-	if err = c.Bind(&params); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	params := SearchParams{Format: transcoder.RAWTRANSCODER}
+	if err := ctx.Bind(&params); err != nil {
+		panic(srverr.NewWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to parse request parameters"))
 	}
 
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
 	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+		panic(srverr.NewWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to get transcoder"))
 	}
 
-	enc := encoder.FromContext(c)
+	enc := encoderFromContext(ctx)
 
-	// get a new unique search index
-	n := names.New()
-	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
-
-	query, aErr := url.QueryUnescape(params.Query)
-
-	if aErr != nil {
-		panic(srverr.New(http.StatusBadRequest, aErr.Error()))
+	// get search engine
+	engine, err := s.getSearchEngine(params.Local)
+	if err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to get search engine"))
 	}
 
-	results := ryftprim.Search(&ryftprim.Params{
-		Query:         query,
-		Files:         params.Files,
-		Surrounding:   params.Surrounding,
-		Fuzziness:     params.Fuzziness,
-		Format:        params.Format,
-		CaseSensitive: params.CaseSensitive,
-		Nodes:         params.Nodes,
-		IndexFile:     n.FullIndexPath(),
-		ResultsFile:   n.FullResultsPath(),
-		KeepFiles:     *KeepResults,
-	})
-
-	// TODO: for cloud code get other ryftprim.Result objects and merge together
-	// [[[ ]]]]
-
-	items, _ := tcode.Transcode(results.Results)
-
-	//	if params.Local {
-	if !params.Stats {
-		//results.Stats = nil
+	// search configuration
+	cfg := search.NewEmptyConfig()
+	if q, err := url.QueryUnescape(params.Query); err != nil {
+		panic(srverr.NewWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to unescape query"))
+	} else {
+		cfg.Query = q
 	}
-	// if params.Format == "xml" && params.Fields != "" {
-	// fields := strings.Split(params.Fields, sepSign)
-	// streamSmplRecords(c, enc, results, fields)
-	// } else {
-	streamAllRecords(c, enc, items, results.Stats)
-	// }
-	//	} else {
-	//		cnslSrvc, err := GetConsulInfo()
-	//		if err != nil {
-	//			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-	//		}
-	//		ch := merge(items)
-	//		// time.Sleep(10 * time.Second)
-	//		for _, srv := range cnslSrvc {
-	//			recsChan, _ := searchInNode(params, srv)
-	//			ch = merge(ch, recsChan)
-	//		}
-	//		streamAllRecords(c, enc, ch, nil)
-	//	}
-}
+	cfg.AddFiles(params.Files) // TODO: unescape?
+	cfg.Surrounding = uint(params.Surrounding)
+	cfg.Fuzziness = uint(params.Fuzziness)
+	cfg.CaseSensitive = params.CaseSensitive
+	cfg.Nodes = uint(params.Nodes)
 
-func searchInNode(params SearchParams, service *api.CatalogService) (recs chan interface{}, chanErr chan error) {
-	recs = make(chan interface{})
-	chanErr = make(chan error)
-
-	go func() {
-		if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
-			close(recs)
-			close(chanErr)
-			return
-		}
-
-		prms := &UrlParams{}
-		prms.SetHost(service.ServiceAddress, fmt.Sprint(service.ServicePort))
-		prms.Path = "search"
-		prms.Params = map[string]interface{}{
-			"query":       params.Query,
-			"files":       createFilesQuery(params.Files),
-			"surrounding": params.Surrounding,
-			"format":      params.Format,
-			"fuzziness":   params.Fuzziness,
-			"local":       true,
-		}
-		url := createClusterUrl(prms)
-		response, err := http.Get(url)
-		if err != nil {
-			close(recs)
-			chanErr <- err
-			return
-		}
-
-		defer response.Body.Close()
-		dec := json.NewDecoder(response.Body)
-		var v map[string][]map[string]interface{}
-		dec.Decode(&v)
-
-		if i, ok := v["results"]; ok {
-			for _, v := range i {
-				if index, ok := v["_index"]; ok {
-					index.(map[string]interface{})["address"] = prms.host
-				}
-			}
-		}
-
-		recs <- v
-
-		// m := map[string]string{
-		// "address": prms.host,
-		// }
-		// recs <- m
-		// recs <- response.Body
-		defer close(chanErr)
-		defer close(recs)
-	}()
-	return
-}
-
-func logErrors(format string, errors chan error) {
-	for err := range errors {
-		if err != nil {
-			log.Printf(format, err.Error())
-		}
+	res, err := engine.Search(cfg)
+	if err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to start search"))
 	}
-}
 
-func streamAllRecords(c *gin.Context, enc encoder.Encoder, results chan interface{}, stats chan ryftprim.Statistics) {
+	// if encoder is MsgPack we can use two formats:
+	// - with tags to report data records and the statistics in one stream
+	// - without tags to report just data records (this format is used by Spark)
+	if mp, ok := enc.(*encoder.MsgPackEncoder); ok {
+		mp.OmitTags = !params.Stats
+	}
 
+	var errors []error // list of received errors
 	first := true
-	c.Stream(func(w io.Writer) bool {
+
+	// ctx.Stream() logic
+	writer := ctx.Writer
+	gone := writer.CloseNotify()
+
+	// put error to stream
+	putErr := func(err error) {
+		if !enc.WriteStreamError(writer, err) {
+			// unable to send error in response stream
+			// just save it and report later
+			errors = append(errors, err)
+		}
+	}
+
+	// put record to stream
+	putRec := func(rec *search.Record) {
+		xrec, err := tcode.Transcode1(rec)
+		if err != nil {
+			//panic(srverr.New(http.StatusInternalServerError, err.Error()))
+			putErr(err)
+			return
+		}
+
 		if first {
-			enc.Begin(w)
+			enc.Begin(writer)
 			first = false
 		}
 
-		if record, ok := <-results; ok {
-			if err := enc.Write(w, record); err != nil {
-				log.Panicln(err)
-			} else {
-				c.Writer.Flush()
+		err = enc.Write(writer, xrec)
+		if err != nil {
+			panic(err)
+		}
+
+		writer.Flush()
+	}
+
+	// process results!
+	for {
+		select {
+		case <-gone:
+			res.Cancel() // cancel processing
+			return
+
+		case rec, ok := <-res.RecordChan:
+			if ok && rec != nil {
+				putRec(rec)
 			}
-			return true
-		}
-		if stats != nil {
-			s := <-stats
-			enc.EndWithStats(w, s.AsMap())
-		} else {
-			enc.End(w)
-		}
-		return false
 
-	})
+		case err, ok := <-res.ErrorChan:
+			if ok && err != nil {
+				// panic(srverr.New(http.StatusInternalServerError, err.Error()))
+				putErr(err)
+			}
+
+		case <-res.DoneChan:
+			// drain the channels
+			for rec := range res.RecordChan {
+				putRec(rec)
+			}
+			for err := range res.ErrorChan {
+				putErr(err)
+			}
+
+			if first {
+				enc.Begin(writer)
+				first = false
+			}
+
+			if params.Stats {
+				xstat, err := tcode.TranscodeStat(res.Stat)
+				if err != nil {
+					putErr(err)
+				}
+				enc.EndWithStats(writer, xstat, errors)
+			} else {
+				enc.End(writer, errors)
+			}
+
+			log.Printf("done: %s", res)
+			return // stop
+		}
+	}
 }
-
-// func streamSmplRecords(c *gin.Context, enc encoder.Encoder, result *ryftprim.Result, sample []string) {
-// first := true
-//
-// c.Stream(func(w io.Writer) bool {
-// 	if first {
-// 		enc.Begin(w)
-// 		first = false
-// 	}
-//
-// 	if record, ok := <-result.Results; ok {
-//
-// 		rec := map[string]interface{}{}
-//
-// 		for i := range sample {
-// 			value, ok := record.(map[string]interface{})[sample[i]]
-// 			if ok {
-// 				rec[sample[i]] = value
-// 			}
-// 		}
-// 		if err := enc.Write(w, rec); err != nil {
-// 			log.Panicln(err)
-// 		} else {
-// 			c.Writer.Flush()
-// 		}
-//
-// 		return true
-//
-// 	}
-//
-// 	if result.Stats != nil {
-// 		stats := <-result.Stats
-// 		enc.EndWithStats(w, stats.AsMap())
-// 	} else {
-// 		enc.End(w)
-// 	}
-// 	return false
-// })
-// }

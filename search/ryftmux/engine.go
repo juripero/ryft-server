@@ -28,39 +28,73 @@
  * ============
  */
 
-package main
+package ryftmux
 
 import (
 	"fmt"
 
-	consul "github.com/hashicorp/consul/api"
+	"github.com/Sirupsen/logrus"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+var (
+	// package logger instance
+	log = logrus.New()
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+	TAG = "ryftmux"
+)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+// RyftMUX engine uses set of abstract engines as backends.
+type Engine struct {
+	Backends []search.Engine
+
+	IndexHost string // optional host in cluster mode
+}
+
+// NewEngine creates new RyftMUX search engine.
+func NewEngine(backends ...search.Engine) (*Engine, error) {
+	engine := new(Engine)
+	engine.Backends = backends
+	return engine, nil
+}
+
+// String gets string representation of the engine.
+func (engine *Engine) String() string {
+	return fmt.Sprintf("RyftMUX{backends:%d}",
+		len(engine.Backends))
+	// TODO: other parameters?
+}
+
+// Options gets all engine options.
+func (engine *Engine) Options() map[string]interface{} {
+	return map[string]interface{}{
+		"index-host": engine.IndexHost,
 	}
+}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+// log returns task related logger.
+func (task *Task) log() *logrus.Entry {
+	return log.WithField("task", task.Identifier)
+}
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+/*
+// factory creates RyftMUX engine.
+func factory(opts map[string]interface{}) (search.Engine, error) {
+	backends := parseOptions(opts)
+	engine, err := NewEngine(backends)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
+	}
+	return engine, nil
+}
+*/
+
+// package initialization
+func init() {
+	// should be created manually!
+	// search.RegisterEngine(TAG, factory)
+
+	// be silent by default
+	log.Level = logrus.WarnLevel
 }

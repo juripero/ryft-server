@@ -28,39 +28,67 @@
  * ============
  */
 
-package main
+package ryfthttp
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 
-	consul "github.com/hashicorp/consul/api"
+	"github.com/getryft/ryft-server/search"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	// prepare request URL TODO: move to dedicated function
+	url := engine.prepareFilesUrl(path)
+	url.Path += "/files"
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+	task := NewTask()
 
+	// prepare request, TODO: authentication?
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+		task.log().WithError(err).Errorf("failed to create HTTP request")
+		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	// we expect JSON format
+	req.Header.Set("Accept", "application/json")
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+	// do HTTP request
+	resp, err := engine.httpClient.Do(req)
+	if err != nil {
+		task.log().WithError(err).Errorf("failed to send HTTP request")
+		return nil, fmt.Errorf("failed to send HTTP request: %s", err)
+	}
+
+	defer resp.Body.Close() // close it later
+
+	// check status code
+	if resp.StatusCode != http.StatusOK {
+		task.log().WithField("status", resp.StatusCode).Errorf("invalid HTTP response status")
+		return nil, fmt.Errorf("invalid HTTP response status: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	// TODO: use dedicated structure from transcode here!
+	var info struct {
+		Path  string   `json:"dir"`
+		Files []string `json:"files,omitempty"`
+		Dirs  []string `json:"folders,omitempty"`
+	}
+
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&info)
+	if err != nil {
+		task.log().WithError(err).Errorf("failed to decode HTTP response")
+		return nil, fmt.Errorf("failed to decode HTTP response: %s", err)
+	}
+
+	res := &search.DirInfo{}
+	res.Path = info.Path
+	res.Files = info.Files
+	res.Dirs = info.Dirs
+
+	return res, nil // OK
 }

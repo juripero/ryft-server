@@ -28,39 +28,43 @@
  * ============
  */
 
-package main
+package search
 
 import (
 	"fmt"
-
-	consul "github.com/hashicorp/consul/api"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// TODO: replace with NodeInfo struct to support trees
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+// Directory content.
+type DirInfo struct {
+	Path string
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+	Files []string
+	Dirs  []string // subdirectories
+}
+
+// NewDirInfo creates empty directory content.
+func NewDirInfo(path string) *DirInfo {
+	res := new(DirInfo)
+
+	// path cannot be empty
+	// so replace "" with "/"
+	if len(path) != 0 {
+		res.Path = path
+	} else {
+		res.Path = "/"
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	// no files/dirs
+	res.Files = []string{}
+	res.Dirs = []string{}
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+	return res
+}
+
+// String gets string representation of directory content.
+func (dir *DirInfo) String() string {
+	return fmt.Sprintf("Dir{path:%q, files:%q, dirs:%q}",
+		dir.Path, dir.Files, dir.Dirs)
 }

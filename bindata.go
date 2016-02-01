@@ -84,7 +84,7 @@ func indexHtml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "index.html", size: 13237, mode: os.FileMode(436), modTime: time.Unix(1452271910, 0)}
+	info := bindataFileInfo{name: "index.html", size: 13237, mode: os.FileMode(436), modTime: time.Unix(1453907242, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -104,7 +104,7 @@ func swaggerJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "swagger.json", size: 12990, mode: os.FileMode(436), modTime: time.Unix(1453816356, 0)}
+	info := bindataFileInfo{name: "swagger.json", size: 12990, mode: os.FileMode(436), modTime: time.Unix(1453912762, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

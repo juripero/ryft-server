@@ -28,39 +28,42 @@
  * ============
  */
 
-package main
+package search
 
 import (
 	"fmt"
-
-	consul "github.com/hashicorp/consul/api"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// Abstract Search Engine interface
+type Engine interface {
+	// Get current engine options.
+	Options() map[string]interface{}
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+	// Run asynchronous "/search" operation.
+	Search(cfg *Config) (*Result, error)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+	// Run asynchronous "/count" operation.
+	Count(cfg *Config) (*Result, error)
+
+	// Run *synchronous* "/files" operation.
+	Files(path string) (*DirInfo, error)
+}
+
+// NewEngine creates new search engine by name.
+// To get list of available engines see GetAvailableEngines().
+// To get list of supported options see corresponding search engine.
+func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
+	// get appropriate factory
+	f, ok := factories[name]
+	if !ok {
+		return nil, fmt.Errorf("%q is unknown search engine", name)
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	if opts == nil {
+		// no options by default
+		opts = map[string]interface{}{}
+	}
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+	// create engine using factory
+	return f(opts)
 }

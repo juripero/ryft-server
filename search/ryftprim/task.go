@@ -28,57 +28,59 @@
  * ============
  */
 
-package names
+package ryftprim
 
 import (
+	"bytes"
 	"fmt"
-	"path/filepath"
-	"strconv"
+	"os/exec"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-var RyftoneMountPoint = "/ryftone"
-var ServerInstancePrefix = "RyftServer"
-var Port = 8765
+var (
+	// global identifier (zero for debugging)
+	taskId = uint64(0 * time.Now().UnixNano())
+)
 
-type Names struct {
-	Index               uint64
-	ResultFile, IdxFile string
+// RyftPrim task related data.
+type Task struct {
+	Identifier    string // unique
+	IndexFileName string
+	DataFileName  string
+
+	// `ryftprim` process & output
+	tool_args []string      // command line arguments
+	tool_cmd  *exec.Cmd     // `ryftprim` executable process
+	tool_out  *bytes.Buffer // combined STDOUT and STDERR
+
+	// index & data
+	enableDataProcessing bool
+	indexChan            chan search.Index // INDEX to DATA
+	indexCancel          chan interface{}  // to cancel INDEX processing
+	dataCancel           chan interface{}  // to cancel DATA processing
+	subtasks             sync.WaitGroup
+
+	// some processing statistics
+	totalDataLength uint64 // total DATA length expected, sum of all index.Length
 }
 
-var namesChan = make(chan Names, 256)
+// NewTask creates new task.
+func NewTask(enableProcessing bool) *Task {
+	id := atomic.AddUint64(&taskId, 1)
 
-func StartNamesGenerator() {
-	go func() {
-		var s string
-		for {
-			for i := uint64(0); i <= ^uint64(0); i++ {
-				s = strconv.FormatUint(i, 10)
-				namesChan <- Names{i, "result-" + s + ".bin", "idx-" + s + ".txt"}
-			}
-		}
-	}()
-}
+	task := new(Task)
+	task.Identifier = fmt.Sprintf("%016x", id)
+	task.enableDataProcessing = enableProcessing
 
-func New() Names {
-	return <-namesChan
-}
+	// NOTE: index file should have 'txt' extension,
+	// otherwise `ryftprim` adds '.txt' anyway.
+	// all files are hidden!
+	task.IndexFileName = fmt.Sprintf(".idx-%s.txt", task.Identifier)
+	task.DataFileName = fmt.Sprintf(".dat-%s.bin", task.Identifier)
 
-func (n *Names) FullIndexPath() string {
-	return PathInRyftoneForResultDir(n.IdxFile)
-}
-
-func (n *Names) FullResultsPath() string {
-	return PathInRyftoneForResultDir(n.ResultFile)
-}
-
-func ResultsDirName() string {
-	return fmt.Sprintf("%s-%d", ServerInstancePrefix, Port)
-}
-
-func ResultsDirPath(filenames ...string) string {
-	return filepath.Join(append([]string{RyftoneMountPoint}, filenames...)...)
-}
-
-func PathInRyftoneForResultDir(filenames ...string) string {
-	return filepath.Join(append([]string{ResultsDirName()}, filenames...)...)
+	return task
 }

@@ -28,65 +28,78 @@
  * ============
  */
 
-package encoder
+package ryftmux
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"time"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-type JsonEncoder struct {
-	Encoder
-	needSeparator bool
-}
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	task := NewTask()
 
-func (enc *JsonEncoder) Begin(w io.Writer) error {
-	_, err := w.Write([]byte("{\"results\":["))
-	return err
-}
+	ch := make(chan *search.DirInfo, len(engine.Backends))
 
-func (enc *JsonEncoder) End(w io.Writer) error {
-	_, err := w.Write([]byte("]}"))
-	return err
-}
-
-func (enc *JsonEncoder) EndWithStats(w io.Writer, stats map[string]interface{}) error {
-	if _, err := w.Write([]byte("], \"stats\": ")); err != nil {
-		return err
+	// prepare requests
+	for _, backend := range engine.Backends {
+		// do search in goroutine
+		go func(backend search.Engine) {
+			res, err := backend.Files(path)
+			if err != nil {
+				task.log().WithError(err).Warnf("failed to start /files subtask")
+				// TODO: report as multiplexed error?
+				ch <- nil
+			} else {
+				ch <- res
+			}
+		}(backend)
 	}
 
-	wEncoder := json.NewEncoder(w)
-	wEncoder.Encode(stats)
+	// wait for all subtasks and merge results
+	muxPath := ""
+	muxFiles := map[string]int{}
+	muxDirs := map[string]int{}
+	for _ = range engine.Backends {
+		select {
+		case res, ok := <-ch:
+			if ok && res != nil {
+				// check directory path is consistent
+				if len(muxPath) == 0 {
+					muxPath = res.Path
+				}
+				if muxPath != res.Path {
+					task.log().WithField("path1", muxPath).
+						WithField("path2", res.Path).
+						Warnf("failed to start /files subtask")
+					return nil, fmt.Errorf("inconsistent directory %q != %q",
+						muxPath, res.Path)
+				}
 
-	_, err := w.Write([]byte("}"))
-	return err
-}
+				// merge files
+				for _, f := range res.Files {
+					muxFiles[f] += 1
+				}
 
-func (enc *JsonEncoder) Write(w io.Writer, itm interface{}) error {
-	if enc.needSeparator {
-		w.Write([]byte(","))
-		enc.needSeparator = false
+				// merge dirs
+				for _, d := range res.Dirs {
+					muxDirs[d] += 1
+				}
+			}
+		}
 	}
-	wEncoder := json.NewEncoder(w)
-	err := jsonEncode(wEncoder, itm, WriteInterval)
-	if err == nil {
-		enc.needSeparator = true
-	}
-	return err
-}
 
-func jsonEncode(enc *json.Encoder, obj interface{}, timeout time.Duration) (err error) {
-	ch := make(chan error, 1)
-	go func() {
-		ch <- enc.Encode(obj)
-	}()
-
-	select {
-	case err = <-ch:
-		return
-	case <-time.After(timeout):
-		return fmt.Errorf("Json encoding timeout")
+	// prepare results
+	mux := search.NewDirInfo(muxPath)
+	mux.Files = make([]string, 0, len(muxFiles))
+	mux.Dirs = make([]string, 0, len(muxDirs))
+	for f, _ := range muxFiles {
+		mux.Files = append(mux.Files, f)
 	}
+	for d, _ := range muxDirs {
+		mux.Dirs = append(mux.Dirs, d)
+	}
+
+	return mux, nil // OK
 }
