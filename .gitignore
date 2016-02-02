@@ -1,1 +1,3 @@
 /ryft-server
+*.deb
+*.orig
