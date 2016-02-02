@@ -60,8 +60,38 @@ func (transcoder *XmlTranscoder) Transcode1(rec *search.Record) (res interface{}
 					log.Printf("PASRING XML: %s", rec.Data)
 				}
 			}()
-			item.(map[string]interface{})["_index"] = NewIndex(rec.Index)
 			res = item
+			res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
+			break
+		}
+		break
+	}
+	return
+}
+
+func (transcoder *XmlTranscoder) TranscodeWithFields(rec *search.Record, fields []string) (res interface{}, err error) {
+	// TODO: replace with XML?
+	obj, err := mxj.NewMapXml(rec.Data.([]byte))
+	res = map[string]interface{}{}
+	if err != nil {
+		return
+	}
+	for k := range obj {
+		item, ok := obj[k]
+		if ok {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Println("Recovered in parsing ", r)
+					debug.PrintStack()
+					log.Printf("PASRING XML: %s", rec.Data)
+				}
+			}()
+			for _, k := range fields {
+				if r, ok := item.(map[string]interface{})[k]; ok {
+					res.(map[string]interface{})[k] = r
+				}
+			}
+			res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
 			break
 		}
 		break

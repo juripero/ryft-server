@@ -116,6 +116,10 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	}
 	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
 	// q.Set("fields", )
+
+	for _, field := range cfg.Fields {
+		q.Add("fields", field)
+	}
 	q.Set("stats", fmt.Sprintf("%t", !engine.SkipStat))
 
 	u.RawQuery = q.Encode()

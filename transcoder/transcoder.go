@@ -38,6 +38,7 @@ import (
 
 type Transcoder interface {
 	Transcode1(rec *search.Record) (interface{}, error)
+	TranscodeWithFields(rec *search.Record, fields []string) (interface{}, error)
 	TranscodeStat(stat *search.Statistics) (interface{}, error)
 }
 
