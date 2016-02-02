@@ -104,7 +104,9 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)
-
+	if params.Fields != "" {
+		cfg.AddFields(params.Fields)
+	}
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,
@@ -136,7 +138,7 @@ func (s *Server) search(ctx *gin.Context) {
 
 	// put record to stream
 	putRec := func(rec *search.Record) {
-		xrec, err := tcode.Transcode1(rec)
+		xrec, err := tcode.Transcode1(rec, cfg.Fields)
 		if err != nil {
 			//panic(srverr.New(http.StatusInternalServerError, err.Error()))
 			putErr(err)
@@ -147,8 +149,9 @@ func (s *Server) search(ctx *gin.Context) {
 			enc.Begin(writer)
 			first = false
 		}
-
-		err = enc.Write(writer, xrec)
+		if xrec != nil {
+			err = enc.Write(writer, xrec)
+		}
 		if err != nil {
 			panic(err)
 		}

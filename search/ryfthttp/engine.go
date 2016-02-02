@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 
@@ -115,7 +116,10 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 		q.Set("nodes", fmt.Sprintf("%d", cfg.Nodes))
 	}
 	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
-	// q.Set("fields", )
+	if len(cfg.Fields) > 0 {
+		fmt.Println(cfg.Fields)
+		q.Set("fields", strings.Join(cfg.Fields, ","))
+	}
 	q.Set("stats", fmt.Sprintf("%t", !engine.SkipStat))
 
 	u.RawQuery = q.Encode()

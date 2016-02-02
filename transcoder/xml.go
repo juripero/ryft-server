@@ -43,10 +43,10 @@ type XmlTranscoder struct {
 	Transcoder
 }
 
-func (transcoder *XmlTranscoder) Transcode1(rec *search.Record) (res interface{}, err error) {
+func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string) (res interface{}, err error) {
 	// TODO: replace with XML?
 	obj, err := mxj.NewMapXml(rec.Data.([]byte))
-
+	tmp := map[string]interface{}{}
 	if err != nil {
 		return
 	}
@@ -60,8 +60,19 @@ func (transcoder *XmlTranscoder) Transcode1(rec *search.Record) (res interface{}
 					log.Printf("PASRING XML: %s", rec.Data)
 				}
 			}()
-			item.(map[string]interface{})["_index"] = NewIndex(rec.Index)
-			res = item
+			// if fields is not empty - do filtering
+			if len(fields) == 0 {
+				res = item
+			} else {
+				for _, k := range fields {
+					if r, ok := item.(map[string]interface{})[k]; ok {
+						tmp[k] = r
+					}
+				}
+				res = tmp
+			}
+
+			res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
 			break
 		}
 		break
