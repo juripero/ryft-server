@@ -145,8 +145,9 @@ func (s *Server) search(ctx *gin.Context) {
 			enc.Begin(writer)
 			first = false
 		}
-
-		err = enc.Write(writer, xrec)
+		if xrec != nil {
+			err = enc.Write(writer, xrec)
+		}
 		if err != nil {
 			panic(err)
 		}

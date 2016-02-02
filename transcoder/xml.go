@@ -46,7 +46,7 @@ type XmlTranscoder struct {
 func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string) (res interface{}, err error) {
 	// TODO: replace with XML?
 	obj, err := mxj.NewMapXml(rec.Data.([]byte))
-	res = map[string]interface{}{}
+	tmp := map[string]interface{}{}
 	if err != nil {
 		return
 	}
@@ -66,9 +66,10 @@ func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string)
 			} else {
 				for _, k := range fields {
 					if r, ok := item.(map[string]interface{})[k]; ok {
-						res.(map[string]interface{})[k] = r
+						tmp[k] = r
 					}
 				}
+				res = tmp
 			}
 
 			res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
