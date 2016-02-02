@@ -177,6 +177,11 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 	// TODO: overall execution timeout?
 
 	case err := <-cmd_done: // process done
+		if task.enableDataProcessing {
+			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
+			task.indexCancel <- nil
+			task.dataCancel <- nil
+		}
 		engine.finish(err, task, res)
 
 	case <-res.CancelChan: // client wants to stop all processing
