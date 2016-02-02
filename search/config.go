@@ -50,8 +50,6 @@ type Config struct {
 // NewEmptyConfig creates new empty search configuration.
 func NewEmptyConfig() *Config {
 	cfg := new(Config)
-	cfg.Files = []string{}  // no files by default
-	cfg.Fields = []string{} // no fields by default
 	return cfg
 }
 

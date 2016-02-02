@@ -132,14 +132,7 @@ func (s *Server) search(ctx *gin.Context) {
 
 	// put record to stream
 	putRec := func(rec *search.Record) {
-		var xrec interface{}
-		var err error
-		if params.Format != "xml" {
-			xrec, err = tcode.Transcode1(rec)
-		} else {
-			xrec, err = tcode.TranscodeWithFields(rec, cfg.Fields)
-
-		}
+		xrec, err := tcode.Transcode1(rec, cfg.Fields)
 		if err != nil {
 			//panic(srverr.New(http.StatusInternalServerError, err.Error()))
 			putErr(err)

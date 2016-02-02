@@ -43,7 +43,8 @@ type RawData struct {
 	Data  interface{} `json:"data"`
 }
 
-func (transcoder *RawTranscoder) Transcode1(rec *search.Record) (interface{}, error) {
+//Fields param is not used in Raw transcoder
+func (transcoder *RawTranscoder) Transcode1(rec *search.Record, fields []string) (interface{}, error) {
 	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
 }
 
