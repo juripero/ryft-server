@@ -151,7 +151,6 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 	go func() {
 		task.log().Debugf("[%s]: waiting for tool finished...", TAG)
 		defer close(cmd_done) // close channel once process is finished
-		defer fmt.Println("Before Close")
 
 		err := task.tool_cmd.Wait()
 		cmd_done <- err
