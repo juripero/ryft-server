@@ -100,7 +100,9 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)
-	cfg.AddFields(params.Fields)
+	if params.Fields != "" {
+		cfg.AddFields(params.Fields)
+	}
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(srverr.NewWithDetails(http.StatusInternalServerError,

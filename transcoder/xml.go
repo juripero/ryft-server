@@ -70,6 +70,7 @@ func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string)
 					}
 				}
 			}
+
 			res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
 			break
 		}
