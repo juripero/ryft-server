@@ -151,6 +151,7 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 	go func() {
 		task.log().Debugf("[%s]: waiting for tool finished...", TAG)
 		defer close(cmd_done) // close channel once process is finished
+		defer fmt.Println("Before Close")
 
 		err := task.tool_cmd.Wait()
 		cmd_done <- err
@@ -177,6 +178,11 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 	// TODO: overall execution timeout?
 
 	case err := <-cmd_done: // process done
+		if task.enableDataProcessing {
+			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
+			task.indexCancel <- nil
+			task.dataCancel <- nil
+		}
 		engine.finish(err, task, res)
 
 	case <-res.CancelChan: // client wants to stop all processing
