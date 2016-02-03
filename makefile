@@ -1,28 +1,27 @@
-#!/bin/bash
+GOBINDATA = $GOPATH/bin/go-bindata
+ASSETS = bindata.go
+BINARIES = ryft-server
 
-SWAGGER_FILE="swagger.json"
-INDEX_FILE="index.html"
-
-function make {
-  generateAssets
-  buildRyftRest
-}
+all: $(ASSETS) build
 
 
-function generateAssets {
-  if [ -f $GOPATH"/go-bindata" ]; then
-  echo "Getting go-bindata"
-  eval go get -u github.com/jteeuwen/go-bindata/...
-  fi
-  echo "Creating Assets"
-  eval go-bindata -o bindata.go $INDEX_FILE $SWAGGER_FILE
-
-}
-
-function buildRyftRest {
-  echo "Building ryft-server"
-  eval go install
-}
+$(GOBINDATA):
+	go get -u github.com/jteeuwen/go-bindata/...
 
 
-make
+$(ASSETS): $(GOBINDATA)
+	go-bindata -o bindata.go -prefix static/ static/...
+	
+
+.PHONY: build	
+build:
+	go build
+	
+.PHONY: install
+install: $(ASSETS) 
+	go install
+	
+	
+clean: 
+	rm -f $(ASSETS)
+	rm -f $(BINARIES) 

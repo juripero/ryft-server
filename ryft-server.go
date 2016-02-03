@@ -34,8 +34,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
@@ -298,18 +300,6 @@ func main() {
 
 	// Configure routes
 
-	// index & help
-	idxHTML := MustAsset("index.html")
-	router.GET("/", func(c *gin.Context) {
-		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
-	})
-
-	// swagger schema
-	swaggerJSON := MustAsset("swagger.json")
-	router.GET("/swagger.json", func(c *gin.Context) {
-		c.Data(http.StatusOK, http.DetectContentType(swaggerJSON), swaggerJSON)
-	})
-
 	// stats page
 	router.GET("/about", func(c *gin.Context) {
 		c.JSON(http.StatusOK, Stats.Data())
@@ -319,6 +309,21 @@ func main() {
 	router.GET("/count", detectEncoder, server.count)
 	router.GET("/cluster/members", server.members)
 	router.GET("/files", server.files)
+
+	// static asset
+	for _, asset := range AssetNames() {
+		data := MustAsset(asset)
+		ct := mime.TypeByExtension(filepath.Ext(asset))
+		router.GET("/"+asset, func(c *gin.Context) {
+			c.Data(http.StatusOK, ct, data)
+		})
+	}
+
+	// index
+	idxHTML := MustAsset("index.html")
+	router.GET("/", func(c *gin.Context) {
+		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
+	})
 
 	// Startup preparatory
 
