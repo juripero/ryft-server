@@ -58,7 +58,10 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 
 	// try to parse raw data as XML...
 	parsed, err := parseXml(rec.Data, fields)
-	res.Data = parsed // might be nil!
+	if parsed != nil {
+
+		res.Data = parsed // might be nil!
+	}
 	if err != nil {
 		res.Error = err.Error()
 	}
