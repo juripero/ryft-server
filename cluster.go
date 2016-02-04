@@ -31,10 +31,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	consul "github.com/hashicorp/consul/api"
 )
 
 // handle /cluster/members endpoint: information about cluster's nodes
@@ -47,4 +50,33 @@ func (s *Server) members(c *gin.Context) {
 		log.Printf("consul info: %#v", info)
 		c.JSON(http.StatusOK, info)
 	}
+}
+
+//type Service struct {
+//	Node           string   `json:"Node"`
+//	Address        string   `json:"Address"`
+//	ServiceID      string   `json:"ServiceID"`
+//	ServiceName    string   `json:"ServiceName"`
+//	ServiceAddress string   `json:"ServiceAddress"`
+//	ServiceTags    []string `json:"ServiceTags"`
+//	ServicePort    string   `json:"ServicePort"`
+//}
+
+func GetConsulInfo() (address []*consul.CatalogService, err error) {
+	config := consul.DefaultConfig()
+	// TODO: get some data from server's configuration
+	config.Datacenter = "dc1"
+	client, err := consul.NewClient(config)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get consul client: %s", err)
+	}
+
+	catalog := client.Catalog()
+	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+
+	// for _, value := range services {
+	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
+	// }
+	return services, err
 }
