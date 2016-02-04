@@ -366,7 +366,19 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 			res.ReportRecord(rec)
 		} else {
 			task.log().Debugf("[%s]: DATA processing cancelled", TAG)
-			task.indexCancel <- nil // just in case, also stop INDEX processing
+
+			// just in case, also stop INDEX processing
+			task.indexCancel <- nil
+
+			// need to drain index channel to give INDEX processing routine
+			// a chance to to finish it's work (it might be blocked sending
+			// index record to the task.indexChan which we are not going
+			// to read anymore)
+			for idx := range task.indexChan {
+				task.log().WithField("index", idx).
+					Debugf("[%s]: INDEX ignored", TAG)
+			}
+
 			return
 		}
 	}
