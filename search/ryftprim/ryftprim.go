@@ -366,6 +366,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 			res.ReportRecord(rec)
 		} else {
 			task.log().Debugf("[%s]: DATA processing cancelled", TAG)
+			task.indexCancel <- nil // just in case, also stop INDEX processing
 			return
 		}
 	}
