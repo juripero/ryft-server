@@ -43,7 +43,7 @@ type Record struct {
 	Index   Index       `json:"_index"`
 	RawData []byte      `json:"_raw_data"` // base-64 encoded
 	Data    interface{} `json:"data,omitempty"`
-	Error   error       `json:"error,omitempty"`
+	Error   string      `json:"error,omitempty"`
 }
 
 // FromRecord converts RECORD to format specific data.
@@ -55,7 +55,14 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 	res := new(Record)
 	res.Index = FromIndex(rec.Index)
 	res.RawData = rec.Data
-	res.Data, res.Error = parseXml(rec.Data, fields)
+
+	// try to parse raw data as XML...
+	parsed, err := parseXml(rec.Data, fields)
+	res.Data = parsed // might be nil!
+	if err != nil {
+		res.Error = err.Error()
+	}
+
 	return res
 }
 
