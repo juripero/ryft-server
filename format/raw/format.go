@@ -28,45 +28,51 @@
  * ============
  */
 
-package search
+package raw
 
 import (
-	"fmt"
-
-	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search"
 )
 
-// Search INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
+// RAW format, does 1=1 mapping.
+// Support for JSON tags.
+type Format struct{}
+
+// New creates new RAW formatter.
+// No options supported.
+func New() (*Format, error) {
+	return new(Format), nil
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
+// Convert INDEX to RAW format specific data.
+func (*Format) FromIndex(idx search.Index) interface{} {
+	return FromIndex(idx)
 }
 
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
+// Convert RAW format specific data to INDEX.
+// WARN: will panic if argument is not of raw.Index type!
+func (*Format) ToIndex(idx interface{}) search.Index {
+	return ToIndex(idx.(Index))
 }
 
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
-	}
+// Convert RECORD to RAW format specific data.
+func (*Format) FromRecord(rec *search.Record) interface{} {
+	return FromRecord(rec)
 }
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+// Convert RAW format spcific data to RECORD.
+// WARN: will panic if argument is not of raw.Record type!
+func (*Format) ToRecord(rec interface{}) *search.Record {
+	return ToRecord(rec.(*Record))
+}
+
+// Convert STATISTICS to RAW format specific data.
+func (f *Format) FromStat(stat *search.Statistics) interface{} {
+	return FromStat(stat)
+}
+
+// Convert RAW format specific data to STATISTICS.
+// WARN: will panic if argument is not of raw.Statistics type!
+func (f *Format) ToStat(stat interface{}) *search.Statistics {
+	return ToStat(stat.(*Statistics))
 }

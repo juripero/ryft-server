@@ -28,45 +28,38 @@
  * ============
  */
 
-package search
+package raw
 
 import (
-	"fmt"
-
-	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search"
 )
 
-// Search INDEX and DATA combined.
+// RECORD format specific data.
 type Record struct {
-	Index Index
-	Data  []byte
+	Index Index  `json:"_index"`
+	Data  []byte `json:"data"` // base-64 encoded
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
-}
-
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
-}
-
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
+// FromRecord converts RECORD to format specific data.
+func FromRecord(rec *search.Record) *Record {
+	if rec == nil {
+		return nil
 	}
+
+	res := new(Record)
+	res.Index = FromIndex(rec.Index)
+	res.Data = rec.Data
+	return res
 }
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+// ToRecord converts format specific data to RECORD.
+func ToRecord(rec *Record) *search.Record {
+	if rec == nil {
+		return nil
+	}
+
+	res := new(search.Record)
+	res.Index = ToIndex(rec.Index)
+	res.Data = rec.Data
+	return res
 }

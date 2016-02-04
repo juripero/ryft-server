@@ -45,7 +45,7 @@ type XmlTranscoder struct {
 
 func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string) (res interface{}, err error) {
 	// TODO: replace with XML?
-	obj, err := mxj.NewMapXml(rec.Data.([]byte))
+	obj, err := mxj.NewMapXml(rec.Data)
 	tmp := map[string]interface{}{}
 	if err != nil {
 		return

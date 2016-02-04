@@ -57,7 +57,7 @@ func DecodeRawItem(item *RawData) (*search.Record, error) {
 			Fuzziness: item.Index.Fuzziness,
 			Host:      item.Index.Host,
 		},
-		Data: item.Data,
+		Data: item.Data.([]byte),
 	}, nil
 }
 

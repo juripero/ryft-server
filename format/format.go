@@ -28,45 +28,44 @@
  * ============
  */
 
-package search
+package format
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/format/xml"
+	"github.com/getryft/ryft-server/search"
 )
 
-// Search INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
+const (
+	RAW = "raw"
+	XML = "xml"
+)
+
+// Abstract Format interface.
+// Support conversion from/to basic search data types.
+type Format interface {
+	FromIndex(search.Index) interface{}
+	ToIndex(interface{}) search.Index
+
+	FromRecord(*search.Record) interface{}
+	ToRecord(interface{}) *search.Record
+
+	FromStat(*search.Statistics) interface{}
+	ToStat(interface{}) *search.Statistics
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
-}
-
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
-}
-
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
+// New creates new formatter instance.
+// XML format supports some options.
+func New(format string, opts map[string]interface{}) (Format, error) {
+	switch strings.ToLower(format) {
+	case RAW:
+		return raw.New()
+	case XML:
+		return xml.New(opts)
 	}
-}
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+	return nil, fmt.Errorf("%q is unsupported format", format)
 }
