@@ -37,8 +37,8 @@ import (
 	"strings"
 
 	"github.com/getryft/ryft-server/encoder"
+	"github.com/getryft/ryft-server/format"
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
 )
 
@@ -65,18 +65,21 @@ func (s *Server) search(ctx *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := SearchParams{Format: transcoder.RAWTRANSCODER}
+	params := SearchParams{Format: format.RAW}
 	if err := ctx.Bind(&params); err != nil {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
-	if params.Format == transcoder.XMLTRANSCODER && !strings.Contains(params.Query, "RECORD") {
+	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
 		panic(NewServerError(http.StatusBadRequest,
 			"format=xml could not be used without RECORD query"))
 	}
 	// setting up transcoder to convert raw data
-	var tcode transcoder.Transcoder
-	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
+	var tcode format.Format
+	tcode_opts := map[string]interface{}{
+		"fields": params.Fields,
+	}
+	if tcode, err = format.New(params.Format, tcode_opts); err != nil {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to get transcoder"))
 	}
@@ -103,10 +106,6 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)
-	var fields []string
-	if params.Fields != "" {
-		fields = strings.Split(params.Fields, ",")
-	}
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -138,12 +137,7 @@ func (s *Server) search(ctx *gin.Context) {
 
 	// put record to stream
 	putRec := func(rec *search.Record) {
-		xrec, err := tcode.Transcode1(rec, fields)
-		if err != nil {
-			//panic(srverr.New(http.StatusInternalServerError, err.Error()))
-			putErr(err)
-			return
-		}
+		xrec := tcode.FromRecord(rec)
 
 		if first {
 			enc.Begin(writer)
@@ -192,10 +186,7 @@ func (s *Server) search(ctx *gin.Context) {
 			}
 
 			if params.Stats {
-				xstat, err := tcode.TranscodeStat(res.Stat)
-				if err != nil {
-					putErr(err)
-				}
+				xstat := tcode.FromStat(res.Stat)
 				enc.EndWithStats(writer, xstat, errors)
 			} else {
 				enc.End(writer, errors)

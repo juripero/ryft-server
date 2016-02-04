@@ -35,8 +35,8 @@ import (
 	"net/http"
 
 	"github.com/getryft/ryft-server/encoder"
+	format "github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/transcoder"
 )
 
 // Search starts asynchronous "/search" with RyftPrim engine.
@@ -97,14 +97,14 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				return // DONE
 
 			case encoder.TAG_MsgPackItem:
-				var item transcoder.RawData
+				var item format.Record
 				err := dec.Next(&item)
 				if err != nil {
 					task.log().WithError(err).Warnf("[%s]: failed to decode record", TAG)
 					res.ReportError(err)
 					return // stop processing
 				} else {
-					rec, _ := transcoder.DecodeRawItem(&item)
+					rec := format.ToRecord(&item)
 					task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
 					rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 					res.ReportRecord(rec)
@@ -126,10 +126,10 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				}
 
 			case encoder.TAG_MsgPackStat:
-				var stat transcoder.Statistics
+				var stat format.Statistics
 				err := dec.Next(&stat)
 				if err == nil {
-					res.Stat, _ = transcoder.DecodeRawStat(&stat)
+					res.Stat = format.ToStat(&stat)
 					task.log().WithField("stat", res.Stat).
 						Infof("[%s]: statistics received", TAG)
 				}
