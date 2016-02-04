@@ -80,7 +80,6 @@ var (
 	tlsKeyFile       = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
 	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
 )
-var hostName string
 
 // Server instance
 type Server struct {
@@ -194,6 +193,7 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 
 			// index-host
 			if _, ok := opts["index-host"]; !ok {
+				hostName, _ := os.Hostname()
 				opts["index-host"] = hostName
 			}
 
@@ -238,8 +238,6 @@ var Stats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
-	//getting current hostname
-	hostName, _ = os.Hostname()
 
 	// set log timestamp format
 	log.SetFlags(log.Lmicroseconds)
