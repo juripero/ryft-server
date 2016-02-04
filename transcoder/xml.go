@@ -31,9 +31,8 @@
 package transcoder
 
 import (
+	"errors"
 	"fmt"
-	"log"
-	"runtime/debug"
 
 	"github.com/clbanning/mxj"
 	"github.com/getryft/ryft-server/search"
@@ -44,40 +43,80 @@ type XmlTranscoder struct {
 }
 
 func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string) (res interface{}, err error) {
-	// TODO: replace with XML?
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in parsing ", r)
+			//          debug.PrintStack()
+			//          log.Printf("PASRING XML: %s", rec.Data)
+			err = errors.New(fmt.Sprintf("PASRING XML: %s", rec))
+			return
+		}
+	}()
+
 	obj, err := mxj.NewMapXml(rec.Data.([]byte))
-	tmp := map[string]interface{}{}
 	if err != nil {
-		return
+		return nil, err
 	}
 	for k := range obj {
 		item, ok := obj[k]
 		if ok {
-			defer func() {
-				if r := recover(); r != nil {
-					fmt.Println("Recovered in parsing ", r)
-					debug.PrintStack()
-					log.Printf("PASRING XML: %s", rec.Data)
-				}
-			}()
-			// if fields is not empty - do filtering
-			if len(fields) == 0 {
-				res = item
-			} else {
-				for _, k := range fields {
-					if r, ok := item.(map[string]interface{})[k]; ok {
-						tmp[k] = r
+			switch i := item.(type) {
+			case map[string]interface{}:
+				// if fields is not empty - do filtering
+				if len(fields) != 0 {
+					res = make(map[string]interface{})
+					for _, k := range fields {
+						if r, ok := i[k]; ok {
+							res.(map[string]interface{})[k] = r
+						}
 					}
+				} else {
+					res = i
 				}
-				res = tmp
+				res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
+				break
+			default:
+				return nil, fmt.Errorf("incorrect input data type")
 			}
-
-			res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
-			break
 		}
 		break
 	}
 	return
+
+	//	obj, err := mxj.NewMapXml(rec.Data.([]byte))
+	//	tmp := map[string]interface{}{}
+	//	if err != nil {
+	//		return
+	//	}
+	//	for k := range obj {
+	//		item, ok := obj[k]
+	//		if ok {
+	//			defer func() {
+	//				if r := recover(); r != nil {
+	//					fmt.Println("Recovered in parsing ", r)
+	//					debug.PrintStack()
+	//					log.Printf("PASRING XML: %s", rec.Data)
+	//				}
+	//			}()
+	//			// if fields is not empty - do filtering
+	//			if len(fields) == 0 {
+	//				res = item
+	//			} else {
+	//				for _, k := range fields {
+	//					if r, ok := item.(map[string]interface{})[k]; ok {
+	//						tmp[k] = r
+	//					}
+	//				}
+	//				res = tmp
+	//			}
+
+	//			res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
+	//			break
+	//		}
+	//		break
+	//	}
+	//	return
 }
 
 func (transcoder *XmlTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
