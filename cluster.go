@@ -34,7 +34,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/getryft/ryft-server/srverr"
 	"github.com/gin-gonic/gin"
 )
 
@@ -43,7 +42,7 @@ func (s *Server) members(c *gin.Context) {
 	info, err := GetConsulInfo()
 
 	if err != nil {
-		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+		panic(NewServerError(http.StatusInternalServerError, err.Error()))
 	} else {
 		log.Printf("consul info: %#v", info)
 		c.JSON(http.StatusOK, info)

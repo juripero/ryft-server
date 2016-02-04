@@ -28,7 +28,7 @@
  * ============
  */
 
-package srverr
+package main
 
 import (
 	"fmt"
@@ -50,15 +50,15 @@ func (err *ServerError) Error() string {
 	return fmt.Sprintf("%d %s", err.Status, err.Message)
 }
 
-func New(status int, message string) *ServerError {
+func NewServerError(status int, message string) *ServerError {
 	return &ServerError{status, message, ""}
 }
 
-func NewWithDetails(status int, message string, details string) *ServerError {
+func NewServerErrorWithDetails(status int, message string, details string) *ServerError {
 	return &ServerError{status, message, details}
 }
 
-func Recover(c *gin.Context) {
+func RecoverFromPanic(c *gin.Context) {
 	if r := recover(); r != nil {
 		if err, ok := r.(*ServerError); ok {
 			log.Printf("Panic recovered server error: status=%d msg:%s => %+v", err.Status, err.Message, err)
@@ -81,5 +81,4 @@ func Recover(c *gin.Context) {
 		log.Printf("Panic recovered with object:%+v", r)
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%+v", r), "status": http.StatusInternalServerError})
 	}
-
 }

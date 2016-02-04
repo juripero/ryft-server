@@ -49,7 +49,6 @@ import (
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
-	"github.com/getryft/ryft-server/srverr"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thoas/stats"
@@ -346,7 +345,7 @@ func detectEncoder(c *gin.Context) {
 
 	// setting up encoder to respond with requested format
 	if enc, err := encoder.GetByMimeType(accept); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+		panic(NewServerError(http.StatusBadRequest, err.Error()))
 	} else {
 		c.Set(ENCODER_CONTEXT_KEY, enc)
 	}

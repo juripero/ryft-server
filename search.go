@@ -38,7 +38,6 @@ import (
 
 	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/srverr"
 	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
 )
@@ -61,24 +60,24 @@ type SearchParams struct {
 // Handle /search endpoint.
 func (s *Server) search(ctx *gin.Context) {
 	// recover from panics if any
-	defer srverr.Recover(ctx)
+	defer RecoverFromPanic(ctx)
 
 	var err error
 
 	// parse request parameters
 	params := SearchParams{Format: transcoder.RAWTRANSCODER}
 	if err := ctx.Bind(&params); err != nil {
-		panic(srverr.NewWithDetails(http.StatusBadRequest,
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
 	if params.Format == transcoder.XMLTRANSCODER && !strings.Contains(params.Query, "RECORD") {
-		panic(srverr.New(http.StatusBadRequest,
+		panic(NewServerError(http.StatusBadRequest,
 			"format=xml could not be used without RECORD query"))
 	}
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
 	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
-		panic(srverr.NewWithDetails(http.StatusBadRequest,
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to get transcoder"))
 	}
 
@@ -87,14 +86,14 @@ func (s *Server) search(ctx *gin.Context) {
 	// get search engine
 	engine, err := s.getSearchEngine(params.Local)
 	if err != nil {
-		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
 	}
 
 	// search configuration
 	cfg := search.NewEmptyConfig()
 	if q, err := url.QueryUnescape(params.Query); err != nil {
-		panic(srverr.NewWithDetails(http.StatusBadRequest,
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to unescape query"))
 	} else {
 		cfg.Query = q
@@ -110,7 +109,7 @@ func (s *Server) search(ctx *gin.Context) {
 	}
 	res, err := engine.Search(cfg)
 	if err != nil {
-		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))
 	}
 
