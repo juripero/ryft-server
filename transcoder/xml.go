@@ -83,40 +83,6 @@ func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string)
 		break
 	}
 	return
-
-	//	obj, err := mxj.NewMapXml(rec.Data.([]byte))
-	//	tmp := map[string]interface{}{}
-	//	if err != nil {
-	//		return
-	//	}
-	//	for k := range obj {
-	//		item, ok := obj[k]
-	//		if ok {
-	//			defer func() {
-	//				if r := recover(); r != nil {
-	//					fmt.Println("Recovered in parsing ", r)
-	//					debug.PrintStack()
-	//					log.Printf("PASRING XML: %s", rec.Data)
-	//				}
-	//			}()
-	//			// if fields is not empty - do filtering
-	//			if len(fields) == 0 {
-	//				res = item
-	//			} else {
-	//				for _, k := range fields {
-	//					if r, ok := item.(map[string]interface{})[k]; ok {
-	//						tmp[k] = r
-	//					}
-	//				}
-	//				res = tmp
-	//			}
-
-	//			res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
-	//			break
-	//		}
-	//		break
-	//	}
-	//	return
 }
 
 func (transcoder *XmlTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
