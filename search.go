@@ -71,9 +71,9 @@ func (s *Server) search(ctx *gin.Context) {
 		panic(srverr.NewWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
-	if params.Format == transcoder.XMLTRANSCODER && strings.Contains(params.Query, "RAW_TEXT") {
+	if params.Format == transcoder.XMLTRANSCODER && !strings.Contains(params.Query, "RECORD") {
 		panic(srverr.New(http.StatusBadRequest,
-			"format=xml could not be used with RAW_TEXT query"))
+			"format=xml could not be used without RECORD query"))
 	}
 	// setting up transcoder to convert raw data
 	var tcode transcoder.Transcoder
