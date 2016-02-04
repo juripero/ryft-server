@@ -39,9 +39,17 @@ import (
 )
 
 // RECORD format specific data.
-type Record struct {
-	Index   Index       `json:"_index"`
-	RawData []byte      `json:"_raw_data"` // base-64 encoded
+type Record map[string]interface{}
+
+const (
+	recFieldIndex = "_index"
+	recFieldError = "_error"
+)
+
+// for future work...
+type Record_0 struct {
+	Index   Index       `json:"index"`
+	RawData []byte      `json:"raw_data,omitempty"` // base-64 encoded
 	Data    interface{} `json:"data,omitempty"`
 	Error   string      `json:"error,omitempty"`
 }
@@ -52,21 +60,23 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 		return nil
 	}
 
-	res := new(Record)
-	res.Index = FromIndex(rec.Index)
-	res.RawData = rec.Data
+	res := Record{}
+	res[recFieldIndex] = FromIndex(rec.Index) // res.Index =
+	// res.RawData = rec.Data
 
 	// try to parse raw data as XML...
 	parsed, err := parseXml(rec.Data, fields)
 	if parsed != nil {
-
-		res.Data = parsed // might be nil!
+		// res.Data = parsed
+		for k, v := range parsed {
+			res[k] = v
+		}
 	}
 	if err != nil {
-		res.Error = err.Error()
+		res[recFieldError] = err.Error() // res.Error =
 	}
 
-	return res
+	return &res
 }
 
 // ToRecord converts format specific data to RECORD.
@@ -75,10 +85,11 @@ func ToRecord(rec *Record) *search.Record {
 		return nil
 	}
 
-	res := new(search.Record)
-	res.Index = ToIndex(rec.Index)
-	res.Data = rec.RawData
-	return res
+	panic("XML ToRecord is not implemented!")
+	//res := new(search.Record)
+	//res.Index = ToIndex(rec.Index)
+	//res.Data = rec.RawData
+	//return res
 }
 
 // this function parses XML raw data.
