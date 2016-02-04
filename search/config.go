@@ -32,7 +32,6 @@ package search
 
 import (
 	"fmt"
-	"strings"
 )
 
 // Search configuration.
@@ -44,7 +43,6 @@ type Config struct {
 	Fuzziness     uint
 	CaseSensitive bool
 	Nodes         uint
-	Fields        []string
 }
 
 // NewEmptyConfig creates new empty search configuration.
@@ -71,13 +69,8 @@ func (cfg *Config) AddFiles(files []string) {
 	cfg.Files = append(cfg.Files, files...)
 }
 
-// AddFields adds one or more fields to the search configuration.
-func (cfg *Config) AddFields(fields string) {
-	cfg.Fields = strings.Split(fields, ",")
-}
-
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
 	return fmt.Sprintf("Config{query:%s, files:%q surr:%d, fuzz:%d, case-sens:%t, nodes:%d}",
-		cfg.Query, cfg.Files, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes, cfg.Fields)
+		cfg.Query, cfg.Files, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes)
 }
