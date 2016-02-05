@@ -28,48 +28,41 @@
  * ============
  */
 
-package json
+package msgpack
 
 import (
-	backend "encoding/json"
 	"io"
+
+	backend "gopkg.in/vmihailenco/msgpack.v2"
+	// ??? "github.com/ugorji/go/codec"
 )
 
-/* Stream JSON encoder uses tag prefixes for each item written.
+/* Stream MSGPACK encoder uses tag prefixed stream of items.
+ */
 
-"rec" { <record> }
-"rec" { <record> }
-"err" "<error message>"
-"rec" { <record> }
-"stat" { <statistics> }
-"end"
-*/
-
-// Stream JSON encoder.
+// MSGPACK stream encoder.
 type StreamEncoder struct {
-	writer  io.Writer
 	encoder *backend.Encoder
 }
 
 const (
-	TAG_REC  = `"rec" `
-	TAG_ERR  = `"err" `
-	TAG_STAT = `"stat" `
-	TAG_EOF  = `"end"`
+	TAG_EOF uint8 = iota
+	TAG_REC
+	TAG_ERR
+	TAG_STAT
 )
 
-// Create new stream JSON encoder instance.
+// Create new stream MSGPACK encoder instance.
 func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 	enc := new(StreamEncoder)
 	enc.encoder = backend.NewEncoder(w)
-	enc.writer = w
 	return enc, nil
 }
 
 // Write a RECORD
 func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
 	// write tag
-	_, err := enc.writer.Write([]byte(TAG_REC))
+	err := enc.encoder.EncodeUint8(TAG_REC)
 	if err != nil {
 		return err
 	}
@@ -86,7 +79,7 @@ func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
 // Write a STATISTICS
 func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
 	// write tag
-	_, err := enc.writer.Write([]byte(TAG_STAT))
+	err := enc.encoder.EncodeUint8(TAG_STAT)
 	if err != nil {
 		return err
 	}
@@ -103,13 +96,13 @@ func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
 // Write an ERROR
 func (enc *StreamEncoder) EncodeError(err_ error) error {
 	// write tag
-	_, err := enc.writer.Write([]byte(TAG_ERR))
+	err := enc.encoder.EncodeUint8(TAG_ERR)
 	if err != nil {
 		return err
 	}
 
 	// encode error as a string
-	err = enc.encoder.Encode(err_.Error())
+	err = enc.encoder.EncodeString(err_.Error())
 	if err != nil {
 		return nil
 	}
@@ -120,10 +113,32 @@ func (enc *StreamEncoder) EncodeError(err_ error) error {
 // End writing, close stream.
 func (enc *StreamEncoder) Close() error {
 	// write tag
-	_, err := enc.writer.Write([]byte(TAG_EOF))
+	err := enc.encoder.EncodeUint8(TAG_EOF)
 	if err != nil {
 		return err
 	}
 
 	return nil // OK
+}
+
+// MSGPACK stream decoder.
+type StreamDecoder struct {
+	decoder *backend.Decoder
+}
+
+// Create new stream MSGPACK decoder instance.
+func NewStreamDecoder(r io.Reader) (*StreamDecoder, error) {
+	dec := new(StreamDecoder)
+	dec.decoder = backend.NewDecoder(r)
+	return dec, nil
+}
+
+// NextTag decodes next tag from the stream.
+func (dec *StreamDecoder) NextTag() (uint8, error) {
+	return dec.decoder.DecodeUint8()
+}
+
+// Next decodes next item from the stream.
+func (dec *StreamDecoder) Next(item interface{}) error {
+	return dec.decoder.Decode(item)
 }

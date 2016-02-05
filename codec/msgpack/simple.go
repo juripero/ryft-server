@@ -28,66 +28,76 @@
  * ============
  */
 
-package codec
+package msgpack
 
 import (
-	"fmt"
 	"io"
 
-	"github.com/getryft/ryft-server/codec/json"
-	"github.com/getryft/ryft-server/codec/msgpack"
+	backend "gopkg.in/vmihailenco/msgpack.v2"
+	// ??? "github.com/ugorji/go/codec"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+/* Simple MSGPACK encoder uses stream of RECORDS.
+Errors and statistics are written at the end.
+*/
 
-// Abstract Encoder interface.
-type Encoder interface {
-	EncodeRecord(rec interface{}) error
-	EncodeStat(stat interface{}) error
-	EncodeError(err error) error
-
-	io.Closer
+// MSGPACK simple encoder.
+type SimpleEncoder struct {
+	encoder *backend.Encoder
+	errors  []string
+	stat    interface{}
 }
 
-// Abstract Decoder interface.
-type Decoder interface {
-	io.Closer
+// Create new simple MSGPACK encoder instance.
+func NewSimpleEncoder(w io.Writer) (*SimpleEncoder, error) {
+	enc := new(SimpleEncoder)
+	enc.encoder = backend.NewEncoder(w)
+	return enc, nil
 }
 
-// Get list of supported MIME types.
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// Create new encoder instance by MIME type.
-func NewEncoder(w io.Writer, mime string, stream bool) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		if stream {
-			return json.NewStreamEncoder(w)
-		} else {
-			return json.NewSimpleEncoder(w)
-		}
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		if stream {
-			return msgpack.NewStreamEncoder(w)
-		} else {
-			return msgpack.NewSimpleEncoder(w)
-		}
-	default:
-		return nil, fmt.Errorf("%q is unsupported MIME type", mime)
+// Write a RECORD
+func (enc *SimpleEncoder) EncodeRecord(rec interface{}) error {
+	err := enc.encoder.Encode(rec)
+	if err != nil {
+		return err
 	}
+
+	return nil // OK
 }
 
-// Create new decoder instance by MIME type.
-func NewDecoder(r io.Reader, mime string, stream bool) (Decoder, error) {
-	return nil, fmt.Errorf("%q not implemented yet", mime)
+// Write a STATISTICS
+func (enc *SimpleEncoder) EncodeStat(stat interface{}) error {
+	enc.stat = stat // will be written later
+	return nil      // OK
+}
+
+// Write an ERROR
+func (enc *SimpleEncoder) EncodeError(err error) error {
+	if err != nil {
+		// just save, will be written later
+		enc.errors = append(enc.errors, err.Error())
+	}
+
+	return nil // OK
+}
+
+// End writing, close JSON object.
+func (enc *SimpleEncoder) Close() error {
+	// write errors
+	for _, emsg := range enc.errors {
+		err := enc.encoder.Encode(emsg)
+		if err != nil {
+			return err
+		}
+	}
+
+	// write statistics
+	if enc.stat != nil {
+		err := enc.encoder.Encode(enc.stat)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil // OK
 }

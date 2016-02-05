@@ -31,7 +31,7 @@
 package json
 
 import (
-	jsonlib "encoding/json"
+	backend "encoding/json"
 	"io"
 )
 
@@ -47,7 +47,7 @@ import (
 // Simple JSON encoder.
 type SimpleEncoder struct {
 	writer  io.Writer
-	encoder *jsonlib.Encoder
+	encoder *backend.Encoder
 
 	records int         // number of records written
 	stat    interface{} // cached statistics
@@ -57,7 +57,7 @@ type SimpleEncoder struct {
 // Create new simple JSON encoder instance.
 func NewSimpleEncoder(w io.Writer) (*SimpleEncoder, error) {
 	enc := new(SimpleEncoder)
-	enc.encoder = jsonlib.NewEncoder(w)
+	enc.encoder = backend.NewEncoder(w)
 	enc.writer = w
 	return enc, nil
 }
