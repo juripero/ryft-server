@@ -277,6 +277,8 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 		return
 	}
 	if file == nil || cancelled {
+		task.dataCancel <- nil
+		close(task.indexChan)
 		return // no file means task is cancelled, do nothing
 	}
 
@@ -417,7 +419,7 @@ func (engine *Engine) removeFile(name string) error {
 func (task *Task) openFile(path string, poll time.Duration, cancel chan interface{}) (*os.File, error, bool) {
 	// task.log().Debugf("[%s] trying to open %q file...", TAG, path) // FIXME: DEBUG
 
-	for !task.enableDataProcessing {
+	for {
 		// wait until file will be created by `ryftone`
 		if _, err := os.Stat(path); err == nil {
 			// file exists, try to open
@@ -438,7 +440,7 @@ func (task *Task) openFile(path string, poll time.Duration, cancel chan interfac
 			// continue
 
 		case <-cancel:
-			// task.log().Warnf("[%s] open %q file cancelled", TAG, path)
+			task.log().Warnf("[%s] open %q file cancelled", TAG, path)
 			return nil, nil, true // fmt.Errorf("cancelled")
 		}
 	}
