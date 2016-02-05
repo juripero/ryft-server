@@ -61,7 +61,9 @@ func main() {
 	//files2(false) // HTTP
 	//files3(false) // MUX
 
-	formatXml()
+	// formatXml()
+
+	testEncoder()
 }
 
 // test xml formatter

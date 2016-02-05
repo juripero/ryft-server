@@ -123,7 +123,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	cmd := exec.Command(engine.ExecPath, task.tool_args...)
 
 	// prepare combined STDERR&STDOUT output
-	task.tool_out = &bytes.Buffer{}
+	task.tool_out = new(bytes.Buffer)
 	cmd.Stdout = task.tool_out
 	cmd.Stderr = task.tool_out
 
