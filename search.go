@@ -191,7 +191,7 @@ func (s *Server) search(ctx *gin.Context) {
 				first = false
 			}
 
-			if params.Stats {
+			if params.Stats && res.Stat != nil {
 				xstat, err := tcode.TranscodeStat(res.Stat)
 				if err != nil {
 					putErr(err)
