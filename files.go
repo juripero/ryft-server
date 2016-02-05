@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/getryft/ryft-server/encoder"
+	"github.com/getryft/ryft-server/codec"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,12 +32,12 @@ func (s *Server) files(c *gin.Context) {
 			err.Error(), "failed to get search engine"))
 	}
 
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
+	accept := c.NegotiateFormat(codec.GetSupportedMimeTypes()...)
 	// default to JSON
 	if accept == "" {
-		accept = encoder.MIME_JSON
+		accept = codec.MIME_JSON
 	}
-	if accept != encoder.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
+	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
 		panic(NewServerError(http.StatusUnsupportedMediaType,
 			"Only JSON format is supported for now"))
 	}

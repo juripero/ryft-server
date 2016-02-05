@@ -45,7 +45,6 @@ import (
 	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
-	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
@@ -302,8 +301,8 @@ func main() {
 		c.JSON(http.StatusOK, Stats.Data())
 	})
 
-	router.GET("/search", detectEncoder, server.search)
-	router.GET("/count", detectEncoder, server.count)
+	router.GET("/search", server.search)
+	router.GET("/count", server.count)
 	router.GET("/cluster/members", server.members)
 	router.GET("/files", server.files)
 
@@ -329,29 +328,4 @@ func main() {
 		go router.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	router.Run((*listenAddress).String())
-}
-
-const (
-	ENCODER_CONTEXT_KEY = "encoder-detected"
-)
-
-func detectEncoder(c *gin.Context) {
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = encoder.MIME_JSON
-	}
-	c.Header("Content-Type", accept)
-
-	// setting up encoder to respond with requested format
-	if enc, err := encoder.GetByMimeType(accept); err != nil {
-		panic(NewServerError(http.StatusBadRequest, err.Error()))
-	} else {
-		c.Set(ENCODER_CONTEXT_KEY, enc)
-	}
-}
-
-func encoderFromContext(c *gin.Context) encoder.Encoder {
-	// TODO add handlers for null value and report 400 error
-	return c.MustGet(ENCODER_CONTEXT_KEY).(encoder.Encoder)
 }

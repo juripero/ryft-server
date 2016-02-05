@@ -34,7 +34,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/getryft/ryft-server/encoder"
+	codec "github.com/getryft/ryft-server/codec/msgpack"
 	format "github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
@@ -85,18 +85,18 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		}
 
 		// read response and report records and/or statistics
-		dec := encoder.NewMsgPackDecoder(resp.Body)
+		dec, _ := codec.NewStreamDecoder(resp.Body)
 
 		// TODO: task cancellation!!
 
 		for {
 			tag, _ := dec.NextTag()
 			switch tag {
-			case encoder.TAG_MsgPackEOF:
+			case codec.TAG_EOF:
 				task.log().Infof("[%s]: got end of response", TAG)
 				return // DONE
 
-			case encoder.TAG_MsgPackItem:
+			case codec.TAG_REC:
 				var item format.Record
 				err := dec.Next(&item)
 				if err != nil {
@@ -111,7 +111,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 					// continue
 				}
 
-			case encoder.TAG_MsgPackError:
+			case codec.TAG_ERR:
 				var msg string
 				err := dec.Next(&msg)
 				if err != nil {
@@ -125,7 +125,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 					// continue
 				}
 
-			case encoder.TAG_MsgPackStat:
+			case codec.TAG_STAT:
 				var stat format.Statistics
 				err := dec.Next(&stat)
 				if err == nil {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/getryft/ryft-server/codec"
 	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
 )
@@ -37,6 +38,16 @@ func (s *Server) count(ctx *gin.Context) {
 	if err := ctx.Bind(&params); err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to parse request parameters"))
+	}
+
+	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
+	// default to JSON
+	if accept == "" {
+		accept = codec.MIME_JSON
+	}
+	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
+		panic(NewServerError(http.StatusUnsupportedMediaType,
+			"Only JSON format is supported for now"))
 	}
 
 	// get search engine

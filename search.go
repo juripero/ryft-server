@@ -36,7 +36,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/getryft/ryft-server/encoder"
+	"github.com/getryft/ryft-server/codec"
 	"github.com/getryft/ryft-server/format"
 	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
@@ -84,7 +84,23 @@ func (s *Server) search(ctx *gin.Context) {
 			err.Error(), "failed to get transcoder"))
 	}
 
-	enc := encoderFromContext(ctx)
+	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
+	// default to JSON
+	if accept == "" {
+		accept = codec.MIME_JSON
+	}
+	ctx.Header("Content-Type", accept)
+
+	// setting up encoder to respond with requested format
+	// we can use two formats:
+	// - with tags to report data records and the statistics in one stream
+	// - without tags to report just data records (this format is used by Spark)
+	// TODO: dedicated parameters to specify streaming!
+	is_stream := params.Stats
+	enc, err := codec.NewEncoder(ctx.Writer, accept, is_stream)
+	if err != nil {
+		panic(NewServerError(http.StatusBadRequest, err.Error()))
+	}
 
 	// get search engine
 	engine, err := s.getSearchEngine(params.Local)
@@ -112,45 +128,28 @@ func (s *Server) search(ctx *gin.Context) {
 			err.Error(), "failed to start search"))
 	}
 
-	// if encoder is MsgPack we can use two formats:
-	// - with tags to report data records and the statistics in one stream
-	// - without tags to report just data records (this format is used by Spark)
-	if mp, ok := enc.(*encoder.MsgPackEncoder); ok {
-		mp.OmitTags = !params.Stats
-	}
-
-	var errors []error // list of received errors
-	first := true
-
 	// ctx.Stream() logic
 	writer := ctx.Writer
 	gone := writer.CloseNotify()
 
 	// put error to stream
-	putErr := func(err error) {
-		if !enc.WriteStreamError(writer, err) {
-			// unable to send error in response stream
-			// just save it and report later
-			errors = append(errors, err)
-		}
-	}
-
-	// put record to stream
-	putRec := func(rec *search.Record) {
-		xrec := tcode.FromRecord(rec)
-
-		if first {
-			enc.Begin(writer)
-			first = false
-		}
-		if xrec != nil {
-			err = enc.Write(writer, xrec)
-		}
+	putErr := func(err_ error) {
+		err := enc.EncodeError(err_)
 		if err != nil {
 			panic(err)
 		}
-
 		writer.Flush()
+	}
+	// put record to stream
+	putRec := func(rec *search.Record) {
+		xrec := tcode.FromRecord(rec)
+		if xrec != nil {
+			err = enc.EncodeRecord(xrec)
+			if err != nil {
+				panic(err)
+			}
+			writer.Flush()
+		}
 	}
 
 	// process results!
@@ -167,7 +166,6 @@ func (s *Server) search(ctx *gin.Context) {
 
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
-				// panic(srverr.New(http.StatusInternalServerError, err.Error()))
 				putErr(err)
 			}
 
@@ -180,16 +178,18 @@ func (s *Server) search(ctx *gin.Context) {
 				putErr(err)
 			}
 
-			if first {
-				enc.Begin(writer)
-				first = false
-			}
-
 			if params.Stats {
 				xstat := tcode.FromStat(res.Stat)
-				enc.EndWithStats(writer, xstat, errors)
-			} else {
-				enc.End(writer, errors)
+				err := enc.EncodeStat(xstat)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			// close encoder
+			err := enc.Close()
+			if err != nil {
+				panic(err)
 			}
 
 			log.Printf("done: %s", res)
