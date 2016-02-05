@@ -276,6 +276,8 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 		return
 	}
 	if file == nil || cancelled {
+		task.dataCancel <- nil
+		close(task.indexChan)
 		return // no file means task is cancelled, do nothing
 	}
 

@@ -178,7 +178,7 @@ func (s *Server) search(ctx *gin.Context) {
 				putErr(err)
 			}
 
-			if params.Stats {
+			if params.Stats && res.Stat != nil {
 				xstat := tcode.FromStat(res.Stat)
 				err := enc.EncodeStat(xstat)
 				if err != nil {

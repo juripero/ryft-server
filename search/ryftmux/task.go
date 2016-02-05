@@ -134,10 +134,12 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 				// once subtask is finished combine statistics
 				task.log().WithField("stat", res.Stat).
 					Infof("[%s]: subtask is finished", TAG)
-				if mux.Stat == nil {
-					mux.Stat = search.NewStat()
+				if res.Stat != nil {
+					if mux.Stat == nil {
+						mux.Stat = search.NewStat()
+					}
+					mux.Stat.Merge(res.Stat)
 				}
-				mux.Stat.Merge(res.Stat)
 				finished[res] = true
 			}
 			continue
