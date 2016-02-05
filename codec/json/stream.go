@@ -127,3 +127,30 @@ func (enc *StreamEncoder) Close() error {
 
 	return nil // OK
 }
+
+// JSON stream decoder.
+type StreamDecoder struct {
+	decoder *backend.Decoder
+}
+
+// Create new stream JSON decoder instance.
+func NewStreamDecoder(r io.Reader) (*StreamDecoder, error) {
+	dec := new(StreamDecoder)
+	dec.decoder = backend.NewDecoder(r)
+	return dec, nil
+}
+
+// NextTag decodes next tag from the stream.
+func (dec *StreamDecoder) NextTag() (string, error) {
+	var tag string
+	err := dec.decoder.Decode(&tag)
+	if err != nil {
+		return "", err
+	}
+	return tag, nil // OK
+}
+
+// Next decodes next item from the stream.
+func (dec *StreamDecoder) Next(item interface{}) error {
+	return dec.decoder.Decode(item)
+}

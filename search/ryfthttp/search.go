@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"net/http"
 
+	//codec "github.com/getryft/ryft-server/codec/json"
 	codec "github.com/getryft/ryft-server/codec/msgpack"
 	format "github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
@@ -57,7 +58,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	// we expect MSGPACK format for streaming
-	req.Header.Set("Accept", "application/msgpack")
+	req.Header.Set("Accept", codec.MIME)
 
 	res := search.NewResult()
 
