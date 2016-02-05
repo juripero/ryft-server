@@ -47,7 +47,7 @@ func main() {
 	// ryftprimLogLevel = "debug"
 	// ryfthttpLogLevel = "debug"
 
-	// printSearchEngines()
+	//printSearchEngines(log)
 
 	//search1(false) // ryftprim
 	//search2(false) // HTTP
