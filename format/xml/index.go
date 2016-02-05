@@ -39,6 +39,11 @@ import (
 // Is the same as RAW format index!
 type Index raw.Index
 
+// NewIndex creates new format specific data.
+func NewIndex() interface{} {
+	return Index{}
+}
+
 // FromIndex converts INDEX to format specific data.
 func FromIndex(idx search.Index) Index {
 	return Index(raw.FromIndex(idx))

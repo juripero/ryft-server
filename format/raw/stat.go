@@ -43,6 +43,11 @@ type Statistics struct {
 	Duration   uint64 `json:"duration"`
 }
 
+// NewStat creates new format specific data.
+func NewStat() interface{} {
+	return new(Statistics)
+}
+
 // FromStat converts STATISTICS to format specific data.
 func FromStat(stat *search.Statistics) *Statistics {
 	if stat == nil {

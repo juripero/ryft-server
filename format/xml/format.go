@@ -54,6 +54,11 @@ func New(opts map[string]interface{}) (*Format, error) {
 	return f, nil
 }
 
+// NewIndex creates new format specific data.
+func (*Format) NewIndex() interface{} {
+	return NewIndex()
+}
+
 // Convert INDEX to RAW format specific data.
 func (*Format) FromIndex(idx search.Index) interface{} {
 	return FromIndex(idx)
@@ -65,6 +70,11 @@ func (*Format) ToIndex(idx interface{}) search.Index {
 	return ToIndex(idx.(Index))
 }
 
+// NewRecord creates new format specific data.
+func (*Format) NewRecord() interface{} {
+	return NewRecord()
+}
+
 // Convert RECORD to RAW format specific data.
 func (f *Format) FromRecord(rec *search.Record) interface{} {
 	return FromRecord(rec, f.Fields)
@@ -74,6 +84,11 @@ func (f *Format) FromRecord(rec *search.Record) interface{} {
 // WARN: will panic if argument is not of raw.Record type!
 func (*Format) ToRecord(rec interface{}) *search.Record {
 	return ToRecord(rec.(*Record))
+}
+
+// NewStat creates new format specific data.
+func (*Format) NewStat() interface{} {
+	return NewStat()
 }
 
 // Convert STATISTICS to RAW format specific data.

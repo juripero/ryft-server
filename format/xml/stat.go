@@ -39,6 +39,11 @@ import (
 // Is the same as RAW format statistics!
 type Statistics raw.Statistics
 
+// NewStat creates new format specific data.
+func NewStat() interface{} {
+	return new(Statistics)
+}
+
 // FromStat converts STATISTICS to format specific data.
 func FromStat(stat *search.Statistics) *Statistics {
 	return (*Statistics)(raw.FromStat(stat))

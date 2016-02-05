@@ -46,13 +46,17 @@ const (
 
 // Abstract Format interface.
 // Support conversion from/to basic search data types.
+// NewXXX() methods are used to decode data from stream.
 type Format interface {
+	NewIndex() interface{}
 	FromIndex(search.Index) interface{}
 	ToIndex(interface{}) search.Index
 
+	NewRecord() interface{}
 	FromRecord(*search.Record) interface{}
 	ToRecord(interface{}) *search.Record
 
+	NewStat() interface{}
 	FromStat(*search.Statistics) interface{}
 	ToStat(interface{}) *search.Statistics
 }

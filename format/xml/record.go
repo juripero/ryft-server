@@ -54,6 +54,11 @@ type Record_0 struct {
 	Error   string      `json:"error,omitempty"`
 }
 
+// NewRecord creates new format specific data.
+func NewRecord() interface{} {
+	return new(Record)
+}
+
 // FromRecord converts RECORD to format specific data.
 func FromRecord(rec *search.Record, fields []string) *Record {
 	if rec == nil {

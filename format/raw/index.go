@@ -45,6 +45,11 @@ type Index struct {
 	Host      string `json:"host,omitempty"`
 }
 
+// NewIndex creates new format specific data.
+func NewIndex() interface{} {
+	return Index{}
+}
+
 // FromIndex converts INDEX to format specific data.
 func FromIndex(idx search.Index) Index {
 	res := Index{}

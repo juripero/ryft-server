@@ -42,6 +42,11 @@ type Record struct {
 	Data  []byte `json:"data"` // base-64 encoded
 }
 
+// NewRecord creates new format specific data.
+func NewRecord() interface{} {
+	return new(Record)
+}
+
 // FromRecord converts RECORD to format specific data.
 func FromRecord(rec *search.Record) *Record {
 	if rec == nil {
