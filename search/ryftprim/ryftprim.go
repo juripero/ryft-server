@@ -237,6 +237,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// stop subtasks if processing enabled
 	if task.enableDataProcessing {
 		task.log().Debugf("[%s]: stopping INDEX&DATA processing...", TAG)
+		task.enableDataProcessing = false // notify DATA&INDEX to stop work
 		task.indexCancel <- nil
 		// task.dataCancel <- nil // will be stopped once INDEX is finished
 
@@ -416,7 +417,7 @@ func (engine *Engine) removeFile(name string) error {
 func (task *Task) openFile(path string, poll time.Duration, cancel chan interface{}) (*os.File, error, bool) {
 	// task.log().Debugf("[%s] trying to open %q file...", TAG, path) // FIXME: DEBUG
 
-	for {
+	for !task.enableDataProcessing {
 		// wait until file will be created by `ryftone`
 		if _, err := os.Stat(path); err == nil {
 			// file exists, try to open
@@ -441,6 +442,8 @@ func (task *Task) openFile(path string, poll time.Duration, cancel chan interfac
 			return nil, nil, true // fmt.Errorf("cancelled")
 		}
 	}
+
+	return nil, nil, true // cancelled
 }
 
 // readFile tries to read file until all data is read
