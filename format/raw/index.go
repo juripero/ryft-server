@@ -34,6 +34,8 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
+// TODO: use type Index search.Index to avoid memory allocations
+
 // INDEX format specific data.
 type Index struct {
 	File      string `json:"file"`

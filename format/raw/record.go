@@ -34,6 +34,8 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
+// TODO: use type Record search.Record to avoid memory allocations
+
 // RECORD format specific data.
 type Record struct {
 	Index Index  `json:"_index"`

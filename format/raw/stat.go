@@ -34,6 +34,8 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
+// TODO: use type Statistics search.Statistics to avoid memory allocations
+
 // STATISTICS format specific data.
 type Statistics struct {
 	Matches    uint64 `json:"matches"`

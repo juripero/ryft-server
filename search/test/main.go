@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	stdlog "log"
 	"os"
 	"runtime/pprof"
@@ -10,6 +11,8 @@ import (
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	_ "github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
+
+	"github.com/getryft/ryft-server/format/xml"
 )
 
 var (
@@ -56,7 +59,21 @@ func main() {
 
 	//files1(false) // ryftprim
 	//files2(false) // HTTP
-	files3(false) // MUX
+	//files3(false) // MUX
+
+	formatXml()
+}
+
+// test xml formatter
+func formatXml() {
+	rec := new(search.Record)
+	rec.Index.File = "test.txt"
+	rec.Index.Offset = 100
+	//rec.Data = []byte(`<rec><ID>10034183</ID><CaseNumber>HY223673</CaseNumber><Date>04/15/2015 11:59:00 PM</Date><Block>062XX S ST LAWRENCE AVE</Block><IUCR>0486</IUCR><PrimaryType>BATTERY</PrimaryType><Description>DOMESTIC BATTERY SIMPLE</Description><LocationDescription>STREET</LocationDescription><Arrest>false</Arrest><Domestic>true</Domestic><Beat>0313</Beat><District>003</District><Ward>20</Ward><CommunityArea>42</CommunityArea><FBICode>08B</FBICode><XCoordinate>1181263</XCoordinate><YCoordinate>1863965</YCoordinate><Year>2015</Year><UpdatedOn>04/22/2015 12:47:10 PM</UpdatedOn><Latitude>41.781961688</Latitude><Longitude>-87.610984705</Longitude><Location>\"(41.781961688, -87.610984705)\"</Location></recx>`)
+	rec.Data = []byte(`<rec><ID>10034183</ID><CaseNumber>HY223673</CaseNumber><Date>04/15/2015 11:59:00 PM</Date><Block>062XX S ST LAWRENCE AVE</Block><IUCR>0486</IUCR><PrimaryType>BATTERY</PrimaryType><Description>DOMESTIC BATTERY SIMPLE</Description><LocationDescription>STREET</LocationDescription><Arrest>false</Arrest><Domestic>true</Domestic><Beat>0313</Beat><District>003</District><Ward>20</Ward><CommunityArea>42</CommunityArea><FBICode>08B</FBICode><XCoordinate>1181263</XCoordinate><YCoordinate>1863965</YCoordinate><Year>2015</Year><UpdatedOn>04/22/2015 12:47:10 PM</UpdatedOn><Latitude>41.781961688</Latitude><Longitude>-87.610984705</Longitude><Location>\"(41.781961688, -87.610984705)\"</Location></rec>`)
+
+	b, _ := json.MarshalIndent(xml.FromRecord(rec, []string{}), "", " ")
+	log("%s", string(b))
 }
 
 // abstract seach
