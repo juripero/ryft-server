@@ -60,5 +60,9 @@ func (s Statistics) String() string {
 func (s *Statistics) Merge(a *Statistics) {
 	s.Matches += a.Matches
 	s.TotalBytes += a.TotalBytes
-	s.Duration += a.Duration // TODO: just max?
+
+	// s.Duration += a.Duration
+	if s.Duration < a.Duration {
+		s.Duration = a.Duration
+	}
 }
