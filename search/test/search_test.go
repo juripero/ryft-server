@@ -6,8 +6,31 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
+// more debug info!
+func init() {
+	// ryftprimLogLevel = "debug"
+	// ryfthttpLogLevel = "debug"
+	// printReceivedRecords = true
+}
+
 // check if expected number of records received
 func checkRecordReceived(t *testing.T, r SearchResult, expected int) {
+
+	// special case for error expected
+	if expected < 0 {
+		if len(r.Errors) == 0 {
+			t.Errorf("error expected")
+			return
+		}
+
+		if r.Stat != nil {
+			t.Errorf("no received statistics expected")
+			return
+		}
+
+		return // OK
+	}
+
 	if r.Stat == nil {
 		t.Errorf("no received statistics")
 		return
@@ -27,7 +50,17 @@ func checkRecordReceived(t *testing.T, r SearchResult, expected int) {
 	if len(r.Records) != expected {
 		t.Errorf("unexpected %d records received (expected: %d)",
 			len(r.Records), expected)
+		return
 	}
+
+	return // OK
+}
+
+// ryftprim search (bad result)
+func TestSearchBad10(t *testing.T) {
+	cfg := search.NewConfig("10", "/regression/passengers_not_found.txt")
+	r := runSearch1(t.Logf, "TEST", newRyftPrim(t.Logf), cfg)
+	checkRecordReceived(t, r, -1)
 }
 
 // ryftprim search

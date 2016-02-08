@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	// global log level
 	ryftprimInstance = ".test"
+
+	// global log level
 	ryftprimLogLevel = "warn"
 	ryfthttpLogLevel = "warn"
 
@@ -121,8 +122,12 @@ func grabResults(log Logger, tag string, res *search.Result, checkRecords bool) 
 			}
 
 		case <-res.DoneChan:
-			log("[%s]: finished with %s", tag, res.Stat)
-			r.Stat = res.Stat
+			if res.Stat != nil {
+				log("[%s]: finished with %s", tag, res.Stat)
+				r.Stat = res.Stat
+			} else {
+				log("[%s]: finished with no stat", tag)
+			}
 
 			// drain error channel
 			for err := range res.ErrorChan {
