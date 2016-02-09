@@ -10,11 +10,13 @@ import (
 )
 
 var (
-	ryftprimInstance = ".test"
+	// ryfthttp
+	ryfthttpServerUrl = "http://localhost:8765"
+	ryfthttpLogLevel  = "warn"
 
-	// global log level
+	// ryftprim
+	ryftprimInstance = ".test"
 	ryftprimLogLevel = "warn"
-	ryfthttpLogLevel = "warn"
 
 	printReceivedRecords = false
 )
@@ -65,6 +67,7 @@ func newRyftPrim(log Logger) search.Engine {
 // create new ryfthttp search engine
 func newRyftHttp(log Logger) search.Engine {
 	opts := map[string]interface{}{
+		"server-url": ryfthttpServerUrl,
 		"local-only": true,
 		"log-level":  ryfthttpLogLevel,
 	}
