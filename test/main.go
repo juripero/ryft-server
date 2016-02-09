@@ -50,19 +50,20 @@ func main() {
 
 	//printSearchEngines(log)
 
-	search1(false) // ryftprim
+	//search1(false) // ryftprim
 	//search2(false) // HTTP
 	//search3(false) // MUX
-	//search4(false) // ryftone
+	search4(false) // ryftone
 
 	//count1(false) // ryftprim
 	//count2(false) // HTTP
 	//count3(false) // MUX
-	//count4(false) // ryftone
+	//count4(true) // ryftone
 
 	//files1(false) // ryftprim
 	//files2(false) // HTTP
 	//files3(false) // MUX
+	//files4(false) // ryftone
 
 	// formatXml()
 
@@ -186,6 +187,11 @@ func count3(concurent bool) {
 	count0(concurent, engine)
 }
 
+// ryftone count
+func count4(concurent bool) {
+	count0(concurent, newRyftOne(log))
+}
+
 // ryftprim files
 func files0(concurent bool, engine search.Engine) {
 	paths := []string{}
@@ -220,4 +226,9 @@ func files3(concurent bool) {
 	)
 
 	files0(concurent, engine)
+}
+
+// ryftone files
+func files4(concurent bool) {
+	files0(concurent, newRyftOne(log))
 }
