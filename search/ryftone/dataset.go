@@ -173,22 +173,27 @@ func (ds *DataSet) LastError() error {
 	return nil // OK
 }
 
+// Get executation duration, milliseconds.
 func (ds *DataSet) GetExecutionDuration() uint64 {
 	return uint64(C.rol_ds_get_execution_duration(ds.output))
 }
 
+// Get fabric execution duration, milliseconds.
 func (ds *DataSet) GetFabricExecutionDuration() uint64 {
 	return uint64(C.rol_ds_get_fabric_execution_duration(ds.output))
 }
 
+// Get total number of bytes processed.
 func (ds *DataSet) GetTotalBytesProcessed() uint64 {
 	return uint64(C.rol_ds_get_total_bytes_processed(ds.output))
 }
 
+// Get total number of matches.
 func (ds *DataSet) GetTotalMatches() uint64 {
 	return uint64(C.rol_ds_get_total_matches(ds.output))
 }
 
+// Get total number of unique terms.
 func (ds *DataSet) GetTotalUniqueTerms() uint64 {
 	return uint64(C.rol_ds_get_total_unique_terms(ds.output))
 }

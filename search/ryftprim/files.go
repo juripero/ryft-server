@@ -32,11 +32,10 @@ package ryftprim
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
-	"strings"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftone"
 )
 
 // Files starts synchronous "/files" with RyftPrim engine.
@@ -45,29 +44,12 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 
 	// read directory content
 	fullPath := filepath.Join(engine.MountPoint, path)
-	items, err := ioutil.ReadDir(fullPath)
+	info, err := ryftone.GetDirInfo(fullPath, path)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)
 	}
 
-	// process directory content
-	res := search.NewDirInfo(path)
-	for _, item := range items {
-		name := item.Name()
-
-		// skip ".", ".." and all hidden files
-		if strings.HasPrefix(name, ".") {
-			continue
-		}
-
-		if item.IsDir() {
-			res.Dirs = append(res.Dirs, name)
-		} else {
-			res.Files = append(res.Files, name)
-		}
-	}
-
-	log.WithField("info", res).Debugf("[%s] done /files", TAG)
-	return res, nil // OK
+	log.WithField("info", info).Debugf("[%s] done /files", TAG)
+	return info, nil // OK
 }

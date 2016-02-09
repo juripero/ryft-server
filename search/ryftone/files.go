@@ -45,14 +45,26 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 
 	// read directory content
 	fullPath := filepath.Join(engine.MountPoint, path)
-	items, err := ioutil.ReadDir(fullPath)
+	info, err := GetDirInfo(fullPath, path)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)
 	}
 
+	log.WithField("info", info).Debugf("[%s] done /files", TAG)
+	return info, nil // OK
+}
+
+// GetDirInfo gets directory content.
+func GetDirInfo(path string, name string) (*search.DirInfo, error) {
+	// read directory content
+	items, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
 	// process directory content
-	res := search.NewDirInfo(path)
+	res := search.NewDirInfo(name)
 	for _, item := range items {
 		name := item.Name()
 
@@ -68,6 +80,5 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 		}
 	}
 
-	log.WithField("info", res).Debugf("[%s] done /files", TAG)
 	return res, nil // OK
 }

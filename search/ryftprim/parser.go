@@ -31,57 +31,18 @@
 package ryftprim
 
 import (
-	"bytes"
 	"fmt"
-	"strconv"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/utils"
 )
 
 // parseIndex parses Index record from custom line.
 func parseIndex(buf []byte) (index search.Index, err error) {
-	sep := []byte(",")
-	fields := bytes.Split(bytes.TrimSpace(buf), sep)
-	n := len(fields)
-	if n < 4 {
-		return index, fmt.Errorf("invalid number of fields in %q", string(buf))
-	}
-
-	// NOTE: filename (first field) may contains ','
-	// so we have to combine some first fields
-	file := bytes.Join(fields[0:n-3], sep)
-
-	// Offset
-	var offset uint64
-	offset, err = strconv.ParseUint(string(fields[n-3]), 10, 64)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse offset: %s", err)
-	}
-
-	// Length
-	var length uint64
-	length, err = strconv.ParseUint(string(fields[n-2]), 10, 16)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse length: %s", err)
-	}
-
-	// Fuzziness
-	var fuzz uint64
-	fuzz, err = strconv.ParseUint(string(fields[n-1]), 10, 8)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse fuzziness: %s", err)
-	}
-
-	// update index
-	index.File = string(file)
-	index.Offset = offset
-	index.Length = length
-	index.Fuzziness = uint8(fuzz)
-
-	return // OK
+	return ryftone.ParseIndex(buf)
 }
 
 // parseStat parses statistics from ryftprim output.
