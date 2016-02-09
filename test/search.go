@@ -10,10 +10,13 @@ import (
 )
 
 var (
-	// global log level
+	// ryfthttp
+	ryfthttpServerUrl = "http://localhost:8765"
+	ryfthttpLogLevel  = "warn"
+
+	// ryftprim
 	ryftprimInstance = ".test"
 	ryftprimLogLevel = "warn"
-	ryfthttpLogLevel = "warn"
 
 	printReceivedRecords = false
 )
@@ -64,6 +67,7 @@ func newRyftPrim(log Logger) search.Engine {
 // create new ryfthttp search engine
 func newRyftHttp(log Logger) search.Engine {
 	opts := map[string]interface{}{
+		"server-url": ryfthttpServerUrl,
 		"local-only": true,
 		"log-level":  ryfthttpLogLevel,
 	}
@@ -121,8 +125,12 @@ func grabResults(log Logger, tag string, res *search.Result, checkRecords bool) 
 			}
 
 		case <-res.DoneChan:
-			log("[%s]: finished with %s", tag, res.Stat)
-			r.Stat = res.Stat
+			if res.Stat != nil {
+				log("[%s]: finished with %s", tag, res.Stat)
+				r.Stat = res.Stat
+			} else {
+				log("[%s]: finished with no stat", tag)
+			}
 
 			// drain error channel
 			for err := range res.ErrorChan {
