@@ -198,6 +198,15 @@ func (s *Server) search(ctx *gin.Context) {
 				}
 				enc.EndWithStats(writer, xstat, errors)
 			} else {
+				if !params.Stats {
+					// if no statistics requested
+					// spark format is assumed
+					// no errors should be reported!
+					for _, e := range errors {
+						log.Printf("ERROR (ignored): %s", e)
+					}
+					errors = nil
+				}
 				enc.End(writer, errors)
 			}
 
