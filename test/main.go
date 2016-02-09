@@ -10,6 +10,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	_ "github.com/getryft/ryft-server/search/ryftmux"
+	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
 	"github.com/getryft/ryft-server/format/xml"
@@ -49,13 +50,15 @@ func main() {
 
 	//printSearchEngines(log)
 
-	//search1(false) // ryftprim
+	search1(false) // ryftprim
 	//search2(false) // HTTP
 	//search3(false) // MUX
+	//search4(false) // ryftone
 
 	//count1(false) // ryftprim
 	//count2(false) // HTTP
 	//count3(false) // MUX
+	//count4(false) // ryftone
 
 	//files1(false) // ryftprim
 	//files2(false) // HTTP
@@ -63,7 +66,7 @@ func main() {
 
 	// formatXml()
 
-	testEncoder()
+	//testEncoder()
 }
 
 // test xml formatter
@@ -126,6 +129,11 @@ func search3(concurent bool) {
 	)
 
 	search0(concurent, engine)
+}
+
+// ryftone search
+func search4(concurent bool) {
+	search0(concurent, newRyftOne(log))
 }
 
 // abstract count
