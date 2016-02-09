@@ -67,6 +67,15 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 	defer task.log().Debugf("[%s]: end TASK processing", TAG)
 	task.log().Debugf("[%s]: start TASK processing...", TAG)
 
+	// start INDEX&DATA processing
+	if task.enableDataProcessing {
+		task.prepareProcessing()
+
+		task.subtasks.Add(2)
+		go engine.processIndex(task, res)
+		go engine.processData(task, res)
+	}
+
 	var err error
 
 	// create data set
@@ -84,15 +93,6 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 			engine.finish(err, task, res)
 			return
 		}
-	}
-
-	// start INDEX&DATA processing
-	if task.enableDataProcessing {
-		task.prepareProcessing()
-
-		task.subtasks.Add(2)
-		go engine.processIndex(task, res)
-		go engine.processData(task, res)
 	}
 
 	// INDEX results file
