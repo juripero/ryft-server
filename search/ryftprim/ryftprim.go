@@ -235,11 +235,12 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// stop subtasks if processing enabled
 	if task.enableDataProcessing {
-		task.log().Debugf("[%s]: stopping INDEX&DATA processing...", TAG)
 		if err != nil {
+			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
 			task.cancelData()
 		} else {
+			task.log().Debugf("[%s]: stopping INDEX&DATA processing...", TAG)
 			task.stopIndex()
 			task.stopData()
 		}
@@ -486,9 +487,9 @@ func (task *Task) readDataFile(file *bufio.Reader, length uint64, poll time.Dura
 		}
 
 		// check for soft stops
-		if task.dataStopped {
+		if task.dataStopped && pos >= length {
 			task.log().Debugf("[%s]: DATA processing stopped", TAG)
-			return nil, nil // fmt.Errorf("stopped")
+			return buf, nil // fmt.Errorf("stopped")
 		}
 
 		// no data available or failed to read
