@@ -82,6 +82,12 @@ var (
 )
 var hostName string
 
+// customized via Makefile
+var (
+	Version string
+	GitHash string
+)
+
 // Server instance
 type Server struct {
 	SearchBackend  string                 `yaml:"searchBackend,omitempty"`
@@ -299,6 +305,14 @@ func main() {
 	}
 
 	// Configure routes
+
+	router.GET("/version", func(ctx *gin.Context) {
+		info := map[string]interface{}{
+			"verison":  Version,
+			"git-hash": GitHash,
+		}
+		ctx.JSON(http.StatusOK, info)
+	})
 
 	// stats page
 	router.GET("/about", func(c *gin.Context) {
