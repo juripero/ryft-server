@@ -1,3 +1,4 @@
 /ryft-server
+/bindata.go
 *.deb
 *.orig
