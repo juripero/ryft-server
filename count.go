@@ -7,6 +7,7 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/srverr"
+	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
 )
 
@@ -67,9 +68,6 @@ func (s *Server) count(ctx *gin.Context) {
 			err.Error(), "failed to start search"))
 	}
 
-	// TODO: for cloud code get other ryftprim.Result objects and merge together
-	// [[[ ]]]]
-
 	for {
 		select {
 		case rec, ok := <-res.RecordChan:
@@ -85,13 +83,14 @@ func (s *Server) count(ctx *gin.Context) {
 			}
 
 		case <-res.DoneChan:
-			log.Printf("DONE: %s", res.Stat)
-			s := map[string]interface{}{
-				"matches":    res.Stat.Matches,
-				"totalBytes": res.Stat.TotalBytes,
-				"duration":   res.Stat.Duration,
+			if res.Stat != nil {
+				log.Printf("DONE: %s", res.Stat)
+				stat := transcoder.NewStat(res.Stat)
+				ctx.JSON(http.StatusOK, stat)
+			} else {
+				panic(srverr.New(http.StatusInternalServerError,
+					"no search statistics available"))
 			}
-			ctx.JSON(http.StatusOK, s)
 			return
 		}
 	}

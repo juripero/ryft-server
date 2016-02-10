@@ -59,7 +59,12 @@ type Index struct {
 type Statistics struct {
 	Matches    uint64 `json:"matches"`
 	TotalBytes uint64 `json:"totalBytes"`
-	Duration   uint64 `json:"duration"`
+
+	Duration uint64  `json:"duration"`
+	DataRate float64 `json:"dataRate"`
+
+	FabricDuration uint64  `json:"fabricDuration"`
+	FabricDataRate float64 `json:"fabricDataRate"`
 }
 
 func NewIndex(index search.Index) (result Index) {
@@ -75,6 +80,9 @@ func NewStat(stat *search.Statistics) (result Statistics) {
 	result.Matches = stat.Matches
 	result.TotalBytes = stat.TotalBytes
 	result.Duration = stat.Duration
+	result.DataRate = stat.DataRate
+	result.FabricDuration = stat.FabricDuration
+	result.FabricDataRate = stat.FabricDataRate
 	return
 }
 

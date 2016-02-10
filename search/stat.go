@@ -40,8 +40,12 @@ import (
 type Statistics struct {
 	Matches    uint64 // total records matched
 	TotalBytes uint64 // total input bytes processed
-	Duration   uint64 // processing duration, milliseconds
-	// TODO: data rate?
+
+	Duration uint64  // processing duration, milliseconds
+	DataRate float64 // MB/sec, TotalBytes/Duration
+
+	FabricDuration uint64  // fabric processing duration, milliseconds
+	FabricDataRate float64 // MB/sec, TotalBytes/FabricDuration
 }
 
 // NewStat creates empty statistics.
@@ -52,8 +56,8 @@ func NewStat() *Statistics {
 
 // String gets string representation of statistics.
 func (s Statistics) String() string {
-	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms}",
-		s.Matches, s.TotalBytes, s.Duration)
+	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms (fabric: %d ms)}",
+		s.Matches, s.TotalBytes, s.Duration, s.FabricDuration)
 }
 
 // Merge merges statistics from another node.
@@ -65,4 +69,13 @@ func (s *Statistics) Merge(a *Statistics) {
 	if s.Duration < a.Duration {
 		s.Duration = a.Duration
 	}
+
+	// s.FabricDuration += a.FabricDuration
+	if s.FabricDuration < a.FabricDuration {
+		s.FabricDuration = a.FabricDuration
+	}
+
+	// just sum all data rates
+	s.FabricDataRate += a.FabricDataRate
+	s.DataRate += a.DataRate
 }
