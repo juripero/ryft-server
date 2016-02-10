@@ -32,7 +32,7 @@ install: $(ASSETS)
 
 .PHONY: debian
 debian: install
-	make -C package VERSION=${VERSION} GITHASH=${GITHASH}
+	make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
 
 clean:
 	rm -f $(ASSETS)
