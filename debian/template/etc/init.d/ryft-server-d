@@ -37,7 +37,7 @@ start)
 	printf "\n%-50s" "Starting $NAME..."
 	cd $DAEMON_PATH
 	
-	while [[ -z $(mount | grep ryftone) ]]; do
+	while [[ -z $(df -h | grep /ryftone) ]]; do
 	    printf "\nWaiting for ryftone partition"
 	    sleep 5s
 	done
