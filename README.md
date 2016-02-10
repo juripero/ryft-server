@@ -43,9 +43,10 @@ Args:
 
 ```
 Default value ``port`` is ``8765``
+
 # Packaging into deb file
 
-https://github.com/getryft/ryft-server/blob/master/ryft-server-make-deb/README.md
+See instructions [here](./debian/README.md)
 
 # Keeping search results
 
