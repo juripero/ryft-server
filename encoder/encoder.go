@@ -67,7 +67,7 @@ func GetByMimeType(mime string) (Encoder, error) {
 	case MIME_JSON:
 		return new(JsonEncoder), nil
 	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
+		return NewMsgPackEncoder(), nil
 	default:
 		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
 	}

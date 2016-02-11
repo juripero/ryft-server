@@ -33,14 +33,16 @@ package encoder
 import (
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
-	// "github.com/ugorji/go/codec"
+	//"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/ugorji/go/codec"
 )
 
 // MSGPACK encoder
 type MsgPackEncoder struct {
 	OmitTags      bool // if we report just data records we can omit tags
 	needSeparator bool
+
+	handle *codec.MsgpackHandle
 }
 
 const (
@@ -49,6 +51,12 @@ const (
 	TAG_MsgPackStat
 	TAG_MsgPackError
 )
+
+func NewMsgPackEncoder() *MsgPackEncoder {
+	enc := new(MsgPackEncoder)
+	enc.handle = new(codec.MsgpackHandle)
+	return enc
+}
 
 func (enc *MsgPackEncoder) Begin(w io.Writer) error {
 	return nil
@@ -60,35 +68,35 @@ func (enc *MsgPackEncoder) End(w io.Writer, errors []error) error {
 
 func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}, errors []error) error {
 	//log.Printf("[msgpack]: encode stat: %#v", stat)
-	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+	e := codec.NewEncoder(w, enc.handle) // FIXME: do not create encoder each time
 
 	if len(errors) > 0 {
 		for _, err := range errors {
 			if !enc.OmitTags {
-				_ = e.EncodeUint8(TAG_MsgPackError)
+				_ = e.Encode(TAG_MsgPackError)
 			}
-			_ = e.EncodeString(err.Error())
+			_ = e.Encode(err.Error())
 		}
 	}
 
 	if stat != nil {
 		if !enc.OmitTags {
-			_ = e.EncodeUint8(TAG_MsgPackStat)
+			_ = e.Encode(TAG_MsgPackStat)
 		}
 		_ = e.Encode(stat)
 	}
 
 	if !enc.OmitTags {
-		_ = e.EncodeUint8(TAG_MsgPackEOF)
+		_ = e.Encode(TAG_MsgPackEOF)
 	}
 	return nil
 }
 
 func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
 	// log.Printf("[msgpack]: encode item: %#v", item)
-	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
+	e := codec.NewEncoder(w, enc.handle) // FIXME: do not create encoder each time
 	if !enc.OmitTags {
-		_ = e.EncodeUint8(TAG_MsgPackItem)
+		_ = e.Encode(TAG_MsgPackItem)
 	}
 	err := e.Encode(item)
 	return err
@@ -96,9 +104,9 @@ func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
 
 func (enc *MsgPackEncoder) WriteStreamError(w io.Writer, err error) bool {
 	if !enc.OmitTags {
-		e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
-		_ = e.EncodeUint8(TAG_MsgPackError)
-		_ = e.EncodeString(err.Error())
+		e := codec.NewEncoder(w, enc.handle) // FIXME: do not create encoder each time
+		_ = e.Encode(TAG_MsgPackError)
+		_ = e.Encode(err.Error())
 		return true
 	}
 	return false
@@ -106,16 +114,19 @@ func (enc *MsgPackEncoder) WriteStreamError(w io.Writer, err error) bool {
 
 // MSGPACK decoder
 type MsgPackDecoder struct {
-	dec *msgpack.Decoder
+	dec *codec.Decoder
 }
 
 // NewMsgPackDecoder creates new MSGPACK decoder instance.
 func NewMsgPackDecoder(r io.Reader) *MsgPackDecoder {
-	return &MsgPackDecoder{dec: msgpack.NewDecoder(r)}
+	handle := new(codec.MsgpackHandle)
+	return &MsgPackDecoder{dec: codec.NewDecoder(r, handle)}
 }
 
 func (dec *MsgPackDecoder) NextTag() (uint8, error) {
-	return dec.dec.DecodeUint8()
+	var tag uint8
+	err := dec.dec.Decode(&tag)
+	return tag, err
 }
 
 // Read decodes next item from the stream.
