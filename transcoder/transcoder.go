@@ -63,7 +63,7 @@ type Statistics struct {
 	Duration uint64  `json:"duration"`
 	DataRate float64 `json:"dataRate"`
 
-	FabricDuration uint64  `json:"fabricDuration"`
+	//	FabricDuration uint64  `json:"fabricDuration"`
 	FabricDataRate float64 `json:"fabricDataRate"`
 }
 
@@ -81,7 +81,7 @@ func NewStat(stat *search.Statistics) (result Statistics) {
 	result.TotalBytes = stat.TotalBytes
 	result.Duration = stat.Duration
 	result.DataRate = stat.DataRate
-	result.FabricDuration = stat.FabricDuration
+	//	result.FabricDuration = stat.FabricDuration
 	result.FabricDataRate = stat.FabricDataRate
 	return
 }

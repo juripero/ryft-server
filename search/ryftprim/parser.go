@@ -126,23 +126,26 @@ func parseStat(buf []byte) (stat *search.Statistics, err error) {
 		return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat from %q`, fdr)
 	}
 
-	// reverse engineering: fabric data rate = (total bytes [MB]) / (fabric duration [sec])
-	// so fabric duration [ms] = 1000 / (1024*1024) * (total bytes) / (fabric data rate [MB/sec])
-	if stat.FabricDataRate > 0.0 {
-		mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
-		sec := mb / stat.FabricDataRate                // duration, seconds
-		stat.FabricDuration = uint64(sec * 1000)       // sec -> msec
-	}
+	//	// reverse engineering: fabric data rate = (total bytes [MB]) / (fabric duration [sec])
+	//	// so fabric duration [ms] = 1000 / (1024*1024) * (total bytes) / (fabric data rate [MB/sec])
+	//	if stat.FabricDataRate > 0.0 {
+	//		mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
+	//		sec := mb / stat.FabricDataRate                // duration, seconds
+	//		stat.FabricDuration = uint64(sec * 1000)       // sec -> msec
+	//	}
 
-	// Data Rate
-	dr, err := utils.AsString(v["Data Rate"])
-	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "Data Rate" stat`)
+	if stat.Duration > 0 {
+		stat.DataRate = float64(stat.TotalBytes / stat.Duration * 1000.0) //sec
 	}
-	stat.DataRate, err = parseDataRate(dr)
-	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "Data Rate" stat from %q`, dr)
-	}
+	//	// Data Rate
+	//	dr, err := utils.AsString(v["Data Rate"])
+	//	if err != nil {
+	//		return nil, fmt.Errorf(`failed to parse "Data Rate" stat`)
+	//	}
+	//	stat.DataRate, err = parseDataRate(dr)
+	//	if err != nil {
+	//		return nil, fmt.Errorf(`failed to parse "Data Rate" stat from %q`, dr)
+	//	}
 
 	return stat, nil // OK
 }

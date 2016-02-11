@@ -63,11 +63,11 @@ func DecodeRawItem(item *RawData) (*search.Record, error) {
 
 func DecodeRawStat(stat *Statistics) (*search.Statistics, error) {
 	return &search.Statistics{
-		Matches:        stat.Matches,
-		TotalBytes:     stat.TotalBytes,
-		Duration:       stat.Duration,
-		DataRate:       stat.DataRate,
-		FabricDuration: stat.FabricDuration,
+		Matches:    stat.Matches,
+		TotalBytes: stat.TotalBytes,
+		Duration:   stat.Duration,
+		DataRate:   stat.DataRate,
+		//		FabricDuration: stat.FabricDuration,
 		FabricDataRate: stat.FabricDataRate,
 	}, nil
 }
