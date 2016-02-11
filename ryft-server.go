@@ -31,20 +31,36 @@
 package main
 
 import (
-	"html/template"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 
+	"github.com/getryft/ryft-server/search"
+	_ "github.com/getryft/ryft-server/search/ryfthttp"
+	"github.com/getryft/ryft-server/search/ryftmux"
+	_ "github.com/getryft/ryft-server/search/ryftprim"
+
+	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
+	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
-	"github.com/getryft/ryft-server/names"
+	"github.com/getryft/ryft-server/srverr"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thoas/stats"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/yaml.v2"
 )
 
 var (
+	serverConfig = kingpin.Flag("config", "Server configuration in YML format.").String()
+
+	// KeepResults console flag for keeping results files
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
 	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
 
@@ -59,11 +75,49 @@ var (
 
 	listenAddress = kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").TCP()
 
-	tlsEnabled        = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
-	tlsCrtFile        = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
-	tlsKeyFile        = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
-	tlsListenAdderess = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
+	tlsEnabled       = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
+	tlsCrtFile       = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
+	tlsKeyFile       = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
+	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
 )
+var hostName string
+
+// customized via Makefile
+var (
+	Version string
+	GitHash string
+)
+
+// Server instance
+type Server struct {
+	SearchBackend  string                 `yaml:"searchBackend,omitempty"`
+	BackendOptions map[string]interface{} `yaml:"backendOptions,omitempty"`
+}
+
+// parse server configuration from YML file
+func (s *Server) parseConfig(fileName string) error {
+	// default configuration if no file provided
+	s.SearchBackend = "ryftprim"
+	s.BackendOptions = map[string]interface{}{}
+
+	if len(fileName) == 0 {
+		return nil // OK
+	}
+
+	// read full file content
+	buf, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return fmt.Errorf("failed to read configuration from %q: %s", fileName, err)
+	}
+
+	// TODO: parse ServerConfig dedicated structure
+	err = yaml.Unmarshal(buf, &s)
+	if err != nil {
+		return fmt.Errorf("failed to parse configuration from %q: %s", fileName, err)
+	}
+
+	return nil // OK
+}
 
 func ensureDefault(flag *string, message string) {
 	if *flag == "" {
@@ -71,9 +125,96 @@ func ensureDefault(flag *string, message string) {
 	}
 }
 
+// get search backend with options
+func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
+	if !localOnly {
+		// cluster search
+
+		// for each service create corresponding search engine
+		backends := []search.Engine{}
+		info, err := GetConsulInfo()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get consul service info: %s", err)
+		}
+		for _, service := range info {
+			if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
+				// local node: just use normal backend
+				engine, err := s.getSearchEngine(true)
+				if err != nil {
+					return nil, err
+				}
+				backends = append(backends, engine)
+				continue // skip
+			}
+
+			// remote node: use RyftHTTP backend
+			port := service.ServicePort
+			scheme := "http"
+			var url string
+			if port == 0 { // TODO: review the URL building!
+				url = fmt.Sprintf("%s://%s:%s", scheme, service.Address, DefaultPort)
+			} else {
+				url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+			}
+
+			opts := map[string]interface{}{
+				"server-url": url,
+				"local-only": true,
+				"skip-stat":  false,
+				"index-host": url,
+			}
+			// log level
+			if _, ok := opts["log-level"]; !ok && *debug {
+				opts["log-level"] = "debug"
+			}
+
+			engine, err := search.NewEngine("ryfthttp", opts)
+			if err != nil {
+				return nil, err
+			}
+			backends = append(backends, engine)
+		}
+
+		if len(backends) > 0 {
+			return ryftmux.NewEngine(backends...)
+		} else {
+			// no services from consule, just use local search as a fallback
+			return s.getSearchEngine(true)
+		}
+	} else {
+		// local node search
+		opts := s.BackendOptions
+
+		// some auto-options
+		switch s.SearchBackend {
+		case "ryftprim":
+			// instance name
+			if _, ok := opts["instance-name"]; !ok {
+				opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+			}
+
+			// keep-files
+			if _, ok := opts["keep-files"]; !ok {
+				opts["keep-files"] = *KeepResults
+			}
+
+			// index-host
+			if _, ok := opts["index-host"]; !ok {
+				opts["index-host"] = hostName
+			}
+
+			// log level
+			if _, ok := opts["log-level"]; !ok && *debug {
+				opts["log-level"] = "debug"
+			}
+		}
+
+		return search.NewEngine(s.SearchBackend, opts)
+	}
+}
+
 func parseParams() {
 	kingpin.Parse()
-
 	// check extra dependencies logic not handled by kingpin
 	switch *authType {
 	case "file":
@@ -99,59 +240,135 @@ func parseParams() {
 	}
 }
 
+var Stats = stats.New()
+
+// RyftAPI include search, index, count
 func main() {
+	//getting current hostname
+	hostName, _ = os.Hostname()
+
+	// set log timestamp format
 	log.SetFlags(log.Lmicroseconds)
+
+	// parse command line arguments
 	parseParams()
+
+	// be quiet and efficient in production
 	if !*debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := gin.Default()
+	// Create a rounter with default middleware: logger, recover
+	router := gin.Default()
 
-	indexTemplate := template.Must(template.New("index").Parse(IndexHTML))
-	r.SetHTMLTemplate(indexTemplate)
+	// Configure required middlewares
+	var server Server
+	err := server.parseConfig(*serverConfig)
+	if err != nil {
+		log.Fatalf("Failed to read server configuration: %s", err)
+	}
+	log.Printf("CONFIG: %+v", server)
 
+	// Logging & error recovery
+	//	router.Use(gin.Logger())
+	//	router.Use(srverr.Recovery())
+
+	// Setting up Stats measirment middleware
+	router.Use(func() gin.HandlerFunc {
+		return func(c *gin.Context) {
+			beginning := time.Now()
+			c.Next()
+			Stats.End(beginning, c.Writer)
+		}
+	}())
+
+	// Allow CORS requests for * (all domains)
+	router.Use(cors.Cors("*"))
+
+	// Enable GZip compression support
+	router.Use(gzip.Gzip(gzip.DefaultCompression))
+
+	// Enable authentication if configured
 	switch *authType {
 	case "file":
-
 		auth, err := auth.AuthBasicFile(*authUsersFile)
 		if err != nil {
 			log.Printf("Error reading users file: %v", err)
 			os.Exit(1)
 		}
-		r.Use(auth)
+		router.Use(auth)
 		break
 	case "ldap":
-		r.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser, *authLdapPass, *authLdapQuery, *authLdapBase))
-
+		router.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
+			*authLdapPass, *authLdapQuery, *authLdapBase))
 		break
-
 	}
 
-	r.Use(gzip.Gzip(gzip.DefaultCompression))
-	//Setting routes
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index", nil)
+	// Configure routes
 
+	router.GET("/version", func(ctx *gin.Context) {
+		info := map[string]interface{}{
+			"verison":  Version,
+			"git-hash": GitHash,
+		}
+		ctx.JSON(http.StatusOK, info)
 	})
-	r.GET("/search", search)
-	r.GET("/count", count)
-	// Clean previously created folder
-	if err := os.RemoveAll(names.ResultsDirPath()); err != nil {
-		log.Printf("Could not delete %s with error %s", names.ResultsDirPath(), err.Error())
-		os.Exit(1)
+
+	// stats page
+	router.GET("/about", func(c *gin.Context) {
+		c.JSON(http.StatusOK, Stats.Data())
+	})
+
+	router.GET("/search", detectEncoder, server.search)
+	router.GET("/count", detectEncoder, server.count)
+	router.GET("/cluster/members", server.members)
+	router.GET("/files", server.files)
+
+	// static asset
+	for _, asset := range AssetNames() {
+		data := MustAsset(asset)
+		ct := mime.TypeByExtension(filepath.Ext(asset))
+		router.GET("/"+asset, func(c *gin.Context) {
+			c.Data(http.StatusOK, ct, data)
+		})
 	}
 
-	// Create folder for results cache
-	if err := os.MkdirAll(names.ResultsDirPath(), 0777); err != nil {
-		log.Printf("Could not create directory %s with error %s", names.ResultsDirPath(), err.Error())
-		os.Exit(1)
-	}
+	// index
+	idxHTML := MustAsset("index.html")
+	router.GET("/", func(c *gin.Context) {
+		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
+	})
 
-	// Name Generator will produce unique file names for each new results files
-	names.StartNamesGenerator()
+	// Startup preparatory
+
+	// start listening on HTTP or HTTPS ports
 	if *tlsEnabled {
-		go r.RunTLS((*tlsListenAdderess).String(), *tlsCrtFile, *tlsKeyFile)
+		go router.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
 	}
-	r.Run((*listenAddress).String())
+	router.Run((*listenAddress).String())
+}
+
+const (
+	ENCODER_CONTEXT_KEY = "encoder-detected"
+)
+
+func detectEncoder(c *gin.Context) {
+	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
+	// default to JSON
+	if accept == "" {
+		accept = encoder.MIME_JSON
+	}
+	c.Header("Content-Type", accept)
+
+	// setting up encoder to respond with requested format
+	if enc, err := encoder.GetByMimeType(accept); err != nil {
+		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	} else {
+		c.Set(ENCODER_CONTEXT_KEY, enc)
+	}
+}
+
+func encoderFromContext(c *gin.Context) encoder.Encoder {
+	// TODO add handlers for null value and report 400 error
+	return c.MustGet(ENCODER_CONTEXT_KEY).(encoder.Encoder)
 }

@@ -28,47 +28,59 @@
  * ============
  */
 
-package encoder
+package ryftprim
 
 import (
+	"bytes"
 	"fmt"
-	"io"
+	"os/exec"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
+var (
+	// global identifier (zero for debugging)
+	taskId = uint64(0 * time.Now().UnixNano())
 )
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+// RyftPrim task related data.
+type Task struct {
+	Identifier    string // unique
+	IndexFileName string
+	DataFileName  string
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
+	// `ryftprim` process & output
+	tool_args []string      // command line arguments
+	tool_cmd  *exec.Cmd     // `ryftprim` executable process
+	tool_out  *bytes.Buffer // combined STDOUT and STDERR
+
+	// index & data
+	enableDataProcessing bool
+	indexChan            chan search.Index // INDEX to DATA
+	indexCancel          chan interface{}  // to cancel INDEX processing
+	dataCancel           chan interface{}  // to cancel DATA processing
+	subtasks             sync.WaitGroup
+
+	// some processing statistics
+	totalDataLength uint64 // total DATA length expected, sum of all index.Length
 }
 
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
+// NewTask creates new task.
+func NewTask(enableProcessing bool) *Task {
+	id := atomic.AddUint64(&taskId, 1)
 
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
-	}
+	task := new(Task)
+	task.Identifier = fmt.Sprintf("%016x", id)
+	task.enableDataProcessing = enableProcessing
+
+	// NOTE: index file should have 'txt' extension,
+	// otherwise `ryftprim` adds '.txt' anyway.
+	// all files are hidden!
+	task.IndexFileName = fmt.Sprintf(".idx-%s.txt", task.Identifier)
+	task.DataFileName = fmt.Sprintf(".dat-%s.bin", task.Identifier)
+
+	return task
 }

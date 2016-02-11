@@ -28,47 +28,39 @@
  * ============
  */
 
-package encoder
+package main
 
 import (
 	"fmt"
-	"io"
+
+	consul "github.com/hashicorp/consul/api"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+//type Service struct {
+//	Node           string   `json:"Node"`
+//	Address        string   `json:"Address"`
+//	ServiceID      string   `json:"ServiceID"`
+//	ServiceName    string   `json:"ServiceName"`
+//	ServiceAddress string   `json:"ServiceAddress"`
+//	ServiceTags    []string `json:"ServiceTags"`
+//	ServicePort    string   `json:"ServicePort"`
+//}
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+func GetConsulInfo() (address []*consul.CatalogService, err error) {
+	config := consul.DefaultConfig()
+	// TODO: get some data from server's configuration
+	config.Datacenter = "dc1"
+	client, err := consul.NewClient(config)
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get consul client", err)
 	}
+
+	catalog := client.Catalog()
+	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+
+	// for _, value := range services {
+	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
+	// }
+	return services, err
 }

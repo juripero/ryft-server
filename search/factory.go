@@ -28,47 +28,36 @@
  * ============
  */
 
-package encoder
+package search
 
-import (
-	"fmt"
-	"io"
+var (
+	// global engine factories
+	factories = map[string]EngineFactory{}
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+// Engine factory function.
+// Returns new engine and possible error.
+// Underlying engine can use custom options.
+type EngineFactory func(map[string]interface{}) (Engine, error)
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
-
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+// RegisterEngine registers search engine factory.
+// If engine factory with that name already exists it will be replaced.
+// To unregister engine factory just pass `nil` as the factory function.
+func RegisterEngine(name string, f EngineFactory) {
+	if f != nil {
+		// register new or replace existing
+		factories[name] = f
+	} else {
+		// deregister existing
+		delete(factories, name)
 	}
+}
+
+// GetAvailableEngines returns all the registered search engines.
+func GetAvailableEngines() []string {
+	names := make([]string, 0, len(factories))
+	for k, _ := range factories {
+		names = append(names, k)
+	}
+	return names
 }

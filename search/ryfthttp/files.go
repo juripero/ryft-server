@@ -28,47 +28,67 @@
  * ============
  */
 
-package encoder
+package ryfthttp
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
+	"net/http"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	// prepare request URL TODO: move to dedicated function
+	url := engine.prepareFilesUrl(path)
+	url.Path += "/files"
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+	task := NewTask()
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+	// prepare request, TODO: authentication?
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		task.log().WithError(err).Errorf("failed to create HTTP request")
+		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
+
+	// we expect JSON format
+	req.Header.Set("Accept", "application/json")
+
+	// do HTTP request
+	resp, err := engine.httpClient.Do(req)
+	if err != nil {
+		task.log().WithError(err).Errorf("failed to send HTTP request")
+		return nil, fmt.Errorf("failed to send HTTP request: %s", err)
+	}
+
+	defer resp.Body.Close() // close it later
+
+	// check status code
+	if resp.StatusCode != http.StatusOK {
+		task.log().WithField("status", resp.StatusCode).Errorf("invalid HTTP response status")
+		return nil, fmt.Errorf("invalid HTTP response status: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	// TODO: use dedicated structure from transcode here!
+	var info struct {
+		Path  string   `json:"dir"`
+		Files []string `json:"files,omitempty"`
+		Dirs  []string `json:"folders,omitempty"`
+	}
+
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&info)
+	if err != nil {
+		task.log().WithError(err).Errorf("failed to decode HTTP response")
+		return nil, fmt.Errorf("failed to decode HTTP response: %s", err)
+	}
+
+	res := &search.DirInfo{}
+	res.Path = info.Path
+	res.Files = info.Files
+	res.Dirs = info.Dirs
+
+	return res, nil // OK
 }

@@ -31,51 +31,61 @@
 package transcoder
 
 import (
+	"errors"
 	"fmt"
-	"log"
-	"runtime/debug"
 
 	"github.com/clbanning/mxj"
-	"github.com/getryft/ryft-server/records"
+	"github.com/getryft/ryft-server/search"
 )
 
 type XmlTranscoder struct {
 	Transcoder
 }
 
-func (transcoder *XmlTranscoder) Transcode(recs chan records.IdxRecord) (chan interface{}, chan error) {
-	output := make(chan interface{}, TranscodeBufferCapacity)
-	errors := make(chan error)
+func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string) (res interface{}, err error) {
 
-	go func() {
-		defer close(output)
-		defer close(errors)
-		for rec := range recs {
-			obj, err := mxj.NewMapXml(rec.Data)
-			if err != nil {
-				errors <- err
-				continue
-			}
-
-			for k := range obj {
-				item, ok := obj[k]
-				if ok {
-					defer func() {
-						if r := recover(); r != nil {
-							fmt.Println("Recovered in parsing ", r)
-							debug.PrintStack()
-							log.Printf("PASRING XML: %s", rec.Data)
-						}
-					}()
-					item.(map[string]interface{})["_index"] = Index{rec.File, rec.Offset, rec.Length, rec.Fuzziness}
-					output <- item
-
-				} else {
-					errors <- fmt.Errorf("Can't parse as xml: %+v", rec)
-				}
-			}
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in parsing ", r)
+			//          debug.PrintStack()
+			//          log.Printf("PASRING XML: %s", rec.Data)
+			err = errors.New(fmt.Sprintf("PASRING XML: %s", rec))
+			return
 		}
 	}()
 
-	return output, errors
+	obj, err := mxj.NewMapXml(rec.Data.([]byte))
+	if err != nil {
+		return nil, err
+	}
+	for k := range obj {
+		item, ok := obj[k]
+		if ok {
+			switch i := item.(type) {
+			case map[string]interface{}:
+				// if fields is not empty - do filtering
+				if len(fields) != 0 {
+					res = make(map[string]interface{})
+					for _, k := range fields {
+						if r, ok := i[k]; ok {
+							res.(map[string]interface{})[k] = r
+						}
+					}
+				} else {
+					res = i
+				}
+				res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
+				break
+			default:
+				return nil, fmt.Errorf("incorrect input data type")
+			}
+		}
+		break
+	}
+	return
+}
+
+func (transcoder *XmlTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
+	// TODO: replace with XML?
+	return NewStat(stat), nil
 }

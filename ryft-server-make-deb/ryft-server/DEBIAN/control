@@ -1,9 +1,0 @@
-Package: ryft-server
-Version: 0.4
-Section: custom
-Priority: optional
-Architecture: amd64
-Essential: no
-Installed-Size: 1024
-Maintainer: www.ryft.com
-Description: ryft-server

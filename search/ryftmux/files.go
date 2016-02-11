@@ -28,47 +28,78 @@
  * ============
  */
 
-package encoder
+package ryftmux
 
 import (
 	"fmt"
-	"io"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	task := NewTask()
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+	ch := make(chan *search.DirInfo, len(engine.Backends))
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+	// prepare requests
+	for _, backend := range engine.Backends {
+		// do search in goroutine
+		go func(backend search.Engine) {
+			res, err := backend.Files(path)
+			if err != nil {
+				task.log().WithError(err).Warnf("failed to start /files subtask")
+				// TODO: report as multiplexed error?
+				ch <- nil
+			} else {
+				ch <- res
+			}
+		}(backend)
 	}
+
+	// wait for all subtasks and merge results
+	muxPath := ""
+	muxFiles := map[string]int{}
+	muxDirs := map[string]int{}
+	for _ = range engine.Backends {
+		select {
+		case res, ok := <-ch:
+			if ok && res != nil {
+				// check directory path is consistent
+				if len(muxPath) == 0 {
+					muxPath = res.Path
+				}
+				if muxPath != res.Path {
+					task.log().WithField("path1", muxPath).
+						WithField("path2", res.Path).
+						Warnf("failed to start /files subtask")
+					return nil, fmt.Errorf("inconsistent directory %q != %q",
+						muxPath, res.Path)
+				}
+
+				// merge files
+				for _, f := range res.Files {
+					muxFiles[f] += 1
+				}
+
+				// merge dirs
+				for _, d := range res.Dirs {
+					muxDirs[d] += 1
+				}
+			}
+		}
+	}
+
+	// prepare results
+	mux := search.NewDirInfo(muxPath)
+	mux.Files = make([]string, 0, len(muxFiles))
+	mux.Dirs = make([]string, 0, len(muxDirs))
+	for f, _ := range muxFiles {
+		mux.Files = append(mux.Files, f)
+	}
+	for d, _ := range muxDirs {
+		mux.Dirs = append(mux.Dirs, d)
+	}
+
+	return mux, nil // OK
 }

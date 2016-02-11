@@ -31,94 +31,74 @@
 package encoder
 
 import (
+	"encoding/json"
 	"io"
-
-	"gopkg.in/vmihailenco/msgpack.v2"
-	// "github.com/ugorji/go/codec"
 )
 
-// MSGPACK encoder
-type MsgPackEncoder struct {
-	OmitTags      bool // if we report just data records we can omit tags
+// simple JSON encoder
+type JsonEncoder struct {
 	needSeparator bool
 }
 
-const (
-	TAG_MsgPackEOF uint8 = iota
-	TAG_MsgPackItem
-	TAG_MsgPackStat
-	TAG_MsgPackError
-)
-
-func (enc *MsgPackEncoder) Begin(w io.Writer) error {
-	return nil
-}
-
-func (enc *MsgPackEncoder) End(w io.Writer, errors []error) error {
-	return enc.EndWithStats(w, nil, errors)
-}
-
-func (enc *MsgPackEncoder) EndWithStats(w io.Writer, stat interface{}, errors []error) error {
-	//log.Printf("[msgpack]: encode stat: %#v", stat)
-	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
-
-	if len(errors) > 0 {
-		for _, err := range errors {
-			if !enc.OmitTags {
-				_ = e.EncodeUint8(TAG_MsgPackError)
-			}
-			_ = e.EncodeString(err.Error())
-		}
-	}
-
-	if stat != nil {
-		if !enc.OmitTags {
-			_ = e.EncodeUint8(TAG_MsgPackStat)
-		}
-		_ = e.Encode(stat)
-	}
-
-	if !enc.OmitTags {
-		_ = e.EncodeUint8(TAG_MsgPackEOF)
-	}
-	return nil
-}
-
-func (enc *MsgPackEncoder) Write(w io.Writer, item interface{}) error {
-	// log.Printf("[msgpack]: encode item: %#v", item)
-	e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
-	if !enc.OmitTags {
-		_ = e.EncodeUint8(TAG_MsgPackItem)
-	}
-	err := e.Encode(item)
+func (enc *JsonEncoder) Begin(w io.Writer) error {
+	_, err := w.Write([]byte(`{"results":[`))
 	return err
 }
 
-func (enc *MsgPackEncoder) WriteStreamError(w io.Writer, err error) bool {
-	if !enc.OmitTags {
-		e := msgpack.NewEncoder(w) // FIXME: do not create encoder each time
-		_ = e.EncodeUint8(TAG_MsgPackError)
-		_ = e.EncodeString(err.Error())
-		return true
+func (enc *JsonEncoder) End(w io.Writer, errors []error) error {
+	return enc.EndWithStats(w, nil, errors)
+}
+
+func (enc *JsonEncoder) EndWithStats(w io.Writer, stat interface{}, errors []error) error {
+	if _, err := w.Write([]byte(`]`)); err != nil {
+		return err
 	}
+	e := json.NewEncoder(w)
+
+	// errors
+	if len(errors) > 0 {
+		// convert errors to strings
+		messages := make([]string, 0, len(errors))
+		for _, e := range errors {
+			messages = append(messages, e.Error())
+		}
+
+		if _, err := w.Write([]byte(`,"errors":`)); err != nil {
+			return err
+		}
+		if err := e.Encode(messages); err != nil {
+			return err
+		}
+	}
+
+	// statistics
+	if stat != nil {
+		if _, err := w.Write([]byte(`,"stats":`)); err != nil {
+			return err
+		}
+		if err := e.Encode(stat); err != nil {
+			return err
+		}
+	}
+
+	_, err := w.Write([]byte("}"))
+	return err
+}
+
+func (enc *JsonEncoder) Write(w io.Writer, item interface{}) error {
+	if enc.needSeparator {
+		w.Write([]byte(","))
+		enc.needSeparator = false
+	}
+	e := json.NewEncoder(w) // FIXME: do not create encoder each time
+	err := e.Encode(item)
+	if err == nil {
+		enc.needSeparator = true
+	}
+	return err
+}
+
+func (enc *JsonEncoder) WriteStreamError(w io.Writer, err error) bool {
+	// JSON fromat doesn't support stream errors
 	return false
-}
-
-// MSGPACK decoder
-type MsgPackDecoder struct {
-	dec *msgpack.Decoder
-}
-
-// NewMsgPackDecoder creates new MSGPACK decoder instance.
-func NewMsgPackDecoder(r io.Reader) *MsgPackDecoder {
-	return &MsgPackDecoder{dec: msgpack.NewDecoder(r)}
-}
-
-func (dec *MsgPackDecoder) NextTag() (uint8, error) {
-	return dec.dec.DecodeUint8()
-}
-
-// Read decodes next item from the stream.
-func (dec *MsgPackDecoder) Next(item interface{}) error {
-	return dec.dec.Decode(item)
 }

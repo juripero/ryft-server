@@ -28,47 +28,54 @@
  * ============
  */
 
-package encoder
+package search
 
 import (
 	"fmt"
-	"io"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+// Search processing statistics.
+// Contains set of search statistics such as total processed bytes
+// and processing duration.
+type Statistics struct {
+	Matches    uint64 // total records matched
+	TotalBytes uint64 // total input bytes processed
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+	Duration uint64  // processing duration, milliseconds
+	DataRate float64 // MB/sec, TotalBytes/Duration
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
+	FabricDuration uint64  // fabric processing duration, milliseconds
+	FabricDataRate float64 // MB/sec, TotalBytes/FabricDuration
 }
 
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
+// NewStat creates empty statistics.
+func NewStat() *Statistics {
+	stat := new(Statistics)
+	return stat
 }
 
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+// String gets string representation of statistics.
+func (s Statistics) String() string {
+	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms (fabric: %d ms)}",
+		s.Matches, s.TotalBytes, s.Duration, s.FabricDuration)
+}
+
+// Merge merges statistics from another node.
+func (s *Statistics) Merge(a *Statistics) {
+	s.Matches += a.Matches
+	s.TotalBytes += a.TotalBytes
+
+	// s.Duration += a.Duration
+	if s.Duration < a.Duration {
+		s.Duration = a.Duration
 	}
+
+	// s.FabricDuration += a.FabricDuration
+	if s.FabricDuration < a.FabricDuration {
+		s.FabricDuration = a.FabricDuration
+	}
+
+	// just sum all data rates
+	s.FabricDataRate += a.FabricDataRate
+	s.DataRate += a.DataRate
 }

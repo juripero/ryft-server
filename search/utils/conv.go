@@ -28,47 +28,75 @@
  * ============
  */
 
-package encoder
+package utils
 
 import (
 	"fmt"
-	"io"
+	"strconv"
+	"time"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
-
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
-
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+// convert custom value to string.
+func AsString(opt interface{}) (string, error) {
+	switch v := opt.(type) {
+	// TODO: other types to string?
+	case string:
+		return v, nil
+	case nil:
+		return "", nil
 	}
+
+	return "", fmt.Errorf("%v is not a string", opt)
+	// return fmt.Sprintf("%s", opt), nil
+}
+
+// convert custom value to time duration.
+func AsDuration(opt interface{}) (time.Duration, error) {
+	switch v := opt.(type) {
+	// TODO: other types to duration?
+	case string:
+		return time.ParseDuration(v)
+	case time.Duration:
+		return v, nil
+	case nil:
+		return time.Duration(0), nil
+	}
+
+	return time.Duration(0), fmt.Errorf("%v is not a time duration", opt)
+}
+
+// convert custom value to uint64.
+func AsUint64(opt interface{}) (uint64, error) {
+	switch v := opt.(type) {
+	// TODO: other types to uint64?
+	case uint:
+		return uint64(v), nil
+	case int:
+		return uint64(v), nil
+	case uint64:
+		return v, nil
+	case int64:
+		return uint64(v), nil
+	case float64:
+		return uint64(v), nil
+	case string:
+		return strconv.ParseUint(v, 10, 64)
+	case nil:
+		return 0, nil
+	}
+
+	return 0, fmt.Errorf("%v os not a uint64", opt)
+}
+
+// convert custom value to bool.
+func AsBool(opt interface{}) (bool, error) {
+	switch v := opt.(type) {
+	// TODO: other types to bool?
+	case bool:
+		return v, nil
+	case nil:
+		return false, nil
+	}
+
+	return false, fmt.Errorf("%v is not a bool", opt)
 }

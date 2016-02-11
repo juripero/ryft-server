@@ -28,47 +28,73 @@
  * ============
  */
 
-package encoder
+package ryftmux
 
 import (
 	"fmt"
-	"io"
+
+	"github.com/Sirupsen/logrus"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
+var (
+	// package logger instance
+	log = logrus.New()
+
+	TAG = "ryftmux"
 )
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+// RyftMUX engine uses set of abstract engines as backends.
+type Engine struct {
+	Backends []search.Engine
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
+	IndexHost string // optional host in cluster mode
 }
 
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
+// NewEngine creates new RyftMUX search engine.
+func NewEngine(backends ...search.Engine) (*Engine, error) {
+	engine := new(Engine)
+	engine.Backends = backends
+	return engine, nil
 }
 
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+// String gets string representation of the engine.
+func (engine *Engine) String() string {
+	return fmt.Sprintf("RyftMUX{backends:%d}",
+		len(engine.Backends))
+	// TODO: other parameters?
+}
+
+// Options gets all engine options.
+func (engine *Engine) Options() map[string]interface{} {
+	return map[string]interface{}{
+		"index-host": engine.IndexHost,
 	}
+}
+
+// log returns task related logger.
+func (task *Task) log() *logrus.Entry {
+	return log.WithField("task", task.Identifier)
+}
+
+/*
+// factory creates RyftMUX engine.
+func factory(opts map[string]interface{}) (search.Engine, error) {
+	backends := parseOptions(opts)
+	engine, err := NewEngine(backends)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
+	}
+	return engine, nil
+}
+*/
+
+// package initialization
+func init() {
+	// should be created manually!
+	// search.RegisterEngine(TAG, factory)
+
+	// be silent by default
+	log.Level = logrus.WarnLevel
 }

@@ -28,47 +28,38 @@
  * ============
  */
 
-package encoder
+package utils
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
-	"io"
+	"unicode"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
-
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
-
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+// DumpAsString get data as ASCII or HEX.
+func DumpAsString(v interface{}) string {
+	if b, ok := v.([]byte); ok {
+		if isAsciiPrintable(b) {
+			return string(b)
+		} else {
+			return "hex:" + hex.EncodeToString(b)
+		}
+	} else {
+		return fmt.Sprintf("%v", v)
 	}
+}
+
+// check if data is printable ASCII
+func isAsciiPrintable(v []byte) bool {
+	for _, r := range bytes.Runes(v) {
+		if r > unicode.MaxASCII {
+			return false
+		}
+		if !unicode.IsPrint(r) {
+			return false
+		}
+	}
+
+	return true // printable
 }

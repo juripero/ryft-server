@@ -28,47 +28,63 @@
  * ============
  */
 
-package encoder
+package ryfthttp
 
 import (
 	"fmt"
-	"io"
+	"net/url"
+
+	"github.com/getryft/ryft-server/search/utils"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
-
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
-
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+// Options gets all engine options.
+func (engine *Engine) Options() map[string]interface{} {
+	return map[string]interface{}{
+		"server-url": engine.ServerURL,
+		"local-only": engine.LocalOnly,
+		"skip-stat":  engine.SkipStat,
+		"index-host": engine.IndexHost,
 	}
+}
+
+// update engine options.
+func (engine *Engine) update(opts map[string]interface{}) (err error) {
+	// server URL
+	if v, ok := opts["server-url"]; ok {
+		engine.ServerURL, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "server-url" option: %s`, err)
+		}
+	} else {
+		engine.ServerURL = "http://localhost:8765"
+	}
+	if _, err := url.Parse(engine.ServerURL); err != nil {
+		return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
+	}
+
+	// local only flag
+	if v, ok := opts["local-only"]; ok {
+		engine.LocalOnly, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "local-only" option: %s`, err)
+		}
+	}
+
+	// skip stat flag
+	if v, ok := opts["skip-stat"]; ok {
+		engine.SkipStat, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "skip-stat" option: %s`, err)
+		}
+	}
+
+	// index host
+	if v, ok := opts["index-host"]; ok {
+		engine.IndexHost, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "index-host" option: %s`, err)
+		}
+	}
+
+	return nil // OK
 }

@@ -28,47 +28,56 @@
  * ============
  */
 
-package encoder
+package search
 
 import (
 	"fmt"
-	"io"
+	"strings"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
-
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
-
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
+// Search configuration.
+// Contains all query related parameters.
+type Config struct {
+	Query         string
+	Files         []string
+	Surrounding   uint
+	Fuzziness     uint
+	CaseSensitive bool
+	Nodes         uint
+	Fields        []string
 }
 
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
+// NewEmptyConfig creates new empty search configuration.
+func NewEmptyConfig() *Config {
+	cfg := new(Config)
+	return cfg
 }
 
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
-	}
+// NewConfig creates new search configuration.
+func NewConfig(query string, files ...string) *Config {
+	cfg := new(Config)
+	cfg.Query = query
+	cfg.Files = files
+	return cfg
+}
+
+// AddFile adds one or more files to the search configuration.
+func (cfg *Config) AddFile(files ...string) {
+	cfg.AddFiles(files)
+}
+
+// AddFiles adds one or more files to the search configuration.
+func (cfg *Config) AddFiles(files []string) {
+	cfg.Files = append(cfg.Files, files...)
+}
+
+// AddFields adds one or more fields to the search configuration.
+func (cfg *Config) AddFields(fields string) {
+	cfg.Fields = strings.Split(fields, ",")
+}
+
+// String gets the string representation of the configuration.
+func (cfg Config) String() string {
+	return fmt.Sprintf("Config{query:%s, files:%q surr:%d, fuzz:%d, case-sens:%t, nodes:%d}",
+		cfg.Query, cfg.Files, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes)
 }

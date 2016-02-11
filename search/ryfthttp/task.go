@@ -28,47 +28,30 @@
  * ============
  */
 
-package encoder
+package ryfthttp
 
 import (
 	"fmt"
-	"io"
+	"sync/atomic"
+	"time"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
+var (
+	// global identifier (zero for debugging)
+	taskId = uint64(0 * time.Now().UnixNano())
 )
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
-
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
+// RyftPrim task related data.
+type Task struct {
+	Identifier string // unique
 }
 
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
+// NewTask creates new task.
+func NewTask() *Task {
+	id := atomic.AddUint64(&taskId, 1)
 
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
-	}
+	task := new(Task)
+	task.Identifier = fmt.Sprintf("http-%08x", id)
+
+	return task
 }

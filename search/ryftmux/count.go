@@ -28,47 +28,31 @@
  * ============
  */
 
-package encoder
+package ryftmux
 
 import (
-	"fmt"
-	"io"
+	// "fmt"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+// Count starts asynchronous "/count" with RyftMUX engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask()
+	mux := search.NewResult()
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+	// prepare requests
+	for _, backend := range engine.Backends {
+		res, err := backend.Count(cfg)
+		if err != nil {
+			task.log().WithError(err).Errorf("failed to start /count subtask")
+			mux.ReportError(err)
+			continue
+		}
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+		task.add(res)
 	}
+
+	go engine.run(task, mux)
+	return mux, nil // OK for now
 }

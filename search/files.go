@@ -28,47 +28,43 @@
  * ============
  */
 
-package encoder
+package search
 
 import (
 	"fmt"
-	"io"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+// TODO: replace with NodeInfo struct to support trees
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+// Directory content.
+type DirInfo struct {
+	Path string
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
+	Files []string
+	Dirs  []string // subdirectories
 }
 
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
+// NewDirInfo creates empty directory content.
+func NewDirInfo(path string) *DirInfo {
+	res := new(DirInfo)
 
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+	// path cannot be empty
+	// so replace "" with "/"
+	if len(path) != 0 {
+		res.Path = path
+	} else {
+		res.Path = "/"
 	}
+
+	// no files/dirs
+	res.Files = []string{}
+	res.Dirs = []string{}
+
+	return res
+}
+
+// String gets string representation of directory content.
+func (dir *DirInfo) String() string {
+	return fmt.Sprintf("Dir{path:%q, files:%q, dirs:%q}",
+		dir.Path, dir.Files, dir.Dirs)
 }

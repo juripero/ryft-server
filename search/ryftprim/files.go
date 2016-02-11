@@ -28,47 +28,46 @@
  * ============
  */
 
-package encoder
+package ryftprim
 
 import (
 	"fmt"
-	"io"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
+
+	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	log.WithField("path", path).Infof("[%s]: start /files", TAG)
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
-
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
-}
-
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+	// read directory content
+	fullPath := filepath.Join(engine.MountPoint, path)
+	items, err := ioutil.ReadDir(fullPath)
+	if err != nil {
+		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
+		return nil, fmt.Errorf("failed to read directory content: %s", err)
 	}
+
+	// process directory content
+	res := search.NewDirInfo(path)
+	for _, item := range items {
+		name := item.Name()
+
+		// skip ".", ".." and all hidden files
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+
+		if item.IsDir() {
+			res.Dirs = append(res.Dirs, name)
+		} else {
+			res.Files = append(res.Files, name)
+		}
+	}
+
+	log.WithField("info", res).Debugf("[%s] done /files", TAG)
+	return res, nil // OK
 }

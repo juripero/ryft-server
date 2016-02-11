@@ -1,57 +1,97 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
-	"os"
+	"net/url"
 
-	"github.com/getryft/ryft-server/crpoll"
-	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/records"
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/srverr"
+	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
 )
 
-func count(c *gin.Context) {
-	defer srverr.DeferRecover(c)
+// CountParams is a parameters for matches count endpoint
+type CountParams struct {
+	Query         string   `form:"query" json:"query" binding:"required"`
+	Files         []string `form:"files" json:"files" binding:"required"`
+	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
+	CaseSensitive bool     `form:"cs" json:"cs"`
+	Nodes         uint8    `form:"nodes" json:"nodes"`
+	Local         bool     `form:"local" json:"local"`
+}
+
+// CountResponse returnes matches for query
+//
+type CountResponse struct {
+	Mathces uint64 `json:"matches, string"`
+}
+
+// Handle /count endpoint.
+func (s *Server) count(ctx *gin.Context) {
+	// recover from panics if any
+	defer srverr.Recover(ctx)
 
 	var err error
 
 	// parse request parameters
-	params := NewSearchParams()
-	if err = c.Bind(&params); err != nil {
-		// panic(srverr.New(http.StatusBadRequest, err.Error()))
+	params := CountParams{}
+	if err := ctx.Bind(&params); err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to parse request parameters"))
 	}
 
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = encoder.MIMEJSON
+	// get search engine
+	engine, err := s.getSearchEngine(params.Local)
+	if err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to get search engine"))
 	}
 
-	c.Header("Content-Type", accept)
-
-	// get a new unique search index
-	n := names.New()
-
-	p := ryftprim(&params, &n)
-
-	// read an index file
-	var idx *os.File
-	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
-		panic(srverr.New(http.StatusInternalServerError, err.Error()))
+	// search configuration
+	cfg := search.NewEmptyConfig()
+	if q, err := url.QueryUnescape(params.Query); err != nil {
+		panic(srverr.NewWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to unescape query"))
+	} else {
+		cfg.Query = q
 	}
-	defer cleanup(idx)
-	counter := uint64(0)
-	indexes, _ := records.Poll(idx, p)
-	for range indexes {
-		counter++
-	}
-	fmt.Println()
+	cfg.AddFiles(params.Files) // TODO: unescape?
+	cfg.Surrounding = 0
+	cfg.Fuzziness = uint(params.Fuzziness)
+	cfg.CaseSensitive = params.CaseSensitive
+	cfg.Nodes = uint(params.Nodes)
 
-	// c.JSON(http.StatusOK, fmt.Sprintf("Matching: %v", counter))
-	c.JSON(http.StatusOK, struct {
-		Matches uint64
-	}{counter})
+	res, err := engine.Count(cfg)
+	if err != nil {
+		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to start search"))
+	}
+
+	for {
+		select {
+		case rec, ok := <-res.RecordChan:
+			if ok && rec != nil {
+				log.Printf("REC: %s", rec)
+				// ignore records
+			}
+
+		case err, ok := <-res.ErrorChan:
+			if ok && err != nil {
+				log.Printf("ERR: %s", err)
+				// TODO: report error
+			}
+
+		case <-res.DoneChan:
+			if res.Stat != nil {
+				log.Printf("DONE: %s", res.Stat)
+				stat := transcoder.NewStat(res.Stat)
+				ctx.JSON(http.StatusOK, stat)
+			} else {
+				panic(srverr.New(http.StatusInternalServerError,
+					"no search statistics available"))
+			}
+			return
+		}
+	}
 }

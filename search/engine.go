@@ -28,47 +28,42 @@
  * ============
  */
 
-package encoder
+package search
 
 import (
 	"fmt"
-	"io"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+// Abstract Search Engine interface
+type Engine interface {
+	// Get current engine options.
+	Options() map[string]interface{}
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+	// Run asynchronous "/search" operation.
+	Search(cfg *Config) (*Result, error)
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
+	// Run asynchronous "/count" operation.
+	Count(cfg *Config) (*Result, error)
+
+	// Run *synchronous* "/files" operation.
+	Files(path string) (*DirInfo, error)
 }
 
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
-}
-
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+// NewEngine creates new search engine by name.
+// To get list of available engines see GetAvailableEngines().
+// To get list of supported options see corresponding search engine.
+func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
+	// get appropriate factory
+	f, ok := factories[name]
+	if !ok {
+		return nil, fmt.Errorf("%q is unknown search engine", name)
 	}
+
+	if opts == nil {
+		// no options by default
+		opts = map[string]interface{}{}
+	}
+
+	// create engine using factory
+	return f(opts)
 }

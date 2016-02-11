@@ -43,9 +43,10 @@ Args:
 
 ```
 Default value ``port`` is ``8765``
+
 # Packaging into deb file
 
-https://github.com/getryft/ryft-server/blob/master/ryft-server-make-deb/README.md
+See instructions [here](./debian/README.md)
 
 # Keeping search results
 
@@ -154,5 +155,5 @@ ryft-server --keep
 [/count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime](/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime)
 
 ```
-"10000"
+"{"matches":10000}"
 ```
