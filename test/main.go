@@ -14,7 +14,7 @@ import (
 	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
-	msgpack_codec "github.com/getryft/ryft-server/codec/msgpack"
+	msgpack_codec "github.com/getryft/ryft-server/codec/msgpack.v2"
 	raw_format "github.com/getryft/ryft-server/format/raw"
 	xml_format "github.com/getryft/ryft-server/format/xml"
 )

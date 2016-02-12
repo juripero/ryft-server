@@ -35,7 +35,7 @@ import (
 	"net/http"
 
 	//codec "github.com/getryft/ryft-server/codec/json"
-	codec "github.com/getryft/ryft-server/codec/msgpack"
+	codec "github.com/getryft/ryft-server/codec/msgpack.v2"
 	format "github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
 )

@@ -8,7 +8,7 @@ import (
 
 	"github.com/getryft/ryft-server/codec"
 	"github.com/getryft/ryft-server/codec/json"
-	"github.com/getryft/ryft-server/codec/msgpack"
+	"github.com/getryft/ryft-server/codec/msgpack.v2"
 	"github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
