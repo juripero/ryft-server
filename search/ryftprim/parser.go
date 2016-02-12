@@ -32,6 +32,9 @@ package ryftprim
 
 import (
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -76,16 +79,70 @@ func parseStat(buf []byte) (stat *search.Statistics, err error) {
 	}
 
 	// Fabric Data Rate
-	_, err = utils.AsString(v["Fabric Data Rate"])
+	fdr, err := utils.AsString(v["Fabric Data Rate"])
 	if err != nil {
 		return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat`)
 	}
-
-	// Data Rate
-	_, err = utils.AsString(v["Data Rate"])
+	stat.FabricDataRate, err = parseDataRate(fdr)
 	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "Data Rate" stat`)
+		return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat from %q`, fdr)
 	}
 
+	//	// reverse engineering: fabric data rate = (total bytes [MB]) / (fabric duration [sec])
+	//	// so fabric duration [ms] = 1000 / (1024*1024) * (total bytes) / (fabric data rate [MB/sec])
+	//	if stat.FabricDataRate > 0.0 {
+	//		mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
+	//		sec := mb / stat.FabricDataRate                // duration, seconds
+	//		stat.FabricDuration = uint64(sec * 1000)       // sec -> msec
+	//	}
+
+	if stat.Duration > 0 {
+		stat.DataRate = float64(stat.TotalBytes / stat.Duration * 1000.0) //sec
+	}
+	//	// Data Rate
+	//	dr, err := utils.AsString(v["Data Rate"])
+	//	if err != nil {
+	//		return nil, fmt.Errorf(`failed to parse "Data Rate" stat`)
+	//	}
+	//	stat.DataRate, err = parseDataRate(dr)
+	//	if err != nil {
+	//		return nil, fmt.Errorf(`failed to parse "Data Rate" stat from %q`, dr)
+	//	}
+
 	return stat, nil // OK
+}
+
+// parse data rate in MS/s
+// "inf" actually means that duration is zero (dataRate=length/duration)
+func parseDataRate(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+
+	// trim suffix: KB, MB or GB
+	scale := 1.0
+	if t := strings.TrimSuffix(s, "KB/sec"); t != s {
+		scale /= 1024
+		s = t
+	}
+	if t := strings.TrimSuffix(s, "MB/sec"); t != s {
+		// scale = 1.0
+		s = t
+	}
+	if t := strings.TrimSuffix(s, "GB/sec"); t != s {
+		scale *= 1024
+		s = t
+	}
+
+	// parse data rate ("inf" is parsed as +Inf)
+	s = strings.TrimSpace(s)
+	r, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0.0, err
+	}
+
+	// filter out any of +Int, -Inf, NaN
+	if math.IsInf(r, 0) || math.IsNaN(r) {
+		return 0.0, nil // report as zero!
+	}
+
+	return r * scale, nil // OK
 }

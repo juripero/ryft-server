@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	stdlog "log"
 	"os"
@@ -63,11 +64,38 @@ func main() {
 	//files1(false) // ryftprim
 	//files2(false) // HTTP
 	//files3(false) // MUX
+
+	testMsgpackFormat()
+	//files3(false) // MUX
 	//files4(false) // ryftone
 
 	// formatXml()
 
 	//testEncoder()
+}
+
+func testMsgpackFormat() {
+	idx := search.Index{}
+	idx.File = "test.file.txt"
+	idx.Offset = 12345
+	idx.Length = 123
+	idx.Fuzziness = 100
+	idx.Host = "localhost"
+	rec := new(search.Record)
+	rec.Index = idx
+	rec.Data = []byte("test data")
+
+	tcode, _ := transcoder.GetByFormat("raw")
+	xrec, _ := tcode.Transcode1(rec, nil)
+
+	enc, _ := encoder.GetByMimeType("application/msgpack")
+
+	b := &bytes.Buffer{}
+	enc.Begin(b)
+	enc.Write(b, xrec)
+	enc.End(b, nil)
+
+	stdlog.Printf("%s", b.String())
 }
 
 // test xml formatter
