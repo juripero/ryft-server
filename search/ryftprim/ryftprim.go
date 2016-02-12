@@ -33,6 +33,7 @@ package ryftprim
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -48,6 +49,24 @@ import (
 // This function converts search configuration to `ryftprim` command line arguments.
 // See `ryftprim -h` for option description.
 func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
+	if engine.UseNewTool {
+		// no arguments for new go tool
+		// but we have to pass search configuration
+		// via STDIN as special JSON object
+		tool_cfg := map[string]interface{}{
+			"rawCfg":    cfg,
+			"indexFile": filepath.Join(engine.Instance, task.IndexFileName), // relative to `ryftone` mountpoint
+			"dataFile":  filepath.Join(engine.Instance, task.DataFileName),  // relative to `ryftone` mountpoint
+		}
+
+		task.tool_in = new(bytes.Buffer)
+		enc := json.NewEncoder(task.tool_in)
+		err := enc.Encode(tool_cfg)
+
+		task.log().WithField("args", task.tool_in.String()).Infof("[%s]: executing new go tool", TAG)
+		return err // done
+	}
+
 	args := []string{}
 
 	// fuzzy-hamming search by default
@@ -126,6 +145,10 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.tool_out = new(bytes.Buffer)
 	cmd.Stdout = task.tool_out
 	cmd.Stderr = task.tool_out
+
+	if task.tool_in != nil {
+		cmd.Stdin = task.tool_in
+	}
 
 	err := cmd.Start()
 	if err != nil {

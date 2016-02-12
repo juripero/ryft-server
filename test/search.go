@@ -58,11 +58,13 @@ func newEngine(log Logger, backend string, opts map[string]interface{}) search.E
 func newRyftPrim(log Logger) search.Engine {
 	opts := map[string]interface{}{
 		"instance-name": ryftprimInstance,
-		"keep-files":    true,
-		"open-poll":     "1s",
-		"read-poll":     "1s",
-		"read-limit":    5,
-		"log-level":     ryftprimLogLevel,
+		// "ryftprim-exec": "/home/ryftuser/go/bin/ryftprim-tool",
+		// "new-go-tool":   true,
+		"keep-files": true,
+		"open-poll":  "1s",
+		"read-poll":  "1s",
+		"read-limit": 5,
+		"log-level":  ryftprimLogLevel,
 	}
 
 	return newEngine(log, "ryftprim", opts)

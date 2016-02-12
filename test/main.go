@@ -88,7 +88,7 @@ func testMsgpackFormat() {
 	rec.Index = idx
 	rec.Data = []byte("test data")
 
-	b := &bytes.Buffer{}
+	b := new(bytes.Buffer)
 	enc, _ := msgpack_codec.NewStreamEncoder(b)
 	enc.EncodeRecord(raw_format.FromRecord(rec))
 	enc.Close()

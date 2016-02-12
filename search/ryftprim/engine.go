@@ -51,6 +51,7 @@ var (
 type Engine struct {
 	Instance   string // empty by default. might be some server instance name like ".server-1234"
 	ExecPath   string // "/usr/bin/ryftprim" by default
+	UseNewTool bool   // special flag to use new `ryftprim` Go tool
 	MountPoint string // "/ryftone" by default
 
 	KeepResultFiles bool // false by default

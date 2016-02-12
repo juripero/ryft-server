@@ -31,8 +31,12 @@ install: $(ASSETS)
 	go install -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}"
 
 .PHONY: debian
-debian: install
+debian: install ryftprim-tool
 	make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
+
+.PHONY: ryftprim-tool
+ryftprim-tool:
+	make -C search/ryftprim/tool install
 
 clean:
 	rm -f $(ASSETS)

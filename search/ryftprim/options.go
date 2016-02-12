@@ -44,6 +44,7 @@ func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{
 		"instance-name": engine.Instance,
 		"ryftprim-exec": engine.ExecPath,
+		"new-go-tool":   engine.UseNewTool,
 		"ryftone-mount": engine.MountPoint,
 		"open-poll":     engine.OpenFilePollTimeout.String(),
 		"read-poll":     engine.ReadFilePollTimeout.String(),
@@ -76,6 +77,16 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if _, err := os.Stat(engine.ExecPath); err != nil {
 		return fmt.Errorf("failed to locate %q ryftprim executable: %s",
 			engine.ExecPath, err)
+	}
+
+	// flag to use new `ryftprim` go tool
+	if v, ok := opts["new-go-tool"]; ok {
+		engine.UseNewTool, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "new-go-tool" option: %s`, err)
+		}
+	} else {
+		engine.UseNewTool = false
 	}
 
 	// `ryftone` mount point

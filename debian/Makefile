@@ -15,12 +15,14 @@ version:
 	@echo "githash: ${GITHASH}"
 
 RYFT_SERVER_BIN=${GOPATH}/bin/ryft-server
+RYFTPRIM_TOOL=${GOPATH}/bin/ryftprim-tool
 DEBNAME=ryft-server-${VERSION}_amd64.deb
 DESTDIR=.build
 
 .PHONY: package
 package: control
 	cp "${RYFT_SERVER_BIN}" "${DESTDIR}/usr/bin/"
+	cp "${RYFTPRIM_TOOL}" "${DESTDIR}/usr/bin/"
 # TODO: copy server configuration	?
 	dpkg --build "${DESTDIR}"
 	mv -f "${DESTDIR}.deb" "${DEBNAME}"
