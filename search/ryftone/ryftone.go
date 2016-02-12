@@ -79,7 +79,7 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 	var err error
 
 	// create data set
-	task.dataSet, err = newDataSet(cfg.Nodes)
+	task.dataSet, err = NewDataSet(cfg.Nodes)
 	if err != nil {
 		engine.finish(err, task, res)
 		return
@@ -109,13 +109,17 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 		dataFile = filepath.Join(engine.Instance, task.DataFileName)
 	}
 
-	err = task.dataSet.SearchFuzzyHamming(engine.prepareQuery(cfg.Query),
+	err = task.dataSet.SearchFuzzyHamming(DetectPlainQuery(cfg.Query),
 		dataFile, indexFile, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive)
 	if err == nil {
 		res.Stat = search.NewStat()
 		res.Stat.Matches = task.dataSet.GetTotalMatches()
-		res.Stat.Duration = task.dataSet.GetExecutionDuration()
 		res.Stat.TotalBytes = task.dataSet.GetTotalBytesProcessed()
+		res.Stat.Duration = task.dataSet.GetExecutionDuration()
+		res.Stat.FabricDuration = task.dataSet.GetFabricExecutionDuration()
+
+		res.Stat.DataRate = BpmsToMbps(res.Stat.TotalBytes, res.Stat.Duration)
+		res.Stat.FabricDataRate = BpmsToMbps(res.Stat.TotalBytes, res.Stat.FabricDuration)
 	}
 
 	engine.finish(err, task, res)
@@ -318,9 +322,9 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	}
 }
 
-// prepareQuery checks for plain queries
+// DetectPlainQuery checks for plain queries
 // plain queries converted to (RAW_TEXT CONTAINS query_in_hex_format)
-func (engine *Engine) prepareQuery(query string) string {
+func DetectPlainQuery(query string) string {
 	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
 		return query // just use it "as is"
 	} else {
@@ -432,4 +436,11 @@ func (task *Task) readDataFile(file *bufio.Reader, length uint64, poll time.Dura
 
 	return buf[0:pos], fmt.Errorf("cancelled by attempt limit %s (%dx%s)",
 		poll*time.Duration(limit), limit, poll)
+}
+
+// Convert bytes per ms to MB/sec
+func BpmsToMbps(bytes uint64, ms uint64) float64 {
+	mb := float64(bytes) / (1024 * 1024)
+	sec := float64(ms) / 1000
+	return mb / sec
 }
