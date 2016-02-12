@@ -31,7 +31,6 @@
 package ryftone
 
 import (
-	"errors"
 	"bytes"
 	"fmt"
 	"strconv"

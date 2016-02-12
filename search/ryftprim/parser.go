@@ -88,26 +88,30 @@ func parseStat(buf []byte) (stat *search.Statistics, err error) {
 		return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat from %q`, fdr)
 	}
 
-	//	// reverse engineering: fabric data rate = (total bytes [MB]) / (fabric duration [sec])
-	//	// so fabric duration [ms] = 1000 / (1024*1024) * (total bytes) / (fabric data rate [MB/sec])
-	//	if stat.FabricDataRate > 0.0 {
-	//		mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
-	//		sec := mb / stat.FabricDataRate                // duration, seconds
-	//		stat.FabricDuration = uint64(sec * 1000)       // sec -> msec
-	//	}
-
-	if stat.Duration > 0 {
-		stat.DataRate = float64(stat.TotalBytes / stat.Duration * 1000.0) //sec
+	// reverse engineering: fabric data rate = (total bytes [MB]) / (fabric duration [sec])
+	// so fabric duration [ms] = 1000 / (1024*1024) * (total bytes) / (fabric data rate [MB/sec])
+	if stat.FabricDataRate > 0.0 {
+		mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
+		sec := mb / stat.FabricDataRate                // duration, seconds
+		stat.FabricDuration = uint64(sec * 1000)       // sec -> msec
 	}
-	//	// Data Rate
-	//	dr, err := utils.AsString(v["Data Rate"])
-	//	if err != nil {
-	//		return nil, fmt.Errorf(`failed to parse "Data Rate" stat`)
-	//	}
-	//	stat.DataRate, err = parseDataRate(dr)
-	//	if err != nil {
-	//		return nil, fmt.Errorf(`failed to parse "Data Rate" stat from %q`, dr)
-	//	}
+
+	// Data Rate
+	dr, err := utils.AsString(v["Data Rate"])
+	if err != nil {
+		// new version of ryftprim doesn't print "Data Rate"
+		// but we can easily calculate it as (total bytes [MB]) / (duration [sec])
+		if stat.Duration > 0 {
+			mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
+			sec := float64(stat.Duration) / 1000           // msec -> sec
+			stat.DataRate = mb / sec
+		}
+	} else {
+		stat.DataRate, err = parseDataRate(dr)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "Data Rate" stat from %q`, dr)
+		}
+	}
 
 	return stat, nil // OK
 }

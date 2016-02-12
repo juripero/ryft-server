@@ -48,10 +48,10 @@ const (
 
 // for future work...
 type Record_0 struct {
-	Index   Index       `json:"index"`
-	RawData []byte      `json:"raw_data,omitempty"` // base-64 encoded
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
+	Index   Index       `json:"index" msgpack:"index"`
+	RawData []byte      `json:"raw_data,omitempty" msgpack:"raw_data,omitempty"` // base-64 encoded
+	Data    interface{} `json:"data,omitempty" msgpack:"data,omitempty"`
+	Error   string      `json:"error,omitempty" msgpack:"error,omitempty"`
 }
 
 // NewRecord creates new format specific data.

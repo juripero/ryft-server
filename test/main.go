@@ -14,7 +14,9 @@ import (
 	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
-	"github.com/getryft/ryft-server/format/xml"
+	msgpack_codec "github.com/getryft/ryft-server/codec/msgpack"
+	raw_format "github.com/getryft/ryft-server/format/raw"
+	xml_format "github.com/getryft/ryft-server/format/xml"
 )
 
 var (
@@ -54,7 +56,7 @@ func main() {
 	//search1(false) // ryftprim
 	//search2(false) // HTTP
 	//search3(false) // MUX
-	search4(false) // ryftone
+	//search4(false) // ryftone
 
 	//count1(false) // ryftprim
 	//count2(false) // HTTP
@@ -74,6 +76,7 @@ func main() {
 	//testEncoder()
 }
 
+// test msgpack codec and raw format
 func testMsgpackFormat() {
 	idx := search.Index{}
 	idx.File = "test.file.txt"
@@ -85,15 +88,10 @@ func testMsgpackFormat() {
 	rec.Index = idx
 	rec.Data = []byte("test data")
 
-	tcode, _ := transcoder.GetByFormat("raw")
-	xrec, _ := tcode.Transcode1(rec, nil)
-
-	enc, _ := encoder.GetByMimeType("application/msgpack")
-
 	b := &bytes.Buffer{}
-	enc.Begin(b)
-	enc.Write(b, xrec)
-	enc.End(b, nil)
+	enc, _ := msgpack_codec.NewStreamEncoder(b)
+	enc.EncodeRecord(raw_format.FromRecord(rec))
+	enc.Close()
 
 	stdlog.Printf("%s", b.String())
 }
@@ -106,7 +104,7 @@ func formatXml() {
 	//rec.Data = []byte(`<rec><ID>10034183</ID><CaseNumber>HY223673</CaseNumber><Date>04/15/2015 11:59:00 PM</Date><Block>062XX S ST LAWRENCE AVE</Block><IUCR>0486</IUCR><PrimaryType>BATTERY</PrimaryType><Description>DOMESTIC BATTERY SIMPLE</Description><LocationDescription>STREET</LocationDescription><Arrest>false</Arrest><Domestic>true</Domestic><Beat>0313</Beat><District>003</District><Ward>20</Ward><CommunityArea>42</CommunityArea><FBICode>08B</FBICode><XCoordinate>1181263</XCoordinate><YCoordinate>1863965</YCoordinate><Year>2015</Year><UpdatedOn>04/22/2015 12:47:10 PM</UpdatedOn><Latitude>41.781961688</Latitude><Longitude>-87.610984705</Longitude><Location>\"(41.781961688, -87.610984705)\"</Location></recx>`)
 	rec.Data = []byte(`<rec><ID>10034183</ID><CaseNumber>HY223673</CaseNumber><Date>04/15/2015 11:59:00 PM</Date><Block>062XX S ST LAWRENCE AVE</Block><IUCR>0486</IUCR><PrimaryType>BATTERY</PrimaryType><Description>DOMESTIC BATTERY SIMPLE</Description><LocationDescription>STREET</LocationDescription><Arrest>false</Arrest><Domestic>true</Domestic><Beat>0313</Beat><District>003</District><Ward>20</Ward><CommunityArea>42</CommunityArea><FBICode>08B</FBICode><XCoordinate>1181263</XCoordinate><YCoordinate>1863965</YCoordinate><Year>2015</Year><UpdatedOn>04/22/2015 12:47:10 PM</UpdatedOn><Latitude>41.781961688</Latitude><Longitude>-87.610984705</Longitude><Location>\"(41.781961688, -87.610984705)\"</Location></rec>`)
 
-	b, _ := json.MarshalIndent(xml.FromRecord(rec, []string{}), "", " ")
+	b, _ := json.MarshalIndent(xml_format.FromRecord(rec, []string{}), "", " ")
 	log("%s", string(b))
 }
 

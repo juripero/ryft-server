@@ -38,11 +38,11 @@ import (
 
 // INDEX format specific data.
 type Index struct {
-	File      string `json:"file"`
-	Offset    uint64 `json:"offset"`
-	Length    uint64 `json:"length"`
-	Fuzziness int    `json:"fuzziness"`
-	Host      string `json:"host,omitempty"`
+	File      string `json:"file" msgpack:"file"`
+	Offset    uint64 `json:"offset" msgpack:"offset"`
+	Length    uint64 `json:"length" msgpack:"length"`
+	Fuzziness int    `json:"fuzziness" msgpack:"fuzziness"`
+	Host      string `json:"host,omitempty" msgpack:"host,omitempty"`
 }
 
 // NewIndex creates new format specific data.

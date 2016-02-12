@@ -38,8 +38,8 @@ import (
 
 // RECORD format specific data.
 type Record struct {
-	Index Index  `json:"_index"`
-	Data  []byte `json:"data"` // base-64 encoded
+	Index Index  `json:"_index" msgpack:"_index"`
+	Data  []byte `json:"data" msgpack:"data"` // base-64 encoded
 }
 
 // NewRecord creates new format specific data.

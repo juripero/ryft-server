@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/getryft/ryft-server/codec"
+	format "github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
 )
@@ -94,10 +95,10 @@ func (s *Server) count(ctx *gin.Context) {
 		case <-res.DoneChan:
 			if res.Stat != nil {
 				log.Printf("DONE: %s", res.Stat)
-				stat := codec.FromStat(res.Stat)
+				stat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, stat)
 			} else {
-				panic(srverr.New(http.StatusInternalServerError,
+				panic(NewServerError(http.StatusInternalServerError,
 					"no search statistics available"))
 			}
 			return
