@@ -12,7 +12,7 @@ import (
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	_ "github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftone"
-	_ "github.com/getryft/ryft-server/search/ryftprim"
+	"github.com/getryft/ryft-server/search/ryftprim"
 
 	msgpack_codec "github.com/getryft/ryft-server/codec/msgpack.v2"
 	raw_format "github.com/getryft/ryft-server/format/raw"
@@ -67,13 +67,31 @@ func main() {
 	//files2(false) // HTTP
 	//files3(false) // MUX
 
-	testMsgpackFormat()
+	//testMsgpackFormat()
 	//files3(false) // MUX
 	//files4(false) // ryftone
 
 	// formatXml()
 
 	//testEncoder()
+
+	testParseStat()
+}
+
+// test statistics parse
+func testParseStat() {
+	s := `Duration           : 9057
+Total Bytes        : 33603779127
+Matches            : 971
+Fabric Data Rate   : 10307.835938 MB/sec
+`
+
+	stat, err := ryftprim.ParseStat([]byte(s))
+	if err != nil {
+		log("Failed to parse stat: %s", err)
+	} else {
+		log("Parsed stat: %s\n%#v", stat, raw_format.FromStat(stat))
+	}
 }
 
 // test msgpack codec and raw format
@@ -88,7 +106,7 @@ func testMsgpackFormat() {
 	rec.Index = idx
 	rec.Data = []byte("test data")
 
-	b := &bytes.Buffer{}
+	b := new(bytes.Buffer)
 	enc, _ := msgpack_codec.NewStreamEncoder(b)
 	enc.EncodeRecord(raw_format.FromRecord(rec))
 	enc.Close()

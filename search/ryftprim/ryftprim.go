@@ -218,7 +218,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// parse statistics from output
 	if err == nil {
-		res.Stat, err = parseStat(out_buf)
+		res.Stat, err = ParseStat(out_buf)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
 			err = fmt.Errorf("failed to parse statistics: %s", err)
