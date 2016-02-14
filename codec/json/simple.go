@@ -117,6 +117,12 @@ func (enc *SimpleEncoder) Close() error {
 		}
 	}
 
+	// end of records
+	_, err := enc.writer.Write([]byte("]"))
+	if err != nil {
+		return err
+	}
+
 	// array of errors
 	if len(enc.errors) > 0 {
 		// write "errors" header
@@ -148,7 +154,7 @@ func (enc *SimpleEncoder) Close() error {
 	}
 
 	// write footer
-	_, err := enc.writer.Write([]byte("}"))
+	_, err = enc.writer.Write([]byte("}"))
 	return err
 }
 
