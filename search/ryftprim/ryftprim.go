@@ -187,13 +187,15 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 		}
 
 		// kill `ryftprim` tool
-		err := task.tool_cmd.Process.Kill()
-		if err != nil {
-			task.log().WithError(err).Warnf("[%s]: killing tool FAILED", TAG)
-			// WARN: error actually ignored!
-			// res.ReportError(err)
-		} else {
-			task.log().Debugf("[%s]: tool killed", TAG)
+		if false { // engine.KillToolOnCancel
+			err := task.tool_cmd.Process.Kill()
+			if err != nil {
+				task.log().WithError(err).Warnf("[%s]: killing tool FAILED", TAG)
+				// WARN: error actually ignored!
+				// res.ReportError(err)
+			} else {
+				task.log().Debugf("[%s]: tool killed", TAG)
+			}
 		}
 
 		engine.finish(fmt.Errorf("cancelled"), task, res)
