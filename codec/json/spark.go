@@ -35,18 +35,18 @@ import (
 	"io"
 )
 
-/* Spark JSON encoder uses an JSON array to store all records.
+/* Spark JSON encoder uses a stream of JSON records.
  Statistics and errors are ignored.
 
-[ <records> ]
+{record N1}
+{record N2}
+{record N3}
 */
 
 // Spark JSON encoder.
 type SparkEncoder struct {
 	writer  io.Writer
 	encoder *backend.Encoder
-
-	records int // number of records written
 }
 
 // Create new Spark JSON encoder instance.
@@ -59,30 +59,11 @@ func NewSparkEncoder(w io.Writer) (*SparkEncoder, error) {
 
 // Write a RECORD
 func (enc *SparkEncoder) EncodeRecord(rec interface{}) error {
-	// write header for the first record
-	if enc.records == 0 {
-		err := enc.writeHeader()
-		if err != nil {
-			return err
-		}
-	}
-
-	// write coma separator for all
-	// records except the first one
-	if enc.records > 0 {
-		_, err := enc.writer.Write([]byte{','})
-		if err != nil {
-			return err
-		}
-	}
-
-	// encode record
 	err := enc.encoder.Encode(rec)
 	if err != nil {
 		return err
 	}
 
-	enc.records += 1
 	return nil // OK
 }
 
@@ -98,25 +79,5 @@ func (enc *SparkEncoder) EncodeError(err error) error {
 
 // End writing, close JSON object.
 func (enc *SparkEncoder) Close() error {
-	// write header for the first record
-	if enc.records == 0 {
-		err := enc.writeHeader()
-		if err != nil {
-			return err
-		}
-	}
-
-	// end of records
-	_, err := enc.writer.Write([]byte("]"))
-	if err != nil {
-		return err
-	}
-
 	return nil // OK
-}
-
-// Write JSON object header.
-func (enc *SparkEncoder) writeHeader() error {
-	_, err := enc.writer.Write([]byte{'['})
-	return err
 }
