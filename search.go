@@ -37,7 +37,6 @@ import (
 	"strings"
 
 	"github.com/getryft/ryft-server/codec"
-	msgpack_codec "github.com/getryft/ryft-server/codec/msgpack.v2"
 	"github.com/getryft/ryft-server/format"
 	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
@@ -56,6 +55,8 @@ type SearchParams struct {
 	Nodes         uint8    `form:"nodes" json:"nodes"`
 	Local         bool     `form:"local" json:"local"`
 	Stats         bool     `form:"stats" json:"stats"`
+	Stream        bool     `form:"stream" json:"stream"`
+	Spark         bool     `form:"spark" json:"spark"`
 }
 
 // Handle /search endpoint.
@@ -96,19 +97,9 @@ func (s *Server) search(ctx *gin.Context) {
 	// we can use two formats:
 	// - with tags to report data records and the statistics in one stream
 	// - without tags to report just data records (this format is used by Spark)
-	// TODO: dedicated parameters to specify streaming or Spark format!
-	is_stream := params.Stats && (accept == codec.MIME_MSGPACK)
-	enc, err := codec.NewEncoder(ctx.Writer, accept, is_stream)
+	enc, err := codec.NewEncoder(ctx.Writer, accept, params.Stream, params.Spark)
 	if err != nil {
 		panic(NewServerError(http.StatusBadRequest, err.Error()))
-	}
-	if senc, ok := enc.(*msgpack_codec.SimpleEncoder); ok {
-		// Spark: even encoder is simple we still need
-		// to filter out all possible errors and statistics!
-		senc.RecordsOnly = !params.Stats
-		if senc.RecordsOnly {
-			log.Printf("Spark format is used (records only)")
-		}
 	}
 
 	// get search engine
