@@ -34,7 +34,6 @@ import (
 	"io"
 
 	backend "gopkg.in/vmihailenco/msgpack.v2"
-	// ??? "github.com/ugorji/go/codec"
 )
 
 /* Simple MSGPACK encoder uses stream of RECORDS.

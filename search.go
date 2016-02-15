@@ -97,7 +97,7 @@ func (s *Server) search(ctx *gin.Context) {
 	// - with tags to report data records and the statistics in one stream
 	// - without tags to report just data records (this format is used by Spark)
 	// TODO: dedicated parameters to specify streaming or Spark format!
-	is_stream := params.Stats
+	is_stream := params.Stats && (accept == codec.MIME_MSGPACK)
 	enc, err := codec.NewEncoder(ctx.Writer, accept, is_stream)
 	if err != nil {
 		panic(NewServerError(http.StatusBadRequest, err.Error()))

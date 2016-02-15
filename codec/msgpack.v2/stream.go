@@ -34,7 +34,6 @@ import (
 	"io"
 
 	backend "gopkg.in/vmihailenco/msgpack.v2"
-	// ??? "github.com/ugorji/go/codec"
 )
 
 /* Stream MSGPACK encoder uses tag prefixed stream of items.
