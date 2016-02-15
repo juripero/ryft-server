@@ -42,6 +42,8 @@ Errors and statistics are written at the end.
 
 // MSGPACK simple encoder.
 type SimpleEncoder struct {
+	RecordsOnly bool // do not write errors and statistics
+
 	encoder *backend.Encoder
 	errors  []string
 	stat    interface{}
@@ -67,13 +69,16 @@ func (enc *SimpleEncoder) EncodeRecord(rec interface{}) error {
 
 // Write a STATISTICS
 func (enc *SimpleEncoder) EncodeStat(stat interface{}) error {
-	enc.stat = stat // will be written later
-	return nil      // OK
+	if !enc.RecordsOnly {
+		enc.stat = stat // will be written later
+	}
+
+	return nil // OK
 }
 
 // Write an ERROR
 func (enc *SimpleEncoder) EncodeError(err error) error {
-	if err != nil {
+	if err != nil && !enc.RecordsOnly {
 		// just save, will be written later
 		enc.errors = append(enc.errors, err.Error())
 	}

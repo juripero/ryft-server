@@ -84,7 +84,7 @@ func (enc *SimpleEncoder) EncodeRecord(rec interface{}) error {
 	// encode record
 	err := enc.encoder.Encode(rec)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	enc.records += 1

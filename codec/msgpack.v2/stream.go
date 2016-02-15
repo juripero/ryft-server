@@ -70,7 +70,7 @@ func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
 	// encode record
 	err = enc.encoder.Encode(rec)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil // OK
@@ -87,7 +87,7 @@ func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
 	// encode statistics
 	err = enc.encoder.Encode(stat)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil // OK
@@ -104,7 +104,7 @@ func (enc *StreamEncoder) EncodeError(err_ error) error {
 	// encode error as a string
 	err = enc.encoder.EncodeString(err_.Error())
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil // OK

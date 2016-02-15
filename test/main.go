@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	stdlog "log"
 	"os"
@@ -14,8 +13,6 @@ import (
 	_ "github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/ryftprim"
 
-	msgpack_codec "github.com/getryft/ryft-server/codec/msgpack.v2"
-	raw_format "github.com/getryft/ryft-server/format/raw"
 	xml_format "github.com/getryft/ryft-server/format/xml"
 )
 
@@ -73,9 +70,9 @@ func main() {
 
 	// formatXml()
 
-	//testEncoder()
+	testJsonCodec()
 
-	testParseStat()
+	// testParseStat()
 }
 
 // test statistics parse
@@ -92,26 +89,6 @@ Fabric Data Rate   : 10307.835938 MB/sec
 	} else {
 		log("Parsed stat: %s\n%#v", stat, raw_format.FromStat(stat))
 	}
-}
-
-// test msgpack codec and raw format
-func testMsgpackFormat() {
-	idx := search.Index{}
-	idx.File = "test.file.txt"
-	idx.Offset = 12345
-	idx.Length = 123
-	idx.Fuzziness = 100
-	idx.Host = "localhost"
-	rec := new(search.Record)
-	rec.Index = idx
-	rec.Data = []byte("test data")
-
-	b := new(bytes.Buffer)
-	enc, _ := msgpack_codec.NewStreamEncoder(b)
-	enc.EncodeRecord(raw_format.FromRecord(rec))
-	enc.Close()
-
-	stdlog.Printf("%s", b.String())
 }
 
 // test xml formatter
