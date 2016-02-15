@@ -305,7 +305,7 @@ func main() {
 
 	router.GET("/version", func(ctx *gin.Context) {
 		info := map[string]interface{}{
-			"verison":  Version,
+			"version":  Version,
 			"git-hash": GitHash,
 		}
 		ctx.JSON(http.StatusOK, info)
