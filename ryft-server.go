@@ -175,41 +175,41 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 
 		if len(backends) > 0 {
 			return ryftmux.NewEngine(backends...)
-		} else {
-			// no services from consule, just use local search as a fallback
-			return s.getSearchEngine(true)
-		}
-	} else {
-		// local node search
-		opts := s.BackendOptions
-
-		// some auto-options
-		switch s.SearchBackend {
-		case "ryftprim":
-			// instance name
-			if _, ok := opts["instance-name"]; !ok {
-				opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
-			}
-
-			// keep-files
-			if _, ok := opts["keep-files"]; !ok {
-				opts["keep-files"] = *KeepResults
-			}
-
-			// index-host
-			if _, ok := opts["index-host"]; !ok {
-				hostName, _ := os.Hostname()
-				opts["index-host"] = hostName
-			}
-
-			// log level
-			if _, ok := opts["log-level"]; !ok && *debug {
-				opts["log-level"] = "debug"
-			}
 		}
 
-		return search.NewEngine(s.SearchBackend, opts)
+		// no services from consule, just use local search as a fallback
+		return s.getSearchEngine(true)
 	}
+
+	// local node search
+	opts := s.BackendOptions
+
+	// some auto-options
+	switch s.SearchBackend {
+	case "ryftprim":
+		// instance name
+		if _, ok := opts["instance-name"]; !ok {
+			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+		}
+
+		// keep-files
+		if _, ok := opts["keep-files"]; !ok {
+			opts["keep-files"] = *KeepResults
+		}
+
+		// index-host
+		if _, ok := opts["index-host"]; !ok {
+			hostName, _ := os.Hostname()
+			opts["index-host"] = hostName
+		}
+
+		// log level
+		if _, ok := opts["log-level"]; !ok && *debug {
+			opts["log-level"] = "debug"
+		}
+	}
+
+	return search.NewEngine(s.SearchBackend, opts)
 }
 
 func parseParams() {
@@ -239,7 +239,7 @@ func parseParams() {
 	}
 }
 
-var Stats = stats.New()
+var serverStats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
@@ -275,7 +275,7 @@ func main() {
 		return func(c *gin.Context) {
 			beginning := time.Now()
 			c.Next()
-			Stats.End(beginning, c.Writer)
+			serverStats.End(beginning, c.Writer)
 		}
 	}())
 
@@ -313,7 +313,7 @@ func main() {
 
 	// stats page
 	router.GET("/about", func(c *gin.Context) {
-		c.JSON(http.StatusOK, Stats.Data())
+		c.JSON(http.StatusOK, serverStats.Data())
 	})
 
 	router.GET("/search", server.search)
