@@ -230,6 +230,18 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 	}
 
+	// suppress some errors
+	error_suppressed := false
+	if err != nil {
+		switch {
+		// if no files found it's better to report 0 matches (TODO: report 0 files also, TODO: engine configuration for this)
+		case strings.Contains(string(out_buf), "ERROR:  Input data set cannot be empty"):
+			task.log().WithError(err).Warnf("[%s]: error suppressed! empty results will be reported", TAG)
+			error_suppressed, err = true, nil // suppress error
+			res.Stat = search.NewStat()       // empty stats
+		}
+	}
+
 	// notify client about error
 	if err != nil {
 		res.ReportError(fmt.Errorf("%s failed with %s\n%s", TAG, err, out_buf))
@@ -237,7 +249,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// stop subtasks if processing enabled
 	if task.enableDataProcessing {
-		if err != nil {
+		if err != nil || error_suppressed {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
 			task.cancelData()
