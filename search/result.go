@@ -107,6 +107,11 @@ func (res *Result) Cancel() {
 	}
 }
 
+// Is the result cancelled?
+func (res *Result) IsCancelled() bool {
+	return res.isCancelled
+}
+
 // ReportDone sends 'done' notification.
 func (res *Result) ReportDone() {
 	res.isDone = true

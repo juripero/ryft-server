@@ -131,6 +131,9 @@ func (s *Server) search(ctx *gin.Context) {
 	// ctx.Stream() logic
 	writer := ctx.Writer
 	gone := writer.CloseNotify()
+	var last_error error
+	num_records := 0
+	num_errors := 0
 
 	// put error to stream
 	putErr := func(err_ error) {
@@ -138,6 +141,8 @@ func (s *Server) search(ctx *gin.Context) {
 		if err != nil {
 			panic(err)
 		}
+		last_error = err_
+		num_errors += 1
 		writer.Flush()
 	}
 	// put record to stream
@@ -148,6 +153,7 @@ func (s *Server) search(ctx *gin.Context) {
 			if err != nil {
 				panic(err)
 			}
+			num_records += 1
 			writer.Flush()
 		}
 	}
@@ -176,6 +182,13 @@ func (s *Server) search(ctx *gin.Context) {
 			}
 			for err := range res.ErrorChan {
 				putErr(err)
+			}
+
+			// special case: if no records and no stats were received
+			// but just an error, we panic to return 500 status code
+			if num_records == 0 && res.Stat == nil &&
+				num_errors == 1 && last_error != nil {
+				panic(last_error)
 			}
 
 			if params.Stats && res.Stat != nil {
