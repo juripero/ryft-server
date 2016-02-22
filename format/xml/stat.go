@@ -28,45 +28,28 @@
  * ============
  */
 
-package search
+package xml
 
 import (
-	"fmt"
-
-	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/search"
 )
 
-// Search INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
+// STATISTICS format specific data.
+// Is the same as RAW format statistics!
+type Statistics raw.Statistics
+
+// NewStat creates new format specific data.
+func NewStat() interface{} {
+	return new(Statistics)
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
+// FromStat converts STATISTICS to format specific data.
+func FromStat(stat *search.Statistics) *Statistics {
+	return (*Statistics)(raw.FromStat(stat))
 }
 
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
-}
-
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
-	}
-}
-
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+// ToStat converts format specific data to STATISTICS.
+func ToStat(stat *Statistics) *search.Statistics {
+	return raw.ToStat((*raw.Statistics)(stat))
 }

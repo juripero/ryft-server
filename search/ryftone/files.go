@@ -28,45 +28,57 @@
  * ============
  */
 
-package search
+package ryftone
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 
-	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search"
 )
 
-// Search INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
-}
+// Files starts synchronous "/files" with RyftOne engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	log.WithField("path", path).Infof("[%s]: start /files", TAG)
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
-}
-
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
-}
-
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
+	// read directory content
+	fullPath := filepath.Join(engine.MountPoint, path)
+	info, err := GetDirInfo(fullPath, path)
+	if err != nil {
+		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
+		return nil, fmt.Errorf("failed to read directory content: %s", err)
 	}
+
+	log.WithField("info", info).Debugf("[%s] done /files", TAG)
+	return info, nil // OK
 }
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+// GetDirInfo gets directory content.
+func GetDirInfo(path string, name string) (*search.DirInfo, error) {
+	// read directory content
+	items, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// process directory content
+	res := search.NewDirInfo(name)
+	for _, item := range items {
+		name := item.Name()
+
+		// skip ".", ".." and all hidden files
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+
+		if item.IsDir() {
+			res.Dirs = append(res.Dirs, name)
+		} else {
+			res.Files = append(res.Files, name)
+		}
+	}
+
+	return res, nil // OK
 }

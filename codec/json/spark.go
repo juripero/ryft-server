@@ -28,45 +28,56 @@
  * ============
  */
 
-package search
+package json
 
 import (
-	"fmt"
-
-	"github.com/getryft/ryft-server/search/utils"
+	backend "encoding/json"
+	"io"
 )
 
-// Search INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
+/* Spark JSON encoder uses a stream of JSON records.
+ Statistics and errors are ignored.
+
+{record N1}
+{record N2}
+{record N3}
+*/
+
+// Spark JSON encoder.
+type SparkEncoder struct {
+	writer  io.Writer
+	encoder *backend.Encoder
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
+// Create new Spark JSON encoder instance.
+func NewSparkEncoder(w io.Writer) (*SparkEncoder, error) {
+	enc := new(SparkEncoder)
+	enc.encoder = backend.NewEncoder(w)
+	enc.writer = w
+	return enc, nil
 }
 
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
-}
-
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
+// Write a RECORD
+func (enc *SparkEncoder) EncodeRecord(rec interface{}) error {
+	err := enc.encoder.Encode(rec)
+	if err != nil {
+		return err
 	}
+
+	return nil // OK
 }
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+// Write a STATISTICS
+func (enc *SparkEncoder) EncodeStat(stat interface{}) error {
+	return nil // OK, ignored
+}
+
+// Write an ERROR
+func (enc *SparkEncoder) EncodeError(err error) error {
+	return nil // OK, ignored
+}
+
+// End writing, close JSON object.
+func (enc *SparkEncoder) Close() error {
+	return nil // OK
 }

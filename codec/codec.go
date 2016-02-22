@@ -28,45 +28,75 @@
  * ============
  */
 
-package search
+package codec
 
 import (
 	"fmt"
+	"io"
 
-	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/codec/json"
+	"github.com/getryft/ryft-server/codec/msgpack.v2"
 )
 
-// Search INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
+const (
+	MIME_JSON     = json.MIME
+	MIME_XMSGPACK = msgpack.X_MIME
+	MIME_MSGPACK  = msgpack.MIME
+)
+
+// Abstract Encoder interface.
+type Encoder interface {
+	EncodeRecord(rec interface{}) error
+	EncodeStat(stat interface{}) error
+	EncodeError(err error) error
+
+	io.Closer
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
+// Abstract Decoder interface.
+type Decoder interface {
+	io.Closer
 }
 
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
+// Get list of supported MIME types.
+func GetSupportedMimeTypes() []string {
+	types := []string{}
+	types = append(types, MIME_JSON)
+	types = append(types, MIME_MSGPACK)
+	types = append(types, MIME_XMSGPACK)
+	return types
 }
 
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
+// Create new encoder instance by MIME type.
+func NewEncoder(w io.Writer, mime string, stream bool, spark bool) (Encoder, error) {
+	switch mime {
+	case MIME_JSON:
+		if spark {
+			return json.NewSparkEncoder(w)
+		} else if stream {
+			return json.NewStreamEncoder(w)
+		} else {
+			return json.NewSimpleEncoder(w)
+		}
+	case MIME_XMSGPACK, MIME_MSGPACK:
+		if spark {
+			enc, err := msgpack.NewSimpleEncoder(w)
+			if err != nil {
+				return nil, err
+			}
+			enc.RecordsOnly = true // Spark format
+			return enc, err
+		} else if stream {
+			return msgpack.NewStreamEncoder(w)
+		} else {
+			return msgpack.NewSimpleEncoder(w)
+		}
+	default:
+		return nil, fmt.Errorf("%q is unsupported MIME type", mime)
 	}
 }
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+// Create new decoder instance by MIME type.
+func NewDecoder(r io.Reader, mime string, stream bool) (Decoder, error) {
+	return nil, fmt.Errorf("%q not implemented yet", mime)
 }

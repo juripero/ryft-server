@@ -28,45 +28,55 @@
  * ============
  */
 
-package search
+package ryftone
 
 import (
+	"bytes"
 	"fmt"
+	"strconv"
 
-	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search"
 )
 
-// Search INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
-}
-
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
-}
-
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
-}
-
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
+// ParseIndex parses Index record from custom line.
+func ParseIndex(buf []byte) (index search.Index, err error) {
+	sep := []byte(",")
+	fields := bytes.Split(bytes.TrimSpace(buf), sep)
+	n := len(fields)
+	if n < 4 {
+		return index, fmt.Errorf("invalid number of fields in %q", string(buf))
 	}
-}
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+	// NOTE: filename (first field) may contains ','
+	// so we have to combine some first fields
+	file := bytes.Join(fields[0:n-3], sep)
+
+	// Offset
+	var offset uint64
+	offset, err = strconv.ParseUint(string(fields[n-3]), 10, 64)
+	if err != nil {
+		return index, fmt.Errorf("failed to parse offset: %s", err)
+	}
+
+	// Length
+	var length uint64
+	length, err = strconv.ParseUint(string(fields[n-2]), 10, 16)
+	if err != nil {
+		return index, fmt.Errorf("failed to parse length: %s", err)
+	}
+
+	// Fuzziness
+	var fuzz uint64
+	fuzz, err = strconv.ParseUint(string(fields[n-1]), 10, 8)
+	if err != nil {
+		return index, fmt.Errorf("failed to parse fuzziness: %s", err)
+	}
+
+	// update index
+	index.File = string(file)
+	index.Offset = offset
+	index.Length = length
+	index.Fuzziness = uint8(fuzz)
+
+	return // OK
 }

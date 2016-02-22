@@ -28,64 +28,46 @@
  * ============
  */
 
-package transcoder
+package raw
 
 import (
-	"errors"
-	"fmt"
-
-	"github.com/clbanning/mxj"
 	"github.com/getryft/ryft-server/search"
 )
 
-type XmlTranscoder struct {
-	Transcoder
+// TODO: use type Index search.Index to avoid memory allocations
+
+// INDEX format specific data.
+type Index struct {
+	File      string `json:"file" msgpack:"file"`
+	Offset    uint64 `json:"offset" msgpack:"offset"`
+	Length    uint64 `json:"length" msgpack:"length"`
+	Fuzziness int    `json:"fuzziness" msgpack:"fuzziness"`
+	Host      string `json:"host,omitempty" msgpack:"host,omitempty"`
 }
 
-func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string) (res interface{}, err error) {
-
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in parsing ", r)
-			//          debug.PrintStack()
-			//          log.Printf("PASRING XML: %s", rec.Data)
-			err = errors.New(fmt.Sprintf("PASRING XML: %s", rec))
-			return
-		}
-	}()
-
-	obj, err := mxj.NewMapXml(rec.Data.([]byte))
-	if err != nil {
-		return nil, err
-	}
-	for k := range obj {
-		item, ok := obj[k]
-		if ok {
-			switch i := item.(type) {
-			case map[string]interface{}:
-				// if fields is not empty - do filtering
-				if len(fields) != 0 {
-					res = make(map[string]interface{})
-					for _, k := range fields {
-						if r, ok := i[k]; ok {
-							res.(map[string]interface{})[k] = r
-						}
-					}
-				} else {
-					res = i
-				}
-				res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
-				break
-			default:
-				return nil, fmt.Errorf("incorrect input data type")
-			}
-		}
-		break
-	}
-	return
+// NewIndex creates new format specific data.
+func NewIndex() interface{} {
+	return Index{}
 }
 
-func (transcoder *XmlTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
-	// TODO: replace with XML?
-	return NewStat(stat), nil
+// FromIndex converts INDEX to format specific data.
+func FromIndex(idx search.Index) Index {
+	res := Index{}
+	res.File = idx.File
+	res.Offset = idx.Offset
+	res.Length = idx.Length
+	res.Fuzziness = int(idx.Fuzziness)
+	res.Host = idx.Host
+	return res
+}
+
+// ToIndex converts format specific data to INDEX.
+func ToIndex(idx Index) search.Index {
+	res := search.Index{}
+	res.File = idx.File
+	res.Offset = idx.Offset
+	res.Length = idx.Length
+	res.Fuzziness = uint8(idx.Fuzziness)
+	res.Host = idx.Host
+	return res
 }

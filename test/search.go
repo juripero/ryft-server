@@ -18,6 +18,10 @@ var (
 	ryftprimInstance = ".test"
 	ryftprimLogLevel = "warn"
 
+	// ryftone
+	ryftoneInstance = ".test"
+	ryftoneLogLevel = "warn"
+
 	printReceivedRecords = false
 )
 
@@ -62,6 +66,20 @@ func newRyftPrim(log Logger) search.Engine {
 	}
 
 	return newEngine(log, "ryftprim", opts)
+}
+
+// create new ryftone search engine
+func newRyftOne(log Logger) search.Engine {
+	opts := map[string]interface{}{
+		"instance-name": ryftoneInstance,
+		"keep-files":    true,
+		"open-poll":     "1s",
+		"read-poll":     "1s",
+		"read-limit":    5,
+		"log-level":     ryftoneLogLevel,
+	}
+
+	return newEngine(log, "ryftone", opts)
 }
 
 // create new ryfthttp search engine

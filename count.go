@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/getryft/ryft-server/codec"
+	format "github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/srverr"
-	"github.com/getryft/ryft-server/transcoder"
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,28 +30,38 @@ type CountResponse struct {
 // Handle /count endpoint.
 func (s *Server) count(ctx *gin.Context) {
 	// recover from panics if any
-	defer srverr.Recover(ctx)
+	defer RecoverFromPanic(ctx)
 
 	var err error
 
 	// parse request parameters
 	params := CountParams{}
 	if err := ctx.Bind(&params); err != nil {
-		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to parse request parameters"))
+	}
+
+	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
+	// default to JSON
+	if accept == "" {
+		accept = codec.MIME_JSON
+	}
+	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
+		panic(NewServerError(http.StatusUnsupportedMediaType,
+			"Only JSON format is supported for now"))
 	}
 
 	// get search engine
 	engine, err := s.getSearchEngine(params.Local)
 	if err != nil {
-		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
 	}
 
 	// search configuration
 	cfg := search.NewEmptyConfig()
 	if q, err := url.QueryUnescape(params.Query); err != nil {
-		panic(srverr.NewWithDetails(http.StatusBadRequest,
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to unescape query"))
 	} else {
 		cfg.Query = q
@@ -64,7 +74,7 @@ func (s *Server) count(ctx *gin.Context) {
 
 	res, err := engine.Count(cfg)
 	if err != nil {
-		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))
 	}
 
@@ -85,10 +95,10 @@ func (s *Server) count(ctx *gin.Context) {
 		case <-res.DoneChan:
 			if res.Stat != nil {
 				log.Printf("DONE: %s", res.Stat)
-				stat := transcoder.NewStat(res.Stat)
+				stat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, stat)
 			} else {
-				panic(srverr.New(http.StatusInternalServerError,
+				panic(NewServerError(http.StatusInternalServerError,
 					"no search statistics available"))
 			}
 			return

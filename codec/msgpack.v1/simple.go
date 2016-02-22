@@ -28,39 +28,81 @@
  * ============
  */
 
-package main
+package msgpack
 
 import (
-	"fmt"
+	"io"
 
-	consul "github.com/hashicorp/consul/api"
+	backend "github.com/ugorji/go/codec"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+/* Simple MSGPACK encoder uses stream of RECORDS.
+Errors and statistics are written at the end.
+*/
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+// MSGPACK simple encoder.
+type SimpleEncoder struct {
+	RecordsOnly bool // do not write errors and statistics
 
+	encoder *backend.Encoder
+	errors  []string
+	stat    interface{}
+}
+
+// Create new simple MSGPACK encoder instance.
+func NewSimpleEncoder(w io.Writer) (*SimpleEncoder, error) {
+	enc := new(SimpleEncoder)
+	h := new(backend.MsgpackHandle)
+	enc.encoder = backend.NewEncoder(w, h)
+	return enc, nil
+}
+
+// Write a RECORD
+func (enc *SimpleEncoder) EncodeRecord(rec interface{}) error {
+	err := enc.encoder.Encode(rec)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+		return err
 	}
 
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
+	return nil // OK
+}
 
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
+// Write a STATISTICS
+func (enc *SimpleEncoder) EncodeStat(stat interface{}) error {
+	if !enc.RecordsOnly {
+		enc.stat = stat // will be written later
+	}
+
+	return nil // OK
+}
+
+// Write an ERROR
+func (enc *SimpleEncoder) EncodeError(err error) error {
+	if err != nil && !enc.RecordsOnly {
+		// just save, will be written later
+		enc.errors = append(enc.errors, err.Error())
+	}
+
+	return nil // OK
+}
+
+// End writing, close JSON object.
+func (enc *SimpleEncoder) Close() error {
+	// write errors
+	for _, emsg := range enc.errors {
+		err := enc.encoder.Encode(emsg)
+		if err != nil {
+			return err
+		}
+	}
+
+	// write statistics
+	if enc.stat != nil {
+		err := enc.encoder.Encode(enc.stat)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil // OK
 }

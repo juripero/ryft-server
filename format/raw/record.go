@@ -28,50 +28,45 @@
  * ============
  */
 
-package transcoder
+package raw
 
 import (
 	"github.com/getryft/ryft-server/search"
 )
 
-type RawTranscoder struct {
-	Transcoder
+// TODO: use type Record search.Record to avoid memory allocations
+
+// RECORD format specific data.
+type Record struct {
+	Index Index  `json:"_index" msgpack:"_index"`
+	Data  []byte `json:"data" msgpack:"data"` // base-64 encoded
 }
 
-type RawData struct {
-	Index Index       `json:"_index"`
-	Data  interface{} `json:"data"`
+// NewRecord creates new format specific data.
+func NewRecord() interface{} {
+	return new(Record)
 }
 
-//Fields param is not used in Raw transcoder
-func (transcoder *RawTranscoder) Transcode1(rec *search.Record, fields []string) (interface{}, error) {
-	return RawData{Index: NewIndex(rec.Index), Data: rec.Data}, nil
+// FromRecord converts RECORD to format specific data.
+func FromRecord(rec *search.Record) *Record {
+	if rec == nil {
+		return nil
+	}
+
+	res := new(Record)
+	res.Index = FromIndex(rec.Index)
+	res.Data = rec.Data
+	return res
 }
 
-func DecodeRawItem(item *RawData) (*search.Record, error) {
-	return &search.Record{
-		Index: search.Index{
-			File:      item.Index.File,
-			Offset:    item.Index.Offset,
-			Length:    uint64(item.Index.Length),
-			Fuzziness: item.Index.Fuzziness,
-			Host:      item.Index.Host,
-		},
-		Data: item.Data,
-	}, nil
-}
+// ToRecord converts format specific data to RECORD.
+func ToRecord(rec *Record) *search.Record {
+	if rec == nil {
+		return nil
+	}
 
-func DecodeRawStat(stat *Statistics) (*search.Statistics, error) {
-	return &search.Statistics{
-		Matches:    stat.Matches,
-		TotalBytes: stat.TotalBytes,
-		Duration:   stat.Duration,
-		DataRate:   stat.DataRate,
-		//		FabricDuration: stat.FabricDuration,
-		FabricDataRate: stat.FabricDataRate,
-	}, nil
-}
-
-func (transcoder *RawTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
-	return NewStat(stat), nil
+	res := new(search.Record)
+	res.Index = ToIndex(rec.Index)
+	res.Data = rec.Data
+	return res
 }

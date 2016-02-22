@@ -28,12 +28,10 @@
  * ============
  */
 
-package ryftprim
+package ryftone
 
 import (
-	"bytes"
 	"fmt"
-	"os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -46,16 +44,14 @@ var (
 	taskId = uint64(0 * time.Now().UnixNano())
 )
 
-// RyftPrim task related data.
+// RyftOne task related data.
 type Task struct {
 	Identifier    string // unique
 	IndexFileName string
 	DataFileName  string
 
-	// `ryftprim` process & output
-	tool_args []string      // command line arguments
-	tool_cmd  *exec.Cmd     // `ryftprim` executable process
-	tool_out  *bytes.Buffer // combined STDOUT and STDERR
+	// `ryftone` data set
+	dataSet *DataSet
 
 	// index & data
 	enableDataProcessing bool
@@ -79,7 +75,7 @@ func NewTask(enableProcessing bool) *Task {
 	task.enableDataProcessing = enableProcessing
 
 	// NOTE: index file should have 'txt' extension,
-	// otherwise `ryftprim` adds '.txt' anyway.
+	// otherwise `ryftone` adds '.txt' anyway.
 	// all files are hidden!
 	task.IndexFileName = fmt.Sprintf(".idx-%s.txt", task.Identifier)
 	task.DataFileName = fmt.Sprintf(".dat-%s.bin", task.Identifier)

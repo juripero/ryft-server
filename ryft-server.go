@@ -43,13 +43,12 @@ import (
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
+	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
-	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
-	"github.com/getryft/ryft-server/srverr"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thoas/stats"
@@ -80,7 +79,6 @@ var (
 	tlsKeyFile       = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
 	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
 )
-var hostName string
 
 // customized via Makefile
 var (
@@ -177,40 +175,41 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 
 		if len(backends) > 0 {
 			return ryftmux.NewEngine(backends...)
-		} else {
-			// no services from consule, just use local search as a fallback
-			return s.getSearchEngine(true)
-		}
-	} else {
-		// local node search
-		opts := s.BackendOptions
-
-		// some auto-options
-		switch s.SearchBackend {
-		case "ryftprim":
-			// instance name
-			if _, ok := opts["instance-name"]; !ok {
-				opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
-			}
-
-			// keep-files
-			if _, ok := opts["keep-files"]; !ok {
-				opts["keep-files"] = *KeepResults
-			}
-
-			// index-host
-			if _, ok := opts["index-host"]; !ok {
-				opts["index-host"] = hostName
-			}
-
-			// log level
-			if _, ok := opts["log-level"]; !ok && *debug {
-				opts["log-level"] = "debug"
-			}
 		}
 
-		return search.NewEngine(s.SearchBackend, opts)
+		// no services from consule, just use local search as a fallback
+		return s.getSearchEngine(true)
 	}
+
+	// local node search
+	opts := s.BackendOptions
+
+	// some auto-options
+	switch s.SearchBackend {
+	case "ryftprim":
+		// instance name
+		if _, ok := opts["instance-name"]; !ok {
+			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+		}
+
+		// keep-files
+		if _, ok := opts["keep-files"]; !ok {
+			opts["keep-files"] = *KeepResults
+		}
+
+		// index-host
+		if _, ok := opts["index-host"]; !ok {
+			hostName, _ := os.Hostname()
+			opts["index-host"] = hostName
+		}
+
+		// log level
+		if _, ok := opts["log-level"]; !ok && *debug {
+			opts["log-level"] = "debug"
+		}
+	}
+
+	return search.NewEngine(s.SearchBackend, opts)
 }
 
 func parseParams() {
@@ -240,12 +239,10 @@ func parseParams() {
 	}
 }
 
-var Stats = stats.New()
+var serverStats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
-	//getting current hostname
-	hostName, _ = os.Hostname()
 
 	// set log timestamp format
 	log.SetFlags(log.Lmicroseconds)
@@ -278,7 +275,7 @@ func main() {
 		return func(c *gin.Context) {
 			beginning := time.Now()
 			c.Next()
-			Stats.End(beginning, c.Writer)
+			serverStats.End(beginning, c.Writer)
 		}
 	}())
 
@@ -308,7 +305,7 @@ func main() {
 
 	router.GET("/version", func(ctx *gin.Context) {
 		info := map[string]interface{}{
-			"verison":  Version,
+			"version":  Version,
 			"git-hash": GitHash,
 		}
 		ctx.JSON(http.StatusOK, info)
@@ -316,11 +313,11 @@ func main() {
 
 	// stats page
 	router.GET("/about", func(c *gin.Context) {
-		c.JSON(http.StatusOK, Stats.Data())
+		c.JSON(http.StatusOK, serverStats.Data())
 	})
 
-	router.GET("/search", detectEncoder, server.search)
-	router.GET("/count", detectEncoder, server.count)
+	router.GET("/search", server.search)
+	router.GET("/count", server.count)
 	router.GET("/cluster/members", server.members)
 	router.GET("/files", server.files)
 
@@ -346,29 +343,4 @@ func main() {
 		go router.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	router.Run((*listenAddress).String())
-}
-
-const (
-	ENCODER_CONTEXT_KEY = "encoder-detected"
-)
-
-func detectEncoder(c *gin.Context) {
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = encoder.MIME_JSON
-	}
-	c.Header("Content-Type", accept)
-
-	// setting up encoder to respond with requested format
-	if enc, err := encoder.GetByMimeType(accept); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
-	} else {
-		c.Set(ENCODER_CONTEXT_KEY, enc)
-	}
-}
-
-func encoderFromContext(c *gin.Context) encoder.Encoder {
-	// TODO add handlers for null value and report 400 error
-	return c.MustGet(ENCODER_CONTEXT_KEY).(encoder.Encoder)
 }

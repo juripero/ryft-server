@@ -28,12 +28,11 @@
  * ============
  */
 
-package ryfthttp
+package ryftone
 
 import (
 	"fmt"
-	"net/http"
-	"net/url"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 
@@ -45,24 +44,27 @@ var (
 	// package logger instance
 	log = logrus.New()
 
-	TAG = "ryfthttp"
+	TAG = "ryftone"
 )
 
-// RyftHTTP engine uses `ryft` HTTP server as a backend.
+// RyftOne engine uses `ryftone` library as a backend.
 type Engine struct {
-	ServerURL string // "http://localhost:8765" by default
-	LocalOnly bool   // "local" query boolean flag
-	SkipStat  bool   // !"stats" query boolean flag
-	IndexHost string // optional host in cluster mode
+	Instance   string // empty by default. might be some server instance name like ".server-1234"
+	MountPoint string // "/ryftone" by default
 
-	httpClient *http.Client
-	// TODO: authentication?
+	KeepResultFiles bool // false by default
+
+	// poll timeouts & limits
+	OpenFilePollTimeout time.Duration
+	ReadFilePollTimeout time.Duration
+	ReadFilePollLimit   int
+
+	IndexHost string // optional host (cluster mode)
 }
 
-// NewEngine creates new RyftHTTP search engine.
+// NewEngine creates new RyftOne search engine.
 func NewEngine(opts map[string]interface{}) (*Engine, error) {
 	engine := new(Engine)
-	engine.httpClient = new(http.Client)
 	err := engine.update(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse options: %s", err)
@@ -81,68 +83,50 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 		}
 	}
 
-	return engine, nil
+	return engine, nil // OK
 }
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftHTTP{url:%q, local:%t, stat:%t}",
-		engine.ServerURL, engine.LocalOnly, !engine.SkipStat)
+	return fmt.Sprintf("RyftOne{instance:%q, ryftone:%q}",
+		engine.Instance, engine.MountPoint)
 	// TODO: other parameters?
 }
 
-// prepareUrl formats proper URL based on search configuration.
-func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
-	// server URL should be parsed in engine initialization
-	// so we can omit error checking here
-	u, _ := url.Parse(engine.ServerURL)
+// Search starts asynchronous "/search" with RyftOne engine.
+func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(true) // enable INDEX&DATA processing
+	task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
 
-	// prepare query
-	q := url.Values{}
-	q.Set("format", format)
-	q.Set("query", cfg.Query)
-	for _, file := range cfg.Files {
-		q.Add("files", file)
+	res := search.NewResult()
+	err := engine.run(task, cfg, res)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to run /search", TAG)
+		return nil, fmt.Errorf("failed to run %s /search: %s", TAG, err)
 	}
-	q.Set("cs", fmt.Sprintf("%t", cfg.CaseSensitive))
-	if cfg.Surrounding > 0 {
-		q.Set("surrounding", fmt.Sprintf("%d", cfg.Surrounding))
-	}
-	if cfg.Fuzziness > 0 {
-		q.Set("fuzziness", fmt.Sprintf("%d", cfg.Fuzziness))
-	}
-	if cfg.Nodes > 0 {
-		q.Set("nodes", fmt.Sprintf("%d", cfg.Nodes))
-	}
-	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
-	q.Set("stats", fmt.Sprintf("%t", !engine.SkipStat))
-	q.Set("stream", fmt.Sprintf("%t", true))
-
-	u.RawQuery = q.Encode()
-	return u
+	return res, nil // OK
 }
 
-// prepareUrl formats proper /files URL based on directory name provided.
-func (engine *Engine) prepareFilesUrl(path string) *url.URL {
-	// server URL should be parsed in engine initialization
-	// so we can omit error checking here
-	u, _ := url.Parse(engine.ServerURL)
+// Count starts asynchronous "/count" with RyftOne engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(false) // disable INDEX&DATA processing
+	task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
 
-	// prepare query
-	q := url.Values{}
-	q.Set("dir", path)
-	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
-
-	u.RawQuery = q.Encode()
-	return u
+	res := search.NewResult()
+	err := engine.run(task, cfg, res)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to run /count", TAG)
+		return nil, fmt.Errorf("failed to run %s /count: %s", TAG, err)
+	}
+	return res, nil // OK
 }
 
-// log returns task related logger.
+// log returns task related log entry.
 func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
 }
 
-// factory creates RyftHTTP engine.
+// factory creates new RyftOne engine.
 func factory(opts map[string]interface{}) (search.Engine, error) {
 	engine, err := NewEngine(opts)
 	if err != nil {
