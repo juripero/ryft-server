@@ -230,6 +230,11 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 	}
 
+	// notify client about error
+	if err != nil {
+		res.ReportError(fmt.Errorf("%s failed with %s\n%s", TAG, err, out_buf))
+	}
+
 	// suppress some errors
 	error_suppressed := false
 	if err != nil {
@@ -240,11 +245,6 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			error_suppressed, err = true, nil // suppress error
 			res.Stat = search.NewStat()       // empty stats
 		}
-	}
-
-	// notify client about error
-	if err != nil {
-		res.ReportError(fmt.Errorf("%s failed with %s\n%s", TAG, err, out_buf))
 	}
 
 	// stop subtasks if processing enabled
