@@ -3,8 +3,9 @@
 
 1. See installation instructions for golang environment — https://golang.org/doc/install
 2. ``go get github.com/getryft/ryft-server``
-3. ``go install``
-4. Get ``ryft-server`` binary from ``$GOPATH/bin``
+3. `cd $GOPATH/src/github.com/getryft/ryft-server`
+4. ``go get``
+5. `make`
 
 # Running & Command Line Parameters
 
