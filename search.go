@@ -143,7 +143,6 @@ func (s *Server) search(ctx *gin.Context) {
 		}
 		last_error = err_
 		num_errors += 1
-		writer.Flush()
 	}
 	// put record to stream
 	putRec := func(rec *search.Record) {
