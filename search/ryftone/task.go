@@ -1,3 +1,5 @@
+// +build !noryftone
+
 /*
  * ============= Ryft-Customized BSD License ============
  * Copyright (c) 2015, Ryft Systems, Inc.

@@ -49,7 +49,7 @@ func main() {
 	// ryftprimLogLevel = "debug"
 	// ryfthttpLogLevel = "debug"
 
-	//printSearchEngines(log)
+	printSearchEngines(log)
 
 	//search1(false) // ryftprim
 	//search2(false) // HTTP
@@ -71,7 +71,7 @@ func main() {
 
 	// formatXml()
 
-	testJsonCodec()
+	// testJsonCodec()
 
 	// testParseStat()
 }

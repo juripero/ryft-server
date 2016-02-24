@@ -1,3 +1,5 @@
+// +build !noryftone
+
 /*
  * ============= Ryft-Customized BSD License ============
  * Copyright (c) 2015, Ryft Systems, Inc.
@@ -79,7 +81,7 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 	var err error
 
 	// create data set
-	task.dataSet, err = newDataSet(cfg.Nodes)
+	task.dataSet, err = NewDataSet(cfg.Nodes)
 	if err != nil {
 		engine.finish(err, task, res)
 		return

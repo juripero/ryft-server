@@ -2,6 +2,11 @@ GOBINDATA = ${GOPATH}/bin/go-bindata
 ASSETS = bindata.go
 BINARIES = ryft-server
 
+# disable ryftone search engine by default
+ifeq (${GO_TAGS},)
+  GO_TAGS=noryftone
+endif
+
 all: $(ASSETS) build
 
 ifeq (${VERSION},)
@@ -24,11 +29,11 @@ $(ASSETS): $(GOBINDATA)
 
 .PHONY: build
 build:
-	go build -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}"
+	go build -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
 .PHONY: install
 install: $(ASSETS)
-	go install -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}"
+	go install -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
 .PHONY: debian
 debian: install

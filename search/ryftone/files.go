@@ -31,29 +31,11 @@
 package ryftone
 
 import (
-	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"strings"
 
 	"github.com/getryft/ryft-server/search"
 )
-
-// Files starts synchronous "/files" with RyftOne engine.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	log.WithField("path", path).Infof("[%s]: start /files", TAG)
-
-	// read directory content
-	fullPath := filepath.Join(engine.MountPoint, path)
-	info, err := GetDirInfo(fullPath, path)
-	if err != nil {
-		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
-		return nil, fmt.Errorf("failed to read directory content: %s", err)
-	}
-
-	log.WithField("info", info).Debugf("[%s] done /files", TAG)
-	return info, nil // OK
-}
 
 // GetDirInfo gets directory content.
 func GetDirInfo(path string, name string) (*search.DirInfo, error) {

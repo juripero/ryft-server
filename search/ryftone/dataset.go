@@ -1,3 +1,5 @@
+// +build !noryftone
+
 /*
  * ============= Ryft-Customized BSD License ============
  * Copyright (c) 2015, Ryft Systems, Inc.
@@ -50,7 +52,7 @@ type DataSet struct {
 }
 
 // create new dataset
-func newDataSet(nodes uint) (*DataSet, error) {
+func NewDataSet(nodes uint) (*DataSet, error) {
 	// create input dataset
 	var ids C.rol_data_set_t
 	if nodes > 0 {

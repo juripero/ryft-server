@@ -1,3 +1,5 @@
+// +build !noryftone
+
 /*
  * ============= Ryft-Customized BSD License ============
  * Copyright (c) 2015, Ryft Systems, Inc.
@@ -32,6 +34,7 @@ package ryftone
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -119,6 +122,22 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to run %s /count: %s", TAG, err)
 	}
 	return res, nil // OK
+}
+
+// Files starts synchronous "/files" with RyftOne engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	log.WithField("path", path).Infof("[%s]: start /files", TAG)
+
+	// read directory content
+	fullPath := filepath.Join(engine.MountPoint, path)
+	info, err := GetDirInfo(fullPath, path)
+	if err != nil {
+		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
+		return nil, fmt.Errorf("failed to read directory content: %s", err)
+	}
+
+	log.WithField("info", info).Debugf("[%s] done /files", TAG)
+	return info, nil // OK
 }
 
 // log returns task related log entry.
