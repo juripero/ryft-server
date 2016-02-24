@@ -1,17 +1,17 @@
-
 # Clonning & Building
+
+> The instructions below assume you have a properly configured GO dev environment with GOPATH and GOROOT env variables configured.
+> If you starty from scratch we recommend to use this [automated installer](https://github.com/demon-xxi/tools).
 
 > To use `go get` command with private repositories use the following setting to force SSH protocol instead of HTTPS:
 > `git config --global url."git@github.com:".insteadOf "https://github.com/"`
 > Make sure you have configured [SSH token authentication](https://help.github.com/articles/generating-an-ssh-key/) for GitHub.
 
-> The instructions below assume you have a properly configured GO dev environment with GOPATH and GOROOT env variables configured.
-> If you starty from scratch we recommend to use this [automated installer](https://github.com/demon-xxi/tools).
-
-1. See installation instructions for golang environment — https://golang.org/doc/install
-2. ``go get github.com/getryft/ryft-server``
-3. `cd $GOPATH/src/github.com/getryft/ryft-server`
-5. `make`
+```bash
+go get github.com/getryft/ryft-server
+cd $GOPATH/src/github.com/getryft/ryft-server
+make
+```
 
 # Running & Command Line Parameters
 
