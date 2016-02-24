@@ -120,6 +120,9 @@ func findBestMatch(client *consul.Client, files []string) []string {
 		mask, _ := url.QueryUnescape(kvp.Key)
 		keys[i] = strings.TrimPrefix(mask, prefix)
 		tags[i] = strings.Split(string(kvp.Value), ",")
+		for k := range tags[i] {
+			tags[i][k] = strings.TrimSpace(tags[i][k])
+		}
 	}
 
 	// match files and wildcards

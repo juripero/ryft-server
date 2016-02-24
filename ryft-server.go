@@ -165,7 +165,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 		// prefer local service first...
 		if local_info != nil {
 			log.Printf("local node tags: %q", local_info.ServiceTags)
-			if update_tags(local_info.ServiceTags) > 0 {
+			if all_nodes || update_tags(local_info.ServiceTags) > 0 {
 				// local node: just use normal backend
 				engine, err := s.getSearchEngine(true, files)
 				if err != nil {
