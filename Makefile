@@ -1,4 +1,4 @@
-GOBINDATA = $GOPATH/bin/go-bindata
+GOBINDATA = ${GOPATH}/bin/go-bindata
 ASSETS = bindata.go
 BINARIES = ryft-server
 
@@ -20,7 +20,7 @@ $(GOBINDATA):
 	go get -u github.com/jteeuwen/go-bindata/...
 
 $(ASSETS): $(GOBINDATA)
-	go-bindata -o bindata.go -prefix static/ static/...
+	${GOBINDATA} -o bindata.go -prefix static/ static/...
 
 .PHONY: build
 build:
