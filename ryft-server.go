@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"mime"
 	"net/http"
 	"os"
@@ -143,6 +144,9 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 
 		log.Printf("cluster search tags: %q", tags)
 
+		// if no tags required - use all nodes
+		all_nodes := (len(tags) == 0)
+
 		// go through service tags and update `tags_required` map
 		// return match count
 		update_tags := func(serviceTags []string) int {
@@ -169,20 +173,24 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 				}
 				backends = append(backends, engine)
 			}
+			log.Printf("remain (local) tags required: %v", tags_required)
 		}
 
-		// ... then remote services
-		for _, service := range remote_info {
+		// ... then remote services (shuffled)
+		for _, k := range rand.Perm(len(remote_info)) {
+			service := remote_info[k]
+
 			// stop if no more tags required
-			if len(tags_required) == 0 {
+			if !all_nodes && len(tags_required) == 0 {
 				break
 			}
 
 			// skip if no required tags found
 			log.Printf("remote node tags: %q", service.ServiceTags)
-			if update_tags(service.ServiceTags) == 0 {
-				continue
+			if !all_nodes && update_tags(service.ServiceTags) == 0 {
+				continue // no tags, skip this node
 			}
+			log.Printf("remain (remote) tags required: %v", tags_required)
 
 			// remote node: use RyftHTTP backend
 			port := service.ServicePort
@@ -210,6 +218,15 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 				return nil, err
 			}
 			backends = append(backends, engine)
+		}
+
+		// fail if there is remaining required tags
+		if !all_nodes && len(tags_required) > 0 {
+			rem := []string{} // remaining tags
+			for k, _ := range tags_required {
+				rem = append(rem, k)
+			}
+			return nil, fmt.Errorf("no nodes found for tags: %q", rem)
 		}
 
 		if len(backends) > 0 {
