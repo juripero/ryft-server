@@ -134,19 +134,54 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 		if err != nil {
 			return nil, fmt.Errorf("failed to get consul service info: %s", err)
 		}
-		for _, service := range info {
-			if len(tags) != 0 && !MatchAnyTag(service.ServiceTags, tags) {
-				continue
-			}
 
-			if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
+		// list of tags required
+		tags_required := make(map[string]bool)
+		for _, t := range tags {
+			tags_required[t] = true
+		}
+
+		log.Printf("cluster search tags: %q", tags)
+
+		// go through service tags and update `tags_required` map
+		// return match count
+		update_tags := func(serviceTags []string) int {
+			count := 0
+			for _, s := range serviceTags {
+				if _, ok := tags_required[s]; ok {
+					delete(tags_required, s)
+					count += 1
+				}
+			}
+			return count
+		}
+
+		local_info, remote_info := SplitToLocalAndRemote(info)
+
+		// prefer local service first...
+		if local_info != nil {
+			log.Printf("local node tags: %q", local_info.ServiceTags)
+			if update_tags(local_info.ServiceTags) > 0 {
 				// local node: just use normal backend
 				engine, err := s.getSearchEngine(true, files)
 				if err != nil {
 					return nil, err
 				}
 				backends = append(backends, engine)
-				continue // skip
+			}
+		}
+
+		// ... then remote services
+		for _, service := range remote_info {
+			// stop if no more tags required
+			if len(tags_required) == 0 {
+				break
+			}
+
+			// skip if no required tags found
+			log.Printf("remote node tags: %q", service.ServiceTags)
+			if update_tags(service.ServiceTags) == 0 {
+				continue
 			}
 
 			// remote node: use RyftHTTP backend
@@ -178,10 +213,13 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 		}
 
 		if len(backends) > 0 {
-			return ryftmux.NewEngine(backends...)
+			engine, err := ryftmux.NewEngine(backends...)
+			log.Printf("cluster search with %s", engine)
+			return engine, err
 		}
 
 		// no services from consule, just use local search as a fallback
+		log.Printf("no cluster built, use local search as fallback, uncovered tags: %v", tags_required)
 		return s.getSearchEngine(true, files)
 	}
 

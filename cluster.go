@@ -91,6 +91,20 @@ func GetConsulInfo(files []string) (address []*consul.CatalogService, tags []str
 	return services, tags, err
 }
 
+// Split services to local and remote
+func SplitToLocalAndRemote(info []*consul.CatalogService) (local_info *consul.CatalogService, remote_info []*consul.CatalogService) {
+	for i, service := range info {
+		if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
+			local_info = service
+			remote_info = info[0:i]
+			remote_info = append(remote_info, info[i+1:]...)
+			return
+		}
+	}
+
+	return nil, info // no local found
+}
+
 // find best matched service tags for the file list
 func findBestMatch(client *consul.Client, files []string) []string {
 	if len(files) == 0 {
@@ -98,11 +112,13 @@ func findBestMatch(client *consul.Client, files []string) []string {
 	}
 
 	// get all wildcards (keys) and tags
-	pairs, _, _ := client.KV().List("partition", nil)
+	prefix := "partitions/"
+	pairs, _, _ := client.KV().List(prefix, nil)
 	keys := make([]string, len(pairs))
 	tags := make([][]string, len(pairs))
 	for i, kvp := range pairs {
-		keys[i], _ = url.QueryUnescape(kvp.Key)
+		mask, _ := url.QueryUnescape(kvp.Key)
+		keys[i] = strings.TrimPrefix(mask, prefix)
 		tags[i] = strings.Split(string(kvp.Value), ",")
 	}
 
