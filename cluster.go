@@ -34,15 +34,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 
+	//"github.com/demon-xxi/wildmatch"
 	"github.com/gin-gonic/gin"
+	"github.com/pilatuz/wildmatch"
 
 	consul "github.com/hashicorp/consul/api"
 )
 
 // handle /cluster/members endpoint: information about cluster's nodes
 func (s *Server) members(c *gin.Context) {
-	info, err := GetConsulInfo()
+	info, _, err := GetConsulInfo(nil)
 
 	if err != nil {
 		panic(NewServerError(http.StatusInternalServerError, err.Error()))
@@ -62,14 +66,15 @@ func (s *Server) members(c *gin.Context) {
 //	ServicePort    string   `json:"ServicePort"`
 //}
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
+// tags is the service tags related to requested files
+func GetConsulInfo(files []string) (address []*consul.CatalogService, tags []string, err error) {
 	config := consul.DefaultConfig()
 	// TODO: get some data from server's configuration
 	config.Datacenter = "dc1"
 	client, err := consul.NewClient(config)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client: %s", err)
+		return nil, nil, fmt.Errorf("failed to get consul client: %s", err)
 	}
 
 	catalog := client.Catalog()
@@ -78,5 +83,56 @@ func GetConsulInfo() (address []*consul.CatalogService, err error) {
 	// for _, value := range services {
 	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
 	// }
-	return services, err
+
+	if len(files) != 0 {
+		tags = findBestMatch(client, files)
+	}
+
+	return services, tags, err
+}
+
+// find best matched service tags for the file list
+func findBestMatch(client *consul.Client, files []string) []string {
+	if len(files) == 0 {
+		return nil // no files - no tags
+	}
+
+	// get all wildcards (keys) and tags
+	pairs, _, _ := client.KV().List("partition", nil)
+	keys := make([]string, len(pairs))
+	tags := make([][]string, len(pairs))
+	for i, kvp := range pairs {
+		keys[i], _ = url.QueryUnescape(kvp.Key)
+		tags[i] = strings.Split(string(kvp.Value), ",")
+	}
+
+	// match files and wildcards
+	tags_map := make(map[string]int)
+	for _, f := range files {
+		if found := wildmatch.IsSubsetOfAnyI(f, keys...); found >= 0 {
+			for _, tag := range tags[found] {
+				tags_map[tag] += 1
+			}
+		}
+	}
+
+	// map keys -> slice
+	res := make([]string, 0, len(tags_map))
+	for k := range tags_map {
+		res = append(res, k)
+	}
+
+	return res
+}
+
+// Check if service match any tag.
+func MatchAnyTag(serviceTags []string, tags []string) bool {
+	for _, t := range serviceTags {
+		for _, q := range tags {
+			if t == q {
+				return true
+			}
+		}
+	}
+	return false
 }

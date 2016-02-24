@@ -26,7 +26,7 @@ func (s *Server) files(c *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local)
+	engine, err := s.getSearchEngine(params.Local, nil /*no files*/)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))

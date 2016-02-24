@@ -124,20 +124,24 @@ func ensureDefault(flag *string, message string) {
 }
 
 // get search backend with options
-func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
+func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine, error) {
 	if !localOnly {
 		// cluster search
 
 		// for each service create corresponding search engine
 		backends := []search.Engine{}
-		info, err := GetConsulInfo()
+		info, tags, err := GetConsulInfo(files)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get consul service info: %s", err)
 		}
 		for _, service := range info {
+			if len(tags) != 0 && !MatchAnyTag(service.ServiceTags, tags) {
+				continue
+			}
+
 			if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
 				// local node: just use normal backend
-				engine, err := s.getSearchEngine(true)
+				engine, err := s.getSearchEngine(true, files)
 				if err != nil {
 					return nil, err
 				}
@@ -178,7 +182,7 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 		}
 
 		// no services from consule, just use local search as a fallback
-		return s.getSearchEngine(true)
+		return s.getSearchEngine(true, files)
 	}
 
 	// local node search
