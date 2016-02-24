@@ -13,6 +13,15 @@ cd $GOPATH/src/github.com/getryft/ryft-server
 make
 ```
 
+To change git branch use combination of commands:
+```bash
+cd $GOPATH/src/github.com/getryft/ryft-server
+git checkout <branch-name>
+go get
+```
+
+For packaging into deb file see instructions [here](./debian/README.md).
+
 # Running & Command Line Parameters
 
 ```
@@ -50,10 +59,6 @@ Args:
 
 ```
 Default value ``port`` is ``8765``
-
-# Packaging into deb file
-
-See instructions [here](./debian/README.md)
 
 # Keeping search results
 
