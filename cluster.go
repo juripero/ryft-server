@@ -67,7 +67,7 @@ func (s *Server) members(c *gin.Context) {
 //}
 
 // tags is the service tags related to requested files
-func GetConsulInfo(files []string) (address []*consul.CatalogService, tags []string, err error) {
+func GetConsulInfo(files []string) (services []*consul.CatalogService, tags []string, err error) {
 	config := consul.DefaultConfig()
 	// TODO: get some data from server's configuration
 	config.Datacenter = "dc1"
@@ -78,48 +78,57 @@ func GetConsulInfo(files []string) (address []*consul.CatalogService, tags []str
 	}
 
 	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
-
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
+	services, _, err = catalog.Service("ryft-rest-api", "", nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get consul services: %s", err)
+	}
 
 	if len(files) != 0 {
-		tags = findBestMatch(client, files)
+		tags, err = findBestMatch(client, files)
+		if err != nil {
+			return services, nil, fmt.Errorf("failed to get match tags: %s", err)
+		}
 	}
 
 	return services, tags, err
 }
 
 // Split services to local and remote
-func SplitToLocalAndRemote(info []*consul.CatalogService) (local_info *consul.CatalogService, remote_info []*consul.CatalogService) {
-	for i, service := range info {
+// NOTE the input `services` slice might be modified!
+func SplitToLocalAndRemote(services []*consul.CatalogService) (local *consul.CatalogService, remotes []*consul.CatalogService) {
+	for i, service := range services {
 		if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
-			local_info = service
-			remote_info = info[0:i]
-			remote_info = append(remote_info, info[i+1:]...)
+			local = service
+			remotes = append(services[:i],
+				services[i+1:]...)
 			return
 		}
 	}
 
-	return nil, info // no local found
+	return nil, services // no local found
 }
 
 // find best matched service tags for the file list
-func findBestMatch(client *consul.Client, files []string) []string {
+func findBestMatch(client *consul.Client, files []string) ([]string, error) {
 	if len(files) == 0 {
-		return nil // no files - no tags
+		return nil, nil // no files - no tags
 	}
 
 	// get all wildcards (keys) and tags
 	prefix := "partitions/"
-	pairs, _, _ := client.KV().List(prefix, nil)
+	pairs, _, err := client.KV().List(prefix, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags from KV: %s", err)
+	}
+
 	keys := make([]string, len(pairs))
 	tags := make([][]string, len(pairs))
 	for i, kvp := range pairs {
 		mask, _ := url.QueryUnescape(kvp.Key)
 		keys[i] = strings.TrimPrefix(mask, prefix)
 		tags[i] = strings.Split(string(kvp.Value), ",")
+
+		// trim spaces from tags
 		for k := range tags[i] {
 			tags[i][k] = strings.TrimSpace(tags[i][k])
 		}
@@ -141,17 +150,5 @@ func findBestMatch(client *consul.Client, files []string) []string {
 		res = append(res, k)
 	}
 
-	return res
-}
-
-// Check if service match any tag.
-func MatchAnyTag(serviceTags []string, tags []string) bool {
-	for _, t := range serviceTags {
-		for _, q := range tags {
-			if t == q {
-				return true
-			}
-		}
-	}
-	return false
+	return res, nil
 }

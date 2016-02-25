@@ -131,10 +131,15 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 
 		// for each service create corresponding search engine
 		backends := []search.Engine{}
-		info, tags, err := GetConsulInfo(files)
+		nodes, tags, err := GetConsulInfo(files)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get consul service info: %s", err)
+			return nil, fmt.Errorf("failed to get consul services: %s", err)
 		}
+		local_node, remote_nodes := SplitToLocalAndRemote(nodes)
+		log.Printf("cluster search tags: %q", tags)
+
+		// if no tags required - use all nodes
+		all_nodes := (len(tags) == 0)
 
 		// list of tags required
 		tags_required := make(map[string]bool)
@@ -142,13 +147,8 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 			tags_required[t] = true
 		}
 
-		log.Printf("cluster search tags: %q", tags)
-
-		// if no tags required - use all nodes
-		all_nodes := (len(tags) == 0)
-
 		// go through service tags and update `tags_required` map
-		// return match count
+		// return match count, matched tags are removed
 		update_tags := func(serviceTags []string) int {
 			count := 0
 			for _, s := range serviceTags {
@@ -160,12 +160,10 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 			return count
 		}
 
-		local_info, remote_info := SplitToLocalAndRemote(info)
-
 		// prefer local service first...
-		if local_info != nil {
-			log.Printf("local node tags: %q", local_info.ServiceTags)
-			if all_nodes || update_tags(local_info.ServiceTags) > 0 {
+		if local_node != nil {
+			log.Printf("local node tags: %q", local_node.ServiceTags)
+			if all_nodes || update_tags(local_node.ServiceTags) > 0 {
 				// local node: just use normal backend
 				engine, err := s.getSearchEngine(true, files)
 				if err != nil {
@@ -177,8 +175,8 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 		}
 
 		// ... then remote services (shuffled)
-		for _, k := range rand.Perm(len(remote_info)) {
-			service := remote_info[k]
+		for _, k := range rand.Perm(len(remote_nodes)) {
+			service := remote_nodes[k]
 
 			// stop if no more tags required
 			if !all_nodes && len(tags_required) == 0 {
@@ -188,7 +186,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 			// skip if no required tags found
 			log.Printf("remote node tags: %q", service.ServiceTags)
 			if !all_nodes && update_tags(service.ServiceTags) == 0 {
-				continue // no tags, skip this node
+				continue // no tags found, skip this node
 			}
 			log.Printf("remain (remote) tags required: %v", tags_required)
 
@@ -226,7 +224,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 			for k, _ := range tags_required {
 				rem = append(rem, k)
 			}
-			return nil, fmt.Errorf("no nodes found for tags: %q", rem)
+			return nil, fmt.Errorf("no services found for tags: %q", rem)
 		}
 
 		if len(backends) > 0 {
@@ -236,7 +234,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 		}
 
 		// no services from consule, just use local search as a fallback
-		log.Printf("no cluster built, use local search as fallback, uncovered tags: %v", tags_required)
+		log.Printf("no cluster built, use local search as fallback")
 		return s.getSearchEngine(true, files)
 	}
 
