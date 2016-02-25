@@ -37,6 +37,7 @@ const (
 	HostPortSep = ":"
 )
 
+// FIXME: review this function
 func compareIP(inIP string) bool {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {

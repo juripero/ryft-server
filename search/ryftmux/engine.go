@@ -61,8 +61,7 @@ func NewEngine(backends ...search.Engine) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%d}",
-		len(engine.Backends))
+	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
 	// TODO: other parameters?
 }
 

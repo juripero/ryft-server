@@ -103,7 +103,7 @@ func (s *Server) search(ctx *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local)
+	engine, err := s.getSearchEngine(params.Local, params.Files)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
