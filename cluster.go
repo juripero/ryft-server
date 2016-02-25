@@ -37,9 +37,8 @@ import (
 	"net/url"
 	"strings"
 
-	//"github.com/demon-xxi/wildmatch"
+	"github.com/demon-xxi/wildmatch"
 	"github.com/gin-gonic/gin"
-	"github.com/pilatuz/wildmatch"
 
 	consul "github.com/hashicorp/consul/api"
 )
@@ -66,7 +65,8 @@ func (s *Server) members(c *gin.Context) {
 //	ServicePort    string   `json:"ServicePort"`
 //}
 
-// tags is the service tags related to requested files
+// GetConsulInfo gets the list of ryft services and
+// the service tags related to requested set of files.
 func GetConsulInfo(files []string) (services []*consul.CatalogService, tags []string, err error) {
 	config := consul.DefaultConfig()
 	// TODO: get some data from server's configuration
@@ -93,7 +93,7 @@ func GetConsulInfo(files []string) (services []*consul.CatalogService, tags []st
 	return services, tags, err
 }
 
-// Split services to local and remote
+// SplitToLocalAndRemote splits services to local and remote set
 // NOTE the input `services` slice might be modified!
 func SplitToLocalAndRemote(services []*consul.CatalogService) (local *consul.CatalogService, remotes []*consul.CatalogService) {
 	for i, service := range services {
