@@ -32,6 +32,7 @@ package ryftmux
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/getryft/ryft-server/search"
 )
@@ -100,6 +101,10 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	for d, _ := range muxDirs {
 		mux.Dirs = append(mux.Dirs, d)
 	}
+
+	// sort names in the ascending order
+	sort.Strings(mux.Files)
+	sort.Strings(mux.Dirs)
 
 	return mux, nil // OK
 }
