@@ -137,7 +137,7 @@ func findBestMatch(client *consul.Client, files []string) ([]string, error) {
 	// match files and wildcards
 	tags_map := make(map[string]int)
 	for _, f := range files {
-		if found := wildmatch.IsSubsetOfAnyI(f, keys...); found >= 0 {
+		if found := wildmatch.IsSubsetOfAny(f, keys...); found >= 0 {
 			for _, tag := range tags[found] {
 				tags_map[tag] += 1
 			}
