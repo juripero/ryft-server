@@ -256,8 +256,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 
 		// index-host
 		if _, ok := opts["index-host"]; !ok {
-			hostName, _ := os.Hostname()
-			opts["index-host"] = hostName
+			opts["index-host"] = getHostName()
 		}
 
 		// log level
@@ -267,6 +266,12 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 	}
 
 	return search.NewEngine(s.SearchBackend, opts)
+}
+
+// get local host name
+func getHostName() string {
+	hostName, _ := os.Hostname()
+	return hostName
 }
 
 func parseParams() {

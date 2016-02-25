@@ -31,6 +31,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -57,6 +58,7 @@ type SearchParams struct {
 	Stats         bool     `form:"stats" json:"stats"`
 	Stream        bool     `form:"stream" json:"stream"`
 	Spark         bool     `form:"spark" json:"spark"`
+	ErrorPrefix   bool     `form:"ep" json:"ep"`
 }
 
 // Handle /search endpoint.
@@ -135,8 +137,19 @@ func (s *Server) search(ctx *gin.Context) {
 	num_records := 0
 	num_errors := 0
 
+	// error prefix
+	var errorPrefix string
+	if params.ErrorPrefix {
+		errorPrefix = getHostName()
+	}
+
 	// put error to stream
 	putErr := func(err_ error) {
+		// to distinguish nodes in cluster mode
+		// mark all errors with a prefix
+		if len(errorPrefix) != 0 {
+			err_ = fmt.Errorf("[%s]: %s", errorPrefix, err_)
+		}
 		err := enc.EncodeError(err_)
 		if err != nil {
 			panic(err)
