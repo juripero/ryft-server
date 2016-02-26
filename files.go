@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/getryft/ryft-server/codec"
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,11 @@ func (s *Server) files(c *gin.Context) {
 		// TODO: detail description?
 		panic(NewServerError(http.StatusNotFound, err.Error()))
 	}
+
+	// TODO: if params.Sort {
+	// sort names in the ascending order
+	sort.Strings(info.Files)
+	sort.Strings(info.Dirs)
 
 	// TODO: use transcoder/dedicated structure instead of simple map!
 	json := map[string]interface{}{

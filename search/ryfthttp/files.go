@@ -34,7 +34,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
 
 	"github.com/getryft/ryft-server/search"
 )
@@ -90,10 +89,6 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	res.Path = info.Path
 	res.Files = info.Files
 	res.Dirs = info.Dirs
-
-	// sort names in the ascending order
-	sort.Strings(res.Files)
-	sort.Strings(res.Dirs)
 
 	return res, nil // OK
 }
