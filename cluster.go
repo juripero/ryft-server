@@ -46,7 +46,7 @@ import (
 // handle /cluster/members endpoint: information about cluster's nodes
 func (s *Server) members(c *gin.Context) {
 	// recover from panics if any
-	defer RecoverFromPanic(ctx)
+	defer RecoverFromPanic(c)
 
 	info, _, err := GetConsulInfo(nil)
 
