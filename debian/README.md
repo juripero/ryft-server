@@ -55,4 +55,14 @@ Full list of arguments is listed by running `ryft-server --help`. Write argument
 
 Daemon will start as follows: `ryft-server @/etc/ryft-rest.conf`
 
+## Log file
+
+You can find log file `ryft-server-d-start.log` inside home directory.
+
+To view log file of the service enter following command
+
+`tail -f $HOME/ryft-server-d-start.log`
+
+
+
 TODO: server configuration file description! search engine and options
