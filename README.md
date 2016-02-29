@@ -181,3 +181,21 @@ ryft-server --keep
 	"fabricDataRate": 3.174002
 }
 ```
+
+
+## Version endpoint
+
+Endpoint that allows to check the current build version
+
+### Version request example 
+
+[/version]
+(/version)
+
+```
+{
+  "git-hash": "35c358378f7c214069333004d01841f9066b8f15",
+  "version": "0.5.9-76-g35c3583"
+}
+
+```
