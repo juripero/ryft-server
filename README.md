@@ -187,7 +187,7 @@ ryft-server --keep
 
 Endpoint that allows to check the current build version
 
-### Version request example 
+### Version request example
 
 [/version]
 (/version)
@@ -198,4 +198,31 @@ Endpoint that allows to check the current build version
   "version": "0.5.9-76-g35c3583"
 }
 
+```
+
+## Files endpoint
+| Method | Input type | Uri | Description |
+| --- | --- | --- | --- |
+| *local* | boolean | GET /files?local={VALUE} | Parameter that specifies search mode, set `true` to enable local search, set `false` for cluster mode search. Default `false` |
+| *dir* | string | GET /files?&dir={VALUE} | Parameter that specifies files directory. Default `/ryftone` |
+
+
+### Files request example
+
+```
+{
+  "dir": "/",
+  "files": [
+    "chicago.pcrime",
+    "passengers.txt"
+  ],
+  "folders": [
+    "RyftServer-8765",
+    "RyftServer-9000",
+    "demo",
+    "regression",
+    "test",
+    "tmp"
+  ]
+}
 ```
