@@ -229,3 +229,9 @@ Endpoint that allows to check the current build version
   ]
 }
 ```
+
+## Cluster members endpoint
+
+### Cluster members example
+[/cluster/members]
+(/cluster/members)
