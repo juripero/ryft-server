@@ -209,6 +209,9 @@ Endpoint that allows to check the current build version
 
 ### Files request example
 
+[/files]
+(/files)
+
 ```
 {
   "dir": "/",
