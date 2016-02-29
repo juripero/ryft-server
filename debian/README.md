@@ -57,9 +57,9 @@ Daemon will start as follows: `ryft-server @/etc/ryft-rest.conf`
 
 ## Log file
 
-You can find log file `ryft-server-d-start.log` inside home directory.
+You can find log file of the service that called `ryft-server-d-start.log` inside home directory.
 
-To view log file of the service enter following command
+To view logs in real-time enter following command
 
 `tail -f $HOME/ryft-server-d-start.log`
 
