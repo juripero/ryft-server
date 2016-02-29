@@ -82,6 +82,11 @@ ryft-server --keep
 | *surroinding* | uint16 | GET /search?query={QUERY}&files={FILE}&surrounding={VALUE} | Parameter that specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text |
 | *fields* | string | GET /search?query={QUERY}&files={FILE}&format=xml&fields={FIELDS...} | Parametr that specifies needed keys in result. Required format=xml. |
 | *nodes* | string | GET /search?query={QUERY}&files={FILE}&nodes={VALUE} | Parameter that specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value. |
+| *local* | boolean | GET /search?query={QUERY}&files={FILE}&local={VALUE} | Parameter that specifies search mode, set `true` to enable local search, set `false` for cluster mode search. Default `false`. |
+| *stats* | boolean | GET /search?query={QUERY}&files={FILE}&stats={VALUE} | Parameter that enables including statistics . Default `false`. |
+| *stream* | boolean | GET /search?query={QUERY}&files={FILE}&stream={VALUE} | ---. |
+| *spark* | boolean | GET /search?query={QUERY}&files={FILE}&local={VALUE} |---. |
+| *ep* | boolean | GET /search?query={QUERY}&files={FILE}&local={VALUE} | ---. |
 
 ### Not structed request example
 
