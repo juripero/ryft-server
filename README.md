@@ -120,7 +120,7 @@ ryft-server --keep
 
 ### Structed request example
 
-[/search?query=(RECORD.id EQUALS "10034183")&files=*.pcrime&surrounding=10&fuzziness=0&format=xml](/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml)
+[/search?query=(RECORD.id EQUALS "10034183")&files=*.pcrime&surrounding=10&fuzziness=0&format=xml&local=true](/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml&local=true)
 
 ```
 [
@@ -166,11 +166,18 @@ ryft-server --keep
 | *fuzziness* | uint8 | GET /count?query={QUERY}&files={FILE}&fuzziness={VALUE} | Specify the fuzzy search distance [0..255] . |
 | *cs* | string | GET /count?query={QUERY}&files={FILE}&cs=true | Case sensitive flag. Default 'false'. |
 | *nodes* | string | GET /count?query={QUERY}&files={FILE}&nodes={VALUE} | Parameter that specifies nodes count [0..4]. Default 4, if nodes=0 system will use default value. |
+| *local* | boolean | GET /search?query={QUERY}&files={FILE}&local={VALUE} | Parameter that specifies search mode, set `true` to enable local search, set `false` for cluster mode search. Default `false`. |
 
 ### Count request example
 
-[/count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime](/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime)
+[/count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime&local=true](/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime&local=true)
 
 ```
-"{"matches":10000}"
+{
+	"matches": 10000,
+	"totalBytes": 6892667,
+	"duration": 2071,
+	"dataRate": 3.174002,
+	"fabricDataRate": 3.174002
+}
 ```
