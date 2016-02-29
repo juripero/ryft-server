@@ -124,36 +124,36 @@ ryft-server --keep
 
 ```
 [
-{
-  "Arrest": "false",
-  "Beat": "0313",
-  "Block": "062XX S ST LAWRENCE AVE",
-  "CaseNumber": "HY223673",
-  "CommunityArea": "42",
-  "Date": "04/15/2015 11:59:00 PM",
-  "Description": "DOMESTIC BATTERY SIMPLE",
-  "District": "003",
-  "Domestic": "true",
-  "FBICode": "08B",
-  "ID": "10034183",
-  "IUCR": "0486",
-  "Latitude": "41.781961688",
-  "Location": "\"(41.781961688, -87.610984705)\"",
-  "LocationDescription": "STREET",
-  "Longitude": "-87.610984705",
-  "PrimaryType": "BATTERY",
-  "UpdatedOn": "04/22/2015 12:47:10 PM",
-  "Ward": "20",
-  "XCoordinate": "1181263",
-  "YCoordinate": "1863965",
-  "Year": "2015",
-  "_index": {
-    "file": "/ryftone/chicago.pcrime",
-    "offset": 0,
-    "length": 693,
-    "fuzziness": 0
+  {
+    "Arrest": "false",
+    "Beat": "0313",
+    "Block": "062XX S ST LAWRENCE AVE",
+    "CaseNumber": "HY223673",
+    "CommunityArea": "42",
+    "Date": "04/15/2015 11:59:00 PM",
+    "Description": "DOMESTIC BATTERY SIMPLE",
+    "District": "003",
+    "Domestic": "true",
+    "FBICode": "08B",
+    "ID": "10034183",
+    "IUCR": "0486",
+    "Latitude": "41.781961688",
+    "Location": "\"(41.781961688, -87.610984705)\"",
+    "LocationDescription": "STREET",
+    "Longitude": "-87.610984705",
+    "PrimaryType": "BATTERY",
+    "UpdatedOn": "04/22/2015 12:47:10 PM",
+    "Ward": "20",
+    "XCoordinate": "1181263",
+    "YCoordinate": "1863965",
+    "Year": "2015",
+    "_index": {
+      "file": "/ryftone/chicago.pcrime",
+      "offset": 0,
+      "length": 693,
+      "fuzziness": 0
+    }
   }
-}
 ]
 ```
 
