@@ -90,7 +90,7 @@ ryft-server --keep
 
 ### Not structed request example
 
-[/search?query=(RAW_TEXT CONTAINS "10")&files=passengers.txt&surrounding=10&fuzziness=0](/search?query=(RAW_TEXT%20CONTAINS%20%2210%22)&files=passengers.txt&surrounding=10&fuzziness=0)
+[/search?query=(RAW_TEXT CONTAINS "10")&files=passengers.txt&surrounding=10&fuzziness=0&local=false](/search?query=(RAW_TEXT%20CONTAINS%20%2210%22)&files=passengers.txt&surrounding=10&fuzziness=0&local=false)
 
 ```
 [
