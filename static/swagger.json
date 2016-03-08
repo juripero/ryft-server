@@ -1,7 +1,7 @@
 {
   "swagger": "2.0",
   "info": {
-    "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execure search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples. For more details visit project page https://github.com/getryft/ryft-server",
+    "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples. For more details visit project page https://github.com/getryft/ryft-server",
     "title": "RyftOne REST API",
     "version": "1.1"
   },
@@ -109,9 +109,9 @@
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elaments of various structure",
+            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
             "schema": {
-              "description": "CountResponse returnes matches for query",
+              "description": "CountResponse returns matches for query",
               "type": "object",
               "$ref": "#/definitions/SearchResponse"
             }
@@ -189,7 +189,7 @@
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elaments of various structure",
+            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
             "schema": {
               "type": "object",
               "$ref": "#/definitions/CountResponse"
