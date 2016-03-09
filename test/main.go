@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	stdlog "log"
 	"os"
 	"runtime/pprof"
@@ -9,7 +10,11 @@ import (
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	_ "github.com/getryft/ryft-server/search/ryftmux"
-	_ "github.com/getryft/ryft-server/search/ryftprim"
+	_ "github.com/getryft/ryft-server/search/ryftone"
+	"github.com/getryft/ryft-server/search/ryftprim"
+
+	raw_format "github.com/getryft/ryft-server/format/raw"
+	xml_format "github.com/getryft/ryft-server/format/xml"
 )
 
 var (
@@ -44,19 +49,59 @@ func main() {
 	// ryftprimLogLevel = "debug"
 	// ryfthttpLogLevel = "debug"
 
-	// printSearchEngines()
+	printSearchEngines(log)
 
 	//search1(false) // ryftprim
 	//search2(false) // HTTP
 	//search3(false) // MUX
+	//search4(false) // ryftone
 
 	//count1(false) // ryftprim
 	//count2(false) // HTTP
 	//count3(false) // MUX
+	//count4(true) // ryftone
 
 	//files1(false) // ryftprim
 	//files2(false) // HTTP
-	files3(false) // MUX
+	//files3(false) // MUX
+
+	//testMsgpackFormat()
+	//files3(false) // MUX
+	//files4(false) // ryftone
+
+	// formatXml()
+
+	// testJsonCodec()
+
+	// testParseStat()
+}
+
+// test statistics parse
+func testParseStat() {
+	s := `Duration           : 9057
+Total Bytes        : 33603779127
+Matches            : 971
+Fabric Data Rate   : 10307.835938 MB/sec
+`
+
+	stat, err := ryftprim.ParseStat([]byte(s))
+	if err != nil {
+		log("Failed to parse stat: %s", err)
+	} else {
+		log("Parsed stat: %s\n%#v", stat, raw_format.FromStat(stat))
+	}
+}
+
+// test xml formatter
+func formatXml() {
+	rec := new(search.Record)
+	rec.Index.File = "test.txt"
+	rec.Index.Offset = 100
+	//rec.Data = []byte(`<rec><ID>10034183</ID><CaseNumber>HY223673</CaseNumber><Date>04/15/2015 11:59:00 PM</Date><Block>062XX S ST LAWRENCE AVE</Block><IUCR>0486</IUCR><PrimaryType>BATTERY</PrimaryType><Description>DOMESTIC BATTERY SIMPLE</Description><LocationDescription>STREET</LocationDescription><Arrest>false</Arrest><Domestic>true</Domestic><Beat>0313</Beat><District>003</District><Ward>20</Ward><CommunityArea>42</CommunityArea><FBICode>08B</FBICode><XCoordinate>1181263</XCoordinate><YCoordinate>1863965</YCoordinate><Year>2015</Year><UpdatedOn>04/22/2015 12:47:10 PM</UpdatedOn><Latitude>41.781961688</Latitude><Longitude>-87.610984705</Longitude><Location>\"(41.781961688, -87.610984705)\"</Location></recx>`)
+	rec.Data = []byte(`<rec><ID>10034183</ID><CaseNumber>HY223673</CaseNumber><Date>04/15/2015 11:59:00 PM</Date><Block>062XX S ST LAWRENCE AVE</Block><IUCR>0486</IUCR><PrimaryType>BATTERY</PrimaryType><Description>DOMESTIC BATTERY SIMPLE</Description><LocationDescription>STREET</LocationDescription><Arrest>false</Arrest><Domestic>true</Domestic><Beat>0313</Beat><District>003</District><Ward>20</Ward><CommunityArea>42</CommunityArea><FBICode>08B</FBICode><XCoordinate>1181263</XCoordinate><YCoordinate>1863965</YCoordinate><Year>2015</Year><UpdatedOn>04/22/2015 12:47:10 PM</UpdatedOn><Latitude>41.781961688</Latitude><Longitude>-87.610984705</Longitude><Location>\"(41.781961688, -87.610984705)\"</Location></rec>`)
+
+	b, _ := json.MarshalIndent(xml_format.FromRecord(rec, []string{}), "", " ")
+	log("%s", string(b))
 }
 
 // abstract seach
@@ -109,6 +154,11 @@ func search3(concurent bool) {
 	search0(concurent, engine)
 }
 
+// ryftone search
+func search4(concurent bool) {
+	search0(concurent, newRyftOne(log))
+}
+
 // abstract count
 func count0(concurent bool, engine search.Engine) {
 	// plain texts
@@ -159,6 +209,11 @@ func count3(concurent bool) {
 	count0(concurent, engine)
 }
 
+// ryftone count
+func count4(concurent bool) {
+	count0(concurent, newRyftOne(log))
+}
+
 // ryftprim files
 func files0(concurent bool, engine search.Engine) {
 	paths := []string{}
@@ -193,4 +248,9 @@ func files3(concurent bool) {
 	)
 
 	files0(concurent, engine)
+}
+
+// ryftone files
+func files4(concurent bool) {
+	files0(concurent, newRyftOne(log))
 }

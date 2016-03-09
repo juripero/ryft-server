@@ -35,8 +35,8 @@ import (
 	"fmt"
 	"net/http"
 
+	format "github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/transcoder"
 )
 
 // Count starts asynchronous "/count" with RyftPrim engine.
@@ -86,14 +86,14 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		// TODO: task cancellation!!
 
 		decoder := json.NewDecoder(resp.Body)
-		var stat transcoder.Statistics
+		var stat format.Statistics
 		err = decoder.Decode(&stat)
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to decode response", TAG)
 			res.ReportError(fmt.Errorf("failed to decode JSON respose: %s", err))
 		}
 
-		res.Stat, _ = transcoder.DecodeRawStat(&stat)
+		res.Stat = format.ToStat(&stat)
 		task.log().WithField("stat", res.Stat).
 			Infof("[%s]: statistics received", TAG)
 	}()

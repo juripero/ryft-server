@@ -28,77 +28,80 @@
  * ============
  */
 
-package encoder
+package msgpack
 
 import (
-	"encoding/json"
 	"io"
+
+	backend "gopkg.in/vmihailenco/msgpack.v2"
 )
 
-// simple JSON encoder
-type JsonEncoder struct {
-	needSeparator bool
+/* Simple MSGPACK encoder uses stream of RECORDS.
+Errors and statistics are written at the end.
+*/
+
+// MSGPACK simple encoder.
+type SimpleEncoder struct {
+	RecordsOnly bool // do not write errors and statistics
+
+	encoder *backend.Encoder
+	errors  []string
+	stat    interface{}
 }
 
-func (enc *JsonEncoder) Begin(w io.Writer) error {
-	_, err := w.Write([]byte(`{"results":[`))
-	return err
+// Create new simple MSGPACK encoder instance.
+func NewSimpleEncoder(w io.Writer) (*SimpleEncoder, error) {
+	enc := new(SimpleEncoder)
+	enc.encoder = backend.NewEncoder(w)
+	return enc, nil
 }
 
-func (enc *JsonEncoder) End(w io.Writer, errors []error) error {
-	return enc.EndWithStats(w, nil, errors)
-}
-
-func (enc *JsonEncoder) EndWithStats(w io.Writer, stat interface{}, errors []error) error {
-	if _, err := w.Write([]byte(`]`)); err != nil {
+// Write a RECORD
+func (enc *SimpleEncoder) EncodeRecord(rec interface{}) error {
+	err := enc.encoder.Encode(rec)
+	if err != nil {
 		return err
 	}
-	e := json.NewEncoder(w)
 
-	// errors
-	if len(errors) > 0 {
-		// convert errors to strings
-		messages := make([]string, 0, len(errors))
-		for _, e := range errors {
-			messages = append(messages, e.Error())
-		}
-
-		if _, err := w.Write([]byte(`,"errors":`)); err != nil {
-			return err
-		}
-		if err := e.Encode(messages); err != nil {
-			return err
-		}
-	}
-
-	// statistics
-	if stat != nil {
-		if _, err := w.Write([]byte(`,"stats":`)); err != nil {
-			return err
-		}
-		if err := e.Encode(stat); err != nil {
-			return err
-		}
-	}
-
-	_, err := w.Write([]byte("}"))
-	return err
+	return nil // OK
 }
 
-func (enc *JsonEncoder) Write(w io.Writer, item interface{}) error {
-	if enc.needSeparator {
-		w.Write([]byte(","))
-		enc.needSeparator = false
+// Write a STATISTICS
+func (enc *SimpleEncoder) EncodeStat(stat interface{}) error {
+	if !enc.RecordsOnly {
+		enc.stat = stat // will be written later
 	}
-	e := json.NewEncoder(w) // FIXME: do not create encoder each time
-	err := e.Encode(item)
-	if err == nil {
-		enc.needSeparator = true
-	}
-	return err
+
+	return nil // OK
 }
 
-func (enc *JsonEncoder) WriteStreamError(w io.Writer, err error) bool {
-	// JSON fromat doesn't support stream errors
-	return false
+// Write an ERROR
+func (enc *SimpleEncoder) EncodeError(err error) error {
+	if err != nil && !enc.RecordsOnly {
+		// just save, will be written later
+		enc.errors = append(enc.errors, err.Error())
+	}
+
+	return nil // OK
+}
+
+// End writing, close JSON object.
+func (enc *SimpleEncoder) Close() error {
+	// write errors
+	for _, emsg := range enc.errors {
+		err := enc.encoder.Encode(emsg)
+		if err != nil {
+			return err
+		}
+	}
+
+	// write statistics
+	if enc.stat != nil {
+		err := enc.encoder.Encode(enc.stat)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil // OK
 }

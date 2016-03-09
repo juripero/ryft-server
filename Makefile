@@ -1,6 +1,11 @@
-GOBINDATA = $GOPATH/bin/go-bindata
+GOBINDATA = ${GOPATH}/bin/go-bindata
 ASSETS = bindata.go
 BINARIES = ryft-server
+
+# disable ryftone search engine by default
+ifeq (${GO_TAGS},)
+  GO_TAGS=noryftone
+endif
 
 all: $(ASSETS) build
 
@@ -20,15 +25,15 @@ $(GOBINDATA):
 	go get -u github.com/jteeuwen/go-bindata/...
 
 $(ASSETS): $(GOBINDATA)
-	go-bindata -o bindata.go -prefix static/ static/...
+	${GOBINDATA} -o bindata.go -prefix static/ static/...
 
 .PHONY: build
 build:
-	go build -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}"
+	go build -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
 .PHONY: install
 install: $(ASSETS)
-	go install -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}"
+	go install -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
 .PHONY: debian
 debian: install

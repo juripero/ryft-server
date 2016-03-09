@@ -28,20 +28,39 @@
  * ============
  */
 
-package rol
+package ryftone
 
-import "strings"
+import (
+	"io/ioutil"
+	"strings"
 
-type Error struct {
-	s string
-}
+	"github.com/getryft/ryft-server/search"
+)
 
-func (e *Error) Error() string {
-	return e.s
-}
+// GetDirInfo gets directory content.
+func GetDirInfo(path string, name string) (*search.DirInfo, error) {
+	// read directory content
+	items, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
 
-const strangePattern = `SearchTreeNode: unable to execute HwController`
+	// process directory content
+	res := search.NewDirInfo(name)
+	for _, item := range items {
+		name := item.Name()
 
-func (e *Error) IsStrangeError() bool {
-	return strings.Contains(e.s, strangePattern)
+		// skip ".", ".." and all hidden files
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+
+		if item.IsDir() {
+			res.Dirs = append(res.Dirs, name)
+		} else {
+			res.Files = append(res.Files, name)
+		}
+	}
+
+	return res, nil // OK
 }

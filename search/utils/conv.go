@@ -85,7 +85,7 @@ func AsUint64(opt interface{}) (uint64, error) {
 		return 0, nil
 	}
 
-	return 0, fmt.Errorf("%v os not a uint64", opt)
+	return 0, fmt.Errorf("%v is not an uint64", opt)
 }
 
 // convert custom value to bool.

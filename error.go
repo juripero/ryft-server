@@ -32,35 +32,53 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+	//	"runtimes/debug"
+	"strings"
 
-	consul "github.com/hashicorp/consul/api"
+	"github.com/gin-gonic/gin"
 )
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+type ServerError struct {
+	Status  int
+	Message string
+	Details string
+}
 
-func GetConsulInfo() (address []*consul.CatalogService, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+func (err *ServerError) Error() string {
+	return fmt.Sprintf("%d %s", err.Status, err.Message)
+}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get consul client", err)
+func NewServerError(status int, message string) *ServerError {
+	return &ServerError{status, message, ""}
+}
+
+func NewServerErrorWithDetails(status int, message string, details string) *ServerError {
+	return &ServerError{status, message, details}
+}
+
+func RecoverFromPanic(c *gin.Context) {
+	if r := recover(); r != nil {
+		if err, ok := r.(*ServerError); ok {
+			log.Printf("Panic recovered server error: status=%d msg:%s => %+v", err.Status, err.Message, err)
+			if len(err.Details) > 0 {
+				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status, "details": err.Details})
+			} else {
+				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status})
+			}
+
+			return
+		}
+
+		if err, ok := r.(error); ok {
+			log.Printf("Panic recovered unknown error with msg:%s", err.Error())
+			//			debug.PrintStack()
+			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%v", err.Error()), "status": http.StatusInternalServerError})
+			return
+		}
+
+		log.Printf("Panic recovered with object:%+v", r)
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%+v", r), "status": http.StatusInternalServerError})
 	}
-
-	catalog := client.Catalog()
-	services, _, _ := catalog.Service("ryft-rest-api", "", nil)
-
-	// for _, value := range services {
-	// 	address <- fmt.Sprintf("%v:%v", value.ServiceAddress, value.ServicePort)
-	// }
-	return services, err
 }

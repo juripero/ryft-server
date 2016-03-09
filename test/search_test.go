@@ -219,3 +219,55 @@ func TestSearchMux_XML_descVEHICLE(t *testing.T) {
 	r := runSearch1(t.Logf, "TEST", s, cfg)
 	checkRecordReceived(t, r, 2*672)
 }
+
+// ryftone search (bad result)
+func TestSearchOne_Bad10(t *testing.T) {
+	cfg := search.NewConfig("10", "/regression/passengers_not_found.txt")
+	r := runSearch1(t.Logf, "TEST", newRyftOne(t.Logf), cfg)
+	checkRecordReceived(t, r, -1)
+}
+
+// ryftone search
+func TestSearchOne_10(t *testing.T) {
+	cfg := search.NewConfig("10", "/regression/passengers.txt")
+	r := runSearch1(t.Logf, "TEST", newRyftOne(t.Logf), cfg)
+	checkRecordReceived(t, r, 12)
+}
+
+// ryftone search
+func TestSearchOne_310(t *testing.T) {
+	cfg := search.NewConfig("310", "/regression/passengers.txt")
+	r := runSearch1(t.Logf, "TEST", newRyftOne(t.Logf), cfg)
+	checkRecordReceived(t, r, 11)
+}
+
+// ryftone search
+func TestSearchOne_555(t *testing.T) {
+	cfg := search.NewConfig("555", "/regression/passengers.txt")
+	r := runSearch1(t.Logf, "TEST", newRyftOne(t.Logf), cfg)
+	checkRecordReceived(t, r, 11)
+}
+
+// ryftone XML search
+// check corresponding RDF file is loaded
+func TestSearchOne_XML_id1003(t *testing.T) {
+	cfg := search.NewConfig(`(RECORD.id CONTAINS "1003")`, "/regression/*.pcrime")
+	r := runSearch1(t.Logf, "TEST", newRyftOne(t.Logf), cfg)
+	checkRecordReceived(t, r, 2542)
+}
+
+// ryftone XML search
+// check corresponding RDF file is loaded
+func TestSearchOne_XML_id1003100(t *testing.T) {
+	cfg := search.NewConfig(`(RECORD.id CONTAINS "1003100")`, "/regression/*.pcrime")
+	r := runSearch1(t.Logf, "TEST", newRyftOne(t.Logf), cfg)
+	checkRecordReceived(t, r, 9)
+}
+
+// ryftone XML search
+// check corresponding RDF file is loaded
+func TestSearchOne_XML_descVEHICLE(t *testing.T) {
+	cfg := search.NewConfig(`(RECORD.desc CONTAINS "VEHICLE")`, "/regression/*.pcrime")
+	r := runSearch1(t.Logf, "TEST", newRyftOne(t.Logf), cfg)
+	checkRecordReceived(t, r, 672)
+}

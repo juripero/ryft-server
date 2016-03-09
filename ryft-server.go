@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"mime"
 	"net/http"
 	"os"
@@ -43,13 +44,12 @@ import (
 	"github.com/getryft/ryft-server/search"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
+	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 
-	"github.com/getryft/ryft-server/encoder"
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
-	"github.com/getryft/ryft-server/srverr"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thoas/stats"
@@ -80,7 +80,6 @@ var (
 	tlsKeyFile       = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
 	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
 )
-var hostName string
 
 // customized via Makefile
 var (
@@ -126,26 +125,70 @@ func ensureDefault(flag *string, message string) {
 }
 
 // get search backend with options
-func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
+func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine, error) {
 	if !localOnly {
 		// cluster search
 
 		// for each service create corresponding search engine
 		backends := []search.Engine{}
-		info, err := GetConsulInfo()
+		nodes, tags, err := GetConsulInfo(files)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get consul service info: %s", err)
+			return nil, fmt.Errorf("failed to get consul services: %s", err)
 		}
-		for _, service := range info {
-			if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
+		local_node, remote_nodes := SplitToLocalAndRemote(nodes)
+		log.Printf("cluster search tags: %q", tags)
+
+		// if no tags required - use all nodes
+		all_nodes := (len(tags) == 0)
+
+		// list of tags required
+		tags_required := make(map[string]bool)
+		for _, t := range tags {
+			tags_required[t] = true
+		}
+
+		// go through service tags and update `tags_required` map
+		// return match count, matched tags are removed
+		update_tags := func(serviceTags []string) int {
+			count := 0
+			for _, s := range serviceTags {
+				if _, ok := tags_required[s]; ok {
+					delete(tags_required, s)
+					count += 1
+				}
+			}
+			return count
+		}
+
+		// prefer local service first...
+		if local_node != nil {
+			log.Printf("local node tags: %q", local_node.ServiceTags)
+			if all_nodes || update_tags(local_node.ServiceTags) > 0 {
 				// local node: just use normal backend
-				engine, err := s.getSearchEngine(true)
+				engine, err := s.getSearchEngine(true, files)
 				if err != nil {
 					return nil, err
 				}
 				backends = append(backends, engine)
-				continue // skip
 			}
+			log.Printf("remain (local) tags required: %v", tags_required)
+		}
+
+		// ... then remote services (shuffled)
+		for _, k := range rand.Perm(len(remote_nodes)) {
+			service := remote_nodes[k]
+
+			// stop if no more tags required
+			if !all_nodes && len(tags_required) == 0 {
+				break
+			}
+
+			// skip if no required tags found
+			log.Printf("remote node tags: %q", service.ServiceTags)
+			if !all_nodes && update_tags(service.ServiceTags) == 0 {
+				continue // no tags found, skip this node
+			}
+			log.Printf("remain (remote) tags required: %v", tags_required)
 
 			// remote node: use RyftHTTP backend
 			port := service.ServicePort
@@ -175,42 +218,60 @@ func (s *Server) getSearchEngine(localOnly bool) (search.Engine, error) {
 			backends = append(backends, engine)
 		}
 
+		// fail if there is remaining required tags
+		if !all_nodes && len(tags_required) > 0 {
+			rem := []string{} // remaining tags
+			for k, _ := range tags_required {
+				rem = append(rem, k)
+			}
+			return nil, fmt.Errorf("no services found for tags: %q", rem)
+		}
+
 		if len(backends) > 0 {
-			return ryftmux.NewEngine(backends...)
-		} else {
-			// no services from consule, just use local search as a fallback
-			return s.getSearchEngine(true)
-		}
-	} else {
-		// local node search
-		opts := s.BackendOptions
-
-		// some auto-options
-		switch s.SearchBackend {
-		case "ryftprim":
-			// instance name
-			if _, ok := opts["instance-name"]; !ok {
-				opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
-			}
-
-			// keep-files
-			if _, ok := opts["keep-files"]; !ok {
-				opts["keep-files"] = *KeepResults
-			}
-
-			// index-host
-			if _, ok := opts["index-host"]; !ok {
-				opts["index-host"] = hostName
-			}
-
-			// log level
-			if _, ok := opts["log-level"]; !ok && *debug {
-				opts["log-level"] = "debug"
-			}
+			engine, err := ryftmux.NewEngine(backends...)
+			log.Printf("cluster search with %s", engine)
+			return engine, err
 		}
 
-		return search.NewEngine(s.SearchBackend, opts)
+		// no services from consule, just use local search as a fallback
+		log.Printf("no cluster built, use local search as fallback")
+		return s.getSearchEngine(true, files)
 	}
+
+	// local node search
+	opts := s.BackendOptions
+
+	// some auto-options
+	switch s.SearchBackend {
+	case "ryftprim":
+		// instance name
+		if _, ok := opts["instance-name"]; !ok {
+			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+		}
+
+		// keep-files
+		if _, ok := opts["keep-files"]; !ok {
+			opts["keep-files"] = *KeepResults
+		}
+
+		// index-host
+		if _, ok := opts["index-host"]; !ok {
+			opts["index-host"] = getHostName()
+		}
+
+		// log level
+		if _, ok := opts["log-level"]; !ok && *debug {
+			opts["log-level"] = "debug"
+		}
+	}
+
+	return search.NewEngine(s.SearchBackend, opts)
+}
+
+// get local host name
+func getHostName() string {
+	hostName, _ := os.Hostname()
+	return hostName
 }
 
 func parseParams() {
@@ -240,12 +301,10 @@ func parseParams() {
 	}
 }
 
-var Stats = stats.New()
+var serverStats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
-	//getting current hostname
-	hostName, _ = os.Hostname()
 
 	// set log timestamp format
 	log.SetFlags(log.Lmicroseconds)
@@ -278,7 +337,7 @@ func main() {
 		return func(c *gin.Context) {
 			beginning := time.Now()
 			c.Next()
-			Stats.End(beginning, c.Writer)
+			serverStats.End(beginning, c.Writer)
 		}
 	}())
 
@@ -308,7 +367,7 @@ func main() {
 
 	router.GET("/version", func(ctx *gin.Context) {
 		info := map[string]interface{}{
-			"verison":  Version,
+			"version":  Version,
 			"git-hash": GitHash,
 		}
 		ctx.JSON(http.StatusOK, info)
@@ -316,11 +375,11 @@ func main() {
 
 	// stats page
 	router.GET("/about", func(c *gin.Context) {
-		c.JSON(http.StatusOK, Stats.Data())
+		c.JSON(http.StatusOK, serverStats.Data())
 	})
 
-	router.GET("/search", detectEncoder, server.search)
-	router.GET("/count", detectEncoder, server.count)
+	router.GET("/search", server.search)
+	router.GET("/count", server.count)
 	router.GET("/cluster/members", server.members)
 	router.GET("/files", server.files)
 
@@ -346,29 +405,4 @@ func main() {
 		go router.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
 	}
 	router.Run((*listenAddress).String())
-}
-
-const (
-	ENCODER_CONTEXT_KEY = "encoder-detected"
-)
-
-func detectEncoder(c *gin.Context) {
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = encoder.MIME_JSON
-	}
-	c.Header("Content-Type", accept)
-
-	// setting up encoder to respond with requested format
-	if enc, err := encoder.GetByMimeType(accept); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
-	} else {
-		c.Set(ENCODER_CONTEXT_KEY, enc)
-	}
-}
-
-func encoderFromContext(c *gin.Context) encoder.Encoder {
-	// TODO add handlers for null value and report 400 error
-	return c.MustGet(ENCODER_CONTEXT_KEY).(encoder.Encoder)
 }

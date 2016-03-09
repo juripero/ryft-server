@@ -31,7 +31,6 @@
 package ryftprim
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"strconv"
@@ -40,112 +39,99 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/utils"
 )
 
 // parseIndex parses Index record from custom line.
 func parseIndex(buf []byte) (index search.Index, err error) {
-	sep := []byte(",")
-	fields := bytes.Split(bytes.TrimSpace(buf), sep)
-	n := len(fields)
-	if n < 4 {
-		return index, fmt.Errorf("invalid number of fields in %q", string(buf))
-	}
-
-	// NOTE: filename (first field) may contains ','
-	// so we have to combine some first fields
-	file := bytes.Join(fields[0:n-3], sep)
-
-	// Offset
-	var offset uint64
-	offset, err = strconv.ParseUint(string(fields[n-3]), 10, 64)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse offset: %s", err)
-	}
-
-	// Length
-	var length uint64
-	length, err = strconv.ParseUint(string(fields[n-2]), 10, 16)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse length: %s", err)
-	}
-
-	// Fuzziness
-	var fuzz uint64
-	fuzz, err = strconv.ParseUint(string(fields[n-1]), 10, 8)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse fuzziness: %s", err)
-	}
-
-	// update index
-	index.File = string(file)
-	index.Offset = offset
-	index.Length = length
-	index.Fuzziness = uint8(fuzz)
-
-	return // OK
+	return ryftone.ParseIndex(buf)
 }
 
-// parseStat parses statistics from ryftprim output.
-func parseStat(buf []byte) (stat *search.Statistics, err error) {
-	// parse as YML map first
+// ParseStat parses statistics from ryftprim output.
+func ParseStat(buf []byte) (stat *search.Statistics, err error) {
+	// parse as YAML map first
 	v := map[string]interface{}{}
 	err = yaml.Unmarshal(buf, &v)
 	if err != nil {
 		return stat, fmt.Errorf("failed to parse ryftprim output: %s", err)
 	}
 
-	log.WithField("stat", v).Debugf("[%s] output as YML", TAG)
+	log.WithField("stat", v).Debugf("[%s] output as YAML", TAG)
 	stat = search.NewStat()
 
 	// Duration
-	stat.Duration, err = utils.AsUint64(v["Duration"])
-	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "Duration" stat`)
+	if x, ok := v["Duration"]; ok {
+		stat.Duration, err = utils.AsUint64(x)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "Duration" stat: %s`, err)
+		}
+	} else {
+		return nil, fmt.Errorf(`failed to find "Duration" stat`)
 	}
 
 	// Total Bytes
-	stat.TotalBytes, err = utils.AsUint64(v["Total Bytes"])
-	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "Total Bytes" stat`)
+	if x, ok := v["Total Bytes"]; ok {
+		stat.TotalBytes, err = utils.AsUint64(x)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "Total Bytes" stat: %s`, err)
+		}
+	} else {
+		return nil, fmt.Errorf(`failed to find "Total Bytes" stat`)
 	}
 
 	// Matches
-	stat.Matches, err = utils.AsUint64(v["Matches"])
-	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "Matches" stat`)
+	if x, ok := v["Matches"]; ok {
+		stat.Matches, err = utils.AsUint64(x)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "Matches" stat: %s`, err)
+		}
+	} else {
+		return nil, fmt.Errorf(`failed to find "Matches" stat`)
 	}
 
 	// Fabric Data Rate
-	fdr, err := utils.AsString(v["Fabric Data Rate"])
-	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat`)
-	}
-	stat.FabricDataRate, err = parseDataRate(fdr)
-	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat from %q`, fdr)
+	if x, ok := v["Fabric Data Rate"]; ok {
+		fdr, err := utils.AsString(x)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat: %s`, err)
+		}
+		stat.FabricDataRate, err = parseDataRate(fdr)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat from %q: %s`, fdr, err)
+		}
+	} else {
+		return nil, fmt.Errorf(`failed to find "Fabric Data Rate" stat: %s`, err)
 	}
 
-	//	// reverse engineering: fabric data rate = (total bytes [MB]) / (fabric duration [sec])
-	//	// so fabric duration [ms] = 1000 / (1024*1024) * (total bytes) / (fabric data rate [MB/sec])
-	//	if stat.FabricDataRate > 0.0 {
-	//		mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
-	//		sec := mb / stat.FabricDataRate                // duration, seconds
-	//		stat.FabricDuration = uint64(sec * 1000)       // sec -> msec
-	//	}
-
-	if stat.Duration > 0 {
-		stat.DataRate = float64(stat.TotalBytes / stat.Duration * 1000.0) //sec
+	// reverse engineering: fabric data rate = (total bytes [MB]) / (fabric duration [sec])
+	// so fabric duration [ms] = 1000 / (1024*1024) * (total bytes) / (fabric data rate [MB/sec])
+	if stat.FabricDataRate > 0.0 {
+		mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
+		sec := mb / stat.FabricDataRate                // duration, seconds
+		stat.FabricDuration = uint64(sec * 1000)       // sec -> msec
 	}
-	//	// Data Rate
-	//	dr, err := utils.AsString(v["Data Rate"])
-	//	if err != nil {
-	//		return nil, fmt.Errorf(`failed to parse "Data Rate" stat`)
-	//	}
-	//	stat.DataRate, err = parseDataRate(dr)
-	//	if err != nil {
-	//		return nil, fmt.Errorf(`failed to parse "Data Rate" stat from %q`, dr)
-	//	}
+
+	// Data Rate
+	if x, ok := v["Data Rate"]; ok {
+		dr, err := utils.AsString(x)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "Data Rate" stat: %s`, err)
+		}
+		stat.DataRate, err = parseDataRate(dr)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "Data Rate" stat from %q: %s`, dr, err)
+		}
+	} else {
+		// new version of ryftprim doesn't print "Data Rate"
+		// but we can easily calculate it as (total bytes [MB]) / (duration [sec])
+		if stat.Duration > 0 {
+			// TODO: ryftone.BpmsToMbps(stat.TotalBytes, stat.Duration)
+			mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
+			sec := float64(stat.Duration) / 1000           // msec -> sec
+			stat.DataRate = mb / sec
+		}
+	}
 
 	return stat, nil // OK
 }

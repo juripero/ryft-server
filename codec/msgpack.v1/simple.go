@@ -28,47 +28,81 @@
  * ============
  */
 
-package encoder
+package msgpack
 
 import (
-	"fmt"
 	"io"
+
+	backend "github.com/ugorji/go/codec"
 )
 
-const (
-	MIME_JSON     = "application/json"
-	MIME_XMSGPACK = "application/x-msgpack"
-	MIME_MSGPACK  = "application/msgpack"
-)
+/* Simple MSGPACK encoder uses stream of RECORDS.
+Errors and statistics are written at the end.
+*/
 
-// abstract Encoder interface
-type Encoder interface {
-	Begin(w io.Writer) error
-	End(w io.Writer, errors []error) error
-	EndWithStats(w io.Writer, stat interface{}, errors []error) error
-	Write(w io.Writer, itm interface{}) error
+// MSGPACK simple encoder.
+type SimpleEncoder struct {
+	RecordsOnly bool // do not write errors and statistics
 
-	// if stream errors are not supported, return `false`
-	WriteStreamError(w io.Writer, err error) bool
+	encoder *backend.Encoder
+	errors  []string
+	stat    interface{}
 }
 
-// get list of supported MIME types
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
+// Create new simple MSGPACK encoder instance.
+func NewSimpleEncoder(w io.Writer) (*SimpleEncoder, error) {
+	enc := new(SimpleEncoder)
+	h := new(backend.MsgpackHandle)
+	enc.encoder = backend.NewEncoder(w, h)
+	return enc, nil
 }
 
-// get encoder instance by MIME type
-func GetByMimeType(mime string) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		return new(JsonEncoder), nil
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		return new(MsgPackEncoder), nil
-	default:
-		return nil, fmt.Errorf("Unsupported mime type: %s", mime)
+// Write a RECORD
+func (enc *SimpleEncoder) EncodeRecord(rec interface{}) error {
+	err := enc.encoder.Encode(rec)
+	if err != nil {
+		return err
 	}
+
+	return nil // OK
+}
+
+// Write a STATISTICS
+func (enc *SimpleEncoder) EncodeStat(stat interface{}) error {
+	if !enc.RecordsOnly {
+		enc.stat = stat // will be written later
+	}
+
+	return nil // OK
+}
+
+// Write an ERROR
+func (enc *SimpleEncoder) EncodeError(err error) error {
+	if err != nil && !enc.RecordsOnly {
+		// just save, will be written later
+		enc.errors = append(enc.errors, err.Error())
+	}
+
+	return nil // OK
+}
+
+// End writing, close JSON object.
+func (enc *SimpleEncoder) Close() error {
+	// write errors
+	for _, emsg := range enc.errors {
+		err := enc.encoder.Encode(emsg)
+		if err != nil {
+			return err
+		}
+	}
+
+	// write statistics
+	if enc.stat != nil {
+		err := enc.encoder.Encode(enc.stat)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil // OK
 }

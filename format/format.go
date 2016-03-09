@@ -28,64 +28,48 @@
  * ============
  */
 
-package transcoder
+package format
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/clbanning/mxj"
+	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/format/xml"
 	"github.com/getryft/ryft-server/search"
 )
 
-type XmlTranscoder struct {
-	Transcoder
+const (
+	RAW = "raw"
+	XML = "xml"
+)
+
+// Abstract Format interface.
+// Support conversion from/to basic search data types.
+// NewXXX() methods are used to decode data from stream.
+type Format interface {
+	NewIndex() interface{}
+	FromIndex(search.Index) interface{}
+	ToIndex(interface{}) search.Index
+
+	NewRecord() interface{}
+	FromRecord(*search.Record) interface{}
+	ToRecord(interface{}) *search.Record
+
+	NewStat() interface{}
+	FromStat(*search.Statistics) interface{}
+	ToStat(interface{}) *search.Statistics
 }
 
-func (transcoder *XmlTranscoder) Transcode1(rec *search.Record, fields []string) (res interface{}, err error) {
-
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in parsing ", r)
-			//          debug.PrintStack()
-			//          log.Printf("PASRING XML: %s", rec.Data)
-			err = errors.New(fmt.Sprintf("PASRING XML: %s", rec))
-			return
-		}
-	}()
-
-	obj, err := mxj.NewMapXml(rec.Data.([]byte))
-	if err != nil {
-		return nil, err
+// New creates new formatter instance.
+// XML format supports some options.
+func New(format string, opts map[string]interface{}) (Format, error) {
+	switch strings.ToLower(format) {
+	case RAW:
+		return raw.New()
+	case XML:
+		return xml.New(opts)
 	}
-	for k := range obj {
-		item, ok := obj[k]
-		if ok {
-			switch i := item.(type) {
-			case map[string]interface{}:
-				// if fields is not empty - do filtering
-				if len(fields) != 0 {
-					res = make(map[string]interface{})
-					for _, k := range fields {
-						if r, ok := i[k]; ok {
-							res.(map[string]interface{})[k] = r
-						}
-					}
-				} else {
-					res = i
-				}
-				res.(map[string]interface{})["_index"] = NewIndex(rec.Index)
-				break
-			default:
-				return nil, fmt.Errorf("incorrect input data type")
-			}
-		}
-		break
-	}
-	return
-}
 
-func (transcoder *XmlTranscoder) TranscodeStat(stat *search.Statistics) (interface{}, error) {
-	// TODO: replace with XML?
-	return NewStat(stat), nil
+	return nil, fmt.Errorf("%q is unsupported format", format)
 }

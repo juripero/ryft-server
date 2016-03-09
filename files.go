@@ -2,9 +2,9 @@ package main
 
 import (
 	"net/http"
+	"sort"
 
-	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/srverr"
+	"github.com/getryft/ryft-server/codec"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,39 +15,44 @@ type FilesParams struct {
 
 func (s *Server) files(c *gin.Context) {
 	// recover from panics if any
-	defer srverr.Recover(c)
+	defer RecoverFromPanic(c)
 
 	var err error
 
 	// parse request parameters
 	params := FilesParams{}
 	if err = c.Bind(&params); err != nil {
-		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to parse request parameters"))
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local)
+	engine, err := s.getSearchEngine(params.Local, nil /*no files*/)
 	if err != nil {
-		panic(srverr.NewWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
 	}
 
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
+	accept := c.NegotiateFormat(codec.GetSupportedMimeTypes()...)
 	// default to JSON
 	if accept == "" {
-		accept = encoder.MIME_JSON
+		accept = codec.MIME_JSON
 	}
-	if accept != encoder.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
-		panic(srverr.New(http.StatusUnsupportedMediaType,
+	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
+		panic(NewServerError(http.StatusUnsupportedMediaType,
 			"Only JSON format is supported for now"))
 	}
 
 	info, err := engine.Files(params.Dir)
 	if err != nil {
 		// TODO: detail description?
-		panic(srverr.New(http.StatusNotFound, err.Error()))
+		panic(NewServerError(http.StatusNotFound, err.Error()))
 	}
+
+	// TODO: if params.Sort {
+	// sort names in the ascending order
+	sort.Strings(info.Files)
+	sort.Strings(info.Dirs)
 
 	// TODO: use transcoder/dedicated structure instead of simple map!
 	json := map[string]interface{}{

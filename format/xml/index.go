@@ -28,45 +28,28 @@
  * ============
  */
 
-package search
+package xml
 
 import (
-	"fmt"
-
-	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/search"
 )
 
-// Search INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
+// INDEX format specific data.
+// Is the same as RAW format index!
+type Index raw.Index
+
+// NewIndex creates new format specific data.
+func NewIndex() interface{} {
+	return Index{}
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
+// FromIndex converts INDEX to format specific data.
+func FromIndex(idx search.Index) Index {
+	return Index(raw.FromIndex(idx))
 }
 
-// Search INDEX record.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
-}
-
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
-	}
-}
-
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%q, offset:%d, length:%d, fuzz:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+// ToIndex converts format specific data to INDEX.
+func ToIndex(idx Index) search.Index {
+	return raw.ToIndex(raw.Index(idx))
 }

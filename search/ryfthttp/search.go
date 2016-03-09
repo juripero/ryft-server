@@ -34,9 +34,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/getryft/ryft-server/encoder"
+	//codec "github.com/getryft/ryft-server/codec/json"
+	codec "github.com/getryft/ryft-server/codec/msgpack.v2"
+	format "github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/transcoder"
 )
 
 // Search starts asynchronous "/search" with RyftPrim engine.
@@ -57,7 +58,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	// we expect MSGPACK format for streaming
-	req.Header.Set("Accept", "application/msgpack")
+	req.Header.Set("Accept", codec.MIME)
 
 	res := search.NewResult()
 
@@ -85,33 +86,33 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		}
 
 		// read response and report records and/or statistics
-		dec := encoder.NewMsgPackDecoder(resp.Body)
+		dec, _ := codec.NewStreamDecoder(resp.Body)
 
 		// TODO: task cancellation!!
 
 		for {
 			tag, _ := dec.NextTag()
 			switch tag {
-			case encoder.TAG_MsgPackEOF:
+			case codec.TAG_EOF:
 				task.log().Infof("[%s]: got end of response", TAG)
 				return // DONE
 
-			case encoder.TAG_MsgPackItem:
-				var item transcoder.RawData
+			case codec.TAG_REC:
+				var item format.Record
 				err := dec.Next(&item)
 				if err != nil {
 					task.log().WithError(err).Warnf("[%s]: failed to decode record", TAG)
 					res.ReportError(err)
 					return // stop processing
 				} else {
-					rec, _ := transcoder.DecodeRawItem(&item)
+					rec := format.ToRecord(&item)
 					task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
 					rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 					res.ReportRecord(rec)
 					// continue
 				}
 
-			case encoder.TAG_MsgPackError:
+			case codec.TAG_ERR:
 				var msg string
 				err := dec.Next(&msg)
 				if err != nil {
@@ -125,11 +126,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 					// continue
 				}
 
-			case encoder.TAG_MsgPackStat:
-				var stat transcoder.Statistics
+			case codec.TAG_STAT:
+				var stat format.Statistics
 				err := dec.Next(&stat)
 				if err == nil {
-					res.Stat, _ = transcoder.DecodeRawStat(&stat)
+					res.Stat = format.ToStat(&stat)
 					task.log().WithField("stat", res.Stat).
 						Infof("[%s]: statistics received", TAG)
 				}
