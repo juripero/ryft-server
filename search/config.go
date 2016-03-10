@@ -39,6 +39,7 @@ import (
 type Config struct {
 	Query         string
 	Files         []string
+	Mode          string
 	Surrounding   uint
 	Fuzziness     uint
 	CaseSensitive bool
@@ -71,6 +72,6 @@ func (cfg *Config) AddFiles(files []string) {
 
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
-	return fmt.Sprintf("Config{query:%s, files:%q surr:%d, fuzz:%d, case-sens:%t, nodes:%d}",
-		cfg.Query, cfg.Files, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes)
+	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, surr:%d, fuzz:%d, case-sens:%t, nodes:%d}",
+		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes)
 }

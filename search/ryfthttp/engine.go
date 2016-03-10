@@ -104,6 +104,9 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	for _, file := range cfg.Files {
 		q.Add("files", file)
 	}
+	if len(cfg.Mode) != 0 {
+		q.Set("mode", cfg.Mode)
+	}
 	q.Set("cs", fmt.Sprintf("%t", cfg.CaseSensitive))
 	if cfg.Surrounding > 0 {
 		q.Set("surrounding", fmt.Sprintf("%d", cfg.Surrounding))
