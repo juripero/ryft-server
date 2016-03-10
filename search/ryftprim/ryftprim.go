@@ -269,6 +269,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// cleanup: remove INDEX&DATA files at the end of processing
 	if len(task.KeepIndexFileAs) != 0 {
+		task.log().WithField("from", filepath.Join(engine.Instance, task.IndexFileName)).
+			WithField("to", task.KeepIndexFileAs).Debugf("[%s]: moving INDEX file", TAG)
 		if err := engine.moveFile(task.IndexFileName, task.KeepIndexFileAs); err != nil {
 			task.log().WithError(err).WithField("file", task.KeepIndexFileAs).Warnf("[%s]: failed to move INDEX file", TAG)
 			res.ReportError(fmt.Errorf("failed to move INDEX file to %q: %s", task.KeepIndexFileAs, err))
@@ -277,6 +279,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 	}
 	if len(task.KeepDataFileAs) != 0 {
+		task.log().WithField("from", filepath.Join(engine.Instance, task.DataFileName)).
+			WithField("to", task.KeepDataFileAs).Debugf("[%s]: moving DATA file", TAG)
 		if err := engine.moveFile(task.DataFileName, task.KeepDataFileAs); err != nil {
 			task.log().WithError(err).WithField("file", task.KeepDataFileAs).Warnf("[%s]: failed to move DATA file", TAG)
 			res.ReportError(fmt.Errorf("failed to move DATA file to %q: %s", task.KeepDataFileAs, err))
