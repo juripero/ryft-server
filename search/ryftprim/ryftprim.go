@@ -103,6 +103,8 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 	// assign command line
 	task.tool_args = args
+	task.KeepIndexFileAs = cfg.KeepIndexAs
+	task.KeepDataFileAs = cfg.KeepDataAs
 
 	return nil // OK
 }
@@ -266,6 +268,22 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing
+	if len(task.KeepIndexFileAs) != 0 {
+		if err := engine.moveFile(task.IndexFileName, task.KeepIndexFileAs); err != nil {
+			task.log().WithError(err).WithField("file", task.KeepIndexFileAs).Warnf("[%s]: failed to move INDEX file", TAG)
+			res.ReportError(fmt.Errorf("failed to move INDEX file to %q: %s", task.KeepIndexFileAs, err))
+		} else {
+			task.IndexFileName = "" // prevent to remove later
+		}
+	}
+	if len(task.KeepDataFileAs) != 0 {
+		if err := engine.moveFile(task.DataFileName, task.KeepDataFileAs); err != nil {
+			task.log().WithError(err).WithField("file", task.KeepDataFileAs).Warnf("[%s]: failed to move DATA file", TAG)
+			res.ReportError(fmt.Errorf("failed to move DATA file to %q: %s", task.KeepDataFileAs, err))
+		} else {
+			task.DataFileName = "" // prevent to remove later
+		}
+	}
 	if !engine.KeepResultFiles {
 		if err := engine.removeFile(task.IndexFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove INDEX file", TAG)
@@ -425,6 +443,21 @@ func (engine *Engine) removeFile(name string) error {
 		path := filepath.Join(engine.MountPoint,
 			engine.Instance, name) // full path
 		err := os.RemoveAll(path)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil // OK
+}
+
+// moveFile moves INDEX or DATA file to a new location.
+func (engine *Engine) moveFile(from string, to string) error {
+	if len(from) != 0 {
+		fromPath := filepath.Join(engine.MountPoint,
+			engine.Instance, from) // full path
+		toPath := filepath.Join(engine.MountPoint, to)
+		err := os.Rename(fromPath, toPath)
 		if err != nil {
 			return err
 		}

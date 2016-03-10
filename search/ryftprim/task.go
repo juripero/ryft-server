@@ -48,9 +48,11 @@ var (
 
 // RyftPrim task related data.
 type Task struct {
-	Identifier    string // unique
-	IndexFileName string
-	DataFileName  string
+	Identifier      string // unique
+	IndexFileName   string
+	DataFileName    string
+	KeepIndexFileAs string
+	KeepDataFileAs  string
 
 	// `ryftprim` process & output
 	tool_args []string      // command line arguments
