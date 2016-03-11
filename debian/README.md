@@ -10,14 +10,20 @@ go build
 Build ``.deb`` file:
 
 ```
+cd ryft-server
 make debian
 ```
 
 or with version:
 
 ```
+cd ryft-server
 make debian VERSION=1.2.3
 ```
+
+Note, `make debian` should be run in the project's root directory. In this case ryft-server is rebuilt
+and corresponding deb package is created. If you run `make` from *debian* subdirectory then only
+deb package is created - ryft-server is not rebuilt, just used from your `$GOPATH/bin`.
 
 
 ## How to install ``.deb`` package
