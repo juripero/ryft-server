@@ -1,0 +1,227 @@
+#!/bin/bash
+
+# print usage info
+usage() {
+	cat <<EOF
+ryftrest is a ryftprim equivalent, it uses ryft-server as a backend.
+
+Usage: $0 [options]
+
+Search specific:
+-h|--help        Prints this short help.
+-p|--mode        Specifies the search mode to run, which can be one of:
+                    - exact_search (or es)
+                    - fuzzy_hamming_search (or fhs)
+                    - fuzzy_edit_distance_search (or feds)
+                    - date_search (or ds)
+                    - time_search (or ts)
+-f|--file        Specifies an input filename.
+-i               Specifies case-insensitive analysis for supported primitives.
+-n|--nodes       Specifies 1-4 RCAB processing nodes to use.
+-d|--fuzziness   Specifies the fuzzy search distance.
+-w|--width       Specifies the surrounding width.
+-s|-q|--query    Specifies the search/query expression to use with *_search primitives.
+-od|--data       Used to keep a data results file.
+-oi|--index      Used to keep an index results file.
+
+REST specific:
+-a|--address     Specifies the ryft-server address.
+                   "http://localhost:8765" by default.
+--local          Specifies the local search. Opposite to --cluster.
+--cluster        Specifies the cluster search. Opposite to --local. Used by default.
+--format         Specifies format of the result records, can be:
+                     - raw - base-64 encoded data, by default.
+                     - xml - decode XML records
+                     - json - decode JSON objects
+--fields         Specifies coma-separated list of fields to return.
+                 This parameter is useful with XML and JSON formats.
+--no-stats       Disable statistics output.
+--stream         Use stream format (is used for node communication within cluster).
+--spark          Use SPARK format.
+
+-v|--verbose     Tells curl to be verbose.
+
+Examples:
+
+$0 -q=Joe -f=*.txt
+EOF
+}
+
+# print error message $1 and exit
+fail() {
+	echo "ERROR: $1"
+	exit 1
+}
+
+# default values
+MODE=
+FILES=
+CASE_INSENS=
+NODES=
+FUZINESS=
+SURROUNDING=
+QUERY=
+DATA=
+INDEX=
+
+ADDRESS=http://localhost:8765
+LOCAL=false
+FORMAT=
+FIELDS=
+STATS=true
+STREAM=
+SPARK=
+VERBOSE=
+
+# parse options
+while [[ $# > 0 ]]; do
+	case "$1" in
+	-p=*|--mode=*)
+		MODE="${1#*=}"
+		shift
+		;;
+	-p|--mode)
+		MODE="$2"
+		shift 2
+		;;
+	-f=*|--file=*)
+		FILES="$FILES:${1#*=}"
+		shift
+		;;
+	-f|--file)
+		FILES="$FILES:$2"
+		shift 2
+		;;
+	-i)
+		CASE_INSENS="true"
+		shift
+		;;
+	-n=*|--nodes=*)
+		NODES="${1#*=}"
+		shift
+		;;
+	-n|--nodes)
+		NODES="$2"
+		shift 2
+		;;
+	-d=*|--fuzziness=*)
+		FUZINESS="${1#*=}"
+		shift
+		;;
+	-d|--fuzziness)
+		FUZINESS="$2"
+		shift 2
+		;;
+	-w=*|--width=*)
+		SURROUNDING="${1#*=}"
+		shift
+		;;
+	-w|--width)
+		SURROUNDING="$2"
+		shift 2
+		;;
+	-s=*|-q=*|--query=*)
+		QUERY="${1#*=}"
+		shift
+		;;
+	-s|-q|--query)
+		QUERY="$2"
+		shift 2
+		;;
+	-od=*|--data=*)
+		DATA="${1#*=}"
+		shift
+		;;
+	-od|--data)
+		DATA="$2"
+		shift 2
+		;;
+	-oi=*|--index=*)
+		INDEX="${1#*=}"
+		shift
+		;;
+	-oi|--index)
+		INDEX="$2"
+		shift 2
+		;;
+	-a=*|--address=*)
+		ADDRESS="${1#*=}"
+		shift
+		;;
+	-a|--address)
+		ADDRESS="$2"
+		shift 2
+		;;
+	--local)
+		LOCAL="true"
+		shift
+		;;
+	--cluster)
+		LOCAL="false"
+		shift
+		;;
+	--format=*)
+		FORMAT="${1#*=}"
+		shift
+		;;
+	--format)
+		FORMAT="$2"
+		shift 2
+		;;
+	--fields=*)
+		FIELDS="${1#*=}"
+		shift
+		;;
+	--fields)
+		FIELDS="$2"
+		shift 2
+		;;
+	--no-stats)
+		STATS="false"
+		shift
+		;;
+	--stream)
+		STREAM="true"
+		shift
+		;;
+	--spark)
+		SPARK="true"
+		shift
+		;;
+	-v|--verbose)
+		VERBOSE="-v"
+		shift
+		;;
+	-h|--help)
+		usage
+		exit 0
+		;;
+	*) # unknown option
+		fail "'$key' is unknown option"
+		;;
+	esac
+done
+
+# build the URL
+URL_DATA=(--data-urlencode "local=$LOCAL")
+[[ ! -z "$QUERY" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "query=$QUERY")
+IFS=':' read -r -a files <<< "$FILES"
+for file in "${files[@]}"; do
+	[[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "files=$file")
+done
+[[ -z "$CASE_INSENS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=true") # inversed!
+[[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")
+[[ ! -z "$FUZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuziness=$FUZINESS")
+[[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
+[[ ! -z "$MODE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "mode=$MODE")
+[[ ! -z "$DATA" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "data=$DATA")
+[[ ! -z "$INDEX" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "index=$INDEX")
+[[ ! -z "$FORMAT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "format=$FORMAT")
+[[ ! -z "$FIELDS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fields=$FIELDS")
+[[ ! -z "$STATS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stats=$STATS")
+[[ ! -z "$STREAM" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stream=$STREAM")
+[[ ! -z "$SPARK" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "spark=$SPARK")
+
+
+# do the search and print error/results
+curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS/search"
