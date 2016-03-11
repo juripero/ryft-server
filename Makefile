@@ -24,6 +24,7 @@ version:
 $(GOBINDATA):
 	go get -u github.com/jteeuwen/go-bindata/...
 
+.PHONY: $(ASSETS)
 $(ASSETS): $(GOBINDATA)
 	${GOBINDATA} -o bindata.go -prefix static/ static/...
 
