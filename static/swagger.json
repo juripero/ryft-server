@@ -3,7 +3,7 @@
   "info": {
     "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples. For more details visit project page https://github.com/getryft/ryft-server",
     "title": "RyftOne REST API",
-    "version": "1.1"
+    "version": "1.2"
   },
   "paths": {
     "/search": {
@@ -305,9 +305,6 @@
       "required": [
         "results"
       ],
-      "additionalProperties": {
-        "type": "object"
-      },
       "properties": {
         "results": {
           "type": "array",
@@ -320,20 +317,7 @@
         },
         "stats": {
           "type": "object",
-          "properties": {
-            "duration": {
-              "type": "number",
-              "format": "int32"
-            },
-            "totalBytes": {
-              "type": "number",
-              "format": "int32"
-            },
-            "matches": {
-              "type": "number",
-              "format": "int32"
-            }
-          }
+          "$ref": "#/definitions/CountResponse"
         }
       }
     },
