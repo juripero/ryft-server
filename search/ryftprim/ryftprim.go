@@ -56,9 +56,12 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-p", "es")
 	case "fuzzy_hamming_search", "fuzzy_hamming", "fhs", "":
 		args = append(args, "-p", "fhs")
-	// TODO: case "fuzzy_edit_distance_search", "fuzzy_edit_distance", "feds":
-	// TODO: case "date_search", "date", "ds":
-	// TODO: case "time_search", "time", "ts":
+	case "fuzzy_edit_distance_search", "fuzzy_edit_distance", "feds":
+		args = append(args, "-p", "feds")
+	case "date_search", "date", "ds":
+		args = append(args, "-p", "ds")
+	case "time_search", "time", "ts":
+		args = append(args, "-p", "ts")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
