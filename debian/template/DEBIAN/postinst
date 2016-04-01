@@ -1,5 +1,23 @@
 #!/bin/bash
 
+# force destination uid gid if needed
+target_uid=ryftuser
+target_gid=ryftuser
+function fixUIDGID {
+        if [[ `ls -al $1|awk '{print \$3}'` != $target_uid ]]
+        then
+                chown $target_uid $1
+        fi
+        if [[ `ls -al $1|awk '{print \$4}'` != $target_gid ]]
+        then
+                chown :$target_gid $1
+        fi
+}
+fixUIDGID /usr/bin/ryft_ps
+fixUIDGID /usr/bin/ryft_status
+fixUIDGID /usr/bin/ryft-server
+fixUIDGID /etc/init.d/ryft-server-d
+
 echo ryft-server-d installing for autostart...
 update-rc.d ryft-server-d defaults
 
