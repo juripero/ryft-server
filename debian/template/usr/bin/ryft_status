@@ -1,0 +1,639 @@
+#!/bin/bash
+
+# ryft status version 0.14 2016/03/25
+
+# 2016/3/25	0.14	~/ryft/apidemo removed when moving from 11163 to 12737
+# 2016/3/25	0.13	add remediation alternative to /ryftone offline
+# 2016/3/10	0.12 	added consul status,start,stop	
+# 2016/3/7	0.11	add -help adds error display
+#			status performed before and after -stop -start
+# 2016/3/7	0.10	add -stop
+# 2016/3/7 	0.9	comment out 12345...80 width template
+# 2016/3/7 	0.8	detect no "FAIL" or no "PASS" message from smoke ( ie. a timeout )
+# 0.7 remove debugging
+# 0.6 correct typo on ryft1_odbcd
+# 0.5 add -help
+# 0.4 add color status
+
+#
+# initial state 
+#
+status=0				# error counter, used as exit status 
+hostname=`hostname`
+expectedProcessCount=3			# rhfsd, ccc_mgr, ryft-server
+redAttributeON="\\033[1;31m"
+greenAttributeON="\\033[1;32m"
+attributesOFF="\\033[0m"
+finalStatus=0
+sleepValue=5
+ryft_statusCount=0
+problemCounter=0
+debug=0
+
+usage() {
+	echo 
+	echo "usage:	ryft_status [-help|-?|-smoke|-start|-stop]"
+	echo
+	echo "ryft_status -help"
+	echo "          this usage display"
+	echo "ryft_status -smoke"
+        echo "		checks status then runs smoke test when resources available"
+	echo "ryft_status -start"
+	echo "		checks status then start processes" 
+	echo "ryft_status -stop"
+	echo "		checks status and stop processes" 
+	echo
+	echo "Returns # of problems found as exit code"
+	echo
+
+}
+
+	
+#status=$((status+1))
+
+#
+# process input parameters
+#
+smokeFlag=0
+helpFlag=0
+startFlag=0
+stopFlag=0
+while [[ $# > 0 ]]; do
+	okay=0
+	if [ "$1" == "-smoke" ]
+	then
+		#echo "smoke test enabled"
+		smokeFlag=1
+		okay=1
+	fi
+	
+	if [ "$1" == "-start" ]
+	then
+		#echo "start enabled"
+		startFlag=1
+		okay=1
+	fi
+
+	if [ "$1" == "-stop" ]
+	then
+		stopFlag=1
+		okay=1
+	fi
+
+	if [ "$1" == "-help" -o "$1" == "-?" ]
+	then
+		#echo "help enabled"
+		helpFlag=1
+		okay=1
+	fi
+
+	if [ $okay = 0 ]
+	then
+		usage
+		exit 0
+	fi
+
+	shift
+done
+
+
+
+#
+# ryft process detection
+#
+ryft_ps_filename=/tmp/ryft_ps_$$
+ryft_status_filename=/tmp/ryft_status_$$
+detect_process() {
+	returnValue=`cat $ryft_ps_filename|egrep "$1"|wc -l`
+	echo $returnValue
+}
+
+#
+# cleanup
+#
+cleanup() {
+	rm -f $ryft_ps_filename
+	rm -f $ryft_status_filename
+}
+
+#
+# ryft status items
+#
+
+#
+filesystem_status=0
+filesystem_error=0
+show_filesystem_error () {
+	#echo "*** /ryftone filesystem is not mounted.  To correct, try commands: '~/ryft/regression/util/cpc; ~/ryft/regression/util/recycle'  ***"
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* /ryftone filesystem is not mounted or smoke test failed.${attributesOFF}"
+	echo "Follow corrective actions in following order:"
+	echo "1. command: '(cd ~ryftuser/ryft/regression/util;./cpc;./recycle)'"
+	echo "   Repeat command if 'ryft_status' doesn't indicate OKAY"
+ 	echo "   If not OKAY, advance to step #2."
+	echo "   If OKAY, 'ryft_status -smoke' should show no problems."
+	echo "   if 'ryft_status -smoke' problems persist, advance to next step."
+	echo
+	#echo "         1         2         3         4         5         6         7         8"
+	#echo "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
+	echo "2. command: 'sudo poweroff;' then remote/manually power on"
+	echo "   'ryft_status -smoke' should show no problems when problem is resolved."
+	echo "   if 'ryft_status -smoke' problems persist, repeat steps 1 and 2 one time."
+	echo "   if 'ryft_status -smoke' problems persist, advance to next step."
+	echo
+	echo "3. repeat 3 times '~/ryft/regression/util/hw_reset_rhfs_ccc.sh; sudo poweroff;'"
+	echo "   ***NOTE***: this process will require restoring /ryftone filesystem data" 
+	echo "   perform 'ryft_status -smoke' after completing 3 hw_reset, poweroff cycles'"
+	echo "   if 'ryft_status -smoke' problems persist, call customer support"
+	echo "   If OKAY, restore /ryftone filesystem data"
+	echo
+	#echo "         1         2         3         4         5         6         7         8"
+	#echo "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
+
+}
+
+#
+rhfsd_status=0
+rhfsd_error=0
+show_rhfsd_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* rhfsd is not running. ${attributesOFF}To start rhfsd issue command: "
+	echo "	'~ryft/ryft/regression/util/recycle'"
+}
+
+#
+ccc_mgr_status=0
+ccc_mgr_error=0
+show_ccc_mgr_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* ccc_mgr is not running. ${attributesOFF}To start ccc_mgr, issue command: "
+	echo "	'~ryft/ryft/regression/util/recycle'"
+}
+
+ryftServer_status=0
+ryftServer_error=0
+ryftServer_startCommand="sudo service ryft-server-d start"
+ryftServer_start() {
+	echo "--------------------"
+	echo "starting ryft-server with $ryftServer_startCommand"
+	${ryftServer_startCommand}
+}
+ryftServer_stopCommand="sudo service ryft-server-d stop"
+ryftServer_stop() {
+	echo "--------------------"
+	echo "stopping ryft-server with $ryftServer_stopCommand"
+	${ryftServer_stopCommand}
+}
+show_ryftServer_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* ryft-server is not running.${attributesOFF} To start ryft-server, issue command: "
+	echo "	'$ryftServer_startCommand'"
+}
+
+
+ryft1_odbcd=NotInstalled
+test -d /usr/local/ryft/bin
+if [ $? == 0 ] 
+then
+	ryft1_odbcd=Installed
+	expectedProcessCount=$((expectedProcessCount+1))
+fi
+if [ $debug != 0 ]
+then
+	echo "ryft1_odbcd=$ryft1_odbcd, expectedProcessCount=$expectedProcessCount"
+fi
+ryft1_odbcd_status=0
+ryft1_odbcd_error=0
+ryft1_odbcd_startCommand="/usr/local/ryft/bin/x8664/ryft1_odbcctl -s"
+ryft1_odbcd_start() {
+	echo "--------------------"
+	echo "starting ryft1_odbcd with $ryft1_odbcd_startCommand"
+	${ryft1_odbcd_startCommand}
+}
+ryft1_odbcd_stopCommand="/usr/local/ryft/bin/x8664/ryft1_odbcctl -k"
+ryft1_odbcd_stop() {
+	echo "--------------------"
+	echo "stoppng ryft1_odbcd with $ryft1_odbcd_stopCommand"
+	${ryft1_odbcd_stopCommand}
+}
+show_ryft1_odbcd_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* ryft1_odbcd is not running.${attributesOFF} To start ryft1_odbcd, issue command"
+	echo "	'$ryft1_odbcd_startCommand'"
+	#echo "or one of following:"
+	#echo "	'su ryftuser -c /usr/local/ryft/bin/x8664/ryft1_odbcctl -s"
+	#echo "	'sudo service ryft1_odbcd start'"
+}
+
+#
+consul=NotInstalled
+test -d /opt/consul/bin
+if [ $? == 0 ] 
+then
+	consul=Installed
+	expectedProcessCount=$((expectedProcessCount+1))
+fi
+if [ $debug != 0 ]
+then
+	echo "consul=$consul, expectedProcessCount=$expectedProcessCount"
+fi
+consul_status=0
+consul_error=0
+consul_startCommand="sudo service consul start"
+consul_start() {
+	echo "--------------------"
+	echo "starting consul with $consul_startCommand"
+	${consul_startCommand}
+}
+consul_stopCommand="sudo service consul stop"
+consul_stop() {
+	echo "--------------------"
+	echo "stopping consul with $consul_stopCommand"
+	${consul_stopCommand}
+}
+show_consul_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* consul is not running.${attributesOFF} To start consul, issue command: "
+	echo "	'$consul_startCommand'"
+}
+
+apidemo=NotInstalled
+test -d ~ryftuser/ryft/apidemo || test -d /opt/ryft-demo
+if [ $? == 0 ] 
+then
+	apidemo=Installed
+	expectedProcessCount=$((expectedProcessCount+1))
+fi
+if [ $debug != 0 ]
+then
+	echo "apidemo=$apidemo, expectedProcessCount=$expectedProcessCount"
+fi
+apidemo_status=0
+apidemo_error=0
+apidemo_startCommand="sudo service ryftwebapidemo start"
+apidemo_start() {
+	echo "--------------------"
+	echo "starting apidemo with $apidemo_startCommand"
+	${apidemo_startCommand}
+}
+apidemo_stopCommand="sudo service ryftwebapidemo stop"
+apidemo_stop() {
+	echo "--------------------"
+	echo "stopping apidemo with $apidemo_stopCommand"
+	${apidemo_stopCommand}
+}
+show_apidemo_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* apidemo is not running.${attributesOFF} To start, issue command:"
+	echo "	'$apidemo_startCommand'"
+}
+
+
+showErrorDisplay() {
+	echo 
+	echo "show error display ---------------------------"
+	show_ryftServer_error 
+
+	if [ $ryft1_odbcd == "Installed" ]
+	then
+		show_ryft1_odbcd_error 
+	fi
+	if [ $consul == "Installed" ]
+	then
+		show_consul_error
+	fi
+	if [ $apidemo == "Installed" ]
+	then
+		show_apidemo_error
+	fi
+
+	show_rhfsd_error
+	show_ccc_mgr_error
+	show_filesystem_error 
+
+	echo "show error display ---------------------------"
+	exit 0
+}
+
+if [ $helpFlag = 1 ]
+then
+	usage
+	showErrorDisplay
+	exit 0
+fi
+
+ryft_status() {
+	#
+	# start status colleciton
+	#
+	ryft_ps >$ryft_ps_filename
+
+	#
+	# reset status and error conditions
+	#
+	status=0
+
+	filesystem_status=0
+	filesystem_error=0
+
+	rhfsd_status=0
+	rhfsd_error=0
+
+	ccc_mgr_status=0
+	ccc_mgr_error=0
+
+	ryftServer_status=0
+	ryftServer_error=0
+
+	ryft1_odbcd_status=0
+	ryft1_odbcd_error=0
+
+	consul_status=0
+	consul_error=0
+
+	apidemo_status=0
+	apidemo_error=0
+
+	ryft_statusCount=$((ryft_statusCount+1))
+	if [ $ryft_statusCount != 1 ]
+	then
+		#echo "--------------------"
+		echo "$hostname status"
+		echo "--------------------"
+	fi
+
+	#
+	# /ryftone filesystem status
+	#
+	#echo
+	echo "$hostname Filesystem" `date`
+	df -h|egrep '^Filesystem|/storage|/ryftone'|tee $ryft_status_filename
+	ryftoneMounted=`cat $ryft_status_filename|grep "/ryftone"|grep "/dev/fuse"|wc -l`
+	if [ $ryftoneMounted != 1 ]
+	then
+		filesystem_error=1
+		status=$((status+1))
+	fi
+	
+	#
+	# ryft process status
+	#
+	echo 
+	processCount=`cat $ryft_ps_filename|tail -n +1|wc -l`
+	if [ $processCount != $expectedProcessCount ]
+	then
+		echo "$hostname Processes processCount=$processCount, but expecting $expectedProcessCount processes"
+	else
+		echo "$hostname Processes"
+	fi
+	cat $ryft_ps_filename
+	
+	rhfsd_status=`detect_process "rhfsd"`
+	# echo "rhfsd_status=$rhfsd_status"
+	ccc_mgr_status=`detect_process "ccc_mgr"`
+	# echo "ccc_mgr_status=$ccc_mgr_status"
+	ryftServer_status=`detect_process "ryft-server"`
+	# echo "ryftServer_status=$ryftServer_status"
+	ryft1_odbcd_status=`detect_process "ryft1_odbcd"`
+	# echo "ryft1_odbcd_status=$ryft1_odbcd_status"
+	consul_status=`detect_process "/opt/consul/bin/consul"`
+	# echo "consul_status=$consul_status"
+	apidemo_status=`detect_process 'java\s+-cp\s+conf:lib/\*\s+com.metasys.ryft.DemoApp'`
+	#echo "apidemo_status=$apidemo_status"
+	
+	if [ $rhfsd_status = 0 ]
+	then
+		rhfsd_error=1
+		status=$((status+1))
+	fi
+	if [ $ccc_mgr_status = 0 ]
+	then
+		ccc_mgr_error=1
+		status=$((status+1))
+	fi
+	if [ $ryftServer_status = 0 ]
+	then
+		ryftServer_error=1
+		status=$((status+1))
+	fi
+	if [ $ryft1_odbcd = "Installed" -a $ryft1_odbcd_status = 0 ]
+	then
+		ryft1_odbcd_error=1
+		status=$((status+1))
+	fi
+	if [ $consul = "Installed" -a $consul_status = 0 ]
+	then
+		consul_error=1
+		status=$((status+1))
+	fi
+	if [ $apidemo = "Installed" -a $apidemo_status = 0 ]
+	then
+		apidemo_error=1
+		status=$((status+1))
+	fi
+
+	#
+	# ryft memory status
+	#	
+	echo
+	echo "$hostname Memory"
+	free -h
+
+	#
+	# -smoke only processed when requested AND when other things look ok
+	#
+	if [ $smokeFlag = 1 -a $rhfsd_status != 0 -a $ccc_mgr_status != 0 ]
+	then
+		~ryftuser/ryft/regression/util/smoke.sh|tee $ryft_status_filename
+		faildetect=`cat $ryft_status_filename|grep FAILED|wc -l`
+		passdetect=`cat $ryft_status_filename|egrep "1 tests.*PASSED"|wc -l`
+		if [ $faildetect != 0 -o $passdetect = 0 ]
+		then
+			echo "*** smoke.sh failed ***"
+			filesystem_error=1
+			status=$((status+1))
+		fi
+	fi
+
+
+	if [ $status = 0 ]
+	then
+		#
+		# OKAY
+		#
+		#echo -e "$hostname ryft_status " ${greenAttributeON}OKAY${attributesOFF}
+		echo
+		echo -e "${greenAttributeON}$hostname ryft_status OKAY${attributesOFF}"
+	else
+		#
+		# PROBLEMS
+		#
+		echo
+		PROBLEMS=`[ $status = 1 ] && echo "PROBLEM" || echo "PROBLEMS"`
+		#echo -e "$hostname ryft_status " "found ${redAttributeON}$status $PROBLEMS${attributesOFF}"
+		echo -e "${redAttributeON}$hostname ryft_status found $status $PROBLEMS${attributesOFF}"
+
+		#
+		# error handling
+		#
+		if [ $filesystem_error != 0 ]
+		then
+			show_filesystem_error
+		fi
+		if [ $rhfsd_error != 0 ]
+		then
+			show_rhfsd_error
+		fi
+		if [ $ccc_mgr_error != 0 ]
+		then
+			show_ccc_mgr_error
+		fi
+	
+		if [ $ryftServer_error != 0 ]
+		then
+			show_ryftServer_error
+		fi
+		if [ $ryft1_odbcd_error != 0 ]
+		then
+			show_ryft1_odbcd_error
+		fi
+		if [ $consul_error != 0 ]
+		then
+			show_consul_error
+		fi
+		if [ $apidemo_error != 0 ]
+		then
+			show_apidemo_error
+		fi
+		
+		count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $apidemo_error" | bc` 
+		message=""
+		#echo "### count=$count"
+		if [ $count != 0 -a $filesystem_error = 0 -a $rhfsd_error = 0 -a $ccc_mgr_error = 0 ] 
+		then
+			message="( try '${redAttributeON}ryft_status -start${attributesOFF}' to correct. )"
+	
+		fi
+		#echo "### message=$message"
+		#echo -e "$hostname ryft_status " "found ${redAttributeON}$status $PROBLEMS${attributesOFF} $message"
+		echo
+		echo -e "${redAttributeON}$hostname ryft_status found $status $PROBLEMS${attributesOFF} $message"
+	fi
+}
+ryft_status
+
+
+#
+# stopFlag detection
+#
+if [ $stopFlag = 1 ]
+then
+	#
+	# any processes we can stop?
+	#
+	count=`echo "$ryftServer_status + $ryft1_odbcd_status + $consul_status + $apidemo_status" | bc` 
+	echo "--------------------"
+	echo -e "${redAttributeON}$hostname Stopping $count services${attributesOFF}"
+	finalStatus=1
+	if [ $count != 0 ]
+		then
+	
+		if [ $ryftServer_error = 0 -a $stopFlag = 1 ]
+		then
+			ryftServer_stop
+		fi
+		if [ $ryft1_odbcd = "Installed" -a $ryft1_odbcd_error = 0 -a $stopFlag = 1 ]
+		then
+			ryft1_odbcd_stop
+		fi
+		if [ $consul = "Installed" -a $consul_error = 0 -a $stopFlag = 1 ]
+		then
+			consul_stop
+		fi
+		if [ $apidemo = "Installed" -a $apidemo_error = 0 -a $stopFlag = 1 ]
+		then
+			apidemo_stop
+		fi
+	fi
+	echo "--------------------"
+	if [ $count != 0 ]
+	then
+		sleep $sleepValue 
+		finalStatus=0
+		ryft_status
+	fi
+fi
+
+#
+# startFlag detection
+#
+if [ $startFlag = 1 ]
+then
+	echo "--------------------"
+	#
+	# requested to start problem processes
+	#
+	okayToStart=0
+	count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $apidemo_error" | bc` 
+	if [ $filesystem_error = 0 -a $rhfsd_error = 0 -a $ccc_mgr_error = 0 ] 
+	then
+		# should be okay to start since filesystem, rhfsd and ccc_mgr appear okay
+		okayToStart=1
+		echo -e "${redAttributeON}$hostname Starting $count services${attributesOFF}"
+	else
+		echo -e "${redAttributeON}$hostname Unable to process -start when filesystem, rhfsd, or ccc_mgr have problems${attributesOFF}"
+	fi
+	finalStatus=1
+	if [ $okayToStart = 1 -a $count != 0 ]
+	then
+		if [ $ryftServer_error != 0 -a $startFlag = 1 ]
+		then
+			ryftServer_start
+		fi
+		if [ $ryft1_odbcd_error != 0 -a $startFlag = 1 ]
+		then
+			ryft1_odbcd_start
+		fi
+		if [ $consul_error != 0 -a $startFlag = 1 ]
+		then
+			consul_start
+		fi
+		if [ $apidemo_error != 0 -a $startFlag = 1 ]
+		then
+			apidemo_start
+		fi
+	fi
+	echo "--------------------"
+
+	if [ $okayToStart = 1 -a $count != 0 ]
+	then
+		sleep $sleepValue 
+		finalStatus=0
+		ryft_status
+	fi
+
+fi
+
+cleanup
+
+if [ $finalStatus = 1 ]
+then
+	if [ $status = 0 ]
+	then
+		#
+		# OKAY
+		#
+		#echo -e "$hostname ryft_status " ${greenAttributeON}OKAY${attributesOFF}
+		echo	
+		echo -e "${greenAttributeON}$hostname ryft_status OKAY${attributesOFF}"
+	else
+		#
+		# PROBLEMS
+		#
+		PROBLEMS=`[ $status = 1 ] && echo "PROBLEM" || echo "PROBLEMS"`
+		#echo -e "$hostname ryft_status " "found ${redAttributeON}$status $PROBLEMS${attributesOFF}"
+		echo
+		echo -e "${redAttributeON}$hostname ryft_status found $status $PROBLEMS${attributesOFF}"
+	fi
+fi
+exit $status
