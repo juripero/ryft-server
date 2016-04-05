@@ -28,7 +28,7 @@
           {
             "type": "string",
             "x-go-name": "Format",
-            "description": "Source format parser name",
+            "description": "Parameter for the structured search. Specify the input data format \"xml\" or \"raw\" (Default)",
             "name": "format",
             "in": "query"
           },
@@ -42,16 +42,8 @@
           {
             "type": "string",
             "x-go-name": "Fields",
+            "description": "For structured search specify the list of required fields. If omitted all fields are used",
             "name": "fields",
-            "in": "query"
-          },
-          {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "x-go-name": "Keys",
-            "name": "keys",
             "in": "query"
           },
           {
@@ -88,7 +80,7 @@
             "type": "integer",
             "format": "uint8",
             "x-go-name": "Nodes",
-            "description": "Active Nodes Count",
+            "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
             "name": "nodes",
             "in": "query"
           },
@@ -102,7 +94,7 @@
           {
             "type": "boolean",
             "x-go-name": "Stats",
-            "description": "Include search stats in response. Default 'false'.",
+            "description": "Include search statistics in response. Default 'false'.",
             "name": "stats",
             "in": "query"
           }
