@@ -8,13 +8,14 @@ ryftrest is a ryftprim equivalent, it uses ryft-server as a backend.
 Usage: $0 [options]
 
 Search specific:
--h|--help        Prints this short help.
+-h|--help        Prints this short help message.
 -p|--mode        Specifies the search mode to run, which can be one of:
                     - exact_search (or es)
-                    - fuzzy_hamming_search (or fhs)
+                    - fuzzy_hamming_search (or fhs) (used by default)
                     - fuzzy_edit_distance_search (or feds)
                     - date_search (or ds)
                     - time_search (or ts)
+                    - numeric_search (or ns)
 -f|--file        Specifies an input filename.
 -i               Specifies case-insensitive analysis for supported primitives.
 -n|--nodes       Specifies 1-4 RCAB processing nodes to use.
@@ -197,7 +198,7 @@ while [[ $# > 0 ]]; do
 		exit 0
 		;;
 	*) # unknown option
-		fail "'$key' is unknown option"
+		fail "'$1' is unknown option, run '$0 --help' for help"
 		;;
 	esac
 done
