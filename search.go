@@ -124,6 +124,8 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)
+
+	log.Printf("search: %s", cfg)
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -217,7 +219,7 @@ func (s *Server) search(ctx *gin.Context) {
 				panic(err)
 			}
 
-			log.Printf("done: %s", res)
+			log.Printf("search done: %s", res)
 			return // stop
 		}
 	}
