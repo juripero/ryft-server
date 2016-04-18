@@ -154,7 +154,7 @@ func (ds *DataSet) SearchFuzzyHamming(query, dataFile, indexFile string,
 
 	// do search
 	ds.output = C.rol_ds_search_fuzzy_hamming(ds.input, cDataFile,
-		cQuery, C.uint16_t(surrounding), C.uint8_t(fuzziness),
+		cQuery, C.uint32_t(surrounding), C.uint8_t(fuzziness),
 		cDelimiter, cIndexFile, C.bool(caseSensitive), nil)
 
 	return ds.LastError()
