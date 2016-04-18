@@ -337,7 +337,7 @@ func main() {
 		return func(c *gin.Context) {
 			beginning := time.Now()
 			c.Next()
-			serverStats.End(beginning, c.Writer)
+			serverStats.End(beginning, stats.NewRecorderResponseWriter(c.Writer, http.StatusOK))
 		}
 	}())
 
