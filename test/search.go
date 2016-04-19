@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/getryft/ryft-server/search/ryftmux"
 )
 
@@ -93,15 +94,28 @@ func newRyftHttp(log Logger) search.Engine {
 	return newEngine(log, "ryfthttp", opts)
 }
 
-// create new ryftmux search engine
-func newRyftMux(log Logger, backends ...search.Engine) search.Engine {
-	backend := "ryftmux"
-	engine, err := ryftmux.NewEngine(backends...)
+// create new ryftdec search engine
+func newRyftDec(log Logger, backend search.Engine) search.Engine {
+	name := "ryftdec"
+	engine, err := ryftdec.NewEngine(backend)
 	if err != nil {
-		log("failed to get %q search engine: %s", backend, err)
+		log("failed to get %q search engine: %s", name, err)
 		panic(err)
 	}
-	log("%q: actual options: %+v", backend, engine.Options())
+	log("%q: actual options: %+v", name, engine.Options())
+
+	return engine
+}
+
+// create new ryftmux search engine
+func newRyftMux(log Logger, backends ...search.Engine) search.Engine {
+	name := "ryftmux"
+	engine, err := ryftmux.NewEngine(backends...)
+	if err != nil {
+		log("failed to get %q search engine: %s", name, err)
+		panic(err)
+	}
+	log("%q: actual options: %+v", name, engine.Options())
 
 	return engine
 }

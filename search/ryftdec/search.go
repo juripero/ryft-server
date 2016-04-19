@@ -38,26 +38,33 @@ import (
 
 // Search starts asynchronous "/search" with RyftDEC engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask()
-	mux := search.NewResult()
+	task := NewTask(cfg)
+	res := search.NewResult()
 
-	// TODO: split cfg.Query into several expressions
-	subqueries := decompose(cfg.Query)
+	// split cfg.Query into several expressions
+	// we assume AND operator for each subquery
+	task.queries = decompose(cfg.Query)
+	task.extension = detectExtension(cfg.Files)
+	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
-	// do requests
-	for _, query := range subqueries {
-		// TODO: tune the INDEX&DATA file
-		cfg.Query = query
-		res, err := engine.Backend.Search(cfg)
-		if err != nil {
-			task.log().WithError(err).Errorf("failed to start /search subtask")
-			mux.ReportError(err)
-			break
-		}
+	go engine.run(task, res)
+	return res, nil // OK for now
+}
 
-		_ = res
-	}
+// Count starts asynchronous "/count" with RyftMUX engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(cfg)
+	res := search.NewResult()
 
-	// go engine.run(task, mux)
-	return mux, nil // OK for now
+	_ = task        // TODO: go engine.run(task, res)
+	return res, nil // OK for now
+}
+
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	return engine.Backend.Files(path)
+}
+
+func detectExtension(files []string) string {
+	return "pcrime"
 }
