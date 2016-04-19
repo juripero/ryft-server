@@ -89,16 +89,33 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 	// INDEX results file
 	if len(task.IndexFileName) != 0 {
-		// file path relative to `ryftone` mountpoint (including just instance)
-		file := filepath.Join(engine.Instance, task.IndexFileName)
-		args = append(args, "-oi", file)
+		if len(cfg.KeepIndexAs) != 0 {
+			task.IndexFileName = cfg.KeepIndexAs
+			task.KeepIndexFile = true
+			if !strings.HasSuffix(task.IndexFileName, ".txt") {
+				// ryft adds .txt anyway, so if this extension is missed
+				// other code won't properly work!
+				task.IndexFileName += ".txt"
+				task.log().WithField("index", task.IndexFileName).
+					Warnf("[%s]: index file name was updated to have TXT extension", TAG)
+			}
+		} else {
+			// file path relative to `ryftone` mountpoint (including just instance)
+			task.IndexFileName = filepath.Join(engine.Instance, task.IndexFileName)
+		}
+		args = append(args, "-oi", task.IndexFileName)
 	}
 
 	// DATA results file
 	if len(task.DataFileName) != 0 {
-		// file path relative to `ryftone` mountpoint (including just instance)
-		file := filepath.Join(engine.Instance, task.DataFileName)
-		args = append(args, "-od", file)
+		if len(cfg.KeepDataAs) != 0 {
+			task.DataFileName = cfg.KeepDataAs
+			task.KeepDataFile = true
+		} else {
+			// file path relative to `ryftone` mountpoint (including just instance)
+			task.DataFileName = filepath.Join(engine.Instance, task.DataFileName)
+		}
+		args = append(args, "-od", task.DataFileName)
 	}
 
 	// assign command line
@@ -266,11 +283,13 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing
-	if !engine.KeepResultFiles {
+	if !engine.KeepResultFiles && !task.KeepIndexFile {
 		if err := engine.removeFile(task.IndexFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove INDEX file", TAG)
 			// WARN: error actually ignored!
 		}
+	}
+	if !engine.KeepResultFiles && !task.KeepDataFile {
 		if err := engine.removeFile(task.DataFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove DATA file", TAG)
 			// WARN: error actually ignored!
@@ -287,7 +306,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 	task.log().Debugf("[%s]: start INDEX processing...", TAG)
 
 	// try to open INDEX file: if operation is cancelled `file` is nil
-	path := filepath.Join(engine.MountPoint, engine.Instance, task.IndexFileName)
+	path := filepath.Join(engine.MountPoint, task.IndexFileName)
 	file, err := task.openFile(path, engine.OpenFilePollTimeout, task.cancelIndexChan)
 	if err != nil {
 		task.log().WithError(err).WithField("path", path).
@@ -359,7 +378,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	task.log().Debugf("[%s]: start DATA processing...", TAG)
 
 	// try to open DATA file: if operation is cancelled `file` is nil
-	path := filepath.Join(engine.MountPoint, engine.Instance, task.DataFileName)
+	path := filepath.Join(engine.MountPoint, task.DataFileName)
 	file, err := task.openFile(path, engine.OpenFilePollTimeout, task.cancelDataChan)
 	if err != nil {
 		task.log().WithError(err).WithField("path", path).
@@ -422,8 +441,7 @@ func (engine *Engine) prepareQuery(query string) string {
 // removeFile removes INDEX or DATA file.
 func (engine *Engine) removeFile(name string) error {
 	if len(name) != 0 {
-		path := filepath.Join(engine.MountPoint,
-			engine.Instance, name) // full path
+		path := filepath.Join(engine.MountPoint, name) // full path
 		err := os.RemoveAll(path)
 		if err != nil {
 			return err
