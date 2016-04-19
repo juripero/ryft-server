@@ -30,34 +30,8 @@
 
 package ryftdec
 
-import (
-	// "fmt"
-
-	"github.com/getryft/ryft-server/search"
-)
-
-// Search starts asynchronous "/search" with RyftDEC engine.
-func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask()
-	mux := search.NewResult()
-
-	// TODO: split cfg.Query into several expressions
-	subqueries := decompose(cfg.Query)
-
-	// do requests
-	for _, query := range subqueries {
-		// TODO: tune the INDEX&DATA file
-		cfg.Query = query
-		res, err := engine.Backend.Search(cfg)
-		if err != nil {
-			task.log().WithError(err).Errorf("failed to start /search subtask")
-			mux.ReportError(err)
-			break
-		}
-
-		_ = res
-	}
-
-	// go engine.run(task, mux)
-	return mux, nil // OK for now
+func decompose(originalQuery string) []string {
+	queries := make([]string, 1)
+	queries = append(queries, originalQuery)
+	return queries
 }
