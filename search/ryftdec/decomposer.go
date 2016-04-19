@@ -30,8 +30,92 @@
 
 package ryftdec
 
-func decompose(originalQuery string) []string {
-	queries := make([]string, 1)
-	queries = append(queries, originalQuery)
+import (
+	"fmt"
+	"strings"
+)
+
+var (
+	delimiters = []string{" AND ", " OR "}
+	markers    = []string{" DATE(", " TIME("}
+)
+
+type SubQuery struct {
+	query    string
+	operator string
+}
+
+func (subquery SubQuery) String() string {
+	return fmt.Sprintf("Query: %s Operator: %s}", subquery.query, subquery.operator)
+}
+
+func decompose(originalQuery string) []SubQuery {
+	queries := make([]SubQuery, 0)
+	// load tokens one by one
+	// each token is logic operator or (expression) that should not be decomposed any more
+	operators := parse(make([]string, 0), originalQuery)
+
+	// build SubQuery instances attaching next logic operator to current query
+	for i := 0; i <= len(operators)-1; i = i + 2 {
+		var operator string
+		if i < len(operators)-1 {
+			operator = operators[i+1]
+		}
+		queries = append(queries, SubQuery{query: operators[i], operator: operator})
+	}
+
+	return queries
+}
+
+// Decompose query only when it includes DATE/TIME operators and has logic operators AND/OR
+func isDecomposable(originalQuery string) bool {
+	return includesAnyToken(originalQuery, delimiters) && includesAnyToken(originalQuery, markers)
+}
+
+func splitQuery(queries []SubQuery, originalQuery string) []SubQuery {
+	return queries
+}
+
+func includesAnyToken(query string, tokens []string) bool {
+	for _, marker := range tokens {
+		if strings.Contains(query, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func parse(queries []string, str string) []string {
+	depth := 1
+	count := 0
+	isBracket := func(r rune) bool {
+		switch {
+		case r == '(':
+			count++
+			if count == depth {
+				return true
+			} else {
+				return false
+			}
+		case r == ')':
+			count--
+			if count == depth-1 {
+				return true
+			} else {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	args := strings.FieldsFunc(str, isBracket)
+	for _, t := range args {
+		if isDecomposable(t) {
+			queries = parse(queries, t)
+		} else {
+			queries = append(queries, t)
+		}
+	}
 	return queries
 }
