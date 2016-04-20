@@ -58,10 +58,22 @@ func (node Node) String() string {
 
 func decompose(originalQuery string) *Node {
 	rootNode := Node{nodeType: "root", subNodes: make([]*Node, 0)}
+	originalQuery = formatQuery(originalQuery)
 	parse(&rootNode, originalQuery)
 	return &rootNode
 }
 
+// Add spaces around logic operators
+func formatQuery(query string) string {
+	for _, delimiter := range delimiters {
+		delimiter = strings.Trim(delimiter, " ")
+		query = strings.Replace(query, ")"+delimiter+"(", ") "+delimiter+" (", -1)
+	}
+	query = strings.Replace(query, "  ", " ", -1)
+	return query
+}
+
+// Parse expression and build query tree
 func parse(currentNode *Node, str string) *Node {
 	count := 0
 	isBracket := func(r rune) bool {
