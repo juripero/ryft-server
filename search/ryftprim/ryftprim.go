@@ -50,8 +50,22 @@ import (
 func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	args := []string{}
 
-	// fuzzy-hamming search by default
-	args = append(args, "-p", "fhs")
+	// select search mode (fuzzy-hamming search by default)
+	switch cfg.Mode {
+	case "exact_search", "exact", "es":
+		args = append(args, "-p", "es")
+	case "fuzzy_hamming_search", "fuzzy_hamming", "fhs", "":
+		args = append(args, "-p", "fhs")
+	case "fuzzy_edit_distance_search", "fuzzy_edit_distance", "feds":
+		args = append(args, "-p", "feds")
+		args = append(args, "-r") // (!) automatic de-duplication
+	case "date_search", "date", "ds":
+		args = append(args, "-p", "ds")
+	case "time_search", "time", "ts":
+		args = append(args, "-p", "ts")
+	default:
+		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
+	}
 
 	// disable data separator
 	args = append(args, "-e", "")
