@@ -36,44 +36,79 @@ import (
 )
 
 var (
-	delimiters = []string{" AND ", " OR "}
-	markers    = []string{" DATE(", " TIME("}
+	delimiters     = []string{" AND ", " OR "}
+	markers        = []string{" DATE(", " TIME("}
+	maxDepth   int = 1
 )
 
-type SubQuery struct {
+type Node struct {
 	query    string
 	operator string
+	nodeType string
+	subNodes []*Node
 }
 
-func (subquery SubQuery) String() string {
-	return fmt.Sprintf("Query: %s Operator: %s}", subquery.query, subquery.operator)
+func (node Node) String() string {
+	if node.nodeType == "operator" {
+		return fmt.Sprintf("Op: '%s'", node.operator)
+	} else {
+		return fmt.Sprintf("Q: '%s'", node.query)
+	}
 }
 
-func decompose(originalQuery string) []SubQuery {
-	queries := make([]SubQuery, 0)
-	// load tokens one by one
-	// each token is logic operator or (expression) that should not be decomposed any more
-	operators := parse(make([]string, 0), originalQuery)
+func decompose(originalQuery string) *Node {
+	rootNode := Node{nodeType: "root", subNodes: make([]*Node, 0)}
+	parse(&rootNode, originalQuery)
+	return &rootNode
+}
 
-	// build SubQuery instances attaching next logic operator to current query
-	for i := 0; i <= len(operators)-1; i = i + 2 {
-		var operator string
-		if i < len(operators)-1 {
-			operator = operators[i+1]
+func parse(currentNode *Node, str string) *Node {
+	count := 0
+	isBracket := func(r rune) bool {
+		switch {
+		case r == '(':
+			count++
+			if count == maxDepth {
+				return true
+			} else {
+				return false
+			}
+		case r == ')':
+			count--
+			if count == maxDepth-1 {
+				return true
+			} else {
+				return false
+			}
+		default:
+			return false
 		}
-		queries = append(queries, SubQuery{query: operators[i], operator: operator})
 	}
 
-	return queries
+	var token string
+	tokens := strings.FieldsFunc(str, isBracket)
+	tokens = translateToPrefixNotation(tokens)
+
+	// Build tree from tokens
+	for i := 0; i < len(tokens); i++ {
+		token = tokens[i]
+		if isDecomposable(token) {
+			parse(currentNode, token)
+		} else {
+			switch {
+			case isOperator(token):
+				currentNode = addChildToNode(currentNode, token)
+			default:
+				addChildToNode(currentNode, token)
+			}
+		}
+	}
+	return currentNode
 }
 
 // Decompose query only when it includes DATE/TIME operators and has logic operators AND/OR
 func isDecomposable(originalQuery string) bool {
 	return includesAnyToken(originalQuery, delimiters) && includesAnyToken(originalQuery, markers)
-}
-
-func splitQuery(queries []SubQuery, originalQuery string) []SubQuery {
-	return queries
 }
 
 func includesAnyToken(query string, tokens []string) bool {
@@ -85,37 +120,36 @@ func includesAnyToken(query string, tokens []string) bool {
 	return false
 }
 
-func parse(queries []string, str string) []string {
-	depth := 1
-	count := 0
-	isBracket := func(r rune) bool {
-		switch {
-		case r == '(':
-			count++
-			if count == depth {
-				return true
-			} else {
-				return false
-			}
-		case r == ')':
-			count--
-			if count == depth-1 {
-				return true
-			} else {
-				return false
-			}
-		default:
-			return false
+func translateToPrefixNotation(tokens []string) []string {
+	for i := 0; i < len(tokens)-1; i++ {
+		if isOperator(tokens[i]) {
+			tokens[i-1], tokens[i] = tokens[i], tokens[i-1]
 		}
 	}
+	return tokens
+}
 
-	args := strings.FieldsFunc(str, isBracket)
-	for _, t := range args {
-		if isDecomposable(t) {
-			queries = parse(queries, t)
-		} else {
-			queries = append(queries, t)
+func addChildToNode(currentNode *Node, token string) *Node {
+	var newNode Node
+	switch {
+	case isOperator(token):
+		newNode = Node{operator: token, nodeType: "operator"}
+	default:
+		newNode = Node{query: token, nodeType: "query"}
+	}
+	currentNode.subNodes = append(currentNode.subNodes, &newNode)
+	return &newNode
+}
+
+func containsString(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
 		}
 	}
-	return queries
+	return false
+}
+
+func isOperator(token string) bool {
+	return containsString(delimiters, token)
 }
