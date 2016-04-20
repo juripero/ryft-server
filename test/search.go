@@ -23,6 +23,12 @@ var (
 	ryftoneInstance = ".test"
 	ryftoneLogLevel = "warn"
 
+	// ryftmux
+	ryftmuxLogLevel = "warn"
+
+	// ryftdec
+	ryftdecLogLevel = "warn"
+
 	printReceivedRecords = false
 )
 
@@ -102,8 +108,9 @@ func newRyftDec(log Logger, backend search.Engine) search.Engine {
 		log("failed to get %q search engine: %s", name, err)
 		panic(err)
 	}
-	log("%q: actual options: %+v", name, engine.Options())
+	// log("%q: actual options: %+v", name, engine.Options())
 
+	ryftdec.SetLogLevel(ryftdecLogLevel)
 	return engine
 }
 
@@ -115,8 +122,9 @@ func newRyftMux(log Logger, backends ...search.Engine) search.Engine {
 		log("failed to get %q search engine: %s", name, err)
 		panic(err)
 	}
-	log("%q: actual options: %+v", name, engine.Options())
+	// log("%q: actual options: %+v", name, engine.Options())
 
+	ryftmux.SetLogLevel(ryftmuxLogLevel)
 	return engine
 }
 

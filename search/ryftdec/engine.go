@@ -68,6 +68,18 @@ func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{}
 }
 
+
+// SetLogLevel changes global module log level.
+func SetLogLevel(level string) error {
+	ll, err := logrus.ParseLevel(level)
+	if err != nil {
+		return err
+	}
+
+	log.Level = ll
+	return nil // OK
+}
+
 // log returns task related logger.
 func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
@@ -91,5 +103,5 @@ func init() {
 	// search.RegisterEngine(TAG, factory)
 
 	// be silent by default
-	log.Level = logrus.DebugLevel // WarnLevel
+	log.Level = logrus.WarnLevel
 }

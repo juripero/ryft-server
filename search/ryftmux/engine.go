@@ -72,6 +72,17 @@ func (engine *Engine) Options() map[string]interface{} {
 	}
 }
 
+// SetLogLevel changes global module log level.
+func SetLogLevel(level string) error {
+	ll, err := logrus.ParseLevel(level)
+	if err != nil {
+		return err
+	}
+
+	log.Level = ll
+	return nil // OK
+}
+
 // log returns task related logger.
 func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
