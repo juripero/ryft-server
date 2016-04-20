@@ -58,6 +58,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-p", "fhs")
 	case "fuzzy_edit_distance_search", "fuzzy_edit_distance", "feds":
 		args = append(args, "-p", "feds")
+		args = append(args, "-r") // (!) automatic de-duplication
 	case "date_search", "date", "ds":
 		args = append(args, "-p", "ds")
 	case "time_search", "time", "ts":
