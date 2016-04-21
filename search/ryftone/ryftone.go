@@ -129,7 +129,7 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 		err = task.dataSet.SearchTime(engine.prepareQuery(cfg.Query),
 			dataFile, indexFile, cfg.Surrounding)
 	default:
-		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
+		err = fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
 
 	if err == nil {
