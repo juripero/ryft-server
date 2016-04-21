@@ -1,3 +1,14 @@
+//Tests for follwing tree
+//Expression: 'AND'
+//  Expression: 'AND'
+//    Expression: '(RECORD.id CONTAINS TIME("1003"))'
+//    Expression: '(RECORD.id CONTAINS DATE("100301"))'
+//  Expression: 'AND'
+//    Expression: '(RECORD.id CONTAINS TIME("200"))'
+//    Expression: 'AND'
+//      Expression: '(RECORD.id CONTAINS DATE("300"))'
+//      Expression: '(RECORD.id CONTAINS DATE("400"))'
+
 package ryftdec
 
 import (
@@ -22,13 +33,13 @@ func DecompositionTests(t *testing.T, query string) {
 	RootNodeChildren(t, result)
 	FirstLevelNodeChildren(t, result)
 	FirstLevelNodeExpression(t, result)
-	SecondLevelNodeChildren(t, result)
+	SecondLevelNodeExpression(t, result)
 	ThirdLevelNodeExpression(t, result)
 }
 
 func RootNodeChildren(t *testing.T, result *ryftdec.Node) {
-	if len(result.SubNodes) != 1 {
-		t.Error("Expected 1 subnodes for root node, got", len(result.SubNodes))
+	if len(result.SubNodes) != 2 {
+		t.Error("Expected 2 subnodes for root node, got", len(result.SubNodes))
 	}
 }
 
@@ -48,18 +59,18 @@ func FirstLevelNodeChildren(t *testing.T, result *ryftdec.Node) {
 	}
 }
 
-func SecondLevelNodeChildren(t *testing.T, result *ryftdec.Node) {
+func SecondLevelNodeExpression(t *testing.T, result *ryftdec.Node) {
 	node := result.SubNodes[0].SubNodes[0]
 
-	if len(node.SubNodes) != 2 {
-		t.Error("Expected 2 subnodes for second level node, got", len(result.SubNodes))
+	if node.Expression != `(RECORD.id CONTAINS TIME("1003"))` {
+		t.Error(`Expected (RECORD.id CONTAINS TIME("1003")), got`, result.Expression)
 	}
 }
 
 func ThirdLevelNodeExpression(t *testing.T, result *ryftdec.Node) {
-	node := result.SubNodes[0].SubNodes[0].SubNodes[0]
+	node := result.SubNodes[1].SubNodes[1].SubNodes[0]
 
-	if node.Expression != `(RECORD.id CONTAINS TIME("1003"))` {
-		t.Error(`Expected RECORD.id CONTAINS TIME("1003"), got`, node.Expression)
+	if node.Expression != `(RECORD.id CONTAINS DATE("300"))` {
+		t.Error(`Expected (RECORD.id CONTAINS DATE("300")), got`, node.Expression)
 	}
 }
