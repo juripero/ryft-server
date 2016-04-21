@@ -153,15 +153,6 @@ func addChildToNode(currentNode *Node, token string) *Node {
 	return &newNode
 }
 
-func containsString(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
-}
-
 func isOperator(token string) bool {
 	return containsString(delimiters, token)
 }

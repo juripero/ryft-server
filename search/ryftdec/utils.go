@@ -30,75 +30,11 @@
 
 package ryftdec
 
-import (
-	// "fmt"
-	"path/filepath"
-
-	"github.com/getryft/ryft-server/search"
-)
-
-// Search starts asynchronous "/search" with RyftDEC engine.
-func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	res := search.NewResult()
-
-	// split cfg.Query into several expressions
-	// task.queries = decompose(cfg.Query)
-	task.queries = &Query{
-		Expression: cfg.Query,
-		Type:       QTYPE_AND,
-		Left: &Query{
-			Expression: `(RECORD.id CONTAINS "1003")`,
-			Type:       QTYPE_SEARCH,
-		},
-		Right: &Query{
-			Expression: `(RECORD.id CONTAINS "1003100")`,
-			Type:       QTYPE_SEARCH,
-		},
-	}
-
-	task.extension = detectExtension(cfg.Files)
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
-
-	go engine.run(task, res)
-	return res, nil // OK for now
-}
-
-// Count starts asynchronous "/count" with RyftMUX engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	res := search.NewResult()
-	_ = task        // TODO: go engine.run(task, res)
-	return res, nil // OK for now
-}
-
-// Files starts synchronous "/files" with RyftPrim engine.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	return engine.Backend.Files(path)
-}
-
-func detectExtension(fileNames []string) string {
-	extensions := make([]string, 0)
-
-	// Collect uniq file extensions list
-	for _, file := range fileNames {
-		ext := extensionByMask(file)
-		if !containsString(extensions, ext) {
-			extensions = append(extensions, ext)
+func containsString(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
 		}
 	}
-
-	if len(extensions) == 1 {
-		return extensions[0]
-	} else {
-		return "todo"
-	}
-}
-
-func extensionByMask(filename string) string {
-	ext := filepath.Ext(filename)
-	if ext == "" {
-		return ".bin"
-	}
-	return ext
+	return false
 }
