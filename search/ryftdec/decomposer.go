@@ -145,9 +145,9 @@ func addChildToNode(currentNode *Node, token string) *Node {
 	var newNode Node
 	switch {
 	case isOperator(token):
-		newNode = Node{operator: token, nodeType: "operator"}
+		newNode = Node{operator: strings.Trim(token, " "), nodeType: "operator"}
 	default:
-		newNode = Node{query: token, nodeType: "query"}
+		newNode = Node{query: "(" + token + ")", nodeType: "query"}
 	}
 	currentNode.SubNodes = append(currentNode.SubNodes, &newNode)
 	return &newNode
