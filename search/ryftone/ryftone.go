@@ -111,8 +111,27 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 		dataFile = filepath.Join(engine.Instance, task.DataFileName)
 	}
 
-	err = task.dataSet.SearchFuzzyHamming(engine.prepareQuery(cfg.Query),
-		dataFile, indexFile, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive)
+	// select search mode (fuzzy-hamming search by default)
+	switch cfg.Mode {
+	case "exact_search", "exact", "es":
+		err = task.dataSet.SearchExact(engine.prepareQuery(cfg.Query),
+			dataFile, indexFile, cfg.Surrounding, cfg.CaseSensitive)
+	case "fuzzy_hamming_search", "fuzzy_hamming", "fhs", "":
+		err = task.dataSet.SearchFuzzyHamming(engine.prepareQuery(cfg.Query),
+			dataFile, indexFile, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive)
+	case "fuzzy_edit_distance_search", "fuzzy_edit_distance", "feds":
+		err = task.dataSet.SearchFuzzyEditDistance(engine.prepareQuery(cfg.Query),
+			dataFile, indexFile, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, true)
+	case "date_search", "date", "ds":
+		err = task.dataSet.SearchDate(engine.prepareQuery(cfg.Query),
+			dataFile, indexFile, cfg.Surrounding)
+	case "time_search", "time", "ts":
+		err = task.dataSet.SearchTime(engine.prepareQuery(cfg.Query),
+			dataFile, indexFile, cfg.Surrounding)
+	default:
+		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
+	}
+
 	if err == nil {
 		res.Stat = search.NewStat()
 		res.Stat.Matches = task.dataSet.GetTotalMatches()

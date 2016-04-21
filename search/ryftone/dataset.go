@@ -120,6 +120,46 @@ func (ds *DataSet) AddFile(file string) error {
 	return nil // OK
 }
 
+// Search Exact
+func (ds *DataSet) SearchExact(query, dataFile, indexFile string,
+	surrounding uint, caseSensitive bool) error {
+	// check output dataset is empty
+	if ds.output != nil {
+		return fmt.Errorf("Non empty output dataset")
+	}
+
+	// query
+	cQuery := ds.cstr(query)
+	if cQuery == nil {
+		return fmt.Errorf("Failed to convert Go query to C")
+	}
+
+	// data file name
+	cDataFile := ds.cstr(dataFile)
+	if cDataFile == nil {
+		return fmt.Errorf("Failed to convert Go data file to C")
+	}
+
+	// index file name
+	cIndexFile := ds.cstr(indexFile)
+	if cIndexFile == nil {
+		return fmt.Errorf("Failed to convert Go index file to C")
+	}
+
+	// delimiter
+	cDelimiter := ds.cstr("")
+	if cDelimiter == nil {
+		return fmt.Errorf("Failed to convert Go delimiter to C")
+	}
+
+	// do search
+	ds.output = C.rol_ds_search_exact(ds.input, cDataFile,
+		cQuery, C.uint32_t(surrounding), cDelimiter,
+		cIndexFile, C.bool(caseSensitive), nil)
+
+	return ds.LastError()
+}
+
 // Search Fuzzy Hamming
 func (ds *DataSet) SearchFuzzyHamming(query, dataFile, indexFile string,
 	surrounding uint, fuzziness uint, caseSensitive bool) error {
@@ -156,6 +196,124 @@ func (ds *DataSet) SearchFuzzyHamming(query, dataFile, indexFile string,
 	ds.output = C.rol_ds_search_fuzzy_hamming(ds.input, cDataFile,
 		cQuery, C.uint32_t(surrounding), C.uint8_t(fuzziness),
 		cDelimiter, cIndexFile, C.bool(caseSensitive), nil)
+
+	return ds.LastError()
+}
+
+// Search Fuzzy Edit Distance
+func (ds *DataSet) SearchFuzzyEditDistance(query, dataFile, indexFile string,
+	surrounding uint, fuzziness uint, caseSensitive bool, reduce bool) error {
+	// check output dataset is empty
+	if ds.output != nil {
+		return fmt.Errorf("Non empty output dataset")
+	}
+
+	// query
+	cQuery := ds.cstr(query)
+	if cQuery == nil {
+		return fmt.Errorf("Failed to convert Go query to C")
+	}
+
+	// data file name
+	cDataFile := ds.cstr(dataFile)
+	if cDataFile == nil {
+		return fmt.Errorf("Failed to convert Go data file to C")
+	}
+
+	// index file name
+	cIndexFile := ds.cstr(indexFile)
+	if cIndexFile == nil {
+		return fmt.Errorf("Failed to convert Go index file to C")
+	}
+
+	// delimiter
+	cDelimiter := ds.cstr("")
+	if cDelimiter == nil {
+		return fmt.Errorf("Failed to convert Go delimiter to C")
+	}
+
+	// do search
+	ds.output = C.rol_ds_search_fuzzy_edit_distance(ds.input, cDataFile,
+		cQuery, C.uint32_t(surrounding), C.uint8_t(fuzziness),
+		cDelimiter, cIndexFile, C.bool(caseSensitive), C.bool(reduce), nil)
+
+	return ds.LastError()
+}
+
+// Search Date
+func (ds *DataSet) SearchDate(query, dataFile, indexFile string, surrounding uint) error {
+	// check output dataset is empty
+	if ds.output != nil {
+		return fmt.Errorf("Non empty output dataset")
+	}
+
+	// query
+	cQuery := ds.cstr(query)
+	if cQuery == nil {
+		return fmt.Errorf("Failed to convert Go query to C")
+	}
+
+	// data file name
+	cDataFile := ds.cstr(dataFile)
+	if cDataFile == nil {
+		return fmt.Errorf("Failed to convert Go data file to C")
+	}
+
+	// index file name
+	cIndexFile := ds.cstr(indexFile)
+	if cIndexFile == nil {
+		return fmt.Errorf("Failed to convert Go index file to C")
+	}
+
+	// delimiter
+	cDelimiter := ds.cstr("")
+	if cDelimiter == nil {
+		return fmt.Errorf("Failed to convert Go delimiter to C")
+	}
+
+	// do search
+	ds.output = C.rol_ds_search_date(ds.input, cDataFile,
+		cQuery, C.uint32_t(surrounding),
+		cDelimiter, cIndexFile, nil)
+
+	return ds.LastError()
+}
+
+// Search Time
+func (ds *DataSet) SearchTime(query, dataFile, indexFile string, surrounding uint) error {
+	// check output dataset is empty
+	if ds.output != nil {
+		return fmt.Errorf("Non empty output dataset")
+	}
+
+	// query
+	cQuery := ds.cstr(query)
+	if cQuery == nil {
+		return fmt.Errorf("Failed to convert Go query to C")
+	}
+
+	// data file name
+	cDataFile := ds.cstr(dataFile)
+	if cDataFile == nil {
+		return fmt.Errorf("Failed to convert Go data file to C")
+	}
+
+	// index file name
+	cIndexFile := ds.cstr(indexFile)
+	if cIndexFile == nil {
+		return fmt.Errorf("Failed to convert Go index file to C")
+	}
+
+	// delimiter
+	cDelimiter := ds.cstr("")
+	if cDelimiter == nil {
+		return fmt.Errorf("Failed to convert Go delimiter to C")
+	}
+
+	// do search
+	ds.output = C.rol_ds_search_time(ds.input, cDataFile,
+		cQuery, C.uint32_t(surrounding),
+		cDelimiter, cIndexFile, nil)
 
 	return ds.LastError()
 }
