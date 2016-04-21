@@ -42,22 +42,21 @@ var (
 )
 
 type Node struct {
-	query    string
-	operator string
-	nodeType string
-	SubNodes []*Node
+	Expression string
+	Type       string
+	SubNodes   []*Node
 }
 
 func (node Node) String() string {
-	if node.nodeType == "operator" {
-		return fmt.Sprintf("Op: '%s'", node.operator)
+	if node.Type == "operator" {
+		return fmt.Sprintf("Op: '%s'", node.Expression)
 	} else {
-		return fmt.Sprintf("Q: '%s'", node.query)
+		return fmt.Sprintf("Q: '%s'", node.Expression)
 	}
 }
 
 func Decompose(originalQuery string) *Node {
-	rootNode := Node{nodeType: "root", SubNodes: make([]*Node, 0)}
+	rootNode := Node{Type: "root", SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 	parse(&rootNode, originalQuery)
 	return &rootNode
@@ -145,9 +144,9 @@ func addChildToNode(currentNode *Node, token string) *Node {
 	var newNode Node
 	switch {
 	case isOperator(token):
-		newNode = Node{operator: strings.Trim(token, " "), nodeType: "operator"}
+		newNode = Node{Expression: strings.Trim(token, " "), Type: "operator"}
 	default:
-		newNode = Node{query: "(" + token + ")", nodeType: "query"}
+		newNode = Node{Expression: "(" + token + ")", Type: "query"}
 	}
 	currentNode.SubNodes = append(currentNode.SubNodes, &newNode)
 	return &newNode
