@@ -45,7 +45,7 @@ type Node struct {
 	query    string
 	operator string
 	nodeType string
-	subNodes []*Node
+	SubNodes []*Node
 }
 
 func (node Node) String() string {
@@ -56,8 +56,8 @@ func (node Node) String() string {
 	}
 }
 
-func decompose(originalQuery string) *Node {
-	rootNode := Node{nodeType: "root", subNodes: make([]*Node, 0)}
+func Decompose(originalQuery string) *Node {
+	rootNode := Node{nodeType: "root", SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 	parse(&rootNode, originalQuery)
 	return &rootNode
@@ -149,7 +149,7 @@ func addChildToNode(currentNode *Node, token string) *Node {
 	default:
 		newNode = Node{query: token, nodeType: "query"}
 	}
-	currentNode.subNodes = append(currentNode.subNodes, &newNode)
+	currentNode.SubNodes = append(currentNode.SubNodes, &newNode)
 	return &newNode
 }
 
