@@ -43,20 +43,16 @@ var (
 
 type Node struct {
 	Expression string
-	Type       string
+	Type       QueryType
 	SubNodes   []*Node
 }
 
 func (node Node) String() string {
-	if node.Type == "operator" {
-		return fmt.Sprintf("Op: '%s'", node.Expression)
-	} else {
-		return fmt.Sprintf("Q: '%s'", node.Expression)
-	}
+	return fmt.Sprintf("Expression: '%s'", node.Expression)
 }
 
 func Decompose(originalQuery string) *Node {
-	rootNode := Node{Type: "root", SubNodes: make([]*Node, 0)}
+	rootNode := Node{Type: QTYPE_XOR, SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 	parse(&rootNode, originalQuery)
 	return &rootNode
@@ -144,12 +140,25 @@ func addChildToNode(currentNode *Node, token string) *Node {
 	var newNode Node
 	switch {
 	case isOperator(token):
-		newNode = Node{Expression: strings.Trim(token, " "), Type: "operator"}
+		newNode = Node{Expression: strings.Trim(token, " "), Type: operatorConst(token)}
 	default:
-		newNode = Node{Expression: "(" + token + ")", Type: "query"}
+		newNode = Node{Expression: "(" + token + ")", Type: QTYPE_SEARCH}
 	}
 	currentNode.SubNodes = append(currentNode.SubNodes, &newNode)
 	return &newNode
+}
+
+// Map string operator value to constant
+func operatorConst(token string) QueryType {
+	token = strings.Trim(token, " ")
+	switch token {
+	case "AND":
+		return QTYPE_AND
+	case "OR":
+		return QTYPE_OR
+	default:
+		return QTYPE_XOR
+	}
 }
 
 func isOperator(token string) bool {
