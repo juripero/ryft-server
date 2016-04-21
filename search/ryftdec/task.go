@@ -46,9 +46,10 @@ var (
 // RyftDEC task related data.
 type Task struct {
 	Identifier string // unique
+	subtaskId  int
 
 	config    *search.Config
-	queries   []string
+	queries   *Query // root query
 	extension string
 }
 
@@ -69,78 +70,121 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	defer mux.Close()
 	defer mux.ReportDone()
 
-	fileset := task.config.Files
-
-	// start multiplexing results and errors
-	for i, query := range task.queries {
-		isLast := i+1 == len(task.queries)
-
-		cfg := *task.config
-		cfg.Files = fileset
-		cfg.Query = query
-		// TODO: cfg.Mode = ???
-		if !isLast {
-			cfg.KeepDataAs = fmt.Sprintf(".temp-%s.%s", task.Identifier, task.extension)
-			fileset = []string{cfg.KeepDataAs}
-		}
-
-		res, err := engine.Backend.Search(&cfg)
-		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to start /search subtask", TAG)
-			mux.ReportError(err)
-			break
-		}
-
-		task.log().WithField("query", query).
-			Debugf("[%s]: subtask in progress", TAG)
-
-			// handle subtask's results and errors
-	loop:
-		for {
-			select {
-			case err, ok := <-res.ErrorChan:
-				if ok && err != nil {
-					// TODO: mark error with subtask's tag?
-					task.log().WithError(err).Debugf("[%s]: new error received", TAG)
-					mux.ReportError(err)
-				}
-
-			case rec, ok := <-res.RecordChan:
-				if ok && rec != nil {
-					task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
-					// rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-					if isLast {
-						mux.ReportRecord(rec)
-					}
-				}
-
-			case <-res.DoneChan:
-				// drain the error channel
-				for err := range res.ErrorChan {
-					task.log().WithError(err).Debugf("[%s]: *** new error received", TAG)
-					mux.ReportError(err)
-				}
-
-				// drain the record channel
-				for rec := range res.RecordChan {
-					task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG)
-					// rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-					if isLast {
-						mux.ReportRecord(rec)
-					}
-				}
-
-				// statistics
-				if isLast {
-					// TODO: combine statistics for all queries!!!
-					mux.Stat = res.Stat
-				}
-
-				task.log().Debugf("[%s]: subtask done", TAG)
-				break loop // done!
-			}
-		}
+	err := engine.run1(task, task.queries, task.config, mux, true)
+	if err != nil {
+		task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
+		mux.ReportError(err)
 	}
 
 	// TODO: handle task cancellation!!!
+}
+
+// process and wait all subtasks
+func (engine *Engine) run1(task *Task, query *Query, cfg *search.Config, mux *search.Result, isLast bool) error {
+	var mode string
+
+	switch query.Type {
+	case QTYPE_SEARCH:
+		mode = task.config.Mode // as requested
+	case QTYPE_DATE:
+		mode = "date_search"
+	case QTYPE_TIME:
+		mode = "time_search"
+	case QTYPE_NUMERIC:
+		mode = "numeric_search"
+
+	case QTYPE_AND:
+		if query.Left == nil || query.Right == nil {
+			return fmt.Errorf("invalid format for AND operator")
+		}
+
+		task.subtaskId += 1
+		tempResult := fmt.Sprintf(".temp-%s-%d.%s",
+			task.Identifier, task.subtaskId, task.extension)
+
+		task.log().WithField("temp", tempResult).
+			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
+
+		// left: save results to temporary file
+		tempCfg := *cfg
+		tempCfg.KeepDataAs = tempResult
+		engine.run1(task, query.Left, &tempCfg, mux, isLast && false)
+
+		// right: read input from temporary file
+		tempCfg.Files = []string{tempResult}
+		tempCfg.KeepDataAs = cfg.KeepDataAs
+		engine.run1(task, query.Right, &tempCfg, mux, isLast && true)
+
+		return nil // OK
+
+	case QTYPE_OR:
+		return fmt.Errorf("OR is not implemented yet")
+
+	case QTYPE_XOR:
+		return fmt.Errorf("XOR is not implemented yet")
+
+	default:
+		return fmt.Errorf("%d is unknown query type", query.Type)
+	}
+
+	task.log().WithField("mode", mode).
+		WithField("query", query.Expression).
+		WithField("input", cfg.Files).
+		WithField("output", cfg.KeepDataAs).
+		Infof("[%s]/%d: running backend search", TAG, task.subtaskId)
+
+	cfg.Mode = mode
+	cfg.Query = query.Expression
+	res, err := engine.Backend.Search(cfg)
+	if err != nil {
+		return err
+	}
+
+	task.drainResults(mux, res, isLast)
+	return nil // OK
+}
+
+// Drain all records/errors from 'res' to 'mux'
+func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecords bool) {
+	for {
+		select {
+		case err, ok := <-res.ErrorChan:
+			if ok && err != nil {
+				// TODO: mark error with subtask's tag?
+				task.log().WithError(err).Debugf("[%s]/%d: new error received", TAG, task.subtaskId)
+				mux.ReportError(err)
+			}
+
+		case rec, ok := <-res.RecordChan:
+			if ok && rec != nil {
+				task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId)
+				if saveRecords {
+					mux.ReportRecord(rec)
+				}
+			}
+
+		case <-res.DoneChan:
+			// drain the error channel
+			for err := range res.ErrorChan {
+				task.log().WithError(err).Debugf("[%s]/%d: *** new error received", TAG, task.subtaskId)
+				mux.ReportError(err)
+			}
+
+			// drain the record channel
+			for rec := range res.RecordChan {
+				task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId)
+				if saveRecords {
+					mux.ReportRecord(rec)
+				}
+			}
+
+			// statistics
+			if saveRecords {
+				// TODO: combine statistics for all queries!!!
+				mux.Stat = res.Stat
+			}
+
+			return // done!
+		}
+	}
 }

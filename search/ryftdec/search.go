@@ -42,8 +42,20 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	res := search.NewResult()
 
 	// split cfg.Query into several expressions
-	// we assume AND operator for each subquery
-	task.queries = decompose(cfg.Query)
+	// task.queries = decompose(cfg.Query)
+	task.queries = &Query{
+		Expression: cfg.Query,
+		Type:       QTYPE_AND,
+		Left: &Query{
+			Expression: `(RECORD.id CONTAINS "1003")`,
+			Type:       QTYPE_SEARCH,
+		},
+		Right: &Query{
+			Expression: `(RECORD.id CONTAINS "1003100")`,
+			Type:       QTYPE_SEARCH,
+		},
+	}
+
 	task.extension = detectExtension(cfg.Files)
 	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
@@ -55,7 +67,6 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
 	res := search.NewResult()
-
 	_ = task        // TODO: go engine.run(task, res)
 	return res, nil // OK for now
 }

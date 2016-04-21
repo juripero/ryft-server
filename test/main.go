@@ -162,7 +162,7 @@ func search4(concurent bool) {
 
 // ryftdec search
 func search5(concurent bool) {
-	ryftprimLogLevel = "debug"
+	ryftdecLogLevel = "debug"
 	search0(concurent, newRyftDec(log, newRyftPrim(log)))
 }
 

@@ -68,6 +68,23 @@ func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{}
 }
 
+type QueryType int
+
+const (
+	QTYPE_SEARCH QueryType = iota
+	QTYPE_DATE
+	QTYPE_TIME
+	QTYPE_NUMERIC
+	QTYPE_AND
+	QTYPE_OR
+	QTYPE_XOR
+)
+
+type Query struct {
+	Type        QueryType
+	Expression  string
+	Left, Right *Query // for AND, OR, XOR
+}
 
 // SetLogLevel changes global module log level.
 func SetLogLevel(level string) error {
