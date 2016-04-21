@@ -52,10 +52,11 @@ func (node Node) String() string {
 }
 
 func Decompose(originalQuery string) *Node {
-	rootNode := Node{Type: QTYPE_XOR, SubNodes: make([]*Node, 0)}
+	rootNode := Node{SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 	parse(&rootNode, originalQuery)
-	return &rootNode
+	// Return first node with value
+	return rootNode.SubNodes[0]
 }
 
 // Add spaces around logic operators
