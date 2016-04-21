@@ -41,6 +41,8 @@ var (
 	maxDepth   int = 1
 )
 
+//const
+
 type Node struct {
 	Expression string
 	Type       QueryType
@@ -143,7 +145,7 @@ func addChildToNode(currentNode *Node, token string) *Node {
 	case isOperator(token):
 		newNode = Node{Expression: strings.Trim(token, " "), Type: operatorConst(token)}
 	default:
-		newNode = Node{Expression: "(" + token + ")", Type: QTYPE_SEARCH}
+		newNode = Node{Expression: "(" + token + ")", Type: queryConst(token)}
 	}
 	currentNode.SubNodes = append(currentNode.SubNodes, &newNode)
 	return &newNode
@@ -159,6 +161,17 @@ func operatorConst(token string) QueryType {
 		return QTYPE_OR
 	default:
 		return QTYPE_XOR
+	}
+}
+
+func queryConst(query string) QueryType {
+	switch {
+	case strings.Contains(query, "DATE("):
+		return QTYPE_DATE
+	case strings.Contains(query, "TIME("):
+		return QTYPE_TIME
+	default:
+		return QTYPE_NUMERIC
 	}
 }
 
