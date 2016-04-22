@@ -32,10 +32,13 @@ package ryftdec
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 var (
@@ -100,8 +103,11 @@ func (engine *Engine) run1(task *Task, query *Node, cfg *search.Config, mux *sea
 		}
 
 		task.subtaskId += 1
-		tempResult := fmt.Sprintf(".temp-%s-%d.%s",
-			task.Identifier, task.subtaskId, task.extension)
+		backendOptions := engine.Backend.Options()
+		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
+		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
+		tempResult := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d.%s",
+			task.Identifier, task.subtaskId, task.extension))
 
 		task.log().WithField("temp", tempResult).
 			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
@@ -109,12 +115,21 @@ func (engine *Engine) run1(task *Task, query *Node, cfg *search.Config, mux *sea
 		// left: save results to temporary file
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = tempResult
-		engine.run1(task, query.SubNodes[0], &tempCfg, mux, isLast && false)
+		err1 := engine.run1(task, query.SubNodes[0], &tempCfg, mux, isLast && false)
+		if err1 != nil {
+			return err1
+		}
 
 		// right: read input from temporary file
 		tempCfg.Files = []string{tempResult}
 		tempCfg.KeepDataAs = cfg.KeepDataAs
-		engine.run1(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+		err2 := engine.run1(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+		if err2 != nil {
+			return err2
+		}
+
+		// remove temporary file
+		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResult))
 
 		return nil // OK
 
