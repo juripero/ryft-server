@@ -31,6 +31,7 @@
 package ryftdec
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -54,14 +55,14 @@ func (node Node) String() string {
 }
 
 func Decompose(originalQuery string) (*Node, error) {
-	// Validate query
-	if err := Validate(originalQuery); err != nil {
+	rootNode := Node{SubNodes: make([]*Node, 0)}
+	originalQuery = formatQuery(originalQuery)
+
+	_, err := parse(&rootNode, originalQuery)
+	if err != nil {
 		return nil, err
 	}
 
-	rootNode := Node{SubNodes: make([]*Node, 0)}
-	originalQuery = formatQuery(originalQuery)
-	parse(&rootNode, originalQuery)
 	return rootNode.SubNodes[0], nil // Return first node with value
 }
 
@@ -76,7 +77,7 @@ func formatQuery(query string) string {
 }
 
 // Parse expression and build query tree
-func parse(currentNode *Node, str string) *Node {
+func parse(currentNode *Node, query string) (*Node, error) {
 	count := 0
 	isBracket := func(r rune) bool {
 		switch {
@@ -100,13 +101,17 @@ func parse(currentNode *Node, str string) *Node {
 	}
 
 	var token string
-	tokens := strings.FieldsFunc(str, isBracket)
+	tokens := strings.FieldsFunc(query, isBracket)
 	tokens = translateToPrefixNotation(tokens)
+
+	if isDecomposable(query) && len(tokens) < 2 {
+		return nil, buildError("Can't parse expression, invalid number of brackets")
+	}
 
 	// Build tree from tokens
 	for i := 0; i < len(tokens); i++ {
 		token = tokens[i]
-		if isDecomposable(token) {
+		if isDecomposable(token) && len(tokens) != 1 {
 			parse(currentNode, token)
 		} else {
 			switch {
@@ -117,7 +122,7 @@ func parse(currentNode *Node, str string) *Node {
 			}
 		}
 	}
-	return currentNode
+	return currentNode, nil
 }
 
 // Decompose query only when it includes DATE/TIME operators and has logic operators AND/OR
@@ -183,4 +188,8 @@ func queryConst(query string) QueryType {
 
 func isOperator(token string) bool {
 	return containsString(delimiters, token)
+}
+
+func buildError(message string) error {
+	return errors.New(message)
 }
