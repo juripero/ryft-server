@@ -53,12 +53,16 @@ func (node Node) String() string {
 	return fmt.Sprintf("Expression: '%s'", node.Expression)
 }
 
-func Decompose(originalQuery string) *Node {
+func Decompose(originalQuery string) (*Node, error) {
+	// Validate query
+	if err := Validate(originalQuery); err != nil {
+		return nil, err
+	}
+
 	rootNode := Node{SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 	parse(&rootNode, originalQuery)
-	// Return first node with value
-	return rootNode.SubNodes[0]
+	return rootNode.SubNodes[0], nil // Return first node with value
 }
 
 // Add spaces around logic operators

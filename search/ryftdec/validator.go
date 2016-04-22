@@ -31,77 +31,28 @@
 package ryftdec
 
 import (
-	// "fmt"
-	"path/filepath"
-
-	"github.com/getryft/ryft-server/search"
+	"errors"
+	"strings"
 )
 
-// Search starts asynchronous "/search" with RyftDEC engine.
-func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	res := search.NewResult()
+type QueryToValidate string
 
-	// split cfg.Query into several expressions
-	// task.queries, err = decompose(cfg.Query)
-	// if err != nil {
-	// //hangle decomposition error here
-	// }
-	task.queries = &Query{
-		Expression: cfg.Query,
-		Type:       QTYPE_AND,
-		Left: &Query{
-			Expression: `(RECORD.id CONTAINS "1003")`,
-			Type:       QTYPE_SEARCH,
-		},
-		Right: &Query{
-			Expression: `(RECORD.id CONTAINS "1003100")`,
-			Type:       QTYPE_SEARCH,
-		},
+func Validate(query string) error {
+	if err := validateBrackets(query); err != nil {
+		return err
 	}
-
-	task.extension = detectExtension(cfg.Files)
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
-
-	go engine.run(task, res)
-	return res, nil // OK for now
+	return nil
 }
 
-// Count starts asynchronous "/count" with RyftMUX engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	res := search.NewResult()
-	_ = task        // TODO: go engine.run(task, res)
-	return res, nil // OK for now
+func validateBrackets(query string) error {
+	result := strings.Count(query, "(") == strings.Count(query, ")")
+
+	if !result {
+		return buildError("Invalid number of brackets")
+	}
+	return nil
 }
 
-// Files starts synchronous "/files" with RyftPrim engine.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	return engine.Backend.Files(path)
-}
-
-func detectExtension(fileNames []string) string {
-	extensions := make([]string, 0)
-
-	// Collect uniq file extensions list
-	for _, file := range fileNames {
-		ext := extensionByMask(file)
-		if !containsString(extensions, ext) {
-			extensions = append(extensions, ext)
-		}
-	}
-
-	if len(extensions) == 1 {
-		return extensions[0]
-	} else {
-		return "todo"
-	}
-}
-
-func extensionByMask(filename string) string {
-	ext := filepath.Ext(filename)
-	if ext == "" {
-		return ".bin"
-	}
-	return ext
+func buildError(message string) error {
+	return errors.New(message)
 }
