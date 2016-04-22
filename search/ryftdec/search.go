@@ -31,8 +31,8 @@
 package ryftdec
 
 import (
-	// "fmt"
 	"path/filepath"
+	"fmt"
 
 	"github.com/getryft/ryft-server/search"
 )
@@ -40,31 +40,23 @@ import (
 // Search starts asynchronous "/search" with RyftDEC engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
-	res := search.NewResult()
+	var err error
 
 	// split cfg.Query into several expressions
-	// task.queries, err = decompose(cfg.Query)
-	// if err != nil {
-	// //hangle decomposition error here
-	// }
-	task.queries = &Query{
-		Expression: cfg.Query,
-		Type:       QTYPE_AND,
-		Left: &Query{
-			Expression: `(RECORD.id CONTAINS "1003")`,
-			Type:       QTYPE_SEARCH,
-		},
-		Right: &Query{
-			Expression: `(RECORD.id CONTAINS "1003100")`,
-			Type:       QTYPE_SEARCH,
-		},
+	task.queries, err = Decompose(cfg.Query)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
+		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
+
+	// TODO: optimize simple queryes, just pass it to backend directly!!!
 
 	task.extension = detectExtension(cfg.Files)
 	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
-	go engine.run(task, res)
-	return res, nil // OK for now
+	mux := search.NewResult()
+	go engine.run(task, mux)
+	return mux, nil // OK for now
 }
 
 // Count starts asynchronous "/count" with RyftMUX engine.

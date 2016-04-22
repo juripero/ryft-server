@@ -49,7 +49,7 @@ type Task struct {
 	subtaskId  int
 
 	config    *search.Config
-	queries   *Query // root query
+	queries   *Node // root query
 	extension string
 }
 
@@ -80,7 +80,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 }
 
 // process and wait all subtasks
-func (engine *Engine) run1(task *Task, query *Query, cfg *search.Config, mux *search.Result, isLast bool) error {
+func (engine *Engine) run1(task *Task, query *Node, cfg *search.Config, mux *search.Result, isLast bool) error {
 	var mode string
 
 	switch query.Type {
@@ -94,7 +94,8 @@ func (engine *Engine) run1(task *Task, query *Query, cfg *search.Config, mux *se
 		mode = "numeric_search"
 
 	case QTYPE_AND:
-		if query.Left == nil || query.Right == nil {
+		//if query.Left == nil || query.Right == nil {
+		if len(query.SubNodes) != 2 {
 			return fmt.Errorf("invalid format for AND operator")
 		}
 
@@ -108,12 +109,12 @@ func (engine *Engine) run1(task *Task, query *Query, cfg *search.Config, mux *se
 		// left: save results to temporary file
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = tempResult
-		engine.run1(task, query.Left, &tempCfg, mux, isLast && false)
+		engine.run1(task, query.SubNodes[0], &tempCfg, mux, isLast && false)
 
 		// right: read input from temporary file
 		tempCfg.Files = []string{tempResult}
 		tempCfg.KeepDataAs = cfg.KeepDataAs
-		engine.run1(task, query.Right, &tempCfg, mux, isLast && true)
+		engine.run1(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
 
 		return nil // OK
 

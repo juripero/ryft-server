@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,6 +113,19 @@ func newRyftDec(log Logger, backend search.Engine) search.Engine {
 
 	ryftdec.SetLogLevel(ryftdecLogLevel)
 	return engine
+}
+
+// test decomposition
+func decomp0() {
+	root, _ := ryftdec.Decompose(`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`)
+	printDecompTree(root, 0)
+}
+
+func printDecompTree(root *ryftdec.Node, deep int) {
+	fmt.Printf("%s%s#%d\n", strings.Repeat("    ", deep), root, root.Type)
+	for _, child := range root.SubNodes {
+		printDecompTree(child, deep+1)
+	}
 }
 
 // create new ryftmux search engine

@@ -80,12 +80,6 @@ const (
 	QTYPE_XOR
 )
 
-type Query struct {
-	Type        QueryType
-	Expression  string
-	Left, Right *Query // for AND, OR, XOR
-}
-
 // SetLogLevel changes global module log level.
 func SetLogLevel(level string) error {
 	ll, err := logrus.ParseLevel(level)

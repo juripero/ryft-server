@@ -55,7 +55,8 @@ func main() {
 	//search2(false) // HTTP
 	//search3(false) // MUX
 	//search4(false) // ryftone
-	search5(false) // ryftdec
+	//search5(false) // ryftdec
+	decomp0()
 
 	//count1(false) // ryftprim
 	//count2(false) // HTTP
