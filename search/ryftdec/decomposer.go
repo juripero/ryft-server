@@ -174,9 +174,11 @@ func queryConst(query string) QueryType {
 		return QTYPE_DATE
 	case strings.Contains(query, "TIME("):
 		return QTYPE_TIME
-	default:
-		return QTYPE_NUMERIC
+		//case strings.Contains(query, "????"):
+		//return QTYPE_NUMERIC
 	}
+
+	return QTYPE_SEARCH
 }
 
 func isOperator(token string) bool {
