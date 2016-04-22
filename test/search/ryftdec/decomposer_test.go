@@ -28,7 +28,7 @@ func TestRegularQuery(t *testing.T) {
 }
 
 func DecompositionTests(t *testing.T, query string) {
-	result := ryftdec.Decompose(query)
+	result, _ := ryftdec.Decompose(query)
 
 	RootNodeChildren(t, result)
 	FirstLevelNodeChildren(t, result)
