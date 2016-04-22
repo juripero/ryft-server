@@ -31,8 +31,8 @@
 package ryftdec
 
 import (
-	"path/filepath"
 	"fmt"
+	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
 )
@@ -49,7 +49,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
 
-	// TODO: optimize simple queryes, just pass it to backend directly!!!
+	// in simple cases when there is only one subquery
+	// we can pass this query directly to the backend
+	if task.queries.Type == QTYPE_SEARCH && len(task.queries.SubNodes) == 0 {
+		return engine.Backend.Search(cfg)
+	}
 
 	task.extension = detectExtension(cfg.Files)
 	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
