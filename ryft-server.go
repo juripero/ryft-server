@@ -272,6 +272,9 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 	}
 
 	// special query decomposer
+	if *debug {
+		ryftdec.SetLogLevel("debug")
+	}
 	return ryftdec.NewEngine(backend)
 }
 
