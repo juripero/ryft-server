@@ -104,7 +104,8 @@ func parse(currentNode *Node, query string) (*Node, error) {
 	tokens := strings.FieldsFunc(query, isBracket)
 	tokens = translateToPrefixNotation(tokens)
 
-	if isDecomposable(query) && len(tokens) < 2 {
+	// If query can be decomposed but it did't happen - it is invalid
+	if (isDecomposable(query) && len(tokens) < 2) || !validBracketsBalance(query) {
 		return nil, buildError("Can't parse expression, invalid number of brackets")
 	}
 
@@ -192,4 +193,23 @@ func isOperator(token string) bool {
 
 func buildError(message string) error {
 	return errors.New(message)
+}
+
+func validBracketsBalance(query string) bool {
+	chars := []rune(query)
+	count := 0
+	for _, c := range chars {
+		if count < 0 {
+			return false
+		}
+
+		switch {
+		case c == '(':
+			count++
+		case c == ')':
+			count--
+		}
+	}
+
+	return count == 0
 }
