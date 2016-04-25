@@ -17,22 +17,6 @@ import (
 	"github.com/getryft/ryft-server/search/ryftdec"
 )
 
-func TestInvalidQueryWithInvalidBrackets(t *testing.T) {
-	query := `(((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`
-	_, err := ryftdec.Decompose(query)
-	if err == nil {
-		t.Error("Expected invalid query error, got valid result")
-	}
-}
-
-func TestInvalidQueryWithInvalidBrackets2(t *testing.T) {
-	query := `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301")))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`
-	_, err := ryftdec.Decompose(query)
-	if err == nil {
-		t.Error("Expected invalid query error, got valid result")
-	}
-}
-
 func TestNode1(t *testing.T) {
 	result := tree()
 	node := result
