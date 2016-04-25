@@ -32,6 +32,7 @@ package ryftdec
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -106,7 +107,7 @@ func (engine *Engine) run1(task *Task, query *Node, cfg *search.Config, mux *sea
 		backendOptions := engine.Backend.Options()
 		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
 		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
-		tempResult := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d.%s",
+		tempResult := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-and.%s",
 			task.Identifier, task.subtaskId, task.extension))
 
 		task.log().WithField("temp", tempResult).
@@ -134,7 +135,79 @@ func (engine *Engine) run1(task *Task, query *Node, cfg *search.Config, mux *sea
 		return nil // OK
 
 	case QTYPE_OR:
-		return fmt.Errorf("OR is not implemented yet")
+		//if query.Left == nil || query.Right == nil {
+		if len(query.SubNodes) != 2 {
+			return fmt.Errorf("invalid format for OR operator")
+		}
+
+		task.subtaskId += 1
+		backendOptions := engine.Backend.Options()
+		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
+		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
+		tempResultA := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-a.%s",
+			task.Identifier, task.subtaskId, task.extension))
+		tempResultB := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-b.%s",
+			task.Identifier, task.subtaskId, task.extension))
+
+		task.log().WithField("temp", []string{tempResultA, tempResultB}).
+			Infof("[%s]/%d: running OR", TAG, task.subtaskId)
+
+		// left: save results to temporary file "A"
+		tempCfg := *cfg
+		tempCfg.KeepDataAs = tempResultA
+		err1 := engine.run1(task, query.SubNodes[0], &tempCfg, mux, isLast && true)
+		if err1 != nil {
+			return err1
+		}
+
+		// right: save results to temporary file "B"
+		tempCfg.KeepDataAs = tempResultB
+		err2 := engine.run1(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+		if err2 != nil {
+			return err2
+		}
+
+		// combine two temporary files into one
+		if len(cfg.KeepDataAs) != 0 {
+			// output file
+			f, err := os.Create(filepath.Join(backendMountPoint, cfg.KeepDataAs))
+			if err != nil {
+				return fmt.Errorf("failed to create output file: %s", err)
+			}
+			defer f.Close()
+
+			// first input file
+			a, err := os.Open(filepath.Join(backendMountPoint, tempResultA))
+			if err != nil {
+				return fmt.Errorf("failed to open first input file: %s", err)
+			}
+			defer a.Close()
+
+			// second input file
+			b, err := os.Open(filepath.Join(backendMountPoint, tempResultB))
+			if err != nil {
+				return fmt.Errorf("failed to open second input file: %s", err)
+			}
+			defer b.Close()
+
+			// copy first file
+			_, err = io.Copy(f, a)
+			if err != nil {
+				return fmt.Errorf("failed to copy first file: %s", err)
+			}
+
+			// copy second file
+			_, err = io.Copy(f, b)
+			if err != nil {
+				return fmt.Errorf("failed to copy second file: %s", err)
+			}
+		}
+
+		// remove temporary files
+		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResultA))
+		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResultB))
+
+		return nil // OK
 
 	case QTYPE_XOR:
 		return fmt.Errorf("XOR is not implemented yet")
