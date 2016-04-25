@@ -51,11 +51,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
-	if task.queries.Type == QTYPE_SEARCH && len(task.queries.SubNodes) == 0 {
+	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
 		return engine.Backend.Search(cfg)
 	}
 
-	task.extension = detectExtension(cfg.Files)
+	task.extension, err = detectExtension(cfg.Files)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
+		return nil, fmt.Errorf("failed to detect extension: %s", err)
+	}
 	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
 	mux := search.NewResult()
@@ -76,28 +80,24 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	return engine.Backend.Files(path)
 }
 
-func detectExtension(fileNames []string) string {
-	extensions := make([]string, 0)
+// Detect extension using input file set.
+func detectExtension(fileNames []string) (string, error) {
+	extensions := map[string]int{}
 
-	// Collect uniq file extensions list
+	// collect unique extensions
 	for _, file := range fileNames {
-		ext := extensionByMask(file)
-		if !containsString(extensions, ext) {
-			extensions = append(extensions, ext)
+		ext := filepath.Ext(file)
+		if len(ext) != 0 {
+			extensions[ext] = 1
 		}
 	}
 
 	if len(extensions) == 1 {
-		return extensions[0]
-	} else {
-		return "todo"
+		// return the first extension
+		for k, _ := range extensions {
+			return k, nil // OK
+		}
 	}
-}
 
-func extensionByMask(filename string) string {
-	ext := filepath.Ext(filename)
-	if ext == "" {
-		return ".bin"
-	}
-	return ext
+	return "", fmt.Errorf("unable to detect extension from %v", extensions)
 }

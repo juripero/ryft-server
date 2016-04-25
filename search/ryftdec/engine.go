@@ -80,6 +80,17 @@ const (
 	QTYPE_XOR
 )
 
+// IsSearch checks if query type is a search
+func (q QueryType) IsSearch() bool {
+	switch q {
+	case QTYPE_SEARCH, QTYPE_DATE,
+		QTYPE_TIME, QTYPE_NUMERIC:
+		return true
+	}
+
+	return false
+}
+
 // SetLogLevel changes global module log level.
 func SetLogLevel(level string) error {
 	ll, err := logrus.ParseLevel(level)
