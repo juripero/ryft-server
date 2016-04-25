@@ -198,7 +198,14 @@ func buildError(message string) error {
 func validBracketsBalance(query string) bool {
 	chars := []rune(query)
 	count := 0
-	for _, c := range chars {
+
+	for i := 0; i < len(chars); i++ {
+		c := chars[i]
+
+		if !validateEmptyBrackets(chars, i) {
+			return false
+		}
+
 		if count < 0 {
 			return false
 		}
