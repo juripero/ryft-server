@@ -30,16 +30,32 @@
 
 package ryftdec
 
-func validBracketsBalance(query string) bool {
-	chars := []rune(query)
-	count := 0
+import (
+	"strings"
+)
 
+func validateQuery(query string) bool {
+	chars := []rune(query)
+
+	if !validateQueryLength(chars) {
+		return false
+	}
+
+	if !validateEmptyBrackets(query) {
+		return false
+	}
+
+	if !validateBracketsBalance(chars) {
+		return false
+	}
+
+	return true
+}
+
+func validateBracketsBalance(chars []rune) bool {
+	count := 0
 	for i := 0; i < len(chars); i++ {
 		c := chars[i]
-
-		if !validateEmptyBrackets(chars, i) {
-			return false
-		}
 
 		if count < 0 {
 			return false
@@ -56,6 +72,10 @@ func validBracketsBalance(query string) bool {
 	return count == 0
 }
 
-func validateEmptyBrackets(chars []rune, index int) bool {
-	return chars[index] != '(' || chars[index+1] != ')'
+func validateQueryLength(chars []rune) bool {
+	return len(chars) > 2
+}
+
+func validateEmptyBrackets(query string) bool {
+	return !strings.Contains(query, "()")
 }

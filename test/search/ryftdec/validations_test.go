@@ -38,6 +38,14 @@ func TestInvalidQuery4(t *testing.T) {
 	}
 }
 
+func TestInvalidQuery5(t *testing.T) {
+	query := `(`
+	_, err := ryftdec.Decompose(query)
+	if err == nil {
+		t.Error("Expected invalid query error, got valid result")
+	}
+}
+
 func TestValidQuery1(t *testing.T) {
 	query := `(RAW_TEXT CONTAINS "Some text0")`
 	_, err := ryftdec.Decompose(query)

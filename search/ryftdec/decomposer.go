@@ -78,6 +78,11 @@ func formatQuery(query string) string {
 
 // Parse expression and build query tree
 func parse(currentNode *Node, query string) (*Node, error) {
+
+	if !validateQuery(query) {
+		return nil, buildError("Can't parse expression, invalid number of brackets")
+	}
+
 	count := 0
 	isBracket := func(r rune) bool {
 		switch {
@@ -104,15 +109,10 @@ func parse(currentNode *Node, query string) (*Node, error) {
 	tokens := strings.FieldsFunc(query, isBracket)
 	tokens = translateToPrefixNotation(tokens)
 
-	// If query can be decomposed but it did't happen - it is invalid
-	if (isDecomposable(query) && len(tokens) < 2) || !validBracketsBalance(query) {
-		return nil, buildError("Can't parse expression, invalid number of brackets")
-	}
-
 	// Build tree from tokens
 	for i := 0; i < len(tokens); i++ {
 		token = tokens[i]
-		if isDecomposable(token) && len(tokens) != 1 {
+		if isDecomposable(token) {
 			parse(currentNode, token)
 		} else {
 			switch {
