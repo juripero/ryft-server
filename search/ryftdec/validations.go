@@ -30,6 +30,32 @@
 
 package ryftdec
 
+func validBracketsBalance(query string) bool {
+	chars := []rune(query)
+	count := 0
+
+	for i := 0; i < len(chars); i++ {
+		c := chars[i]
+
+		if !validateEmptyBrackets(chars, i) {
+			return false
+		}
+
+		if count < 0 {
+			return false
+		}
+
+		switch {
+		case c == '(':
+			count++
+		case c == ')':
+			count--
+		}
+	}
+
+	return count == 0
+}
+
 func validateEmptyBrackets(chars []rune, index int) bool {
 	return chars[index] != '(' || chars[index+1] != ')'
 }

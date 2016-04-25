@@ -194,29 +194,3 @@ func isOperator(token string) bool {
 func buildError(message string) error {
 	return errors.New(message)
 }
-
-func validBracketsBalance(query string) bool {
-	chars := []rune(query)
-	count := 0
-
-	for i := 0; i < len(chars); i++ {
-		c := chars[i]
-
-		if !validateEmptyBrackets(chars, i) {
-			return false
-		}
-
-		if count < 0 {
-			return false
-		}
-
-		switch {
-		case c == '(':
-			count++
-		case c == ')':
-			count--
-		}
-	}
-
-	return count == 0
-}
