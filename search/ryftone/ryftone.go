@@ -111,6 +111,7 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 		dataFile = filepath.Join(engine.Instance, task.DataFileName)
 	}
 
+	// TODO: use cfg.Mode to run specific search!
 	err = task.dataSet.SearchFuzzyHamming(engine.prepareQuery(cfg.Query),
 		dataFile, indexFile, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive)
 	if err == nil {

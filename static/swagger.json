@@ -55,6 +55,13 @@
             "required": true
           },
           {
+            "type": "string",
+            "x-go-name": "Mode",
+            "description": "Search mode. Should be \"es\" for exact search, \"fhs\" for fuzzy hamming search, \"feds\" for fuzzy edit distance search, \"ds\", \"ts\", \"ns\" for date, time or numeric search",
+            "name": "mode",
+            "in": "query"
+          },
+          {
             "maximum": 6554,
             "minimum": 0,
             "type": "integer",
