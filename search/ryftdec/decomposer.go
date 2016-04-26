@@ -42,8 +42,6 @@ var (
 	maxDepth   int = 1
 )
 
-//const
-
 type Node struct {
 	Expression string
 	Type       QueryType
@@ -78,11 +76,18 @@ func formatQuery(query string) string {
 
 // Parse expression and build query tree
 func parse(currentNode *Node, query string) (*Node, error) {
-
 	if !validateQuery(query) {
-		return nil, buildError("Can't parse expression, invalid number of brackets")
+		return nil, buildError("Can't parse expression, invalid format")
 	}
 
+	tokens := tokenize(query)
+	tokens = translateToPrefixNotation(tokens)
+	currentNode = addToTree(currentNode, tokens)
+
+	return currentNode, nil
+}
+
+func tokenize(query string) []string {
 	count := 0
 	isBracket := func(r rune) bool {
 		switch {
@@ -104,14 +109,12 @@ func parse(currentNode *Node, query string) (*Node, error) {
 			return false
 		}
 	}
+	return strings.FieldsFunc(query, isBracket)
+}
 
-	var token string
-	tokens := strings.FieldsFunc(query, isBracket)
-	tokens = translateToPrefixNotation(tokens)
-
-	// Build tree from tokens
+func addToTree(currentNode *Node, tokens []string) *Node {
 	for i := 0; i < len(tokens); i++ {
-		token = tokens[i]
+		token := tokens[i]
 		if isDecomposable(token) {
 			parse(currentNode, token)
 		} else {
@@ -123,12 +126,34 @@ func parse(currentNode *Node, query string) (*Node, error) {
 			}
 		}
 	}
-	return currentNode, nil
+	return currentNode
 }
 
 // Decompose query only when it includes DATE/TIME operators and has logic operators AND/OR
 func isDecomposable(originalQuery string) bool {
-	return includesAnyToken(originalQuery, delimiters) && includesAnyToken(originalQuery, markers)
+	return includesMultipleSearchTypes(originalQuery) && includesAnyToken(originalQuery, delimiters)
+}
+
+func includesMultipleSearchTypes(originalQuery string) bool {
+	for _, marker := range markers {
+		if containsMultipleTypes(originalQuery, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// Check if expression has multiple kinds of expressions, e.g. (TEXT AND DATE) or maybe (DATE AND TIME)
+func containsMultipleTypes(query string, marker string) bool {
+	delimitersCount := 0
+	for _, delimiter := range delimiters {
+		count := strings.Count(query, delimiter)
+		delimitersCount = delimitersCount + count
+	}
+
+	markersCount := strings.Count(query, marker)
+
+	return (delimitersCount == markersCount) || (delimitersCount > 1 && markersCount > 0 && markersCount < delimitersCount)
 }
 
 func includesAnyToken(query string, tokens []string) bool {
