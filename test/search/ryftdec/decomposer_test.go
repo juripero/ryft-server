@@ -130,6 +130,19 @@ func TestDifferentTypeDecomposition2(t *testing.T) {
 	}
 }
 
+func TestDifferentTypeDecomposition3(t *testing.T) {
+	query := `((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS DATE("100301")) OR (RECORD.id CONTAINS "2003"))`
+	node, _ := ryftdec.Decompose(query)
+
+	if node.Expression != `AND` {
+		t.Error(`Expected AND, got`, node.Expression)
+	}
+
+	if len(node.SubNodes) != 2 {
+		t.Error("Expected 2 subnodes, got", len(node.SubNodes))
+	}
+}
+
 func TestSameTypeDecomposition1(t *testing.T) {
 	query := `((RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")))`
 	node, _ := ryftdec.Decompose(query)
@@ -162,6 +175,19 @@ func TestSameTypeDecomposition3(t *testing.T) {
 
 	if node.Expression != `((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS "100301"))` {
 		t.Error(`Expected ((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS "100301")), got`, node.Expression)
+	}
+
+	if len(node.SubNodes) != 0 {
+		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
+	}
+}
+
+func TestSameTypeDecomposition4(t *testing.T) {
+	query := `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301")))`
+	node, _ := ryftdec.Decompose(query)
+
+	if node.Expression != `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301")))` {
+		t.Error(`Expected ((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301"))), got`, node.Expression)
 	}
 
 	if len(node.SubNodes) != 0 {
