@@ -83,20 +83,31 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	// TODO: handle task cancellation!!!
 }
 
+// get search mode based on query type
+func getSearchMode(query QueryType, defaultMode string) string {
+	switch query {
+	case QTYPE_SEARCH:
+		return defaultMode
+	case QTYPE_DATE:
+		return "ds" // date_search
+	case QTYPE_TIME:
+		return "ts" // time_search
+	case QTYPE_NUMERIC:
+		return "ns" // numeric_search
+	}
+
+	return defaultMode
+}
+
 // process and wait all subtasks
 // returns number of matches
 func (engine *Engine) run1(task *Task, query *Node, cfg *search.Config, mux *search.Result, isLast bool) (uint64, error) {
-	var mode string
-
 	switch query.Type {
 	case QTYPE_SEARCH:
-		mode = task.config.Mode // as requested
 	case QTYPE_DATE:
-		mode = "date_search"
 	case QTYPE_TIME:
-		mode = "time_search"
 	case QTYPE_NUMERIC:
-		mode = "numeric_search"
+		// search later
 
 	case QTYPE_AND:
 		//if query.Left == nil || query.Right == nil {
@@ -223,14 +234,15 @@ func (engine *Engine) run1(task *Task, query *Node, cfg *search.Config, mux *sea
 		return 0, fmt.Errorf("%d is unknown query type", query.Type)
 	}
 
-	task.log().WithField("mode", mode).
-		WithField("query", query.Expression).
+	cfg.Mode = getSearchMode(query.Type, task.config.Mode)
+	cfg.Query = query.Expression
+
+	task.log().WithField("mode", cfg.Mode).
+		WithField("query", cfg.Query).
 		WithField("input", cfg.Files).
 		WithField("output", cfg.KeepDataAs).
 		Infof("[%s]/%d: running backend search", TAG, task.subtaskId)
 
-	cfg.Mode = mode
-	cfg.Query = query.Expression
 	res, err := engine.Backend.Search(cfg)
 	if err != nil {
 		return 0, err
