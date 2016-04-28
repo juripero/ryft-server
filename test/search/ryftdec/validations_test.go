@@ -9,22 +9,30 @@ import (
 
 func TestInvalidQueries(t *testing.T) {
 	queries := []string{
+		"", " ", "   ",
+		"(", ")", "((", "))", ")(",
+		"TEST", " TEST ", " TEST   FOO   TEST  ",
+		"AND", " AND ", "   AND  ", ` ( "AND" ) `,
+		`))OR((`,
+		`() AND ()`,
+		`() AND (OR)`,
+		`() AND () AND ()`,
+		`() AND OR" "() MOR ()`,
 		`(((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`,
 		`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301")))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`,
-		`() AND OR" "() MOR ()`,
-		`))OR((`,
-		`(`,
 	}
 
 	for _, q := range queries {
 		_, err := ryftdec.Decompose(q)
-		assert.Error(t, err, "Invalid query")
+		assert.Error(t, err, "Invalid query: `%s`", q)
 	}
 }
 
 func TestValidQueries(t *testing.T) {
 	queries := []string{
 		`(RAW_TEXT CONTAINS "Some text0")`,
+		`((RAW_TEXT CONTAINS "Some text0"))`,
+		`(RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2")`,
 		`((RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2"))`,
 		`(( record.city EQUALS "Rockville" ) AND ( record.state EQUALS "MD" ))`,
 		`(( ( record.city EQUALS "Rockville" ) OR ( record.city EQUALS "Gaithersburg" ) ) AND ( record.state EQUALS "MD" ))`,
@@ -37,6 +45,6 @@ func TestValidQueries(t *testing.T) {
 
 	for _, q := range queries {
 		_, err := ryftdec.Decompose(q)
-		assert.NoError(t, err, "Valid query")
+		assert.NoError(t, err, "Valid query: `%s`", q)
 	}
 }
