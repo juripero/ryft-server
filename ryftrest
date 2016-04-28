@@ -59,7 +59,7 @@ MODE=
 FILES=
 CASE_INSENS=
 NODES=
-FUZINESS=
+FUZZINESS=
 SURROUNDING=
 QUERY=
 DATA=
@@ -106,11 +106,11 @@ while [[ $# > 0 ]]; do
 		shift 2
 		;;
 	-d=*|--fuzziness=*)
-		FUZINESS="${1#*=}"
+		FUZZINESS="${1#*=}"
 		shift
 		;;
 	-d|--fuzziness)
-		FUZINESS="$2"
+		FUZZINESS="$2"
 		shift 2
 		;;
 	-w=*|--width=*)
@@ -212,7 +212,7 @@ for file in "${files[@]}"; do
 done
 [[ -z "$CASE_INSENS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=true") # inversed!
 [[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")
-[[ ! -z "$FUZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuziness=$FUZINESS")
+[[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
 [[ ! -z "$MODE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "mode=$MODE")
 [[ ! -z "$DATA" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "data=$DATA")
