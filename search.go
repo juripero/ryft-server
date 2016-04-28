@@ -130,6 +130,8 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+
+	log.Printf("search: %s", cfg)
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -223,7 +225,7 @@ func (s *Server) search(ctx *gin.Context) {
 				panic(err)
 			}
 
-			log.Printf("done: %s", res)
+			log.Printf("search done: %s", res)
 			return // stop
 		}
 	}
