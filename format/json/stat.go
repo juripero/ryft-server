@@ -28,52 +28,28 @@
  * ============
  */
 
-package format
+package json
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/getryft/ryft-server/format/json"
 	"github.com/getryft/ryft-server/format/raw"
-	"github.com/getryft/ryft-server/format/xml"
 	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	JSON = "json"
-	RAW  = "raw"
-	XML  = "xml"
-)
+// STATISTICS format specific data.
+// Is the same as RAW format statistics!
+type Statistics raw.Statistics
 
-// Abstract Format interface.
-// Support conversion from/to basic search data types.
-// NewXXX() methods are used to decode data from stream.
-type Format interface {
-	NewIndex() interface{}
-	FromIndex(search.Index) interface{}
-	ToIndex(interface{}) search.Index
-
-	NewRecord() interface{}
-	FromRecord(*search.Record) interface{}
-	ToRecord(interface{}) *search.Record
-
-	NewStat() interface{}
-	FromStat(*search.Statistics) interface{}
-	ToStat(interface{}) *search.Statistics
+// NewStat creates new format specific data.
+func NewStat() interface{} {
+	return new(Statistics)
 }
 
-// New creates new formatter instance.
-// XML format supports some options.
-func New(format string, opts map[string]interface{}) (Format, error) {
-	switch strings.ToLower(format) {
-	case JSON:
-		return json.New(opts)
-	case RAW:
-		return raw.New()
-	case XML:
-		return xml.New(opts)
-	}
+// FromStat converts STATISTICS to format specific data.
+func FromStat(stat *search.Statistics) *Statistics {
+	return (*Statistics)(raw.FromStat(stat))
+}
 
-	return nil, fmt.Errorf("%q is unsupported format", format)
+// ToStat converts format specific data to STATISTICS.
+func ToStat(stat *Statistics) *search.Statistics {
+	return raw.ToStat((*raw.Statistics)(stat))
 }
