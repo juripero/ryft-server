@@ -19,6 +19,7 @@
             "items": {
               "type": "string"
             },
+            "collectionFormat": "multi",
             "x-go-name": "Files",
             "description": "Source files",
             "name": "files",
