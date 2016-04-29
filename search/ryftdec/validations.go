@@ -31,6 +31,7 @@
 package ryftdec
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -78,4 +79,25 @@ func validateQueryLength(chars []rune) bool {
 
 func validateEmptyBrackets(query string) bool {
 	return !strings.Contains(query, "()")
+}
+
+func validateTokens(tokens []string) bool {
+	for _, token := range tokens {
+		if notParsable(token) && !isOperator(token) && !validateToken(token) {
+			return false
+		}
+	}
+	return true
+}
+
+func validateToken(token string) bool {
+	result, _ := regexp.MatchString(`^$|^[(.a-zA-Z0-9_]+ [a-zA-Z-]+ [a-zA-Z0-9-"():<>/ ]+?$`, token)
+	return result
+}
+
+func validateTree(node *Node) bool {
+	if isOperator(node.Expression) && !node.hasSubnodes() {
+		return false
+	}
+	return true
 }

@@ -117,10 +117,10 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND (RECORD.date CONTAINS DATE("00/00/0000"))   OR   (RECORD.date CONTAINS TIME("00:00:00"))`,
 		`[  OR]:
+  [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))
   [ AND]:
     [    ]: (RECORD.id CONTAINS "1003")
-    [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))
-  [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
+    [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))`)
 
 	// TODO: provide expected query trees!
 	_testQueryTree(t, `((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS DATE("100301")))`,

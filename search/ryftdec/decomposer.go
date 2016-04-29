@@ -31,7 +31,6 @@
 package ryftdec
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -71,10 +70,6 @@ type Node struct {
 	SubNodes   []*Node
 }
 
-func (node Node) String() string {
-	return fmt.Sprintf("Expression: '%s'", node.Expression)
-}
-
 func Decompose(originalQuery string) (*Node, error) {
 	rootNode := Node{SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
@@ -83,11 +78,11 @@ func Decompose(originalQuery string) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	node := normalizeTree(rootNode.SubNodes[0])
 
-	return rootNode.SubNodes[0], nil // Return first node with value
+	return node, nil // Return first node with value
 }
 
-// Add spaces around logic operators
 func formatQuery(query string) string {
 	for _, delimiter := range delimiters {
 		delimiter = strings.Trim(delimiter, " ")
@@ -100,14 +95,38 @@ func formatQuery(query string) string {
 // Parse expression and build query tree
 func parse(currentNode *Node, query string) (*Node, error) {
 	if !validateQuery(query) {
-		return nil, buildError("Can't parse expression, invalid format")
+		return nil, buildError("Invalid query: " + query)
 	}
 
 	tokens := tokenize(query)
+
+	if !validateTokens(tokens) {
+		return nil, buildError("Invalid query: " + query)
+	}
+
 	tokens = translateToPrefixNotation(tokens)
 	currentNode = addToTree(currentNode, tokens)
 
+	if !validateTree(currentNode) {
+		return nil, buildError("Invalid query: " + query)
+	}
+
 	return currentNode, nil
+}
+
+func normalizeTree(node *Node) *Node {
+	if node.hasSubnodes() && node.sameTypeSubnodes() && node.subnodesAreQueries() {
+		subnodesType := node.SubNodes[0].Type
+		node.Expression = node.SubNodes[0].Expression + " " + node.Expression + " " + node.SubNodes[1].Expression
+		node.Type = subnodesType
+		node.SubNodes = node.SubNodes[0:0]
+	} else {
+		for _, subNode := range node.SubNodes {
+			normalizeTree(subNode)
+		}
+	}
+
+	return node
 }
 
 func tokenize(query string) []string {
@@ -132,77 +151,20 @@ func tokenize(query string) []string {
 			return false
 		}
 	}
-	return strings.FieldsFunc(query, isBracket)
-}
 
-func addToTree(currentNode *Node, tokens []string) *Node {
-	for i := 0; i < len(tokens); i++ {
-		token := tokens[i]
-		if isDecomposable(token) {
-			parse(currentNode, token)
-		} else {
-			switch {
-			case isOperator(token):
-				currentNode = addChildToNode(currentNode, token)
-			default:
-				addChildToNode(currentNode, token)
-			}
-		}
+	tokens := strings.FieldsFunc(query, isBracket)
+	for i, token := range tokens {
+		tokens[i] = strings.Trim(token, " ")
 	}
-	return currentNode
-}
-
-// Decompose query only when it includes DATE/TIME operators and has logic operators AND/OR
-func isDecomposable(originalQuery string) bool {
-	return includesMultipleSearchTypes(originalQuery) && includesAnyToken(originalQuery, delimiters)
-}
-
-func includesMultipleSearchTypes(originalQuery string) bool {
-	for _, marker := range markers {
-		if containsMultipleTypes(originalQuery, marker) {
-			return true
-		}
-	}
-	return false
-}
-
-func formatSubQuery(query string) string {
-	// Add brackets if query is not surrounded by them
-	// e.g RAW_TEXT CONTAINS "100"
-	if []rune(query)[0] != '(' {
-		return "(" + query + ")"
-	}
-	return query
-}
-
-func containsMultipleExpressions(query string) bool {
-	return includesAnyToken(query, delimiters)
-}
-
-// Check if expression has multiple kinds of expressions, e.g. (TEXT AND DATE) or maybe (DATE AND TIME)
-func containsMultipleTypes(query string, marker string) bool {
-	delimitersCount := 0
-	for _, delimiter := range delimiters {
-		count := strings.Count(query, delimiter)
-		delimitersCount = delimitersCount + count
-	}
-
-	markersCount := strings.Count(query, marker)
-
-	return (delimitersCount == markersCount) || (delimitersCount > 1 && markersCount > 0 && markersCount < delimitersCount)
-}
-
-func includesAnyToken(query string, tokens []string) bool {
-	for _, marker := range tokens {
-		if strings.Contains(query, marker) {
-			return true
-		}
-	}
-	return false
+	return tokens
 }
 
 func translateToPrefixNotation(tokens []string) []string {
-	for i := 0; i < len(tokens)-1; i++ {
+	if containsString(tokens, "OR") && containsString(tokens, "AND") {
+		tokens = reorderOperators(tokens, make([]string, 0))
+	}
+
+	for i := 1; i < len(tokens)-1; i++ {
 		if isOperator(tokens[i]) {
 			tokens[i-1], tokens[i] = tokens[i], tokens[i-1]
 		}
@@ -210,16 +172,56 @@ func translateToPrefixNotation(tokens []string) []string {
 	return tokens
 }
 
-func addChildToNode(currentNode *Node, token string) *Node {
-	var newNode Node
-	switch {
-	case isOperator(token):
-		newNode = Node{Expression: strings.Trim(token, " "), Type: operatorConst(token)}
-	default:
-		newNode = Node{Expression: formatSubQuery(token), Type: queryConst(token)}
+func reorderOperators(tokens []string, result []string) []string {
+	index := indexOfToken(tokens, "OR")
+	if index > 0 {
+		result = append(result, tokens[index:]...)
+		result = reorderOperators(tokens[:index], result)
+	} else {
+		result = append(result, tokens...)
 	}
+
+	return result
+}
+
+func addToTree(currentNode *Node, tokens []string) *Node {
+	for _, token := range tokens {
+		if isOperator(token) {
+			currentNode = addChildToNode(currentNode, token)
+		} else {
+			if notParsable(token) {
+				addChildToNode(currentNode, token)
+			} else {
+				_, _ = parse(currentNode, token)
+			}
+		}
+	}
+	return currentNode
+}
+
+func notParsable(expression string) bool {
+	twoBrackets := (strings.Count(expression, "(") == 1) && (strings.Count(expression, ")") == 1)
+	dateExpression := strings.Contains(expression, "DATE(")
+	timeExpression := strings.Contains(expression, "TIME(")
+	noBrackets := (strings.Count(expression, "(") == 0) && (strings.Count(expression, ")") == 0)
+	return noBrackets || (twoBrackets && dateExpression) || (twoBrackets && timeExpression)
+}
+
+func addChildToNode(currentNode *Node, token string) *Node {
+	// TODO: use New method to build node for expression
+	newNode := nodeForExpression(token)
 	currentNode.SubNodes = append(currentNode.SubNodes, &newNode)
 	return &newNode
+}
+
+func nodeForExpression(expression string) Node {
+	var newNode Node
+	if isOperator(expression) {
+		newNode = Node{Expression: strings.Trim(expression, " "), Type: operatorConst(expression)}
+	} else {
+		newNode = Node{Expression: "(" + expression + ")", Type: queryConst(expression)}
+	}
+	return newNode
 }
 
 // Map string operator value to constant
@@ -249,9 +251,22 @@ func queryConst(query string) QueryType {
 }
 
 func isOperator(token string) bool {
-	return containsString(delimiters, token)
+	return containsString(delimiters, " "+token+" ")
 }
 
-func buildError(message string) error {
-	return errors.New(message)
+func (node *Node) sameTypeSubnodes() bool {
+	return node.SubNodes[0].Type == node.SubNodes[1].Type
+}
+
+func (node *Node) subnodesAreQueries() bool {
+	// TODO: handle OR and XOR here
+	return (node.SubNodes[0].Type != QTYPE_AND) && (node.SubNodes[1].Type != QTYPE_AND)
+}
+
+func (node *Node) hasSubnodes() bool {
+	return len(node.SubNodes) > 0
+}
+
+func (node Node) String() string {
+	return fmt.Sprintf("Expression: '%s'", node.Expression)
 }

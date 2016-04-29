@@ -31,6 +31,7 @@
 package ryftdec
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 )
@@ -64,4 +65,17 @@ func detectExtension(fileNames []string) (string, error) {
 	}
 
 	return "", fmt.Errorf("unable to detect extension from %v", extensions)
+}
+
+func buildError(message string) error {
+	return errors.New(message)
+}
+
+func indexOfToken(tokens []string, token string) int {
+	for index, value := range tokens {
+		if value == token {
+			return index
+		}
+	}
+	return -1
 }
