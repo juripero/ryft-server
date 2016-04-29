@@ -30,6 +30,11 @@
 
 package ryftdec
 
+import (
+	"fmt"
+	"path/filepath"
+)
+
 func containsString(slice []string, item string) bool {
 	for _, v := range slice {
 		if v == item {
@@ -37,4 +42,26 @@ func containsString(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// Detect extension using input file set.
+func detectExtension(fileNames []string) (string, error) {
+	extensions := map[string]int{}
+
+	// collect unique extensions
+	for _, file := range fileNames {
+		ext := filepath.Ext(file)
+		if len(ext) != 0 {
+			extensions[ext] = 1
+		}
+	}
+
+	if len(extensions) == 1 {
+		// return the first extension
+		for k, _ := range extensions {
+			return k, nil // OK
+		}
+	}
+
+	return "", fmt.Errorf("unable to detect extension from %v", extensions)
 }

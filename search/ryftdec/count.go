@@ -40,8 +40,8 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
-// Search starts asynchronous "/search" with RyftDEC engine.
-func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
+// Count starts asynchronous "/count" with RyftDEC engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
 	var err error
 
@@ -60,7 +60,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			// if query contains corresponding keywords
 			cfg.Mode = getSearchMode(task.queries.Type, "")
 		}
-		return engine.Backend.Search(cfg)
+		return engine.Backend.Count(cfg)
 	}
 
 	task.extension, err = detectExtension(cfg.Files)
@@ -76,9 +76,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		defer mux.Close()
 		defer mux.ReportDone()
 
-		_, err := engine.search(task, task.queries, task.config, mux, true)
+		_, err := engine.count(task, task.queries, task.config, mux, true)
 		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
+			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
 			mux.ReportError(err)
 		}
 
@@ -87,15 +87,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return mux, nil // OK for now
 }
 
-// process and wait all /search subtasks
+// process and wait all /count subtasks
 // returns number of matches
-func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *search.Result, isLast bool) (uint64, error) {
+func (engine *Engine) count(task *Task, query *Node, cfg *search.Config, mux *search.Result, isLast bool) (uint64, error) {
 	switch query.Type {
 	case QTYPE_SEARCH:
 	case QTYPE_DATE:
 	case QTYPE_TIME:
 	case QTYPE_NUMERIC:
-		// search later
+		// count later
 
 	case QTYPE_AND:
 		//if query.Left == nil || query.Right == nil {
@@ -127,7 +127,11 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *s
 			// right: read input from temporary file
 			tempCfg.Files = []string{tempResult}
 			tempCfg.KeepDataAs = cfg.KeepDataAs
-			n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+			if isLast {
+				n2, err2 = engine.count(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+			} else {
+				n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+			}
 			if err2 != nil {
 				return 0, err2
 			}
@@ -161,14 +165,22 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *s
 		// left: save results to temporary file "A"
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = tempResultA
-		n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, mux, isLast && true)
+		if isLast {
+			n1, err1 = engine.count(task, query.SubNodes[0], &tempCfg, mux, isLast && true)
+		} else {
+			n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, mux, isLast && true)
+		}
 		if err1 != nil {
 			return 0, err1
 		}
 
 		// right: save results to temporary file "B"
 		tempCfg.KeepDataAs = tempResultB
-		n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+		if isLast {
+			n2, err2 = engine.count(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+		} else {
+			n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+		}
 		if err2 != nil {
 			return 0, err2
 		}
@@ -231,7 +243,13 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *s
 		WithField("output", cfg.KeepDataAs).
 		Infof("[%s]/%d: running backend search", TAG, task.subtaskId)
 
-	res, err := engine.Backend.Search(cfg)
+	var res *search.Result
+	var err error
+	if isLast {
+		res, err = engine.Backend.Count(cfg)
+	} else {
+		res, err = engine.Backend.Search(cfg)
+	}
 	if err != nil {
 		return 0, err
 	}

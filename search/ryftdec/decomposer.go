@@ -42,6 +42,29 @@ var (
 	maxDepth   int = 1
 )
 
+type QueryType int
+
+const (
+	QTYPE_SEARCH QueryType = iota
+	QTYPE_DATE
+	QTYPE_TIME
+	QTYPE_NUMERIC
+	QTYPE_AND
+	QTYPE_OR
+	QTYPE_XOR
+)
+
+// IsSearch checks if query type is a search
+func (q QueryType) IsSearch() bool {
+	switch q {
+	case QTYPE_SEARCH, QTYPE_DATE,
+		QTYPE_TIME, QTYPE_NUMERIC:
+		return true
+	}
+
+	return false
+}
+
 type Node struct {
 	Expression string
 	Type       QueryType
