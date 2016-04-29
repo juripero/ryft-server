@@ -214,6 +214,9 @@ while [[ $# > 0 ]]; do
 	esac
 done
 
+[[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
+[[ -z "$FILES" ]] && fail "no any file provided, run '$0 --help' for help"
+
 # build the URL
 URL_DATA=(--data-urlencode "local=$LOCAL")
 [[ ! -z "$QUERY" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "query=$QUERY")
@@ -221,7 +224,7 @@ IFS=':' read -r -a files <<< "$FILES"
 for file in "${files[@]}"; do
 	[[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "files=$file")
 done
-[[ -z "$CASE_INSENS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=true") # inversed!
+[[ -z "$CASE_INSENS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=true") # inverted!
 [[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")
 [[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
