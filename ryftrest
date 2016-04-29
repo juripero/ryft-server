@@ -75,7 +75,9 @@ FIELDS=
 STATS=true
 STREAM=
 SPARK=
-VERBOSE=
+
+# be silent by default
+VERBOSE=-s
 
 # parse options
 while [[ $# > 0 ]]; do
