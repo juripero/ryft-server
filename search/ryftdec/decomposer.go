@@ -166,6 +166,19 @@ func includesMultipleSearchTypes(originalQuery string) bool {
 	return false
 }
 
+func formatSubQuery(query string) string {
+	// Add brackets if query is not surrounded by them
+	// e.g RAW_TEXT CONTAINS "100"
+	if []rune(query)[0] != '(' {
+		return "(" + query + ")"
+	}
+	return query
+}
+
+func containsMultipleExpressions(query string) bool {
+	return includesAnyToken(query, delimiters)
+}
+
 // Check if expression has multiple kinds of expressions, e.g. (TEXT AND DATE) or maybe (DATE AND TIME)
 func containsMultipleTypes(query string, marker string) bool {
 	delimitersCount := 0
@@ -203,7 +216,7 @@ func addChildToNode(currentNode *Node, token string) *Node {
 	case isOperator(token):
 		newNode = Node{Expression: strings.Trim(token, " "), Type: operatorConst(token)}
 	default:
-		newNode = Node{Expression: "(" + token + ")", Type: queryConst(token)}
+		newNode = Node{Expression: formatSubQuery(token), Type: queryConst(token)}
 	}
 	currentNode.SubNodes = append(currentNode.SubNodes, &newNode)
 	return &newNode
