@@ -21,6 +21,7 @@
             },
             "x-go-name": "Files",
             "description": "Source files",
+            "collectionFormat": "multi",
             "name": "files",
             "in": "query",
             "required": true
@@ -59,14 +60,14 @@
             "x-go-name": "Data",
             "description": "Name of data file to keep",
             "name": "data",
-            "in": "data"
+            "in": "query"
           },
           {
             "type": "string",
             "x-go-name": "Index",
             "description": "Name of index file to keep",
             "name": "index",
-            "in": "index"
+            "in": "query"
           },
           {
             "type": "string",
@@ -161,14 +162,14 @@
             "x-go-name": "Data",
             "description": "Name of data file to keep",
             "name": "data",
-            "in": "data"
+            "in": "query"
           },
           {
             "type": "string",
             "x-go-name": "Index",
             "description": "Name of index file to keep",
             "name": "index",
-            "in": "index"
+            "in": "query"
           },
           {
             "type": "string",
@@ -184,6 +185,7 @@
             },
             "x-go-name": "Files",
             "description": "Source files",
+            "collectionFormat": "multi",
             "name": "files",
             "in": "query",
             "required": true
