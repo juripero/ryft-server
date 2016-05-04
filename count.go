@@ -19,6 +19,8 @@ type CountParams struct {
 	CaseSensitive bool     `form:"cs" json:"cs"`
 	Nodes         uint8    `form:"nodes" json:"nodes"`
 	Local         bool     `form:"local" json:"local"`
+	KeepDataAs    string   `form:"data" json:"data"`
+	KeepIndexAs   string   `form:"index" json:"index"`
 }
 
 // CountResponse returnes matches for query
@@ -71,6 +73,8 @@ func (s *Server) count(ctx *gin.Context) {
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)
+	cfg.KeepDataAs = params.KeepDataAs
+	cfg.KeepIndexAs = params.KeepIndexAs
 
 	res, err := engine.Count(cfg)
 	if err != nil {
