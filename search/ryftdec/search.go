@@ -76,7 +76,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		defer mux.Close()
 		defer mux.ReportDone()
 
-		_, err := engine.search(task, task.queries, task.config, mux, true)
+		_, err := engine.search(task, task.queries, task.config,
+			engine.Backend.Search, mux, true)
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
 			mux.ReportError(err)
@@ -87,9 +88,12 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return mux, nil // OK for now
 }
 
+// Backend search function. Search() or Count()
+type SearchFunc func(cfg *search.Config) (*search.Result, error)
+
 // process and wait all /search subtasks
 // returns number of matches
-func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *search.Result, isLast bool) (uint64, error) {
+func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, searchFunc SearchFunc, mux *search.Result, isLast bool) (uint64, error) {
 	switch query.Type {
 	case QTYPE_SEARCH:
 	case QTYPE_DATE:
@@ -118,7 +122,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *s
 		// left: save results to temporary file
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = tempResult
-		n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, mux, isLast && false)
+		n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
 		if err1 != nil {
 			return 0, err1
 		}
@@ -127,13 +131,13 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *s
 			// right: read input from temporary file
 			tempCfg.Files = []string{tempResult}
 			tempCfg.KeepDataAs = cfg.KeepDataAs
-			n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+			n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 			if err2 != nil {
 				return 0, err2
 			}
 		}
 
-		// remove temporary file
+		// remove temporary file TODO: defer!!!
 		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResult))
 
 		return n2, nil // OK
@@ -161,14 +165,14 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *s
 		// left: save results to temporary file "A"
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = tempResultA
-		n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, mux, isLast && true)
+		n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
 		if err1 != nil {
 			return 0, err1
 		}
 
 		// right: save results to temporary file "B"
 		tempCfg.KeepDataAs = tempResultB
-		n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, mux, isLast && true)
+		n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 		if err2 != nil {
 			return 0, err2
 		}
@@ -209,7 +213,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *s
 			}
 		}
 
-		// remove temporary files
+		// remove temporary files TODO: defer!!!
 		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResultA))
 		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResultB))
 
@@ -231,7 +235,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, mux *s
 		WithField("output", cfg.KeepDataAs).
 		Infof("[%s]/%d: running backend search", TAG, task.subtaskId)
 
-	res, err := engine.Backend.Search(cfg)
+	res, err := searchFunc(cfg)
 	if err != nil {
 		return 0, err
 	}
