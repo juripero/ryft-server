@@ -62,6 +62,20 @@
             "in": "query"
           },
           {
+            "type": "string",
+            "x-go-name": "Data",
+            "description": "Name of result data file to keep",
+            "name": "data",
+            "in": "data"
+          },
+          {
+            "type": "string",
+            "x-go-name": "Index",
+            "description": "Name of result index file to keep",
+            "name": "index",
+            "in": "index"
+          },
+          {
             "maximum": 6554,
             "minimum": 0,
             "type": "integer",
@@ -141,6 +155,22 @@
             "name": "query",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Data",
+            "description": "Name of result data file to keep",
+            "name": "data",
+            "in": "data",
+            "required": false
+          },
+          {
+            "type": "string",
+            "x-go-name": "Index",
+            "description": "Name of result index file to keep",
+            "name": "index",
+            "in": "index",
+            "required": false
           },
           {
             "type": "array",
