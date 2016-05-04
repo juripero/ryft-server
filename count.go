@@ -15,6 +15,7 @@ import (
 type CountParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
 	Files         []string `form:"files" json:"files" binding:"required"`
+	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
 	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
 	CaseSensitive bool     `form:"cs" json:"cs"`
 	Nodes         uint8    `form:"nodes" json:"nodes"`
@@ -69,7 +70,7 @@ func (s *Server) count(ctx *gin.Context) {
 		cfg.Query = q
 	}
 	cfg.AddFiles(params.Files) // TODO: unescape?
-	cfg.Surrounding = 0
+	cfg.Surrounding = uint(params.Surrounding)
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)

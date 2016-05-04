@@ -79,7 +79,7 @@
             "required": false
           },
           {
-            "maximum": 6554,
+            "maximum": 65000,
             "minimum": 0,
             "type": "integer",
             "format": "uint16",
@@ -185,6 +185,16 @@
             "name": "files",
             "in": "query",
             "required": true
+          },
+          {
+            "maximum": 65000,
+            "minimum": 0,
+            "type": "integer",
+            "format": "uint16",
+            "x-go-name": "Surrounding",
+            "description": "Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text",
+            "name": "surrounding",
+            "in": "query"
           },
           {
             "type": "integer",
