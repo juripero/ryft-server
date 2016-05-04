@@ -28,83 +28,81 @@
  * ============
  */
 
-package ryftmux
+package json
 
 import (
+	"encoding/json"
 	"fmt"
-
-	"github.com/Sirupsen/logrus"
 
 	"github.com/getryft/ryft-server/search"
 )
 
-var (
-	// package logger instance
-	log = logrus.New()
+// RECORD format specific data.
+type Record map[string]interface{}
 
-	TAG = "ryftmux"
+const (
+	recFieldIndex = "_index"
+	recFieldError = "_error"
 )
 
-// RyftMUX engine uses set of abstract engines as backends.
-type Engine struct {
-	Backends []search.Engine
-
-	IndexHost string // optional host in cluster mode
+// for future work...
+type Record_0 struct {
+	Index   Index       `json:"index" msgpack:"index"`
+	RawData []byte      `json:"raw_data,omitempty" msgpack:"raw_data,omitempty"` // base-64 encoded
+	Data    interface{} `json:"data,omitempty" msgpack:"data,omitempty"`
+	Error   string      `json:"error,omitempty" msgpack:"error,omitempty"`
 }
 
-// NewEngine creates new RyftMUX search engine.
-func NewEngine(backends ...search.Engine) (*Engine, error) {
-	engine := new(Engine)
-	engine.Backends = backends
-	return engine, nil
+// NewRecord creates new format specific data.
+func NewRecord() interface{} {
+	return new(Record)
 }
 
-// String gets string representation of the engine.
-func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
-	// TODO: other parameters?
-}
-
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
-	}
-}
-
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
-	ll, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
+// FromRecord converts RECORD to format specific data.
+func FromRecord(rec *search.Record, fields []string) *Record {
+	if rec == nil {
+		return nil
 	}
 
-	log.Level = ll
-	return nil // OK
-}
+	res := Record{}
+	// res.RawData = rec.Data
 
-// log returns task related logger.
-func (task *Task) log() *logrus.Entry {
-	return log.WithField("task", task.Identifier)
-}
+	// try to parse raw data as JSON...
+	err := json.Unmarshal(rec.Data, &res)
+	if err == nil {
+		// field filtration: if fields is empty all fields are used in result
+		// othewise only requested fields are copied (missing fields are ignored)
+		if len(fields) > 0 {
+			filtered := Record{}
 
-/*
-// factory creates RyftMUX engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
-	backends := parseOptions(opts)
-	engine, err := NewEngine(backends)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
+			// do filtration by fields
+			for _, field := range fields {
+				// missing fields are ignored!
+				if v, ok := res[field]; ok {
+					filtered[field] = v
+				}
+			}
+
+			res = filtered
+		}
+	} else {
+		res[recFieldError] = fmt.Sprintf("failed to parse JSON data: %s", err) // res.Error =
 	}
-	return engine, nil
+
+	res[recFieldIndex] = FromIndex(rec.Index) // res.Index =
+
+	return &res
 }
-*/
 
-// package initialization
-func init() {
-	// should be created manually!
-	// search.RegisterEngine(TAG, factory)
+// ToRecord converts format specific data to RECORD.
+func ToRecord(rec *Record) *search.Record {
+	if rec == nil {
+		return nil
+	}
 
-	// be silent by default
-	log.Level = logrus.WarnLevel
+	panic("JSON ToRecord is not implemented!")
+	//res := new(search.Record)
+	//res.Index = ToIndex(rec.Index)
+	//res.Data = rec.RawData
+	//return res
 }

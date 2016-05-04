@@ -28,7 +28,7 @@
  * ============
  */
 
-package xml
+package json
 
 import (
 	"fmt"
@@ -37,13 +37,13 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// XML format, tries to decode record data as XML.
+// JSON format, tries to decode record data as JSON object.
 // Supports fields filtration.
 type Format struct {
 	Fields []string
 }
 
-// New creates new XML formatter.
+// New creates new JSON formatter.
 // "fields" option is supported.
 func New(opts map[string]interface{}) (*Format, error) {
 	f := new(Format)
@@ -59,13 +59,13 @@ func (*Format) NewIndex() interface{} {
 	return NewIndex()
 }
 
-// Convert INDEX to XML format specific data.
+// Convert INDEX to JSON format specific data.
 func (*Format) FromIndex(idx search.Index) interface{} {
 	return FromIndex(idx)
 }
 
-// Convert XML format specific data to INDEX.
-// WARN: will panic if argument is not of xml.Index type!
+// Convert JSON format specific data to INDEX.
+// WARN: will panic if argument is not of json.Index type!
 func (*Format) ToIndex(idx interface{}) search.Index {
 	return ToIndex(idx.(Index))
 }
@@ -75,13 +75,13 @@ func (*Format) NewRecord() interface{} {
 	return NewRecord()
 }
 
-// Convert RECORD to XML format specific data.
+// Convert RECORD to JSON format specific data.
 func (f *Format) FromRecord(rec *search.Record) interface{} {
 	return FromRecord(rec, f.Fields)
 }
 
-// Convert XML format spcific data to RECORD.
-// WARN: will panic if argument is not of xml.Record type!
+// Convert JSON format spcific data to RECORD.
+// WARN: will panic if argument is not of json.Record type!
 func (*Format) ToRecord(rec interface{}) *search.Record {
 	return ToRecord(rec.(*Record))
 }
@@ -91,13 +91,13 @@ func (*Format) NewStat() interface{} {
 	return NewStat()
 }
 
-// Convert STATISTICS to XML format specific data.
+// Convert STATISTICS to JSON format specific data.
 func (f *Format) FromStat(stat *search.Statistics) interface{} {
 	return FromStat(stat)
 }
 
-// Convert XML format specific data to STATISTICS.
-// WARN: will panic if argument is not of xml.Statistics type!
+// Convert JSON format specific data to STATISTICS.
+// WARN: will panic if argument is not of json.Statistics type!
 func (f *Format) ToStat(stat interface{}) *search.Statistics {
 	return ToStat(stat.(*Statistics))
 }

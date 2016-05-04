@@ -75,8 +75,7 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 			return nil, fmt.Errorf(`failed to convert "log-level" option: %s`, err)
 		}
 
-		log.Level, err = logrus.ParseLevel(s)
-		if err != nil {
+		if err := SetLogLevel(s); err != nil {
 			return nil, fmt.Errorf("failed to update log level: %s", err)
 		}
 	}
@@ -122,6 +121,13 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	q.Set("stream", fmt.Sprintf("%t", true))
 	q.Set("ep", fmt.Sprintf("%t", true)) // enable error prefixes!
 
+	if len(cfg.KeepDataAs) != 0 {
+		q.Set("data", cfg.KeepDataAs)
+	}
+	if len(cfg.KeepIndexAs) != 0 {
+		q.Set("index", cfg.KeepIndexAs)
+	}
+
 	u.RawQuery = q.Encode()
 	return u
 }
@@ -139,6 +145,17 @@ func (engine *Engine) prepareFilesUrl(path string) *url.URL {
 
 	u.RawQuery = q.Encode()
 	return u
+}
+
+// SetLogLevel changes global module log level.
+func SetLogLevel(level string) error {
+	ll, err := logrus.ParseLevel(level)
+	if err != nil {
+		return err
+	}
+
+	log.Level = ll
+	return nil // OK
 }
 
 // log returns task related logger.

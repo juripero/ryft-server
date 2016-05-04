@@ -34,14 +34,16 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/getryft/ryft-server/format/json"
 	"github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/format/xml"
 	"github.com/getryft/ryft-server/search"
 )
 
 const (
-	RAW = "raw"
-	XML = "xml"
+	JSON = "json"
+	RAW  = "raw"
+	XML  = "xml"
 )
 
 // Abstract Format interface.
@@ -65,6 +67,8 @@ type Format interface {
 // XML format supports some options.
 func New(format string, opts map[string]interface{}) (Format, error) {
 	switch strings.ToLower(format) {
+	case JSON:
+		return json.New(opts)
 	case RAW:
 		return raw.New()
 	case XML:

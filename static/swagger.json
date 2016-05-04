@@ -8,95 +8,120 @@
   "paths": {
     "/search": {
       "get": {
-        "description": "Endpoint for the search",
+        "description": "Endpoint for the search. Does the text or structured search.",
         "tags": [
           "search"
         ],
         "operationId": "search",
         "parameters": [
           {
+            "in": "query",
+            "type": "string",
+            "name": "query",
+            "x-go-name": "Query",
+            "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")",
+            "required": true
+          },
+          {
+            "in": "query",
             "type": "array",
             "items": {
               "type": "string"
             },
+            "name": "files",
             "x-go-name": "Files",
             "description": "Source files",
-            "name": "files",
-            "in": "query",
+            "collectionFormat": "multi",
             "required": true
           },
           {
-            "type": "string",
-            "x-go-name": "Format",
-            "description": "Parameter for the structured search. Specify the input data format \"xml\" or \"raw\" (Default)",
-            "name": "format",
-            "in": "query"
-          },
-          {
-            "type": "boolean",
-            "x-go-name": "CaseSensitive",
-            "description": "Case sensitive flag",
-            "name": "cs",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "x-go-name": "Fields",
-            "description": "For structured search specify the list of required fields. If omitted all fields are used",
-            "name": "fields",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "x-go-name": "Query",
-            "description": "Search query, for example: ( RAW_TEXT CONTAINS \"night\" )",
-            "name": "query",
             "in": "query",
-            "required": true
+            "type": "string",
+            "name": "mode",
+            "x-go-name": "Mode",
+            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts) or numeric search (ns)",
+            "enum": ["es", "fhs", "feds", "ds", "ts", "ns"]
           },
           {
-            "maximum": 6554,
-            "minimum": 0,
+            "in": "query",
             "type": "integer",
             "format": "uint16",
-            "x-go-name": "Surrounding",
-            "description": "Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text",
+            "maximum": 65000,
+            "minimum": 0,
             "name": "surrounding",
-            "in": "query"
+            "x-go-name": "Surrounding",
+            "description": "Number of characters before the match and after the match that will be returned. This parameter is used with RAW text search"
           },
           {
+            "in": "query",
+            "type": "integer",
+            "format": "uint8",
             "maximum": 255,
             "minimum": 0,
-            "type": "integer",
-            "format": "uint8",
-            "x-go-name": "Fuzziness",
-            "description": "Is the fuzziness of the search. Measured as the maximum Hamming distance.",
             "name": "fuzziness",
-            "in": "query"
+            "x-go-name": "Fuzziness",
+            "description": "Fuzziness of the search. Measured as the maximum Hamming distance for \"fhs\" mode or edit distance for \"feds\" mode."
           },
           {
+            "in": "query",
+            "type": "string",
+            "name": "format",
+            "x-go-name": "Format",
+            "description": "Input data format. Parameter is used with structured search.",
+            "enum": ["raw", "xml", "json"]
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "cs",
+            "x-go-name": "CaseSensitive",
+            "description": "Case sensitive flag"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "fields",
+            "x-go-name": "Fields",
+            "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Data",
+            "name": "data",
+            "description": "Name of data file to keep. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "index",
+            "x-go-name": "Index",
+            "description": "Name of index file to keep. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint8",
             "maximum": 4,
             "minimum": 0,
-            "type": "integer",
-            "format": "uint8",
+            "name": "nodes",
             "x-go-name": "Nodes",
             "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
-            "name": "nodes",
-            "in": "query"
+            "enum": [1, 2, 3, 4]
           },
           {
+            "in": "query",
             "type": "boolean",
-            "x-go-name": "Local",
-            "description": "Perform search only on this cluster member. Default 'false'.",
             "name": "local",
-            "in": "query"
+            "x-go-name": "Local",
+            "description": "Perform search only on this cluster member. Default 'false'."
           },
           {
+            "in": "query",
             "type": "boolean",
-            "x-go-name": "Stats",
-            "description": "Include search statistics in response. Default 'false'.",
             "name": "stats",
-            "in": "query"
+            "x-go-name": "Stats",
+            "description": "Include search statistics in response. Default 'false'."
           }
         ],
         "responses": {
@@ -120,7 +145,7 @@
     },
     "/count": {
       "get": {
-        "description": "Endpoint for the count",
+        "description": "Endpoint for the count. Does the search but returns just statistics.",
         "tags": [
           "count"
         ],
@@ -128,55 +153,91 @@
         "operationId": "count",
         "parameters": [
           {
-            "type": "string",
-            "x-go-name": "Query",
-            "description": "Search query, for example: ( RAW_TEXT CONTAINS \"night\" )",
-            "name": "query",
             "in": "query",
+            "type": "string",
+            "name": "query",
+            "x-go-name": "Query",
+            "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")",
             "required": true
           },
           {
+            "in": "query",
             "type": "array",
             "items": {
               "type": "string"
             },
+            "name": "files",
             "x-go-name": "Files",
             "description": "Source files",
-            "name": "files",
-            "in": "query",
+            "collectionFormat": "multi",
             "required": true
           },
           {
+            "in": "query",
+            "type": "string",
+            "name": "mode",
+            "x-go-name": "Mode",
+            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts) or numeric search (ns)",
+            "enum": ["es", "fhs", "feds", "ds", "ts", "ns"]
+          },
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65000,
+            "minimum": 0,
+            "name": "surrounding",
+            "x-go-name": "Surrounding",
+            "description": "Number of characters before the match and after the match that will be returned. This parameter is used with RAW text search"
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint8",
-            "x-go-name": "Fuzziness",
-            "description": "Is the fuzziness of the search. Measured as the maximum Hamming distance.",
+            "maximum": 255,
+            "minimum": 0,
             "name": "fuzziness",
-            "in": "query"
+            "x-go-name": "Fuzziness",
+            "description": "Fuzziness of the search. Measured as the maximum Hamming distance for \"fhs\" mode or edit distance for \"feds\" mode."
           },
           {
+            "in": "query",
             "type": "boolean",
-            "x-go-name": "CaseSensitive",
-            "description": "Case sensitive flag",
             "name": "cs",
-            "in": "query"
+            "x-go-name": "CaseSensitive",
+            "description": "Case sensitive flag"
           },
           {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Data",
+            "name": "data",
+            "description": "Name of data file to keep. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "index",
+            "x-go-name": "Index",
+            "description": "Name of index file to keep. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint8",
             "maximum": 4,
             "minimum": 0,
-            "type": "integer",
-            "format": "uint8",
-            "x-go-name": "Nodes",
-            "description": "Active Nodes Count",
             "name": "nodes",
-            "in": "query"
+            "x-go-name": "Nodes",
+            "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
+            "enum": [1, 2, 3, 4]
           },
           {
+            "in": "query",
             "type": "boolean",
-            "x-go-name": "Local",
-            "description": "Perform search only on this cluster member. Default 'false'.",
             "name": "local",
-            "in": "query"
+            "x-go-name": "Local",
+            "description": "Perform search only on this cluster member. Default 'false'."
           }
         ],
         "responses": {

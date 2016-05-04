@@ -28,7 +28,7 @@
  * ============
  */
 
-package ryftmux
+package ryftdec
 
 import (
 	"fmt"
@@ -42,34 +42,30 @@ var (
 	// package logger instance
 	log = logrus.New()
 
-	TAG = "ryftmux"
+	TAG = "ryftdec"
 )
 
-// RyftMUX engine uses set of abstract engines as backends.
+// RyftDEC engine uses abstract engine as backend.
 type Engine struct {
-	Backends []search.Engine
-
-	IndexHost string // optional host in cluster mode
+	Backend search.Engine
 }
 
-// NewEngine creates new RyftMUX search engine.
-func NewEngine(backends ...search.Engine) (*Engine, error) {
+// NewEngine creates new RyftDEC search engine.
+func NewEngine(backend search.Engine) (*Engine, error) {
 	engine := new(Engine)
-	engine.Backends = backends
+	engine.Backend = backend
 	return engine, nil
 }
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
+	return fmt.Sprintf("RyftDEC{backend:%s}", engine.Backend)
 	// TODO: other parameters?
 }
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
-	}
+	return map[string]interface{}{}
 }
 
 // SetLogLevel changes global module log level.
@@ -89,12 +85,12 @@ func (task *Task) log() *logrus.Entry {
 }
 
 /*
-// factory creates RyftMUX engine.
+// factory creates RyftDEC engine.
 func factory(opts map[string]interface{}) (search.Engine, error) {
-	backends := parseOptions(opts)
-	engine, err := NewEngine(backends)
+	backend := parseOptions(opts)
+	engine, err := NewEngine(backend)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
+		return nil, fmt.Errorf("Failed to create RyftDEC engine: %s", err)
 	}
 	return engine, nil
 }

@@ -42,6 +42,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftdec"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftone"
@@ -265,7 +266,16 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 		}
 	}
 
-	return search.NewEngine(s.SearchBackend, opts)
+	backend, err := search.NewEngine(s.SearchBackend, opts)
+	if err != nil {
+		return backend, err
+	}
+
+	// special query decomposer
+	if *debug {
+		ryftdec.SetLogLevel("debug")
+	}
+	return ryftdec.NewEngine(backend)
 }
 
 // get local host name
@@ -332,7 +342,7 @@ func main() {
 	//	router.Use(gin.Logger())
 	//	router.Use(srverr.Recovery())
 
-	// Setting up Stats measirment middleware
+	// Setting up Stats measurement middleware
 	router.Use(func() gin.HandlerFunc {
 		return func(c *gin.Context) {
 			beginning := time.Now()

@@ -16,10 +16,13 @@ type CountParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
 	Files         []string `form:"files" json:"files" binding:"required"`
 	Mode          string   `form:"mode" json:"mode"`
+	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
 	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
 	CaseSensitive bool     `form:"cs" json:"cs"`
 	Nodes         uint8    `form:"nodes" json:"nodes"`
 	Local         bool     `form:"local" json:"local"`
+	KeepDataAs    string   `form:"data" json:"data"`
+	KeepIndexAs   string   `form:"index" json:"index"`
 }
 
 // CountResponse returnes matches for query
@@ -69,10 +72,12 @@ func (s *Server) count(ctx *gin.Context) {
 	}
 	cfg.AddFiles(params.Files) // TODO: unescape?
 	cfg.Mode = params.Mode
-	cfg.Surrounding = 0
+	cfg.Surrounding = uint(params.Surrounding)
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)
+	cfg.KeepDataAs = params.KeepDataAs
+	cfg.KeepIndexAs = params.KeepIndexAs
 
 	res, err := engine.Count(cfg)
 	if err != nil {
