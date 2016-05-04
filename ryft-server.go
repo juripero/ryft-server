@@ -244,7 +244,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 
 	// some auto-options
 	switch s.SearchBackend {
-	case "ryftprim":
+	case "ryftprim", "ryftone":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
 			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
