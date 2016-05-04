@@ -28,11 +28,63 @@ This file is based on `chicago.pcrime` with reduced number of records (10) and m
 Combining 2 and 3 queries with OR operator we should get 11 records (ID=10034197 will be included twice):
 [((RECORD.date CONTAINS DATE(MM/DD/YYYY <= 04/12/2015)) OR (RECORD.date CONTAINS TIME(HH:MM:SS > 11:15:00)))](http://localhost:8765/search?local=true&query=%28%28RECORD.date%20CONTAINS%20DATE%28MM/DD/YYYY%20%3C=%2004/12/2015%29%29%20OR%20%28RECORD.date%20CONTAINS%20TIME%28HH:MM:SS%20%3E%2011:15:00%29%29%29&files=or.pcrime&fields=ID,Date,Description&format=xml&fuzziness=0&stats=true)
 
+```{.json}
+{"results":[{"Date":"04/10/2015 10:15:00 PM","Description":"John","ID":"10034183","_index":{"file":"/or.pcrime","offset":0,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/10/2015 10:30:00 PM","Description":"Jonny","ID":"10034188","_index":{"file":"/or.pcrime","offset":657,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/11/2015 10:45:00 PM","Description":"Jenny","ID":"10034213","_index":{"file":"/or.pcrime","offset":1314,"length":667,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/11/2015 10:53:00 PM","Description":"Lenny","ID":"10034327","_index":{"file":"/or.pcrime","offset":1982,"length":679,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 10:52:00 PM","Description":"Manny","ID":"10034247","_index":{"file":"/or.pcrime","offset":2662,"length":670,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 11:18:00 PM","Description":"More","ID":"10034197","_index":{"file":"/or.pcrime","offset":3333,"length":655,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 11:18:00 PM","Description":"More","ID":"10034197","_index":{"file":"/or.pcrime","offset":3333,"length":655,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/13/2015 11:48:00 PM","Description":"Less","ID":"10034248","_index":{"file":"/or.pcrime","offset":3989,"length":671,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/13/2015 11:35:00 PM","Description":"No","ID":"10037110","_index":{"file":"/or.pcrime","offset":4661,"length":666,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/14/2015 11:40:00 PM","Description":"John","ID":"10034200","_index":{"file":"/or.pcrime","offset":5328,"length":659,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/15/2015 11:30:00 PM","Description":"Job","ID":"10034234","_index":{"file":"/or.pcrime","offset":5988,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+],"stats":{"matches":11,"totalBytes":13290,"duration":1027,"dataRate":0.17293808260219598,"fabricDataRate":0.172939}
+}
+```
+
 Combining 1 and 3 queries we should get 15 records (the last 5 will have duplicates):
 [(RECORD.id CONTAINS "1003") OR (RECORD.date CONTAINS TIME(HH:MM:SS > 11:15:00))](http://localhost:8765/search?local=true&query=%28RECORD.id%20CONTAINS%20%221003%22%29%20OR%20%28RECORD.date%20CONTAINS%20TIME%28HH:MM:SS%20%3E%2011:15:00%29%29&files=or.pcrime&fields=ID,Date,Description&format=xml&fuzziness=0&stats=true)
 
+```{.json}
+{"results":[{"Date":"04/10/2015 10:15:00 PM","Description":"John","ID":"10034183","_index":{"file":"/or.pcrime","offset":0,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/10/2015 10:30:00 PM","Description":"Jonny","ID":"10034188","_index":{"file":"/or.pcrime","offset":657,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/11/2015 10:45:00 PM","Description":"Jenny","ID":"10034213","_index":{"file":"/or.pcrime","offset":1314,"length":667,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/11/2015 10:53:00 PM","Description":"Lenny","ID":"10034327","_index":{"file":"/or.pcrime","offset":1982,"length":679,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 10:52:00 PM","Description":"Manny","ID":"10034247","_index":{"file":"/or.pcrime","offset":2662,"length":670,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 11:18:00 PM","Description":"More","ID":"10034197","_index":{"file":"/or.pcrime","offset":3333,"length":655,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/13/2015 11:48:00 PM","Description":"Less","ID":"10034248","_index":{"file":"/or.pcrime","offset":3989,"length":671,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/13/2015 11:35:00 PM","Description":"No","ID":"10037110","_index":{"file":"/or.pcrime","offset":4661,"length":666,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/14/2015 11:40:00 PM","Description":"John","ID":"10034200","_index":{"file":"/or.pcrime","offset":5328,"length":659,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/15/2015 11:30:00 PM","Description":"Job","ID":"10034234","_index":{"file":"/or.pcrime","offset":5988,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 11:18:00 PM","Description":"More","ID":"10034197","_index":{"file":"/or.pcrime","offset":3333,"length":655,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/13/2015 11:48:00 PM","Description":"Less","ID":"10034248","_index":{"file":"/or.pcrime","offset":3989,"length":671,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/13/2015 11:35:00 PM","Description":"No","ID":"10037110","_index":{"file":"/or.pcrime","offset":4661,"length":666,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/14/2015 11:40:00 PM","Description":"John","ID":"10034200","_index":{"file":"/or.pcrime","offset":5328,"length":659,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/15/2015 11:30:00 PM","Description":"Job","ID":"10034234","_index":{"file":"/or.pcrime","offset":5988,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+],"stats":{"matches":15,"totalBytes":13290,"duration":1038,"dataRate":0.25959180269627213,"fabricDataRate":0.25959200000000004}
+}
+```
+
 We also could use AND and OR together:
 [(RECORD.id CONTAINS "1003") AND ((RECORD.date CONTAINS DATE(MM/DD/YYYY <= 04/12/2015)) OR (RECORD.date CONTAINS TIME(HH:MM:SS > 11:15:00)))](http://localhost:8765/search?local=true&query=%28RECORD.id%20CONTAINS%20%221003%22%29%20AND%20%28%28RECORD.date%20CONTAINS%20DATE%28MM/DD/YYYY%20%3C=%2004/12/2015%29%29%20OR%20%28RECORD.date%20CONTAINS%20TIME%28HH:MM:SS%20%3E%2011:15:00%29%29%29&files=or.pcrime&fields=ID,Date,Description&format=xml&fuzziness=0&stats=true)
+
+```{.json}
+{"results":[{"Date":"04/10/2015 10:15:00 PM","Description":"John","ID":"10034183","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":0,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/10/2015 10:30:00 PM","Description":"Jonny","ID":"10034188","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":656,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/11/2015 10:45:00 PM","Description":"Jenny","ID":"10034213","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":1312,"length":667,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/11/2015 10:53:00 PM","Description":"Lenny","ID":"10034327","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":1979,"length":679,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 10:52:00 PM","Description":"Manny","ID":"10034247","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":2658,"length":670,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 11:18:00 PM","Description":"More","ID":"10034197","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":3328,"length":655,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/12/2015 11:18:00 PM","Description":"More","ID":"10034197","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":3328,"length":655,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/13/2015 11:48:00 PM","Description":"Less","ID":"10034248","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":3983,"length":671,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/13/2015 11:35:00 PM","Description":"No","ID":"10037110","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":4654,"length":666,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/14/2015 11:40:00 PM","Description":"John","ID":"10034200","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":5320,"length":659,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+,{"Date":"04/15/2015 11:30:00 PM","Description":"Job","ID":"10034234","_index":{"file":"/RyftServer-8765/.temp-dec-0000000e-1-and.pcrime","offset":5979,"length":656,"fuzziness":0,"host":"ryftone-vm-selaptop"}}
+],"stats":{"matches":11,"totalBytes":13270,"duration":1042,"dataRate":0.1436297348163805,"fabricDataRate":0.14363}
+}
+```
 
 Note the index of the resulting records. The file contains reference to temporary generated file - result of first AND operand.
 The number of records is still 11.
