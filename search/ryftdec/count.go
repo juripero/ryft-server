@@ -28,83 +28,58 @@
  * ============
  */
 
-package ryftmux
+package ryftdec
 
 import (
 	"fmt"
 
-	"github.com/Sirupsen/logrus"
-
 	"github.com/getryft/ryft-server/search"
 )
 
-var (
-	// package logger instance
-	log = logrus.New()
+// Count starts asynchronous "/count" with RyftDEC engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(cfg)
+	var err error
 
-	TAG = "ryftmux"
-)
-
-// RyftMUX engine uses set of abstract engines as backends.
-type Engine struct {
-	Backends []search.Engine
-
-	IndexHost string // optional host in cluster mode
-}
-
-// NewEngine creates new RyftMUX search engine.
-func NewEngine(backends ...search.Engine) (*Engine, error) {
-	engine := new(Engine)
-	engine.Backends = backends
-	return engine, nil
-}
-
-// String gets string representation of the engine.
-func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
-	// TODO: other parameters?
-}
-
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
-	}
-}
-
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
-	ll, err := logrus.ParseLevel(level)
+	// split cfg.Query into several expressions
+	task.queries, err = Decompose(cfg.Query)
 	if err != nil {
-		return err
+		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
+		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
 
-	log.Level = ll
-	return nil // OK
-}
+	// in simple cases when there is only one subquery
+	// we can pass this query directly to the backend
+	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
+		if len(cfg.Mode) == 0 {
+			// use "ds", "ts", "ns" search mode
+			// if query contains corresponding keywords
+			cfg.Mode = getSearchMode(task.queries.Type, "")
+		}
+		return engine.Backend.Count(cfg)
+	}
 
-// log returns task related logger.
-func (task *Task) log() *logrus.Entry {
-	return log.WithField("task", task.Identifier)
-}
-
-/*
-// factory creates RyftMUX engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
-	backends := parseOptions(opts)
-	engine, err := NewEngine(backends)
+	task.extension, err = detectExtension(cfg.Files)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
+		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
+		return nil, fmt.Errorf("failed to detect extension: %s", err)
 	}
-	return engine, nil
-}
-*/
+	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
-// package initialization
-func init() {
-	// should be created manually!
-	// search.RegisterEngine(TAG, factory)
+	mux := search.NewResult()
+	go func() {
+		// some futher cleanup
+		defer mux.Close()
+		defer mux.ReportDone()
 
-	// be silent by default
-	log.Level = logrus.WarnLevel
+		_, err := engine.search(task, task.queries, task.config,
+			engine.Backend.Count, mux, true)
+		if err != nil {
+			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
+			mux.ReportError(err)
+		}
+
+		// TODO: handle task cancellation!!!
+	}()
+	return mux, nil // OK for now
 }

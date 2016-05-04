@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/getryft/ryft-server/search/ryftmux"
 )
 
@@ -21,6 +23,12 @@ var (
 	// ryftone
 	ryftoneInstance = ".test"
 	ryftoneLogLevel = "warn"
+
+	// ryftmux
+	ryftmuxLogLevel = "warn"
+
+	// ryftdec
+	ryftdecLogLevel = "warn"
 
 	printReceivedRecords = false
 )
@@ -93,16 +101,44 @@ func newRyftHttp(log Logger) search.Engine {
 	return newEngine(log, "ryfthttp", opts)
 }
 
-// create new ryftmux search engine
-func newRyftMux(log Logger, backends ...search.Engine) search.Engine {
-	backend := "ryftmux"
-	engine, err := ryftmux.NewEngine(backends...)
+// create new ryftdec search engine
+func newRyftDec(log Logger, backend search.Engine) search.Engine {
+	name := "ryftdec"
+	engine, err := ryftdec.NewEngine(backend)
 	if err != nil {
-		log("failed to get %q search engine: %s", backend, err)
+		log("failed to get %q search engine: %s", name, err)
 		panic(err)
 	}
-	log("%q: actual options: %+v", backend, engine.Options())
+	// log("%q: actual options: %+v", name, engine.Options())
 
+	ryftdec.SetLogLevel(ryftdecLogLevel)
+	return engine
+}
+
+// test decomposition
+func decomp0() {
+	root, _ := ryftdec.Decompose(`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`)
+	printDecompTree(root, 0)
+}
+
+func printDecompTree(root *ryftdec.Node, deep int) {
+	fmt.Printf("%s%s#%d\n", strings.Repeat("    ", deep), root, root.Type)
+	for _, child := range root.SubNodes {
+		printDecompTree(child, deep+1)
+	}
+}
+
+// create new ryftmux search engine
+func newRyftMux(log Logger, backends ...search.Engine) search.Engine {
+	name := "ryftmux"
+	engine, err := ryftmux.NewEngine(backends...)
+	if err != nil {
+		log("failed to get %q search engine: %s", name, err)
+		panic(err)
+	}
+	// log("%q: actual options: %+v", name, engine.Options())
+
+	ryftmux.SetLogLevel(ryftmuxLogLevel)
 	return engine
 }
 

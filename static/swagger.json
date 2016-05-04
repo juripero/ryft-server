@@ -57,18 +57,16 @@
           {
             "type": "string",
             "x-go-name": "Data",
-            "description": "Name of result data file to keep",
+            "description": "Name of data file to keep",
             "name": "data",
-            "in": "data",
-            "required": false
+            "in": "data"
           },
           {
             "type": "string",
             "x-go-name": "Index",
-            "description": "Name of result index file to keep",
+            "description": "Name of index file to keep",
             "name": "index",
-            "in": "index",
-            "required": false
+            "in": "index"
           },
           {
             "type": "string",
@@ -161,18 +159,16 @@
           {
             "type": "string",
             "x-go-name": "Data",
-            "description": "Name of result data file to keep",
+            "description": "Name of data file to keep",
             "name": "data",
-            "in": "data",
-            "required": false
+            "in": "data"
           },
           {
             "type": "string",
             "x-go-name": "Index",
-            "description": "Name of result index file to keep",
+            "description": "Name of index file to keep",
             "name": "index",
-            "in": "index",
-            "required": false
+            "in": "index"
           },
           {
             "type": "string",

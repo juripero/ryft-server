@@ -45,7 +45,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	for _, backend := range engine.Backends {
 		res, err := backend.Search(cfg)
 		if err != nil {
-			task.log().WithError(err).Errorf("failed to start /search subtask")
+			task.log().WithError(err).Errorf("[%s]: failed to start /search subtask", TAG)
 			mux.ReportError(err)
 			continue
 		}

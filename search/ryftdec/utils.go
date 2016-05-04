@@ -28,83 +28,40 @@
  * ============
  */
 
-package ryftmux
+package ryftdec
 
 import (
 	"fmt"
-
-	"github.com/Sirupsen/logrus"
-
-	"github.com/getryft/ryft-server/search"
+	"path/filepath"
 )
 
-var (
-	// package logger instance
-	log = logrus.New()
-
-	TAG = "ryftmux"
-)
-
-// RyftMUX engine uses set of abstract engines as backends.
-type Engine struct {
-	Backends []search.Engine
-
-	IndexHost string // optional host in cluster mode
-}
-
-// NewEngine creates new RyftMUX search engine.
-func NewEngine(backends ...search.Engine) (*Engine, error) {
-	engine := new(Engine)
-	engine.Backends = backends
-	return engine, nil
-}
-
-// String gets string representation of the engine.
-func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
-	// TODO: other parameters?
-}
-
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
+func containsString(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
 	}
+	return false
 }
 
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
-	ll, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
+// Detect extension using input file set.
+func detectExtension(fileNames []string) (string, error) {
+	extensions := map[string]int{}
+
+	// collect unique extensions
+	for _, file := range fileNames {
+		ext := filepath.Ext(file)
+		if len(ext) != 0 {
+			extensions[ext] = 1
+		}
 	}
 
-	log.Level = ll
-	return nil // OK
-}
-
-// log returns task related logger.
-func (task *Task) log() *logrus.Entry {
-	return log.WithField("task", task.Identifier)
-}
-
-/*
-// factory creates RyftMUX engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
-	backends := parseOptions(opts)
-	engine, err := NewEngine(backends)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
+	if len(extensions) == 1 {
+		// return the first extension
+		for k, _ := range extensions {
+			return k, nil // OK
+		}
 	}
-	return engine, nil
-}
-*/
 
-// package initialization
-func init() {
-	// should be created manually!
-	// search.RegisterEngine(TAG, factory)
-
-	// be silent by default
-	log.Level = logrus.WarnLevel
+	return "", fmt.Errorf("unable to detect extension from %v", extensions)
 }

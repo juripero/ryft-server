@@ -8,6 +8,8 @@ Search engine is one of:
   (to disable this search engine pass "noryftone" as go build tags)
 - [ryfthttp](./ryfthttp/README.md) uses `ryft-server` (HTTP/msgpack or HTTP/json)
 - [ryftmux](./ryftmux/README.md) multiplexes results from several search engines
+- [ryftdec](./ryftdec/README.md) decomposes search queries and combines several
+  calls to another search engine
 
 ## Import search backends
 
