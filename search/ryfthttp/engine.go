@@ -122,6 +122,13 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	q.Set("stream", fmt.Sprintf("%t", true))
 	q.Set("ep", fmt.Sprintf("%t", true)) // enable error prefixes!
 
+	if len(cfg.KeepDataAs) != 0 {
+		q.Set("data", cfg.KeepDataAs)
+	}
+	if len(cfg.KeepIndexAs) != 0 {
+		q.Set("index", cfg.KeepIndexAs)
+	}
+
 	u.RawQuery = q.Encode()
 	return u
 }

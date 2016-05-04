@@ -60,6 +60,8 @@ type SearchParams struct {
 	Stream        bool     `form:"stream" json:"stream"`
 	Spark         bool     `form:"spark" json:"spark"`
 	ErrorPrefix   bool     `form:"ep" json:"ep"`
+	KeepDataAs    string   `form:"data" json:"data"`
+	KeepIndexAs   string   `form:"index" json:"index"`
 }
 
 // Handle /search endpoint.
@@ -126,6 +128,8 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)
+	cfg.KeepDataAs = params.KeepDataAs
+	cfg.KeepIndexAs = params.KeepIndexAs
 
 	log.Printf("search: %s", cfg)
 	res, err := engine.Search(cfg)

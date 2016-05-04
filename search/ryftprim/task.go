@@ -51,6 +51,8 @@ type Task struct {
 	Identifier    string // unique
 	IndexFileName string
 	DataFileName  string
+	KeepIndexFile bool
+	KeepDataFile  bool
 
 	// `ryftprim` process & output
 	tool_args []string      // command line arguments

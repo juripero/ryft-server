@@ -56,13 +56,29 @@
           },
           {
             "type": "string",
+            "x-go-name": "Data",
+            "description": "Name of result data file to keep",
+            "name": "data",
+            "in": "data",
+            "required": false
+          },
+          {
+            "type": "string",
+            "x-go-name": "Index",
+            "description": "Name of result index file to keep",
+            "name": "index",
+            "in": "index",
+            "required": false
+          },
+          {
+            "type": "string",
             "x-go-name": "Mode",
             "description": "Search mode. Should be \"es\" for exact search, \"fhs\" for fuzzy hamming search, \"feds\" for fuzzy edit distance search, \"ds\", \"ts\", \"ns\" for date, time or numeric search",
             "name": "mode",
             "in": "query"
           },
           {
-            "maximum": 6554,
+            "maximum": 65000,
             "minimum": 0,
             "type": "integer",
             "format": "uint16",
@@ -144,6 +160,22 @@
           },
           {
             "type": "string",
+            "x-go-name": "Data",
+            "description": "Name of result data file to keep",
+            "name": "data",
+            "in": "data",
+            "required": false
+          },
+          {
+            "type": "string",
+            "x-go-name": "Index",
+            "description": "Name of result index file to keep",
+            "name": "index",
+            "in": "index",
+            "required": false
+          },
+          {
+            "type": "string",
             "x-go-name": "Mode",
             "description": "Search mode. Should be \"es\" for exact search, \"fhs\" for fuzzy hamming search, \"feds\" for fuzzy edit distance search, \"ds\", \"ts\", \"ns\" for date, time or numeric search",
             "name": "mode",
@@ -159,6 +191,16 @@
             "name": "files",
             "in": "query",
             "required": true
+          },
+          {
+            "maximum": 65000,
+            "minimum": 0,
+            "type": "integer",
+            "format": "uint16",
+            "x-go-name": "Surrounding",
+            "description": "Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text",
+            "name": "surrounding",
+            "in": "query"
           },
           {
             "type": "integer",
