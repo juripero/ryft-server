@@ -332,7 +332,7 @@ func main() {
 	//	router.Use(gin.Logger())
 	//	router.Use(srverr.Recovery())
 
-	// Setting up Stats measirment middleware
+	// Setting up Stats measurement middleware
 	router.Use(func() gin.HandlerFunc {
 		return func(c *gin.Context) {
 			beginning := time.Now()
