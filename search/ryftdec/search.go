@@ -111,7 +111,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		backendOptions := engine.Backend.Options()
 		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
 		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
-		tempResult := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-and.%s",
+		tempResult := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-and%s",
 			task.Identifier, task.subtaskId, task.extension))
 
 		task.log().WithField("temp", tempResult).
@@ -152,9 +152,9 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		backendOptions := engine.Backend.Options()
 		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
 		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
-		tempResultA := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-a.%s",
+		tempResultA := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-a%s",
 			task.Identifier, task.subtaskId, task.extension))
-		tempResultB := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-b.%s",
+		tempResultB := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-b%s",
 			task.Identifier, task.subtaskId, task.extension))
 
 		task.log().WithField("temp", []string{tempResultA, tempResultB}).
