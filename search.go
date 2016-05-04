@@ -78,6 +78,7 @@ func (s *Server) search(ctx *gin.Context) {
 			err.Error(), "failed to parse request parameters"))
 	}
 	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
+		// TODO: do we need the same check for JSON format?
 		panic(NewServerError(http.StatusBadRequest,
 			"format=xml could not be used without RECORD query"))
 	}

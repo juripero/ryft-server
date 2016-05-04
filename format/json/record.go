@@ -28,52 +28,81 @@
  * ============
  */
 
-package format
+package json
 
 import (
+	"encoding/json"
 	"fmt"
-	"strings"
 
-	"github.com/getryft/ryft-server/format/json"
-	"github.com/getryft/ryft-server/format/raw"
-	"github.com/getryft/ryft-server/format/xml"
 	"github.com/getryft/ryft-server/search"
 )
 
+// RECORD format specific data.
+type Record map[string]interface{}
+
 const (
-	JSON = "json"
-	RAW  = "raw"
-	XML  = "xml"
+	recFieldIndex = "_index"
+	recFieldError = "_error"
 )
 
-// Abstract Format interface.
-// Support conversion from/to basic search data types.
-// NewXXX() methods are used to decode data from stream.
-type Format interface {
-	NewIndex() interface{}
-	FromIndex(search.Index) interface{}
-	ToIndex(interface{}) search.Index
-
-	NewRecord() interface{}
-	FromRecord(*search.Record) interface{}
-	ToRecord(interface{}) *search.Record
-
-	NewStat() interface{}
-	FromStat(*search.Statistics) interface{}
-	ToStat(interface{}) *search.Statistics
+// for future work...
+type Record_0 struct {
+	Index   Index       `json:"index" msgpack:"index"`
+	RawData []byte      `json:"raw_data,omitempty" msgpack:"raw_data,omitempty"` // base-64 encoded
+	Data    interface{} `json:"data,omitempty" msgpack:"data,omitempty"`
+	Error   string      `json:"error,omitempty" msgpack:"error,omitempty"`
 }
 
-// New creates new formatter instance.
-// XML format supports some options.
-func New(format string, opts map[string]interface{}) (Format, error) {
-	switch strings.ToLower(format) {
-	case JSON:
-		return json.New(opts)
-	case RAW:
-		return raw.New()
-	case XML:
-		return xml.New(opts)
+// NewRecord creates new format specific data.
+func NewRecord() interface{} {
+	return new(Record)
+}
+
+// FromRecord converts RECORD to format specific data.
+func FromRecord(rec *search.Record, fields []string) *Record {
+	if rec == nil {
+		return nil
 	}
 
-	return nil, fmt.Errorf("%q is unsupported format", format)
+	res := Record{}
+	// res.RawData = rec.Data
+
+	// try to parse raw data as JSON...
+	err := json.Unmarshal(rec.Data, &res)
+	if err == nil {
+		// field filtration: if fields is empty all fields are used in result
+		// othewise only requested fields are copied (missing fields are ignored)
+		if len(fields) > 0 {
+			filtered := Record{}
+
+			// do filtration by fields
+			for _, field := range fields {
+				// missing fields are ignored!
+				if v, ok := res[field]; ok {
+					filtered[field] = v
+				}
+			}
+
+			res = filtered
+		}
+	} else {
+		res[recFieldError] = fmt.Sprintf("failed to parse JSON data: %s", err) // res.Error =
+	}
+
+	res[recFieldIndex] = FromIndex(rec.Index) // res.Index =
+
+	return &res
+}
+
+// ToRecord converts format specific data to RECORD.
+func ToRecord(rec *Record) *search.Record {
+	if rec == nil {
+		return nil
+	}
+
+	panic("JSON ToRecord is not implemented!")
+	//res := new(search.Record)
+	//res.Index = ToIndex(rec.Index)
+	//res.Data = rec.RawData
+	//return res
 }
