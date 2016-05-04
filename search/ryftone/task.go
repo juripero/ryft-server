@@ -51,6 +51,8 @@ type Task struct {
 	Identifier    string // unique
 	IndexFileName string
 	DataFileName  string
+	KeepIndexFile bool
+	KeepDataFile  bool
 
 	// `ryftone` data set
 	dataSet *DataSet
