@@ -132,8 +132,9 @@ func translateToPrefixNotation(tokens []string) []string {
 func reorderOperators(tokens []string, result []string) []string {
 	index := indexOfToken(tokens, "OR")
 	if index > 0 {
-		result = append(result, tokens[index:]...)
-		result = reorderOperators(tokens[:index], result)
+		result = append(result, tokens[index])
+		result = append(result, tokens[:index]...)
+		result = append(result, tokens[index+1:]...)
 	} else {
 		result = append(result, tokens...)
 	}
@@ -143,17 +144,30 @@ func reorderOperators(tokens []string, result []string) []string {
 
 func addToTree(currentNode *Node, tokens []string) *Node {
 	for _, token := range tokens {
-		if isOperator(token) {
+		if notParsable(token) {
 			currentNode = addChildToNode(currentNode, token)
 		} else {
-			if notParsable(token) {
-				addChildToNode(currentNode, token)
-			} else {
-				_, _ = parse(currentNode, token)
-			}
+			_, _ = parse(currentNode, token)
 		}
 	}
 	return currentNode
+}
+
+func addChildToNode(currentNode *Node, expression string) *Node {
+	var node *Node = &Node{}
+	if len(currentNode.SubNodes) == 2 {
+		node = node.New(expression, currentNode.Parent)
+		currentNode.Parent.SubNodes = append(currentNode.Parent.SubNodes, node)
+	} else {
+		node = node.New(expression, currentNode)
+		currentNode.SubNodes = append(currentNode.SubNodes, node)
+	}
+
+	if isOperator(expression) {
+		return node
+	} else {
+		return currentNode
+	}
 }
 
 func notParsable(expression string) bool {
@@ -162,13 +176,6 @@ func notParsable(expression string) bool {
 	timeExpression := strings.Contains(expression, "TIME(")
 	noBrackets := (strings.Count(expression, "(") == 0) && (strings.Count(expression, ")") == 0)
 	return noBrackets || (twoBrackets && dateExpression) || (twoBrackets && timeExpression)
-}
-
-func addChildToNode(currentNode *Node, expression string) *Node {
-	var node *Node = &Node{}
-	node = node.New(expression, currentNode)
-	currentNode.SubNodes = append(currentNode.SubNodes, node)
-	return node
 }
 
 func isOperator(token string) bool {
