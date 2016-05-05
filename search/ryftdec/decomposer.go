@@ -48,7 +48,9 @@ func Decompose(originalQuery string) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	node := normalizeTree(rootNode.SubNodes[0])
+
+	node := rootNode.SubNodes[0]
+	normalizeTree(node)
 
 	return node, nil // Return first node with value
 }
@@ -82,21 +84,6 @@ func parse(currentNode *Node, query string) (*Node, error) {
 	}
 
 	return currentNode, nil
-}
-
-func normalizeTree(node *Node) *Node {
-	if node.hasSubnodes() && node.sameTypeSubnodes() && node.subnodesAreQueries() {
-		subnodesType := node.SubNodes[0].Type
-		node.Expression = node.SubNodes[0].Expression + " " + node.Expression + " " + node.SubNodes[1].Expression
-		node.Type = subnodesType
-		node.SubNodes = node.SubNodes[0:0]
-	} else {
-		for _, subNode := range node.SubNodes {
-			normalizeTree(subNode)
-		}
-	}
-
-	return node
 }
 
 func tokenize(query string) []string {
@@ -179,7 +166,7 @@ func notParsable(expression string) bool {
 
 func addChildToNode(currentNode *Node, expression string) *Node {
 	var node *Node = &Node{}
-	node = node.New(expression)
+	node = node.New(expression, currentNode)
 	currentNode.SubNodes = append(currentNode.SubNodes, node)
 	return node
 }

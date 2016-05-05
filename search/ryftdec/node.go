@@ -50,16 +50,18 @@ const (
 type Node struct {
 	Expression string
 	Type       QueryType
+	Parent     *Node
 	SubNodes   []*Node
 }
 
-func (node *Node) New(expression string) *Node {
+func (node *Node) New(expression string, parent *Node) *Node {
 	if isOperator(expression) {
 		node.Expression = strings.Trim(expression, " ")
 	} else {
 		node.Expression = "(" + expression + ")"
 	}
 	node.Type = expressionType(expression)
+	node.Parent = parent
 	return node
 }
 
@@ -72,11 +74,19 @@ func (node *Node) subnodesAreQueries() bool {
 }
 
 func (node *Node) hasSubnodes() bool {
-	return len(node.SubNodes) > 0
+	return len(node.SubNodes) == 2
 }
 
 func (node Node) String() string {
 	return fmt.Sprintf("Expression: '%s'", node.Expression)
+}
+
+func (node *Node) isSearch() bool {
+	return node.Type.IsSearch()
+}
+
+func (node *Node) isOperator() bool {
+	return !node.Type.IsSearch()
 }
 
 // Map string operator value to constant
