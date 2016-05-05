@@ -117,10 +117,10 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND (RECORD.date CONTAINS DATE("00/00/0000"))   OR   (RECORD.date CONTAINS TIME("00:00:00"))`,
 		`[  OR]:
-  [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))
   [ AND]:
     [    ]: (RECORD.id CONTAINS "1003")
-    [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))`)
+    [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))
+  [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE("100301")))`,
 		`[ AND]:
@@ -129,10 +129,10 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE("100301")) OR (RECORD.id CONTAINS "2003"))`,
 		`[  OR]:
-  [    ]: (RECORD.id CONTAINS "2003")
   [ AND]:
     [    ]: (RECORD.id CONTAINS "1003")
-    [DATE]: (RECORD.date CONTAINS DATE("100301"))`)
+    [DATE]: (RECORD.date CONTAINS DATE("100301"))
+  [    ]: (RECORD.id CONTAINS "2003")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301")))`,
 		`[DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))`)
@@ -150,8 +150,8 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301"))  OR   (RECORD.id CONTAINS "200301"))`,
 		`[  OR]:
-  [    ]: (RECORD.id CONTAINS "200301")
-  [DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))`)
+  [DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))
+  [    ]: (RECORD.id CONTAINS "200301")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301")) AND (RECORD.id CONTAINS DATE("200301")) AND (RECORD.id CONTAINS DATE("20030102")))`,
 		`[ AND]:
