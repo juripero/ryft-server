@@ -1,5 +1,3 @@
-// +build !noryftone
-
 /*
  * ============= Ryft-Customized BSD License ============
  * Copyright (c) 2015, Ryft Systems, Inc.
@@ -33,54 +31,33 @@
 package ryftone
 
 import (
-	"fmt"
-	"sync"
-	"sync/atomic"
-	"time"
+	"github.com/Sirupsen/logrus"
 )
 
 var (
-	// global identifier (zero for debugging)
-	taskId = uint64(0 * time.Now().UnixNano())
+	// package logger instance
+	log = logrus.New()
+
+	TAG = "ryftone"
 )
 
-// RyftOne task related data.
-type Task struct {
-	Identifier    string // unique
-	IndexFileName string
-	DataFileName  string
-	KeepIndexFile bool
-	KeepDataFile  bool
+// SetLogLevel changes global module log level.
+func SetLogLevel(level string) error {
+	ll, err := logrus.ParseLevel(level)
+	if err != nil {
+		return err
+	}
 
-	// `ryftone` data set
-	dataSet *DataSet
-
-	// index & data
-	enableDataProcessing bool
-	index                *IndexTask
-	data                 *DataTask
-	subtasks             sync.WaitGroup
+	log.Level = ll
+	return nil // OK
 }
 
-// NewTask creates new task.
-func NewTask(enableProcessing bool) *Task {
-	id := atomic.AddUint64(&taskId, 1)
-
-	task := new(Task)
-	task.Identifier = fmt.Sprintf("%016x", id)
-	task.enableDataProcessing = enableProcessing
-
-	// NOTE: index file should have 'txt' extension,
-	// otherwise `ryftone` adds '.txt' anyway.
-	// all files are hidden!
-	task.IndexFileName = fmt.Sprintf(".idx-%s.txt", task.Identifier)
-	task.DataFileName = fmt.Sprintf(".dat-%s.bin", task.Identifier)
-
-	return task
+// log returns task related log entry.
+func (task *IndexTask) log() *logrus.Entry {
+	return log.WithField("task", task.Identifier)
 }
 
-// Prepare INDEX&DATA processing subtasks.
-func (task *Task) prepareProcessing() {
-	task.index = NewIndexTask(task.Identifier)
-	task.data = NewDataTask(task.index)
+// log returns task related log entry.
+func (task *DataTask) log() *logrus.Entry {
+	return log.WithField("task", task.Identifier)
 }

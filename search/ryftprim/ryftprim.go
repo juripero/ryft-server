@@ -31,7 +31,6 @@
 package ryftprim
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/hex"
 	"fmt"
@@ -39,7 +38,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/getryft/ryft-server/search"
 )
@@ -198,8 +196,21 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 		task.prepareProcessing()
 
 		task.subtasks.Add(2)
-		go engine.processIndex(task, res)
-		go engine.processData(task, res)
+		go func() {
+			defer task.subtasks.Done()
+
+			path := filepath.Join(engine.MountPoint, task.IndexFileName)
+			task.index.Process(path, engine.OpenFilePollTimeout,
+				engine.ReadFilePollTimeout, res)
+		}()
+		go func() {
+			defer task.subtasks.Done()
+
+			path := filepath.Join(engine.MountPoint, task.DataFileName)
+			task.data.Process(path, engine.MountPoint, engine.IndexHost,
+				engine.OpenFilePollTimeout, engine.ReadFilePollTimeout,
+				engine.ReadFilePollLimit, res)
+		}()
 	}
 
 	select {
@@ -213,8 +224,8 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 
 		if task.enableDataProcessing {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
-			task.cancelIndex()
-			task.cancelData()
+			task.index.Cancel()
+			task.data.Cancel()
 		}
 
 		// kill `ryftprim` tool
@@ -282,12 +293,12 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	if task.enableDataProcessing {
 		if err != nil || error_suppressed {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
-			task.cancelIndex()
-			task.cancelData()
+			task.index.Cancel()
+			task.data.Cancel()
 		} else {
 			task.log().Debugf("[%s]: stopping INDEX&DATA processing...", TAG)
-			task.stopIndex()
-			task.stopData()
+			task.index.Stop()
+			task.data.Stop()
 		}
 
 		task.log().Debugf("[%s]: waiting INDEX&DATA...", TAG)
@@ -308,134 +319,6 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			task.log().WithError(err).Warnf("[%s]: failed to remove DATA file", TAG)
 			// WARN: error actually ignored!
 		}
-	}
-}
-
-// Process the `ryftprim` INDEX results file.
-func (engine *Engine) processIndex(task *Task, res *search.Result) {
-	defer task.subtasks.Done()
-	defer close(task.indexChan)
-
-	defer task.log().Debugf("[%s]: end INDEX processing", TAG)
-	task.log().Debugf("[%s]: start INDEX processing...", TAG)
-
-	// try to open INDEX file: if operation is cancelled `file` is nil
-	path := filepath.Join(engine.MountPoint, task.IndexFileName)
-	file, err := task.openFile(path, engine.OpenFilePollTimeout, task.cancelIndexChan)
-	if err != nil {
-		task.log().WithError(err).WithField("path", path).
-			Warnf("[%s]: failed to open INDEX file", TAG)
-		res.ReportError(err)
-	}
-	if err != nil || file == nil {
-		task.cancelData() // force to cancel DATA processing
-		return            // no file means task is cancelled, do nothing
-	}
-
-	// close at the end
-	defer file.Close()
-
-	// try to read all index records
-	r := bufio.NewReader(file)
-	for {
-		// read line by line
-		line, err := r.ReadBytes('\n')
-		if err != nil {
-			// task.log().WithError(err).Debugf("[%s]: failed to read line from INDEX file", TAG) // FIXME: DEBUG
-			// will sleep a while and try again...
-		} else {
-			// task.log().WithField("line", string(bytes.TrimSpace(line))).
-			// 	Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
-
-			index, err := parseIndex(line)
-			if err != nil {
-				task.log().WithError(err).Warnf("failed to parse index from %q", bytes.TrimSpace(line))
-				res.ReportError(fmt.Errorf("failed to parse index: %s", err))
-			} else {
-				// put new index to DATA processing
-				task.totalDataLength += index.Length
-				task.indexChan <- index // WARN: might be blocked if index channel is full!
-			}
-
-			continue // go to next index ASAP
-		}
-
-		// check for soft stops
-		if task.indexStopped {
-			task.log().Debugf("[%s]: INDEX processing stopped", TAG)
-			task.log().WithField("data_len", task.totalDataLength).
-				Infof("[%s]: total DATA length expected", TAG)
-			return
-		}
-
-		// no data available or failed to read
-		// just sleep a while and try again
-		// task.log().Debugf("[%s]: INDEX poll...", TAG) // FIXME: DEBUG
-		select {
-		case <-time.After(engine.ReadFilePollTimeout):
-			// continue
-
-		case <-task.cancelIndexChan:
-			task.log().Debugf("[%s]: INDEX processing cancelled", TAG)
-			task.log().WithField("data_len", task.totalDataLength).
-				Infof("[%s]: total DATA length expected", TAG)
-			return
-		}
-	}
-}
-
-// Process the `ryftprim` DATA results file.
-func (engine *Engine) processData(task *Task, res *search.Result) {
-	defer task.subtasks.Done()
-
-	defer task.log().Debugf("[%s]: end DATA processing", TAG)
-	task.log().Debugf("[%s]: start DATA processing...", TAG)
-
-	// try to open DATA file: if operation is cancelled `file` is nil
-	path := filepath.Join(engine.MountPoint, task.DataFileName)
-	file, err := task.openFile(path, engine.OpenFilePollTimeout, task.cancelDataChan)
-	if err != nil {
-		task.log().WithError(err).WithField("path", path).
-			Warnf("[%s]: failed to open DATA file", TAG)
-		res.ReportError(err)
-	}
-	if err != nil || file == nil {
-		task.cancelIndex() // force to cancel INDEX processing
-		return             // no file means task is cancelled, do nothing
-	}
-
-	// close at the end
-	defer file.Close()
-
-	// try to process all INDEX records
-	r := bufio.NewReader(file)
-	for index := range task.indexChan {
-		// trim mount point from file name! TODO: special option for this?
-		index.File = strings.TrimPrefix(index.File, engine.MountPoint)
-
-		rec := new(search.Record)
-		rec.Index = index
-
-		// try to read data: if operation is cancelled `data` is nil
-		rec.Data, err = task.readDataFile(r, index.Length,
-			engine.ReadFilePollTimeout,
-			engine.ReadFilePollLimit)
-		if err != nil {
-			task.log().WithError(err).Warnf("[%s]: failed to read DATA", TAG)
-			res.ReportError(fmt.Errorf("failed to read DATA: %s", err))
-		}
-		if err != nil || rec.Data == nil {
-			task.log().Debugf("[%s]: DATA processing cancelled", TAG)
-
-			// just in case, also stop INDEX processing
-			task.cancelIndex()
-
-			return // no sense to continue processing
-		}
-
-		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
-		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-		res.ReportRecord(rec)
 	}
 }
 
@@ -463,93 +346,4 @@ func (engine *Engine) removeFile(name string) error {
 	}
 
 	return nil // OK
-}
-
-// openFile tries to open file until it's open
-// or until operation is cancelled by calling code
-// NOTE, if operation is cancelled the file is nil!
-func (task *Task) openFile(path string, poll time.Duration, cancel chan interface{}) (*os.File, error) {
-	// task.log().Debugf("[%s] trying to open %q file...", TAG, path) // FIXME: DEBUG
-
-	for {
-		// wait until file will be created by `ryftone`
-		if _, err := os.Stat(path); err == nil {
-			// file exists, try to open
-			f, err := os.Open(path)
-			if err == nil {
-				return f, nil // OK
-			} else {
-				// task.log().WithError(err).Warnf("[%s] failed to open file", TAG) // FIXME: DEBUG
-				// will sleep a while and try again...
-			}
-		} else {
-			// task.log().WithError(err).Warnf("[%s] failed to stat file", TAG) // FIXME: DEBUG
-			// will sleep a while and try again...
-		}
-
-		// file doesn't exist or failed to open
-		// just sleep a while and try again
-		select {
-		case <-time.After(poll):
-			// continue
-
-		case <-cancel:
-			task.log().Warnf("[%s] open %q file cancelled", TAG, path)
-			return nil, nil // fmt.Errorf("cancelled")
-		}
-	}
-}
-
-// readDataFile tries to read DATA file until all data is read
-// or until operation is cancelled by calling code
-// providing `limit` we can limit the overall number of attempts to poll.
-// if operation is cancelled the `data` is nil.
-func (task *Task) readDataFile(file *bufio.Reader, length uint64, poll time.Duration, limit int) ([]byte, error) {
-	// task.log().Debugf("[%s]: start reading %d byte(s)...", TAG, length) // FIXME: DEBUG
-
-	buf := make([]byte, length)
-	pos := uint64(0) // actual number of bytes read
-
-	for attempt := 0; attempt < limit; attempt++ {
-		n, err := file.Read(buf[pos:])
-		// task.log().Debugf("[%s]: read %d DATA byte(s)", TAG, n) // FIXME: DEBUG
-		if n > 0 {
-			// if we got something
-			// reset attempt count
-			attempt = 0
-		}
-		pos += uint64(n)
-		if err != nil {
-			// task.log().WithError(err).Debugf("[%s]: failed to read data file (%d of %d)", TAG, pos, length) // FIXME: DEBUG
-			// will sleep a while and try again
-		} else {
-			if pos >= length {
-				return buf, nil // OK
-			}
-
-			// no errors, just not all data read
-			// need to do next attemt ASAP
-			continue
-		}
-
-		// check for soft stops
-		if task.dataStopped && pos >= length {
-			task.log().Debugf("[%s]: DATA processing stopped", TAG)
-			return buf, nil // fmt.Errorf("stopped")
-		}
-
-		// no data available or failed to read
-		// just sleep a while and try again
-		select {
-		case <-time.After(poll):
-			// continue
-
-		case <-task.cancelDataChan:
-			task.log().Warnf("[%s]: read file cancelled", TAG)
-			return nil, nil // fmt.Errorf("cancelled")
-		}
-	}
-
-	return buf[0:pos], fmt.Errorf("cancelled by attempt limit %s (%dx%s)",
-		poll*time.Duration(limit), limit, poll)
 }

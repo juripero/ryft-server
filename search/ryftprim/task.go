@@ -38,7 +38,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftone"
 )
 
 var (
@@ -61,15 +61,9 @@ type Task struct {
 
 	// index & data
 	enableDataProcessing bool
-	indexChan            chan search.Index // INDEX to DATA
-	cancelIndexChan      chan interface{}  // to cancel INDEX processing (hard stop)
-	cancelDataChan       chan interface{}  // to cancel DATA processing (hard stop)
-	indexStopped         bool              // soft stop
-	dataStopped          bool              // soft stop
+	index                *ryftone.IndexTask
+	data                 *ryftone.DataTask
 	subtasks             sync.WaitGroup
-
-	// some processing statistics
-	totalDataLength uint64 // total DATA length expected, sum of all index.Length
 }
 
 // NewTask creates new task.
@@ -91,38 +85,6 @@ func NewTask(enableProcessing bool) *Task {
 
 // Prepare INDEX&DATA processing subtasks.
 func (task *Task) prepareProcessing() {
-	task.indexChan = make(chan search.Index, 1024) // TODO: capacity constant from engine?
-	task.cancelIndexChan = make(chan interface{}, 2)
-	task.cancelDataChan = make(chan interface{}, 2)
-}
-
-// Cancel INDEX processing subtask (hard stop).
-func (task *Task) cancelIndex() {
-	task.cancelIndexChan <- nil
-	task.stopIndex()
-
-	// need to drain index channel to give INDEX processing routine
-	// a chance to finish it's work (it might be blocked sending
-	// index record to the task.indexChan which DATA processing
-	// is not going to read anymore)
-	for idx := range task.indexChan {
-		task.log().WithField("index", idx).
-			Debugf("[%s]: INDEX ignored", TAG)
-	}
-}
-
-// Cancel DATA processing subtask (hard stop).
-func (task *Task) cancelData() {
-	task.cancelDataChan <- nil
-	task.stopData()
-}
-
-// Stop INDEX processing subtask (soft stop).
-func (task *Task) stopIndex() {
-	task.indexStopped = true
-}
-
-// Stop DATA processing subtask (soft stop).
-func (task *Task) stopData() {
-	task.dataStopped = true
+	task.index = ryftone.NewIndexTask(task.Identifier)
+	task.data = ryftone.NewDataTask(task.index)
 }
