@@ -31,7 +31,6 @@
 package ryftdec
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -40,35 +39,6 @@ var (
 	markers        = []string{" DATE(", " TIME("}
 	maxDepth   int = 1
 )
-
-type QueryType int
-
-const (
-	QTYPE_SEARCH QueryType = iota
-	QTYPE_DATE
-	QTYPE_TIME
-	QTYPE_NUMERIC
-	QTYPE_AND
-	QTYPE_OR
-	QTYPE_XOR
-)
-
-// IsSearch checks if query type is a search
-func (q QueryType) IsSearch() bool {
-	switch q {
-	case QTYPE_SEARCH, QTYPE_DATE,
-		QTYPE_TIME, QTYPE_NUMERIC:
-		return true
-	}
-
-	return false
-}
-
-type Node struct {
-	Expression string
-	Type       QueryType
-	SubNodes   []*Node
-}
 
 func Decompose(originalQuery string) (*Node, error) {
 	rootNode := Node{SubNodes: make([]*Node, 0)}
@@ -207,66 +177,13 @@ func notParsable(expression string) bool {
 	return noBrackets || (twoBrackets && dateExpression) || (twoBrackets && timeExpression)
 }
 
-func addChildToNode(currentNode *Node, token string) *Node {
-	// TODO: use New method to build node for expression
-	newNode := nodeForExpression(token)
-	currentNode.SubNodes = append(currentNode.SubNodes, &newNode)
-	return &newNode
-}
-
-func nodeForExpression(expression string) Node {
-	var newNode Node
-	if isOperator(expression) {
-		newNode = Node{Expression: strings.Trim(expression, " "), Type: operatorConst(expression)}
-	} else {
-		newNode = Node{Expression: "(" + expression + ")", Type: queryConst(expression)}
-	}
-	return newNode
-}
-
-// Map string operator value to constant
-func operatorConst(token string) QueryType {
-	token = strings.Trim(token, " ")
-	switch token {
-	case "AND":
-		return QTYPE_AND
-	case "OR":
-		return QTYPE_OR
-	default:
-		return QTYPE_XOR
-	}
-}
-
-func queryConst(query string) QueryType {
-	switch {
-	case strings.Contains(query, "DATE("):
-		return QTYPE_DATE
-	case strings.Contains(query, "TIME("):
-		return QTYPE_TIME
-		//case strings.Contains(query, "????"):
-		//return QTYPE_NUMERIC
-	}
-
-	return QTYPE_SEARCH
+func addChildToNode(currentNode *Node, expression string) *Node {
+	var node *Node = &Node{}
+	node = node.New(expression)
+	currentNode.SubNodes = append(currentNode.SubNodes, node)
+	return node
 }
 
 func isOperator(token string) bool {
 	return containsString(delimiters, " "+token+" ")
-}
-
-func (node *Node) sameTypeSubnodes() bool {
-	return node.SubNodes[0].Type == node.SubNodes[1].Type
-}
-
-func (node *Node) subnodesAreQueries() bool {
-	// TODO: handle OR and XOR here
-	return (node.SubNodes[0].Type != QTYPE_AND) && (node.SubNodes[1].Type != QTYPE_AND)
-}
-
-func (node *Node) hasSubnodes() bool {
-	return len(node.SubNodes) > 0
-}
-
-func (node Node) String() string {
-	return fmt.Sprintf("Expression: '%s'", node.Expression)
 }
