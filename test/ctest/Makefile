@@ -2,4 +2,4 @@ all: build
 
 .PHONY: build
 build:
-	gcc -Wall -o ctest main.c -lryftone
+	gcc -Wall -pthread -o ctest main.c -lryftone
