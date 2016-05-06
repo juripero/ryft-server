@@ -1,5 +1,7 @@
 #!/bin/bash
 
+tailLines="-40"
+
 #
 # initial state 
 #
@@ -223,12 +225,12 @@ function ryft_start_menu
     local START_MENU_TITLE="Ryft Start Menu"
 
     local -a START_MENU_TEXT
-    START_MENU_TEXT[0]="exit"
-    START_MENU_TEXT[1]="start ALL"
-    START_MENU_TEXT[2]="start ryft-server-d"
-    START_MENU_TEXT[3]="start ryftwebapidemo"
-    START_MENU_TEXT[4]="start ryft1_odbcd"
-    START_MENU_TEXT[5]="start consul"
+    START_MENU_TEXT[0]="Exit"
+    START_MENU_TEXT[1]="Start ALL"
+    START_MENU_TEXT[2]="Start ryft-server-d"
+    START_MENU_TEXT[3]="Start ryftwebapidemo"
+    START_MENU_TEXT[4]="Start ryft1_odbcd"
+    START_MENU_TEXT[5]="Start consul"
     
     local -a START_MENU_ACTIONS
     START_MENU_ACTIONS[0]="exit"
@@ -271,12 +273,12 @@ function ryft_stop_menu
     local STOP_MENU_TITLE="Ryft Stop Menu"
 
     local -a STOP_MENU_TEXT
-    STOP_MENU_TEXT[0]="exit"
-    STOP_MENU_TEXT[1]="stop ALL"
-    STOP_MENU_TEXT[2]="stop ryft-server-d"
-    STOP_MENU_TEXT[3]="stop ryftwebapidemo"
-    STOP_MENU_TEXT[4]="stop ryft1_odbcd"
-    STOP_MENU_TEXT[5]="stop consul"
+    STOP_MENU_TEXT[0]="Exit"
+    STOP_MENU_TEXT[1]="Stop ALL"
+    STOP_MENU_TEXT[2]="Stop ryft-server-d"
+    STOP_MENU_TEXT[3]="Stop ryftwebapidemo"
+    STOP_MENU_TEXT[4]="Stop ryft1_odbcd"
+    STOP_MENU_TEXT[5]="Stop consul"
     
     local -a STOP_MENU_ACTIONS
     STOP_MENU_ACTIONS[0]="exit"
@@ -312,12 +314,12 @@ function ryft_restart_menu
     RESTART_MENU_TITLE="Ryft Restart Menu"
 
     local -a RESTART_MENU_TEXT
-    RESTART_MENU_TEXT[0]="exit"
-    RESTART_MENU_TEXT[1]="restart ALL"
-    RESTART_MENU_TEXT[2]="restart ryft-server-d"
-    RESTART_MENU_TEXT[3]="restart ryftwebapidemo"
-    RESTART_MENU_TEXT[4]="restart ryft1_odbcd"
-    RESTART_MENU_TEXT[5]="restart consul"
+    RESTART_MENU_TEXT[0]="Exit"
+    RESTART_MENU_TEXT[1]="Restart ALL"
+    RESTART_MENU_TEXT[2]="Restart ryft-server-d"
+    RESTART_MENU_TEXT[3]="Restart ryftwebapidemo"
+    RESTART_MENU_TEXT[4]="Restart ryft1_odbcd"
+    RESTART_MENU_TEXT[5]="Restart consul"
 
     local -a RESTART_MENU_ACTIONS
     RESTART_MENU_ACTIONS[0]="exit"
@@ -401,12 +403,12 @@ function ryft_boot_toggle_menu
     local BOOT_TOGGLE_MENU_TITLE="Ryft Boot Toggle Menu"
     
     local -a BOOT_TOGGLE_MENU_TEXT
-    BOOT_TOGGLE_MENU_TEXT[0]="exit"
-    BOOT_TOGGLE_MENU_TEXT[1]="boot toggle ALL"
-    BOOT_TOGGLE_MENU_TEXT[2]="boot toggle ryft_server_d"
-    BOOT_TOGGLE_MENU_TEXT[3]="boot toggle ryftwebapidemo"
-    BOOT_TOGGLE_MENU_TEXT[4]="boot toggle ryft1_odbcd"
-    BOOT_TOGGLE_MENU_TEXT[5]="boot toggle consul"
+    BOOT_TOGGLE_MENU_TEXT[0]="Exit"
+    BOOT_TOGGLE_MENU_TEXT[1]="Boot toggle ALL"
+    BOOT_TOGGLE_MENU_TEXT[2]="Boot toggle ryft_server_d"
+    BOOT_TOGGLE_MENU_TEXT[3]="Boot toggle ryftwebapidemo"
+    BOOT_TOGGLE_MENU_TEXT[4]="Boot toggle ryft1_odbcd"
+    BOOT_TOGGLE_MENU_TEXT[5]="Boot toggle consul"
     
     local -a BOOT_TOGGLE_MENU_ACTIONS
     BOOT_TOGGLE_MENU_ACTIONS[0]="exit"
@@ -426,12 +428,12 @@ function ryft_boot_on_menu
     local BOOT_ON_MENU_TITLE="Ryft Boot On Menu"
 
     local -a BOOT_ON_MENU_TEXT
-    BOOT_ON_MENU_TEXT[0]="exit"
-    BOOT_ON_MENU_TEXT[1]="boot on ALL"
-    BOOT_ON_MENU_TEXT[2]="boot on ryft_server_d"
-    BOOT_ON_MENU_TEXT[3]="boot on ryftwebapidemo"
-    BOOT_ON_MENU_TEXT[4]="boot on ryft1_odbcd"
-    BOOT_ON_MENU_TEXT[5]="boot on consul"
+    BOOT_ON_MENU_TEXT[0]="Exit"
+    BOOT_ON_MENU_TEXT[1]="Boot on ALL"
+    BOOT_ON_MENU_TEXT[2]="Boot on ryft_server_d"
+    BOOT_ON_MENU_TEXT[3]="Boot on ryftwebapidemo"
+    BOOT_ON_MENU_TEXT[4]="Boot on ryft1_odbcd"
+    BOOT_ON_MENU_TEXT[5]="Boot on consul"
     
     local -a BOOT_ON_MENU_ACTIONS
     BOOT_ON_MENU_ACTIONS[0]="exit"
@@ -451,12 +453,12 @@ function ryft_boot_off_menu
     local BOOT_OFF_MENU_TITLE="Ryft Boot Off Menu"
 
     local -a BOOT_OFF_MENU_TEXT
-    BOOT_OFF_MENU_TEXT[0]="exit"
-    BOOT_OFF_MENU_TEXT[1]="boot off ALL"
-    BOOT_OFF_MENU_TEXT[2]="boot off ryft_server_d"
-    BOOT_OFF_MENU_TEXT[3]="boot off ryftwebapidemo"
-    BOOT_OFF_MENU_TEXT[4]="boot off ryft1_odbcd"
-    BOOT_OFF_MENU_TEXT[5]="boot off consul"
+    BOOT_OFF_MENU_TEXT[0]="Exit"
+    BOOT_OFF_MENU_TEXT[1]="Boot off ALL"
+    BOOT_OFF_MENU_TEXT[2]="Boot off ryft_server_d"
+    BOOT_OFF_MENU_TEXT[3]="Boot off ryftwebapidemo"
+    BOOT_OFF_MENU_TEXT[4]="Boot off ryft1_odbcd"
+    BOOT_OFF_MENU_TEXT[5]="Boot off consul"
 
     local -a BOOT_OFF_MENU_ACTIONS
     BOOT_OFF_MENU_ACTIONS[0]="exit"
@@ -473,29 +475,174 @@ function ryft_boot_off_menu
 
 #######################################0
 
-function ryft_maintenance_menu
+function ryft_ryftone_maintenance_menu
 {
-    local MAINTENANCE_MENU_TITLE="Ryft Maintenance Menu"
+    local MAINTENANCE_MENU_TITLE="RyftOne Maintenance Menu"
 
     local -a MAINTENANCE_MENU_TEXT
-    MAINTENANCE_MENU_TEXT[0]="exit"
-    MAINTENANCE_MENU_TEXT[1]="smoke test"
-    MAINTENANCE_MENU_TEXT[2]="cpc"
-    MAINTENANCE_MENU_TEXT[3]="recycle"
-    MAINTENANCE_MENU_TEXT[4]="free"
-    MAINTENANCE_MENU_TEXT[5]="fsck_rhfs -y -Y"
-    MAINTENANCE_MENU_TEXT[6]="hw reset rhfs ccc"
-    MAINTENANCE_MENU_TEXT[7]="poweroff"
+    MAINTENANCE_MENU_TEXT[0]="Exit"
+    MAINTENANCE_MENU_TEXT[1]="Smoke test"
+    MAINTENANCE_MENU_TEXT[2]="Cpc"
+    MAINTENANCE_MENU_TEXT[3]="Recycle"
+    MAINTENANCE_MENU_TEXT[4]="File system check/repair (fsck_rhfs -y -Y)"
+    MAINTENANCE_MENU_TEXT[5]="Hardware reset rhfs ccc"
+    MAINTENANCE_MENU_TEXT[6]="Poweroff"
     
     local -a MAINTENANCE_MENU_ACTIONS
     MAINTENANCE_MENU_ACTIONS[0]="exit"
     MAINTENANCE_MENU_ACTIONS[1]="~ryftuser/ryft/regression/util/smoke.sh"
     MAINTENANCE_MENU_ACTIONS[2]="~ryftuser/ryft/regression/util/cpc"
-    MAINTENANCE_MENU_ACTIONS[3]="~ryftuser/ryft/regression/util/recycle"
-    MAINTENANCE_MENU_ACTIONS[4]="free"
-    MAINTENANCE_MENU_ACTIONS[5]="fsck_rhfs -y -Y"
-    MAINTENANCE_MENU_ACTIONS[6]="ryft_ays \"This process will require restoring /ryftone filesystem data.\" && sudo ~ryftuser/ryft/regression/util/hw_reset_rhfs_ccc.sh || echo \"not sure\""
-    MAINTENANCE_MENU_ACTIONS[7]="ryft_ays \"This process will power down the ryftone.\" && sudo poweroff || echo \"not sure\""
+    MAINTENANCE_MENU_ACTIONS[3]="ryft_ays \"Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.\" && ~ryftuser/ryft/regression/util/recycle"
+    MAINTENANCE_MENU_ACTIONS[5]="ryft_ays \"Requested action performs /ryftone file system check/repair\" && sudo fsck_rhfs -y -Y"
+    MAINTENANCE_MENU_ACTIONS[6]="ryft_ays \"Requested action permanently removes all /ryftone filesystem data.\" && ryft_ays \"Double checking...\" && sudo ~ryftuser/ryft/regression/util/hw_reset_rhfs_ccc.shx || echo \"not sure\""
+    MAINTENANCE_MENU_ACTIONS[7]="ryft_ays \"Requested action will power down the ryftone.\" && sudo poweroff || echo \"not sure\""
+
+    local MAINTENANCE_MENU_COMMAND="ryft_boot_status; ryft_status;"
+
+    ryft_menu "$MAINTENANCE_MENU_TITLE" MAINTENANCE_MENU_TEXT[@] MAINTENANCE_MENU_ACTIONS[@] "$MAINTENANCE_MENU_COMMAND" 
+}
+
+#######################################0
+
+function ryft_ryft_server_d_maintenance_menu
+{
+    local processName=ryft-server-d
+    local configFile=/etc/ryft-rest.conf
+
+    local MAINTENANCE_MENU_TITLE="$processName Maintenance Menu"
+	
+    local -a MAINTENANCE_MENU_TEXT
+    MAINTENANCE_MENU_TEXT[0]="Exit"
+    MAINTENANCE_MENU_TEXT[1]="$processName restart"
+    MAINTENANCE_MENU_TEXT[2]="$processName stop"
+    MAINTENANCE_MENU_TEXT[3]="$processName boot_on"
+    MAINTENANCE_MENU_TEXT[4]="$processName boot_off"
+    MAINTENANCE_MENU_TEXT[5]="$processName configuration	(cat $configFile)"
+    
+    local -a MAINTENANCE_MENU_ACTIONS
+    MAINTENANCE_MENU_ACTIONS[0]="exit"
+    MAINTENANCE_MENU_ACTIONS[1]="ryft_restart $processName"
+    MAINTENANCE_MENU_ACTIONS[2]="ryft_stop $processName"
+    MAINTENANCE_MENU_ACTIONS[3]="ryft_boot_on $processName"
+    MAINTENANCE_MENU_ACTIONS[4]="ryft_boot_off $processName"
+    MAINTENANCE_MENU_ACTIONS[5]="ryft_separator; cat $configFile || echo \"File Not Found. Using default configuration\"; ryft_separator"
+
+    local MAINTENANCE_MENU_COMMAND="ryft_boot_status; ryft_status;"
+
+    ryft_menu "$MAINTENANCE_MENU_TITLE" MAINTENANCE_MENU_TEXT[@] MAINTENANCE_MENU_ACTIONS[@] "$MAINTENANCE_MENU_COMMAND" 
+}
+
+#######################################0
+
+function ryft_consul_maintenance_menu
+{
+    local processName=consul
+    local configFile=/etc/consul.conf
+
+    local MAINTENANCE_MENU_TITLE="$processName Maintenance Menu"
+	
+    local -a MAINTENANCE_MENU_TEXT
+    MAINTENANCE_MENU_TEXT[0]="Exit"
+    MAINTENANCE_MENU_TEXT[1]="$processName restart"
+    MAINTENANCE_MENU_TEXT[2]="$processName stop"
+    MAINTENANCE_MENU_TEXT[3]="$processName boot_on"
+    MAINTENANCE_MENU_TEXT[4]="$processName boot_off"
+    MAINTENANCE_MENU_TEXT[5]="$processName configuration	(cat $configFile)"
+    
+    local -a MAINTENANCE_MENU_ACTIONS
+    MAINTENANCE_MENU_ACTIONS[0]="exit"
+    MAINTENANCE_MENU_ACTIONS[1]="ryft_restart $processName"
+    MAINTENANCE_MENU_ACTIONS[2]="ryft_stop $processName"
+    MAINTENANCE_MENU_ACTIONS[3]="ryft_boot_on $processName"
+    MAINTENANCE_MENU_ACTIONS[4]="ryft_boot_off $processName"
+    MAINTENANCE_MENU_ACTIONS[5]="ryft_separator; cat $configFile; ryft_separator"
+
+    local MAINTENANCE_MENU_COMMAND="ryft_boot_status; ryft_status;"
+
+    ryft_menu "$MAINTENANCE_MENU_TITLE" MAINTENANCE_MENU_TEXT[@] MAINTENANCE_MENU_ACTIONS[@] "$MAINTENANCE_MENU_COMMAND" 
+}
+
+#######################################0
+
+function ryft_ryft1_odbcd_maintenance_menu
+{
+    local processName=ryft1_odbcd
+    local configFile=/usr/local/ryft/bin/x8664/.ryftone.server.ini
+
+    local MAINTENANCE_MENU_TITLE="$processName Maintenance Menu"
+	
+    local -a MAINTENANCE_MENU_TEXT
+    MAINTENANCE_MENU_TEXT[0]="Exit"
+    MAINTENANCE_MENU_TEXT[1]="$processName restart"
+    MAINTENANCE_MENU_TEXT[2]="$processName stop"
+    MAINTENANCE_MENU_TEXT[3]="$processName boot_on"
+    MAINTENANCE_MENU_TEXT[4]="$processName boot_off"
+    MAINTENANCE_MENU_TEXT[5]="$processName configuration	(cat $configFile)"
+    
+    local -a MAINTENANCE_MENU_ACTIONS
+    MAINTENANCE_MENU_ACTIONS[0]="exit"
+    MAINTENANCE_MENU_ACTIONS[1]="ryft_restart $processName"
+    MAINTENANCE_MENU_ACTIONS[2]="ryft_stop $processName"
+    MAINTENANCE_MENU_ACTIONS[3]="ryft_boot_on $processName"
+    MAINTENANCE_MENU_ACTIONS[4]="ryft_boot_off $processName"
+    MAINTENANCE_MENU_ACTIONS[5]="ryft_separator; cat $configFile; ryft_separator"
+
+    local MAINTENANCE_MENU_COMMAND="ryft_boot_status; ryft_status;"
+
+    ryft_menu "$MAINTENANCE_MENU_TITLE" MAINTENANCE_MENU_TEXT[@] MAINTENANCE_MENU_ACTIONS[@] "$MAINTENANCE_MENU_COMMAND" 
+}
+
+#######################################0
+
+function ryft_ryftwebapidemo_maintenance_menu
+{
+    local processName=ryftwebapidemo
+    local configFile=/opt/ryft-demo/conf/ryft.properties
+
+    local MAINTENANCE_MENU_TITLE="$processName Maintenance Menu"
+	
+    local -a MAINTENANCE_MENU_TEXT
+    MAINTENANCE_MENU_TEXT[0]="Exit"
+    MAINTENANCE_MENU_TEXT[1]="$processName restart"
+    MAINTENANCE_MENU_TEXT[2]="$processName stop"
+    MAINTENANCE_MENU_TEXT[3]="$processName boot_on"
+    MAINTENANCE_MENU_TEXT[4]="$processName boot_off"
+    MAINTENANCE_MENU_TEXT[5]="$processName configuration	(cat $configFile)"
+    
+    local -a MAINTENANCE_MENU_ACTIONS
+    MAINTENANCE_MENU_ACTIONS[0]="exit"
+    MAINTENANCE_MENU_ACTIONS[1]="ryft_restart $processName"
+    MAINTENANCE_MENU_ACTIONS[2]="ryft_stop $processName"
+    MAINTENANCE_MENU_ACTIONS[3]="ryft_boot_on $processName"
+    MAINTENANCE_MENU_ACTIONS[4]="ryft_boot_off $processName"
+    MAINTENANCE_MENU_ACTIONS[5]="ryft_separator; cat $configFile; echo; ryft_separator"
+
+    local MAINTENANCE_MENU_COMMAND="ryft_boot_status; ryft_status;"
+
+    ryft_menu "$MAINTENANCE_MENU_TITLE" MAINTENANCE_MENU_TEXT[@] MAINTENANCE_MENU_ACTIONS[@] "$MAINTENANCE_MENU_COMMAND" 
+}
+
+#######################################0
+
+function ryft_maintenance_menu
+{
+    local MAINTENANCE_MENU_TITLE="Maintenance Menu"
+
+    local -a MAINTENANCE_MENU_TEXT
+    MAINTENANCE_MENU_TEXT[0]="Exit"
+    MAINTENANCE_MENU_TEXT[1]="RyftONE maintenance"
+    MAINTENANCE_MENU_TEXT[2]="ryft-server-d maintenance"
+    MAINTENANCE_MENU_TEXT[3]="ryftwebapidemo maintenance"
+    MAINTENANCE_MENU_TEXT[4]="ryft1_odbcd maintenance"
+    MAINTENANCE_MENU_TEXT[5]="consul maintenance"
+    
+    local -a MAINTENANCE_MENU_ACTIONS
+    MAINTENANCE_MENU_ACTIONS[0]="exit"
+    MAINTENANCE_MENU_ACTIONS[1]="ryft_ryftone_maintenance_menu"
+    MAINTENANCE_MENU_ACTIONS[2]="ryft_ryft_server_d_maintenance_menu"
+    MAINTENANCE_MENU_ACTIONS[3]="ryft_ryftwebapidemo_maintenance_menu"
+    MAINTENANCE_MENU_ACTIONS[4]="ryft_ryft1_odbcd_maintenance_menu"
+    MAINTENANCE_MENU_ACTIONS[5]="ryft_consul_maintenance_menu"
 
     local MAINTENANCE_MENU_COMMAND="ryft_boot_status; ryft_status;"
 
@@ -503,6 +650,44 @@ function ryft_maintenance_menu
 }
 
 ####################################
+function ryft_separator() 
+{
+    echo "-----------------------------------------------"
+}
+
+function ryft_logs_menu
+{
+    local ryftoneLog=/var/log/ryft/ryftone.log
+    local ryft_server_dLog=~ryftuser/ryft-server-d-start.log
+    local ryftwebapidemoLog=/tmp/apidemo.log
+    local ryft1_odbcdLog=/usr/local/ryft/bin/x8664/ryftone_server.log
+    local consulLog=/var/log/consul
+    
+    local LOGS_MENU_TITLE="Ryft Logs Menu"
+
+    local -a LOGS_MENU_TEXT
+    LOGS_MENU_TEXT[0]="Exit"
+    LOGS_MENU_TEXT[1]="RyftOne log           (tail ${tailLines} $ryftoneLog)"
+    LOGS_MENU_TEXT[2]="ryft-server-d log     (tail ${tailLines} $ryft_server_dLog)"
+    LOGS_MENU_TEXT[3]="ryftwebapidemo log    (tail ${tailLines} $ryftwebapidemoLog)"
+    LOGS_MENU_TEXT[4]="ryft1_odbcd log       (tail ${tailLines} $ryft1_odbcdLog)"
+    LOGS_MENU_TEXT[5]="consul log            (tail ${tailLines} $consulLog)"
+    LOGS_MENU_TEXT[6]="Ryft diagnostic dump  (sudo ryft_diagnostics_dump)"
+    
+    local -a LOGS_MENU_ACTIONS
+    LOGS_MENU_ACTIONS[0]="exit"
+    LOGS_MENU_ACTIONS[1]="ryft_separator; tail ${tailLines} $ryftoneLog; ryft_separator"
+    LOGS_MENU_ACTIONS[2]="ryft_separator; tail ${tailLines} $ryft_server_dLog; ryft_separator"
+    LOGS_MENU_ACTIONS[3]="ryft_separator; tail ${tailLines} $ryftwebapidemoLog; ryft_separator"
+    LOGS_MENU_ACTIONS[4]="ryft_separator; tail ${tailLines} $ryft1_odbcdLog; ryft_separator"
+    LOGS_MENU_ACTIONS[5]="ryft_separator; tail ${tailLines} $consulLog; ryft_separator"
+    LOGS_MENU_ACTIONS[6]="ryft_separator; sudo ryft_diagnostics_dump && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
+
+    local LOGS_MENU_COMMAND="ryft_boot_status; ryft_status;"
+
+    ryft_menu "$LOGS_MENU_TITLE" LOGS_MENU_TEXT[@] LOGS_MENU_ACTIONS[@] "$LOGS_MENU_COMMAND" 
+}
+
 
 function ryft_main_menu
 {
@@ -516,7 +701,8 @@ function ryft_main_menu
     MAIN_MENU_TEXT[4]="Boot on menu"
     MAIN_MENU_TEXT[5]="Boot off menu"
     #MAIN_MENU_TEXT[6]="boot toggle menu"
-    MAIN_MENU_TEXT[6]="Ryft maintenance"
+    MAIN_MENU_TEXT[6]="Maintenance menu"
+    MAIN_MENU_TEXT[7]="Ryft logs menu"
     
     local -a MAIN_MENU_ACTIONS
     MAIN_MENU_ACTIONS[0]="exit"
@@ -527,6 +713,7 @@ function ryft_main_menu
     MAIN_MENU_ACTIONS[5]="ryft_boot_off_menu"
     #MAIN_MENU_ACTIONS[6]="ryft_boot_toggle_menu"
     MAIN_MENU_ACTIONS[6]="ryft_maintenance_menu"
+    MAIN_MENU_ACTIONS[7]="ryft_logs_menu"
 
     local MAIN_MENU_COMMAND="ryft_boot_status; ryft_status;"
 
@@ -635,7 +822,7 @@ show_filesystem_error () {
 	echo "Follow corrective actions in following order:"
 	echo "1. command: '(cd ~ryftuser/ryft/regression/util;./cpc;./recycle)'"
 	echo "   Repeat command if 'ryft_status' doesn't indicate OKAY"
-        echo "   If ryft_status is not OKAY, issue "fsck_rhfs -y -Y"
+        echo "   If ryft_status is not OKAY, issue "sudo fsck_rhfs -y -Y"
  	echo "   If ryft_status is not OKAY, advance to step #2."
 	echo "   If OKAY, 'ryft_status -smoke' should show no problems."
 	echo "   if 'ryft_status -smoke' problems persist, advance to next step."
@@ -847,39 +1034,39 @@ showCommandDisplay() {
 
 	echo
 
-	echo "ryftwebapidemo start/stop"
+	echo "ryftwebapidemo start/stop process"
 	echo "	$apidemo_startCommand"
 	echo "	$apidemo_stopCommand"
-	echo "ryftwebapidemo start at boot" 
+	echo "ryftwebapidemo boot_on/boot_off process"
+	echo "	sudo rm -f /etc/init/ryftwebapidemo.override"
 	echo "	echo \"manual\" | sudo tee /etc/init/ryftwebapidemo.override"
-	echo "	sudo rm -f /etc/init/ryftapidemo.override"
 
 	echo
 	
-	echo "ryft-server-d start/stop"
+	echo "ryft-server-d start/stop process"
 	echo "	$ryftServer_startCommand"
 	echo "	$ryftServer_stopCommand"
-	echo "ryft-server-d start at boot"
-	echo "	echo \"manual\" | sudo tee /etc/init/ryft-server-d.override"
+	echo "ryft-server-d boot_on/boot_off process"
 	echo "	sudo rm -f /etc/init/ryft-server-d.override"
+	echo "	echo \"manual\" | sudo tee /etc/init/ryft-server-d.override"
 
 	echo
 
-	echo "consul start/stop"
+	echo "consul start/stop process"
 	echo "	sudo service consul start"
 	echo "	sudo service consul stop"
-	echo "consul start at boot"
-	echo "	echo \"manual\" | sudo tee /etc/init/consul.override"
+	echo "consul boot_on/boot_off process"
 	echo "	sudo rm -f /etc/init/consul.override"
+	echo "	echo \"manual\" | sudo tee /etc/init/consul.override"
 
 	echo 
 
-	echo "odbcd start/stop"
+	echo "ryft1_odbcd start/stop process"
 	echo "	" $ryft1_odbcd_startCommand
 	echo "	" $ryft1_odbcd_stopCommand
-	echo "odbcd start at boot"
-	echo "	 echo \"manual\" | sudo tee /etc/init/ryft1_odbcd.override"
+	echo "ryft1_odbcd boot_on/boot_off process"
 	echo "	 sudo rm -f /etc/init/ryft1_odbcd.override"
+	echo "	 echo \"manual\" | sudo tee /etc/init/ryft1_odbcd.override"
 
 	echo
 
