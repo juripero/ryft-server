@@ -103,8 +103,8 @@ func expressionType(expression string) QueryType {
 		return QTYPE_DATE
 	case strings.Contains(expression, "TIME("):
 		return QTYPE_TIME
-		//case strings.Contains(query, "????"):
-		//return QTYPE_NUMERIC
+	case strings.Contains(expression, "NUMBER("):
+		return QTYPE_NUMERIC
 	default:
 		return QTYPE_SEARCH
 	}

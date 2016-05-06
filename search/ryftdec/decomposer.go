@@ -36,7 +36,7 @@ import (
 
 var (
 	delimiters     = []string{" AND ", " OR "}
-	markers        = []string{" DATE(", " TIME("}
+	markers        = []string{" DATE(", " TIME(", "NUMBER("}
 	maxDepth   int = 1
 )
 
@@ -174,8 +174,9 @@ func notParsable(expression string) bool {
 	twoBrackets := (strings.Count(expression, "(") == 1) && (strings.Count(expression, ")") == 1)
 	dateExpression := strings.Contains(expression, "DATE(")
 	timeExpression := strings.Contains(expression, "TIME(")
+	numberExpression := strings.Contains(expression, "NUMBER(")
 	noBrackets := (strings.Count(expression, "(") == 0) && (strings.Count(expression, ")") == 0)
-	return noBrackets || (twoBrackets && dateExpression) || (twoBrackets && timeExpression)
+	return noBrackets || (twoBrackets && dateExpression) || (twoBrackets && timeExpression) || (twoBrackets && numberExpression)
 }
 
 func isOperator(token string) bool {
