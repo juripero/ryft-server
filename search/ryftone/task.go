@@ -52,9 +52,6 @@ type Task struct {
 	KeepIndexFile bool
 	KeepDataFile  bool
 
-	// `ryftone` data set
-	dataSet *DataSet
-
 	// index & data
 	enableDataProcessing bool
 	index                *IndexTask

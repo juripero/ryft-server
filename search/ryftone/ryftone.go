@@ -117,19 +117,17 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 		}()
 	}
 
-	var err error
-
 	// create data set
-	task.dataSet, err = NewDataSet(cfg.Nodes)
+	ds, err := NewDataSet(cfg.Nodes)
 	if err != nil {
 		engine.finish(err, task, res)
 		return
 	}
-	defer task.dataSet.Delete()
+	defer ds.Delete()
 
 	// files
 	for _, file := range cfg.Files {
-		err = task.dataSet.AddFile(file)
+		err = ds.AddFile(file)
 		if err != nil {
 			engine.finish(err, task, res)
 			return
@@ -139,19 +137,19 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 	// select search mode (fuzzy-hamming search by default)
 	switch cfg.Mode {
 	case "exact_search", "exact", "es":
-		err = task.dataSet.SearchExact(engine.prepareQuery(cfg.Query),
+		err = ds.SearchExact(engine.prepareQuery(cfg.Query),
 			task.DataFileName, task.IndexFileName, cfg.Surrounding, cfg.CaseSensitive)
 	case "fuzzy_hamming_search", "fuzzy_hamming", "fhs", "":
-		err = task.dataSet.SearchFuzzyHamming(engine.prepareQuery(cfg.Query),
+		err = ds.SearchFuzzyHamming(engine.prepareQuery(cfg.Query),
 			task.DataFileName, task.IndexFileName, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive)
 	case "fuzzy_edit_distance_search", "fuzzy_edit_distance", "feds":
-		err = task.dataSet.SearchFuzzyEditDistance(engine.prepareQuery(cfg.Query),
+		err = ds.SearchFuzzyEditDistance(engine.prepareQuery(cfg.Query),
 			task.DataFileName, task.IndexFileName, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, true)
 	case "date_search", "date", "ds":
-		err = task.dataSet.SearchDate(engine.prepareQuery(cfg.Query),
+		err = ds.SearchDate(engine.prepareQuery(cfg.Query),
 			task.DataFileName, task.IndexFileName, cfg.Surrounding)
 	case "time_search", "time", "ts":
-		err = task.dataSet.SearchTime(engine.prepareQuery(cfg.Query),
+		err = ds.SearchTime(engine.prepareQuery(cfg.Query),
 			task.DataFileName, task.IndexFileName, cfg.Surrounding)
 	default:
 		err = fmt.Errorf("%q is unknown search mode", cfg.Mode)
@@ -159,10 +157,10 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 
 	if err == nil {
 		res.Stat = search.NewStat()
-		res.Stat.Matches = task.dataSet.GetTotalMatches()
-		res.Stat.Duration = task.dataSet.GetExecutionDuration()
-		res.Stat.FabricDuration = task.dataSet.GetFabricExecutionDuration()
-		res.Stat.TotalBytes = task.dataSet.GetTotalBytesProcessed()
+		res.Stat.Matches = ds.GetTotalMatches()
+		res.Stat.Duration = ds.GetExecutionDuration()
+		res.Stat.FabricDuration = ds.GetFabricExecutionDuration()
+		res.Stat.TotalBytes = ds.GetTotalBytesProcessed()
 	}
 
 	engine.finish(err, task, res)
