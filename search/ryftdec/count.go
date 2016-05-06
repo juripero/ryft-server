@@ -34,6 +34,7 @@ import (
 	"fmt"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftone"
 )
 
 // Count starts asynchronous "/count" with RyftDEC engine.
@@ -42,6 +43,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	var err error
 
 	// split cfg.Query into several expressions
+	cfg.Query = ryftone.PrepareQuery(cfg.Query)
 	task.queries, err = Decompose(cfg.Query)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)

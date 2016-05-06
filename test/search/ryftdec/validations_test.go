@@ -31,6 +31,7 @@ func TestInvalidQueries(t *testing.T) {
 func TestValidQueries(t *testing.T) {
 	queries := []string{
 		`(RAW_TEXT CONTAINS "Some text0")`,
+		`(RAW_TEXT CONTAINS aabbccddeeff)`,
 		`((RAW_TEXT CONTAINS "Some text0"))`,
 		`(RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2")`,
 		`((RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2"))`,

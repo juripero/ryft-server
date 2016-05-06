@@ -31,51 +31,92 @@
 package ryftdec
 
 import (
-	"errors"
 	"fmt"
-	"path/filepath"
+	"strings"
 )
 
-func containsString(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
+type QueryType int
+
+const (
+	QTYPE_SEARCH QueryType = iota
+	QTYPE_DATE
+	QTYPE_TIME
+	QTYPE_NUMERIC
+	QTYPE_AND
+	QTYPE_OR
+	QTYPE_XOR
+)
+
+type Node struct {
+	Expression string
+	Type       QueryType
+	Parent     *Node
+	SubNodes   []*Node
+}
+
+func (node *Node) New(expression string, parent *Node) *Node {
+	if isOperator(expression) {
+		node.Expression = strings.Trim(expression, " ")
+	} else {
+		node.Expression = "(" + expression + ")"
 	}
+	node.Type = expressionType(expression)
+	node.Parent = parent
+	return node
+}
+
+func (node *Node) sameTypeSubnodes() bool {
+	return node.SubNodes[0].Type == node.SubNodes[1].Type
+}
+
+func (node *Node) subnodesAreQueries() bool {
+	return node.SubNodes[0].Type.IsSearch() && node.SubNodes[1].Type.IsSearch()
+}
+
+func (node *Node) hasSubnodes() bool {
+	return len(node.SubNodes) == 2
+}
+
+func (node Node) String() string {
+	return fmt.Sprintf("Expression: '%s'", node.Expression)
+}
+
+func (node *Node) isSearch() bool {
+	return node.Type.IsSearch()
+}
+
+func (node *Node) isOperator() bool {
+	return !node.Type.IsSearch()
+}
+
+// Map string operator value to constant
+func expressionType(expression string) QueryType {
+	expression = strings.Trim(expression, " ")
+	switch {
+	case expression == "AND":
+		return QTYPE_AND
+	case expression == "OR":
+		return QTYPE_OR
+	case expression == "XOR":
+		return QTYPE_XOR
+	case strings.Contains(expression, "DATE("):
+		return QTYPE_DATE
+	case strings.Contains(expression, "TIME("):
+		return QTYPE_TIME
+	case strings.Contains(expression, "NUMBER("):
+		return QTYPE_NUMERIC
+	default:
+		return QTYPE_SEARCH
+	}
+}
+
+// IsSearch checks if query type is a search
+func (q QueryType) IsSearch() bool {
+	switch q {
+	case QTYPE_SEARCH, QTYPE_DATE,
+		QTYPE_TIME, QTYPE_NUMERIC:
+		return true
+	}
+
 	return false
-}
-
-// Detect extension using input file set.
-func detectExtension(fileNames []string) (string, error) {
-	extensions := map[string]int{}
-
-	// collect unique extensions
-	for _, file := range fileNames {
-		ext := filepath.Ext(file)
-		if len(ext) != 0 {
-			extensions[ext] = 1
-		}
-	}
-
-	if len(extensions) == 1 {
-		// return the first extension
-		for k, _ := range extensions {
-			return k, nil // OK
-		}
-	}
-
-	return "", fmt.Errorf("unable to detect extension from %v", extensions)
-}
-
-func buildError(message string) error {
-	return errors.New(message)
-}
-
-func indexOfToken(tokens []string, token string) int {
-	for index, value := range tokens {
-		if value == token {
-			return index
-		}
-	}
-	return -1
 }

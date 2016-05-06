@@ -35,7 +35,6 @@ package ryftone
 import (
 	"bufio"
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -112,7 +111,7 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 	}
 
 	// TODO: use cfg.Mode to run specific search!
-	err = task.dataSet.SearchFuzzyHamming(engine.prepareQuery(cfg.Query),
+	err = task.dataSet.SearchFuzzyHamming(PrepareQuery(cfg.Query),
 		dataFile, indexFile, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive)
 	if err == nil {
 		res.Stat = search.NewStat()
@@ -318,19 +317,6 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 		res.ReportRecord(rec)
-	}
-}
-
-// prepareQuery checks for plain queries
-// plain queries converted to (RAW_TEXT CONTAINS query_in_hex_format)
-func (engine *Engine) prepareQuery(query string) string {
-	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
-		return query // just use it "as is"
-	} else {
-		// if no keywords - assume plain text query
-		// use hexadecimal encoding here to avoid escaping problems
-		return fmt.Sprintf("(RAW_TEXT CONTAINS %s)",
-			hex.EncodeToString([]byte(query)))
 	}
 }
 

@@ -28,54 +28,23 @@
  * ============
  */
 
-package ryftdec
+package ryftone
 
 import (
-	"errors"
+	"encoding/hex"
 	"fmt"
-	"path/filepath"
+	"strings"
 )
 
-func containsString(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
+// PrepareQuery checks for plain queries
+// plain queries converted to (RAW_TEXT CONTAINS query_in_hex_format)
+func PrepareQuery(query string) string {
+	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
+		return query // just use it "as is"
+	} else {
+		// if no keywords - assume plain text query
+		// use hexadecimal encoding here to avoid escaping problems
+		return fmt.Sprintf("(RAW_TEXT CONTAINS %s)",
+			hex.EncodeToString([]byte(query)))
 	}
-	return false
-}
-
-// Detect extension using input file set.
-func detectExtension(fileNames []string) (string, error) {
-	extensions := map[string]int{}
-
-	// collect unique extensions
-	for _, file := range fileNames {
-		ext := filepath.Ext(file)
-		if len(ext) != 0 {
-			extensions[ext] = 1
-		}
-	}
-
-	if len(extensions) == 1 {
-		// return the first extension
-		for k, _ := range extensions {
-			return k, nil // OK
-		}
-	}
-
-	return "", fmt.Errorf("unable to detect extension from %v", extensions)
-}
-
-func buildError(message string) error {
-	return errors.New(message)
-}
-
-func indexOfToken(tokens []string, token string) int {
-	for index, value := range tokens {
-		if value == token {
-			return index
-		}
-	}
-	return -1
 }
