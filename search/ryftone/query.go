@@ -28,60 +28,23 @@
  * ============
  */
 
-package ryftdec
+package ryftone
 
 import (
+	"encoding/hex"
 	"fmt"
-
-	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
+	"strings"
 )
 
-// Count starts asynchronous "/count" with RyftDEC engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	var err error
-
-	// split cfg.Query into several expressions
-	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
-		return nil, fmt.Errorf("failed to decompose query: %s", err)
+// PrepareQuery checks for plain queries
+// plain queries converted to (RAW_TEXT CONTAINS query_in_hex_format)
+func PrepareQuery(query string) string {
+	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
+		return query // just use it "as is"
+	} else {
+		// if no keywords - assume plain text query
+		// use hexadecimal encoding here to avoid escaping problems
+		return fmt.Sprintf("(RAW_TEXT CONTAINS %s)",
+			hex.EncodeToString([]byte(query)))
 	}
-
-	// in simple cases when there is only one subquery
-	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		if len(cfg.Mode) == 0 {
-			// use "ds", "ts", "ns" search mode
-			// if query contains corresponding keywords
-			cfg.Mode = getSearchMode(task.queries.Type, "")
-		}
-		return engine.Backend.Count(cfg)
-	}
-
-	task.extension, err = detectExtension(cfg.Files)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
-		return nil, fmt.Errorf("failed to detect extension: %s", err)
-	}
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
-
-	mux := search.NewResult()
-	go func() {
-		// some futher cleanup
-		defer mux.Close()
-		defer mux.ReportDone()
-
-		_, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Count, mux, true)
-		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
-			mux.ReportError(err)
-		}
-
-		// TODO: handle task cancellation!!!
-	}()
-	return mux, nil // OK for now
 }
