@@ -34,9 +34,9 @@ import (
 	"os"
 )
 
-func DeleteFiles(filepaths []string) error {
+func DeleteFiles(mountPoint string, filepaths []string) error {
 	for _, filepath := range filepaths {
-		err := deleteFile(filepath)
+		err := deleteFile(mountPoint + "/" + filepath)
 		if err != nil {
 			return err
 		}
