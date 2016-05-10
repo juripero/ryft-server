@@ -42,6 +42,7 @@ func TestValidQueries(t *testing.T) {
 		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
 		`(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
 		`((RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))  AND (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00)))`,
+		`(RECORD.Name.Actors.[].Name CONTAINS "Christian")`,
 	}
 
 	for _, q := range queries {
