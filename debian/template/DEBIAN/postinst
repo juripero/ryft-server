@@ -16,10 +16,7 @@ function fixUIDGID {
 fixUIDGID /usr/bin/ryft_ps
 fixUIDGID /usr/bin/ryft_status
 fixUIDGID /usr/bin/ryft-server
-fixUIDGID /etc/init.d/ryft-server-d
-
-echo ryft-server-d installing for autostart...
-update-rc.d ryft-server-d defaults
+fixUIDGID /etc/init/ryft-server-d.conf
 
 echo ryft-server-d starting...
 service ryft-server-d start
