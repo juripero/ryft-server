@@ -19,7 +19,8 @@ func (s *Server) deleteFiles(c *gin.Context) {
 	var err error
 	result := "Ok"
 
-	//mountPoint := s.BackendOptions["ryftone-mount"]
+	mountPoint, _ := utils.AsString(s.BackendOptions["ryftone-mount"])
+
 	params := DeleteFilesParams{}
 	if err := c.Bind(&params); err != nil {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
@@ -27,11 +28,11 @@ func (s *Server) deleteFiles(c *gin.Context) {
 	}
 
 	if len(params.Dir) > 0 {
-		err = utils.DeleteDirs("/ryftone", params.Dir)
+		err = utils.DeleteDirs(mountPoint, params.Dir)
 	}
 
 	if len(params.File) > 0 {
-		err = utils.DeleteFiles("/ryftone", params.File)
+		err = utils.DeleteFiles(mountPoint, params.File)
 	}
 
 	if err != nil {
