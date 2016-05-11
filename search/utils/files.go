@@ -32,7 +32,8 @@ package utils
 
 import (
 	"errors"
-	"fmt"
+	_ "fmt"
+	"io"
 	"mime/multipart"
 	"os"
 )
@@ -63,8 +64,17 @@ func DeleteFiles(mountPoint string, filepaths []string) error {
 }
 
 func CreateFile(mountPoint string, file File) (string, error) {
-	fmt.Println("creating file")
-	return "/filepath", nil
+	path := filePath(mountPoint, file.Path)
+
+	outputFile, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := io.Copy(outputFile, file.Reader); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func deleteFile(filepath string) error {
@@ -97,5 +107,12 @@ func deleteDir(filepath string) error {
 	return err
 }
 
-//func hasRandomFilename(file) bool {
-//}
+func filePath(mountPoint, filename string) string {
+	// TODO: handle filenames with random token file<random>.txt
+	filename = randomizeFilename(filename)
+	return mountPoint + "/" + filename
+}
+
+func randomizeFilename(filename string) string {
+	return filename
+}
