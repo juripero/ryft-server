@@ -34,8 +34,13 @@ import (
 	"errors"
 	_ "fmt"
 	"io"
+	"math/rand"
 	"mime/multipart"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type File struct {
@@ -115,5 +120,8 @@ func filePath(mountPoint, filename string) string {
 }
 
 func randomizeFilename(filename string) string {
-	return filename
+	rand.Seed(time.Now().Unix())
+	result := regexp.MustCompile("([<])\\w+([>])").Split(filename, -1)
+	randomToken := strconv.Itoa(rand.Intn(2000)) + "-" + strconv.Itoa(int(time.Now().Unix()))
+	return strings.Join(result, randomToken)
 }
