@@ -78,6 +78,7 @@ func CreateFile(mountPoint string, file File) (string, error) {
 		path = appendToFilename(path, randomToken())
 	}
 
+	// TODO: create subfolders for file
 	outputFile, err := os.Create(path)
 	if err != nil {
 		return "", err
