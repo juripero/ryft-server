@@ -1,196 +1,176 @@
-//Tests for follwing tree
-//Expression: 'AND'
-//  Expression: 'AND'
-//    Expression: '(RECORD.id CONTAINS TIME("1003"))'
-//    Expression: '(RECORD.id CONTAINS DATE("100301"))'
-//  Expression: 'AND'
-//    Expression: '(RECORD.id CONTAINS TIME("200"))'
-//    Expression: '((RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400")))'
-
 package ryftdec
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/getryft/ryft-server/search/ryftdec"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestNode1(t *testing.T) {
-	result := tree()
-	node := result
-	if len(node.SubNodes) != 2 {
-		t.Error("Expected 2 subnodes, got", len(node.SubNodes))
+// gets query type string representation.
+func dumpType(q ryftdec.QueryType) string {
+	switch q {
+	case ryftdec.QTYPE_SEARCH:
+		return "    " // general search (es, fhs, feds)
+	case ryftdec.QTYPE_DATE:
+		return "DATE"
+	case ryftdec.QTYPE_TIME:
+		return "TIME"
+	case ryftdec.QTYPE_NUMERIC:
+		return " NUM"
+	case ryftdec.QTYPE_AND:
+		return " AND"
+	case ryftdec.QTYPE_OR:
+		return "  OR"
+	case ryftdec.QTYPE_XOR:
+		return " XOR"
 	}
-	if node.Expression != "AND" {
-		t.Error("Expected AND, got", node.Expression)
+
+	return "????" // unknown
+}
+
+// dump query tree as a string
+func dumpTree(root *ryftdec.Node, deep int) string {
+	s := fmt.Sprintf("%s[%s]:",
+		strings.Repeat("  ", deep),
+		dumpType(root.Type))
+
+	if root.Type.IsSearch() {
+		s += " " + root.Expression
+	}
+
+	for _, subnode := range root.SubNodes {
+		s += "\n" + dumpTree(subnode, deep+1)
+	}
+
+	return s
+}
+
+// decompose the query and check it
+func testQueryTree(t *testing.T, query string, expected string) {
+	tree, err := ryftdec.Decompose(query)
+	assert.NoError(t, err, "Bad query")
+	if assert.NotNil(t, tree, "No tree") {
+		assert.Equal(t, expected, dumpTree(tree, 0))
 	}
 }
 
-func TestNode2(t *testing.T) {
-	result := tree()
-	node := result.SubNodes[0]
-
-	if len(node.SubNodes) != 2 {
-		t.Error("Expected 2 subnodes, got", len(node.SubNodes))
-	}
-	if node.Expression != "AND" {
-		t.Error("Expected AND, got", node.Expression)
-	}
+// this function is used to disable corresponding test
+func _testQueryTree(t *testing.T, query string, expected string) {
+	// do nothing
 }
 
-func TestNode3(t *testing.T) {
-	result := tree()
-	node := result.SubNodes[1]
+func TestQueries(t *testing.T) {
+	testQueryTree(t, `(RAW_TEXT CONTAINS "100")`,
+		`[    ]: (RAW_TEXT CONTAINS "100")`)
+	testQueryTree(t, `((RAW_TEXT CONTAINS "100"))`,
+		`[    ]: (RAW_TEXT CONTAINS "100")`)
 
-	if len(node.SubNodes) != 2 {
-		t.Error("Expected 2 subnodes, got", len(node.SubNodes))
-	}
-	if node.Expression != "AND" {
-		t.Error("Expected AND, got", node.Expression)
-	}
-}
+	testQueryTree(t, `(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`,
+		`[    ]: (RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
+	testQueryTree(t, `((RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200"))`,
+		`[    ]: (RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
 
-func TestNode4(t *testing.T) {
-	result := tree()
-	node := result.SubNodes[0].SubNodes[0]
+	testQueryTree(t, `(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`,
+		`[    ]: (RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
+	testQueryTree(t, `((RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200"))`,
+		`[    ]: (RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
 
-	if len(node.SubNodes) != 0 {
-		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
-	}
-	if node.Expression != `(RECORD.id CONTAINS TIME("1003"))` {
-		t.Error(`Expected (RECORD.id CONTAINS TIME("1003")), got`, node.Expression)
-	}
-}
+	testQueryTree(t, `(RECORD.date CONTAINS DATE("00/00/0000")) OR (RECORD.date CONTAINS DATE("11/11/1111"))`,
+		`[DATE]: (RECORD.date CONTAINS DATE("00/00/0000")) OR (RECORD.date CONTAINS DATE("11/11/1111"))`)
+	testQueryTree(t, `((RECORD.date CONTAINS DATE("00/00/0000")) OR (RECORD.date CONTAINS DATE("11/11/1111")))`,
+		`[DATE]: (RECORD.date CONTAINS DATE("00/00/0000")) OR (RECORD.date CONTAINS DATE("11/11/1111"))`)
 
-func TestNode5(t *testing.T) {
-	result := tree()
-	node := result.SubNodes[0].SubNodes[1]
+	testQueryTree(t, `(RECORD.date CONTAINS TIME("00:00")) OR (RECORD.date CONTAINS TIME("11:11"))`,
+		`[TIME]: (RECORD.date CONTAINS TIME("00:00")) OR (RECORD.date CONTAINS TIME("11:11"))`)
+	testQueryTree(t, `((RECORD.date CONTAINS TIME("00:00")) OR (RECORD.date CONTAINS TIME("11:11")))`,
+		`[TIME]: (RECORD.date CONTAINS TIME("00:00")) OR (RECORD.date CONTAINS TIME("11:11"))`)
 
-	if len(node.SubNodes) != 0 {
-		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
-	}
-	if node.Expression != `(RECORD.id CONTAINS DATE("100301"))` {
-		t.Error(`Expected (RECORD.id CONTAINS DATE("100301")), got`, node.Expression)
-	}
-}
+	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE("00/00/0000"))`,
+		`[ AND]:
+  [    ]: (RECORD.id CONTAINS "1003")
+  [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))`)
 
-func TestNode6(t *testing.T) {
-	result := tree()
-	node := result.SubNodes[1].SubNodes[0]
+	testQueryTree(t, `(RECORD.id CONTAINS "1003")   AND   (RECORD.date CONTAINS DATE("00/00/0000"))`,
+		`[ AND]:
+  [    ]: (RECORD.id CONTAINS "1003")
+  [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))`)
 
-	if len(node.SubNodes) != 0 {
-		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
-	}
-	if node.Expression != `(RECORD.id CONTAINS TIME("200"))` {
-		t.Error(`Expected (RECORD.id CONTAINS TIME("200")), got`, node.Expression)
-	}
-}
+	testQueryTree(t, `(RECORD.id CONTAINS "1003")OR(RECORD.date CONTAINS TIME("00:00:00"))`,
+		`[  OR]:
+  [    ]: (RECORD.id CONTAINS "1003")
+  [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
 
-func TestNode7(t *testing.T) {
-	result := tree()
-	node := result.SubNodes[1].SubNodes[1]
+	testQueryTree(t, `(RECORD.id CONTAINS "1003")    OR   (RECORD.date CONTAINS TIME("00:00:00"))`,
+		`[  OR]:
+  [    ]: (RECORD.id CONTAINS "1003")
+  [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
 
-	if len(node.SubNodes) != 0 {
-		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
-	}
-	if node.Expression != `((RECORD.id CONTAINS DATE("300")) AND (RAW_TEXT CONTAINS DATE("400")))` {
-		t.Error(`Expected (RECORD.id CONTAINS DATE("300")) AND (RAW_TEXT CONTAINS DATE("400"))), got`, node.Expression)
-	}
-}
+	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND (RECORD.date CONTAINS DATE("00/00/0000")) AND(RECORD.date CONTAINS TIME("00:00:00"))`,
+		`[ AND]:
+  [    ]: (RECORD.id CONTAINS "1003")
+  [ AND]:
+    [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))
+    [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
 
-func tree() *ryftdec.Node {
-	query := `((RECORD.id CONTAINS TIME("1003"))AND(RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND ((RECORD.id CONTAINS DATE("300")) AND (RAW_TEXT CONTAINS DATE("400")))`
-	result, _ := ryftdec.Decompose(query)
-	return result
-}
+	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND (RECORD.date CONTAINS DATE("00/00/0000"))   OR   (RECORD.date CONTAINS TIME("00:00:00"))`,
+		`[  OR]:
+  [ AND]:
+    [    ]: (RECORD.id CONTAINS "1003")
+    [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))
+  [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
 
-func TestDifferentTypeDecomposition1(t *testing.T) {
-	query := `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301")))`
-	node, _ := ryftdec.Decompose(query)
+	testQueryTree(t, `((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE("100301")))`,
+		`[ AND]:
+  [    ]: (RECORD.id CONTAINS "1003")
+  [DATE]: (RECORD.date CONTAINS DATE("100301"))`)
 
-	if node.Expression != "AND" {
-		t.Error("Expected AND, got", node.Expression)
-	}
+	testQueryTree(t, `((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE("100301")) OR (RECORD.id CONTAINS "2003"))`,
+		`[  OR]:
+  [ AND]:
+    [    ]: (RECORD.id CONTAINS "1003")
+    [DATE]: (RECORD.date CONTAINS DATE("100301"))
+  [    ]: (RECORD.id CONTAINS "2003")`)
 
-	if len(node.SubNodes) != 2 {
-		t.Error("Expected 2 subnodes, got", len(node.SubNodes))
-	}
-}
+	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301")))`,
+		`[DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))`)
 
-func TestDifferentTypeDecomposition2(t *testing.T) {
-	query := `((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS DATE("100301")))`
-	node, _ := ryftdec.Decompose(query)
+	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301"))  AND   (RECORD.id CONTAINS DATE("200301")))`,
+		`[DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301"))`)
 
-	if node.Expression != `AND` {
-		t.Error(`Expected AND, got`, node.Expression)
-	}
+	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301"))  OR   (RECORD.id CONTAINS DATE("200301")))`,
+		`[DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")) OR (RECORD.id CONTAINS DATE("200301"))`)
 
-	if len(node.SubNodes) != 2 {
-		t.Error("Expected 2 subnodes, got", len(node.SubNodes))
-	}
-}
+	testQueryTree(t, `((RECORD.id CONTAINS "1003")   AND   (RECORD.id CONTAINS DATE("100301"))  AND   (RECORD.id CONTAINS DATE("200301")))`,
+		`[ AND]:
+  [    ]: (RECORD.id CONTAINS "1003")
+  [DATE]: (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301"))`)
 
-func TestDifferentTypeDecomposition3(t *testing.T) {
-	query := `((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS DATE("100301")) OR (RECORD.id CONTAINS "2003"))`
-	node, _ := ryftdec.Decompose(query)
+	testQueryTree(t, `(((RECORD.id CONTAINS "1003")   AND   (RECORD.id CONTAINS DATE("100301")))  AND   (RECORD.id CONTAINS DATE("200301")))`,
+		`[ AND]:
+  [ AND]:
+    [    ]: (RECORD.id CONTAINS "1003")
+    [DATE]: (RECORD.id CONTAINS DATE("100301"))
+  [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
-	if node.Expression != `AND` {
-		t.Error(`Expected AND, got`, node.Expression)
-	}
+	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301"))  OR   (RECORD.id CONTAINS "200301"))`,
+		`[  OR]:
+  [DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))
+  [    ]: (RECORD.id CONTAINS "200301")`)
 
-	if len(node.SubNodes) != 2 {
-		t.Error("Expected 2 subnodes, got", len(node.SubNodes))
-	}
-}
+	testQueryTree(t, `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301")) AND (RECORD.id CONTAINS DATE("200301")) AND (RECORD.id CONTAINS DATE("20030102")))`,
+		`[ AND]:
+  [TIME]: (RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301"))
+  [DATE]: (RECORD.id CONTAINS DATE("200301")) AND (RECORD.id CONTAINS DATE("20030102"))`)
 
-func TestSameTypeDecomposition1(t *testing.T) {
-	query := `((RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")))`
-	node, _ := ryftdec.Decompose(query)
+	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS NUMBER(NUM < 7))`,
+		`[ AND]:
+  [    ]: (RECORD.id CONTAINS "1003")
+  [ NUM]: (RECORD.date CONTAINS NUMBER(NUM < 7))`)
 
-	if node.Expression != `((RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")))` {
-		t.Error(`Expected ((RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))), got`, node.Expression)
-	}
+	testQueryTree(t, `((RECORD.id CONTAINS NUMBER(NUM < 7))   AND   (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
+		`[ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8))`)
 
-	if len(node.SubNodes) != 0 {
-		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
-	}
-}
-
-func TestSameTypeDecomposition2(t *testing.T) {
-	query := `((RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301")))`
-	node, _ := ryftdec.Decompose(query)
-
-	if node.Expression != `((RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301")))` {
-		t.Error(`Expected ((RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301"))), got`, node.Expression)
-	}
-
-	if len(node.SubNodes) != 0 {
-		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
-	}
-}
-
-func TestSameTypeDecomposition3(t *testing.T) {
-	query := `((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS "100301"))`
-	node, _ := ryftdec.Decompose(query)
-
-	if node.Expression != `((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS "100301"))` {
-		t.Error(`Expected ((RECORD.id CONTAINS "1003") AND (RECORD.id CONTAINS "100301")), got`, node.Expression)
-	}
-
-	if len(node.SubNodes) != 0 {
-		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
-	}
-}
-
-func TestSameTypeDecomposition4(t *testing.T) {
-	query := `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301")))`
-	node, _ := ryftdec.Decompose(query)
-
-	if node.Expression != `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301")))` {
-		t.Error(`Expected ((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301"))), got`, node.Expression)
-	}
-
-	if len(node.SubNodes) != 0 {
-		t.Error("Expected 0 subnodes, got", len(node.SubNodes))
-	}
 }

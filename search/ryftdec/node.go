@@ -28,78 +28,95 @@
  * ============
  */
 
-package ryftmux
+package ryftdec
 
 import (
 	"fmt"
-
-	"github.com/getryft/ryft-server/search"
+	"strings"
 )
 
-// Files starts synchronous "/files" with RyftMUX engine.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	task := NewTask()
+type QueryType int
 
-	ch := make(chan *search.DirInfo, len(engine.Backends))
+const (
+	QTYPE_SEARCH QueryType = iota
+	QTYPE_DATE
+	QTYPE_TIME
+	QTYPE_NUMERIC
+	QTYPE_AND
+	QTYPE_OR
+	QTYPE_XOR
+)
 
-	// prepare requests
-	for _, backend := range engine.Backends {
-		// do search in goroutine
-		go func(backend search.Engine) {
-			res, err := backend.Files(path)
-			if err != nil {
-				task.log().WithError(err).Warnf("failed to start /files subtask")
-				// TODO: report as multiplexed error?
-				ch <- nil
-			} else {
-				ch <- res
-			}
-		}(backend)
+type Node struct {
+	Expression string
+	Type       QueryType
+	Parent     *Node
+	SubNodes   []*Node
+}
+
+func (node *Node) New(expression string, parent *Node) *Node {
+	if isOperator(expression) {
+		node.Expression = strings.Trim(expression, " ")
+	} else {
+		node.Expression = "(" + expression + ")"
+	}
+	node.Type = expressionType(expression)
+	node.Parent = parent
+	return node
+}
+
+func (node *Node) sameTypeSubnodes() bool {
+	return node.SubNodes[0].Type == node.SubNodes[1].Type
+}
+
+func (node *Node) subnodesAreQueries() bool {
+	return node.SubNodes[0].Type.IsSearch() && node.SubNodes[1].Type.IsSearch()
+}
+
+func (node *Node) hasSubnodes() bool {
+	return len(node.SubNodes) == 2
+}
+
+func (node Node) String() string {
+	return fmt.Sprintf("Expression: '%s'", node.Expression)
+}
+
+func (node *Node) isSearch() bool {
+	return node.Type.IsSearch()
+}
+
+func (node *Node) isOperator() bool {
+	return !node.Type.IsSearch()
+}
+
+// Map string operator value to constant
+func expressionType(expression string) QueryType {
+	expression = strings.Trim(expression, " ")
+	switch {
+	case expression == "AND":
+		return QTYPE_AND
+	case expression == "OR":
+		return QTYPE_OR
+	case expression == "XOR":
+		return QTYPE_XOR
+	case strings.Contains(expression, "DATE("):
+		return QTYPE_DATE
+	case strings.Contains(expression, "TIME("):
+		return QTYPE_TIME
+	case strings.Contains(expression, "NUMBER("):
+		return QTYPE_NUMERIC
+	default:
+		return QTYPE_SEARCH
+	}
+}
+
+// IsSearch checks if query type is a search
+func (q QueryType) IsSearch() bool {
+	switch q {
+	case QTYPE_SEARCH, QTYPE_DATE,
+		QTYPE_TIME, QTYPE_NUMERIC:
+		return true
 	}
 
-	// wait for all subtasks and merge results
-	muxPath := ""
-	muxFiles := map[string]int{}
-	muxDirs := map[string]int{}
-	for _ = range engine.Backends {
-		select {
-		case res, ok := <-ch:
-			if ok && res != nil {
-				// check directory path is consistent
-				if len(muxPath) == 0 {
-					muxPath = res.Path
-				}
-				if muxPath != res.Path {
-					task.log().WithField("path1", muxPath).
-						WithField("path2", res.Path).
-						Warnf("failed to start /files subtask")
-					return nil, fmt.Errorf("inconsistent directory %q != %q",
-						muxPath, res.Path)
-				}
-
-				// merge files
-				for _, f := range res.Files {
-					muxFiles[f] += 1
-				}
-
-				// merge dirs
-				for _, d := range res.Dirs {
-					muxDirs[d] += 1
-				}
-			}
-		}
-	}
-
-	// prepare results
-	mux := search.NewDirInfo(muxPath)
-	mux.Files = make([]string, 0, len(muxFiles))
-	mux.Dirs = make([]string, 0, len(muxDirs))
-	for f, _ := range muxFiles {
-		mux.Files = append(mux.Files, f)
-	}
-	for d, _ := range muxDirs {
-		mux.Dirs = append(mux.Dirs, d)
-	}
-
-	return mux, nil // OK
+	return false
 }

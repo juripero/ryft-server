@@ -28,78 +28,23 @@
  * ============
  */
 
-package ryftmux
+package ryftone
 
 import (
+	"encoding/hex"
 	"fmt"
-
-	"github.com/getryft/ryft-server/search"
+	"strings"
 )
 
-// Files starts synchronous "/files" with RyftMUX engine.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	task := NewTask()
-
-	ch := make(chan *search.DirInfo, len(engine.Backends))
-
-	// prepare requests
-	for _, backend := range engine.Backends {
-		// do search in goroutine
-		go func(backend search.Engine) {
-			res, err := backend.Files(path)
-			if err != nil {
-				task.log().WithError(err).Warnf("failed to start /files subtask")
-				// TODO: report as multiplexed error?
-				ch <- nil
-			} else {
-				ch <- res
-			}
-		}(backend)
+// PrepareQuery checks for plain queries
+// plain queries converted to (RAW_TEXT CONTAINS query_in_hex_format)
+func PrepareQuery(query string) string {
+	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
+		return query // just use it "as is"
+	} else {
+		// if no keywords - assume plain text query
+		// use hexadecimal encoding here to avoid escaping problems
+		return fmt.Sprintf("(RAW_TEXT CONTAINS %s)",
+			hex.EncodeToString([]byte(query)))
 	}
-
-	// wait for all subtasks and merge results
-	muxPath := ""
-	muxFiles := map[string]int{}
-	muxDirs := map[string]int{}
-	for _ = range engine.Backends {
-		select {
-		case res, ok := <-ch:
-			if ok && res != nil {
-				// check directory path is consistent
-				if len(muxPath) == 0 {
-					muxPath = res.Path
-				}
-				if muxPath != res.Path {
-					task.log().WithField("path1", muxPath).
-						WithField("path2", res.Path).
-						Warnf("failed to start /files subtask")
-					return nil, fmt.Errorf("inconsistent directory %q != %q",
-						muxPath, res.Path)
-				}
-
-				// merge files
-				for _, f := range res.Files {
-					muxFiles[f] += 1
-				}
-
-				// merge dirs
-				for _, d := range res.Dirs {
-					muxDirs[d] += 1
-				}
-			}
-		}
-	}
-
-	// prepare results
-	mux := search.NewDirInfo(muxPath)
-	mux.Files = make([]string, 0, len(muxFiles))
-	mux.Dirs = make([]string, 0, len(muxDirs))
-	for f, _ := range muxFiles {
-		mux.Files = append(mux.Files, f)
-	}
-	for d, _ := range muxDirs {
-		mux.Dirs = append(mux.Dirs, d)
-	}
-
-	return mux, nil // OK
 }

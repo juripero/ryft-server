@@ -28,6 +28,10 @@ $(GOBINDATA):
 $(ASSETS): $(GOBINDATA)
 	${GOBINDATA} -o bindata.go -prefix static/ static/...
 
+.PHONY: update
+update:
+	go get -d -u -v ./...
+
 .PHONY: build
 build:
 	go build -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"

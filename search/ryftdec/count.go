@@ -28,78 +28,60 @@
  * ============
  */
 
-package ryftmux
+package ryftdec
 
 import (
 	"fmt"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftone"
 )
 
-// Files starts synchronous "/files" with RyftMUX engine.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	task := NewTask()
+// Count starts asynchronous "/count" with RyftDEC engine.
+func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(cfg)
+	var err error
 
-	ch := make(chan *search.DirInfo, len(engine.Backends))
-
-	// prepare requests
-	for _, backend := range engine.Backends {
-		// do search in goroutine
-		go func(backend search.Engine) {
-			res, err := backend.Files(path)
-			if err != nil {
-				task.log().WithError(err).Warnf("failed to start /files subtask")
-				// TODO: report as multiplexed error?
-				ch <- nil
-			} else {
-				ch <- res
-			}
-		}(backend)
+	// split cfg.Query into several expressions
+	cfg.Query = ryftone.PrepareQuery(cfg.Query)
+	task.queries, err = Decompose(cfg.Query)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
+		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
 
-	// wait for all subtasks and merge results
-	muxPath := ""
-	muxFiles := map[string]int{}
-	muxDirs := map[string]int{}
-	for _ = range engine.Backends {
-		select {
-		case res, ok := <-ch:
-			if ok && res != nil {
-				// check directory path is consistent
-				if len(muxPath) == 0 {
-					muxPath = res.Path
-				}
-				if muxPath != res.Path {
-					task.log().WithField("path1", muxPath).
-						WithField("path2", res.Path).
-						Warnf("failed to start /files subtask")
-					return nil, fmt.Errorf("inconsistent directory %q != %q",
-						muxPath, res.Path)
-				}
-
-				// merge files
-				for _, f := range res.Files {
-					muxFiles[f] += 1
-				}
-
-				// merge dirs
-				for _, d := range res.Dirs {
-					muxDirs[d] += 1
-				}
-			}
+	// in simple cases when there is only one subquery
+	// we can pass this query directly to the backend
+	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
+		if len(cfg.Mode) == 0 {
+			// use "ds", "ts", "ns" search mode
+			// if query contains corresponding keywords
+			cfg.Mode = getSearchMode(task.queries.Type, "")
 		}
+		return engine.Backend.Count(cfg)
 	}
 
-	// prepare results
-	mux := search.NewDirInfo(muxPath)
-	mux.Files = make([]string, 0, len(muxFiles))
-	mux.Dirs = make([]string, 0, len(muxDirs))
-	for f, _ := range muxFiles {
-		mux.Files = append(mux.Files, f)
+	task.extension, err = detectExtension(cfg.Files)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
+		return nil, fmt.Errorf("failed to detect extension: %s", err)
 	}
-	for d, _ := range muxDirs {
-		mux.Dirs = append(mux.Dirs, d)
-	}
+	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
-	return mux, nil // OK
+	mux := search.NewResult()
+	go func() {
+		// some futher cleanup
+		defer mux.Close()
+		defer mux.ReportDone()
+
+		_, err := engine.search(task, task.queries, task.config,
+			engine.Backend.Count, mux, true)
+		if err != nil {
+			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
+			mux.ReportError(err)
+		}
+
+		// TODO: handle task cancellation!!!
+	}()
+	return mux, nil // OK for now
 }
