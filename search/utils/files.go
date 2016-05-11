@@ -74,6 +74,7 @@ func CreateFile(mountPoint string, file File) (string, error) {
 	if _, err := io.Copy(outputFile, file.Reader); err != nil {
 		return "", err
 	}
+	file.Reader.Close()
 	return path, nil
 }
 
