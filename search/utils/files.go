@@ -37,6 +37,7 @@ import (
 	"math/rand"
 	"mime/multipart"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -70,6 +71,12 @@ func DeleteFiles(mountPoint string, filepaths []string) error {
 
 func CreateFile(mountPoint string, file File) (string, error) {
 	path := filePath(mountPoint, file.Path)
+
+	// append random token if such file already exists
+	_, err := os.Stat(path)
+	if err == nil {
+		path = appendToFilename(path, randomToken())
+	}
 
 	outputFile, err := os.Create(path)
 	if err != nil {
@@ -114,14 +121,23 @@ func deleteDir(filepath string) error {
 }
 
 func filePath(mountPoint, filename string) string {
-	// TODO: handle filenames with random token file<random>.txt
 	filename = randomizeFilename(filename)
 	return mountPoint + "/" + filename
 }
 
+// replace <...> sections of filename with random token
 func randomizeFilename(filename string) string {
 	rand.Seed(time.Now().Unix())
 	result := regexp.MustCompile("([<])\\w+([>])").Split(filename, -1)
-	randomToken := strconv.Itoa(rand.Intn(2000)) + "-" + strconv.Itoa(int(time.Now().Unix()))
-	return strings.Join(result, randomToken)
+	return strings.Join(result, randomToken())
+}
+
+func randomToken() string {
+	return strconv.Itoa(rand.Intn(2000)) + "-" + strconv.Itoa(int(time.Now().Unix()))
+}
+
+func appendToFilename(filename, token string) string {
+	ext := filepath.Ext(filename)
+	base := strings.TrimSuffix(filename, ext)
+	return base + token + ext
 }
