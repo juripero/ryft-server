@@ -31,8 +31,24 @@
 package utils
 
 import (
+	"errors"
 	"os"
 )
+
+type File struct {
+	path    string
+	payload []byte
+}
+
+func DeleteDirs(mountPoint string, filepaths []string) error {
+	for _, filepath := range filepaths {
+		err := deleteDir(mountPoint + "/" + filepath)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func DeleteFiles(mountPoint string, filepaths []string) error {
 	for _, filepath := range filepaths {
@@ -45,6 +61,47 @@ func DeleteFiles(mountPoint string, filepaths []string) error {
 }
 
 func deleteFile(filepath string) error {
-	err := os.Remove(filepath)
+	stat, err := os.Stat(filepath)
+
+	if err != nil {
+		return errors.New("Specified file does not exist")
+	}
+
+	if !stat.Mode().IsRegular() {
+		return errors.New("Specified path is not regular file")
+	}
+
+	err = os.Remove(filepath)
 	return err
 }
+
+func deleteDir(filepath string) error {
+	stat, err := os.Stat(filepath)
+
+	if os.IsNotExist(err) {
+		return errors.New("Specified directory doest not exist")
+	}
+
+	if !stat.IsDir() {
+		return errors.New("Specified path if not directory")
+	}
+
+	err = os.RemoveAll(filepath)
+	return err
+}
+
+//func CreateFiles(files []File) error {
+//for _, file := range files {
+//err := createFile(file)
+//if err != nil {
+//return err
+//}
+//}
+//return nil
+//}
+
+//func createFile(file File) error {
+//}
+
+//func hasRandomFilename(file) bool {
+//}

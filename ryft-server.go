@@ -35,10 +35,10 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"mime"
+	_ "mime"
 	"net/http"
 	"os"
-	"path/filepath"
+	_ "path/filepath"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
@@ -392,21 +392,22 @@ func main() {
 	router.GET("/count", server.count)
 	router.GET("/cluster/members", server.members)
 	router.GET("/files", server.files)
+	router.DELETE("/files/delete", server.deleteFiles)
 
 	// static asset
-	for _, asset := range AssetNames() {
-		data := MustAsset(asset)
-		ct := mime.TypeByExtension(filepath.Ext(asset))
-		router.GET("/"+asset, func(c *gin.Context) {
-			c.Data(http.StatusOK, ct, data)
-		})
-	}
+	//for _, asset := range AssetNames() {
+	//data := MustAsset(asset)
+	//ct := mime.TypeByExtension(filepath.Ext(asset))
+	//router.GET("/"+asset, func(c *gin.Context) {
+	//c.Data(http.StatusOK, ct, data)
+	//})
+	//}
 
 	// index
-	idxHTML := MustAsset("index.html")
-	router.GET("/", func(c *gin.Context) {
-		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
-	})
+	//idxHTML := MustAsset("index.html")
+	//router.GET("/", func(c *gin.Context) {
+	//c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
+	//})
 
 	// Startup preparatory
 
