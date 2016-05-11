@@ -32,12 +32,14 @@ package utils
 
 import (
 	"errors"
+	"fmt"
+	"mime/multipart"
 	"os"
 )
 
 type File struct {
-	path    string
-	payload []byte
+	Path   string
+	Reader multipart.File
 }
 
 func DeleteDirs(mountPoint string, filepaths []string) error {
@@ -58,6 +60,11 @@ func DeleteFiles(mountPoint string, filepaths []string) error {
 		}
 	}
 	return nil
+}
+
+func CreateFile(mountPoint string, file File) (string, error) {
+	fmt.Println("creating file")
+	return "/filepath", nil
 }
 
 func deleteFile(filepath string) error {
@@ -89,19 +96,6 @@ func deleteDir(filepath string) error {
 	err = os.RemoveAll(filepath)
 	return err
 }
-
-//func CreateFiles(files []File) error {
-//for _, file := range files {
-//err := createFile(file)
-//if err != nil {
-//return err
-//}
-//}
-//return nil
-//}
-
-//func createFile(file File) error {
-//}
 
 //func hasRandomFilename(file) bool {
 //}

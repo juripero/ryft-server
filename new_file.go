@@ -7,11 +7,6 @@ import (
 	"net/http"
 )
 
-type NewFileParams struct {
-	Path    string `form:"file" json:"file" binding:"required"`
-	Content []byte `form:"content" json:"content" binding:"required"`
-}
-
 func (s *Server) newFile(c *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(c)
@@ -21,24 +16,27 @@ func (s *Server) newFile(c *gin.Context) {
 
 	mountPoint, _ := utils.AsString(s.BackendOptions["ryftone-mount"])
 
-	params := NewFileParams{}
-	if err := c.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to parse request parameters"))
-	}
-
-	file := utils.File{
-		Path:    params.Path,
-		Content: params.Content,
-	}
-	err = utils.CreateFile(mountPoint, file)
+	file := bindParams(c)
+	fmt.Println("f", file)
+	path, err := utils.CreateFile(mountPoint, file)
 
 	if err != nil {
 		result = fmt.Sprintf("%s", err)
 	}
 
 	json := map[string]string{
+		"path":   path,
 		"result": result,
 	}
 	c.JSON(http.StatusOK, json)
+}
+
+func bindParams(c *gin.Context) utils.File {
+	file, _, _ := c.Request.FormFile("content")
+	path := c.Query("file")
+
+	return utils.File{
+		Path:   path,
+		Reader: file,
+	}
 }
