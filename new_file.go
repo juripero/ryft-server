@@ -17,7 +17,6 @@ func (s *Server) newFile(c *gin.Context) {
 	mountPoint, _ := utils.AsString(s.BackendOptions["ryftone-mount"])
 
 	file := bindParams(c)
-	fmt.Println("f", file)
 	path, err := utils.CreateFile(mountPoint, file)
 
 	if err != nil {

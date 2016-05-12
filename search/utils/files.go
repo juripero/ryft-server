@@ -32,7 +32,6 @@ package utils
 
 import (
 	"errors"
-	_ "fmt"
 	"io"
 	"math/rand"
 	"mime/multipart"
@@ -78,8 +77,10 @@ func CreateFile(mountPoint string, file File) (string, error) {
 		path = appendToFilename(path, randomToken())
 	}
 
-	// TODO: create subfolders for file
+	createDirectoryTree(path)
 	outputFile, err := os.Create(path)
+	defer outputFile.Close()
+
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +89,10 @@ func CreateFile(mountPoint string, file File) (string, error) {
 		return "", err
 	}
 	file.Reader.Close()
-	return path, nil
+
+	// return path to file without mountpoint
+	location, _ := filepath.Abs(strings.TrimPrefix(path, mountPoint))
+	return location, nil
 }
 
 func deleteFile(filepath string) error {
@@ -141,4 +145,9 @@ func appendToFilename(filename, token string) string {
 	ext := filepath.Ext(filename)
 	base := strings.TrimSuffix(filename, ext)
 	return base + token + ext
+}
+
+func createDirectoryTree(path string) {
+	dir := filepath.Dir(path)
+	os.MkdirAll(dir, os.ModePerm)
 }

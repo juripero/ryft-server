@@ -1,6 +1,8 @@
 package utils
 
 import (
+	_ "fmt"
+	"mime/multipart"
 	"os"
 	"strconv"
 	"testing"
@@ -70,32 +72,74 @@ func testFileNotRegular(t *testing.T) {
 
 func testFileSuccessfuleDelete(t *testing.T) {
 	prepare()
-	files := []string{"/file1.txt"}
+	files := []string{"/file0.txt"}
 	err := utils.DeleteFiles(mount, files)
 	assert.NoError(t, err)
 	cleanup()
 }
 
 func testRootFileCreate(t *testing.T) {
+	prepare()
+	file := utils.File{
+		Path:   "/root_file.txt",
+		Reader: reader(),
+	}
+	path, err := utils.CreateFile(mount, file)
+	assert.NoError(t, err)
+	assert.Equal(t, path, "/root_file.txt")
+	cleanup()
 }
 
 func testNestedFileCreate(t *testing.T) {
+	prepare()
+	file := utils.File{
+		Path:   "/nested_dir/nested_file.txt",
+		Reader: reader(),
+	}
+	path, err := utils.CreateFile(mount, file)
+	assert.NoError(t, err)
+	assert.Equal(t, path, "/nested_dir/nested_file.txt")
+	cleanup()
 }
 
 func testFileAlreadyExists(t *testing.T) {
+	prepare()
+	file := utils.File{
+		Path:   "/file1.txt",
+		Reader: reader(),
+	}
+	path, err := utils.CreateFile(mount, file)
+	assert.NoError(t, err)
+	assert.NotEqual(t, path, "/file1.txt")
+	cleanup()
 }
 
 func testFileRandomName(t *testing.T) {
+	prepare()
+	file := utils.File{
+		Path:   "/file<random_id>.txt",
+		Reader: reader(),
+	}
+	path, err := utils.CreateFile(mount, file)
+	assert.NoError(t, err)
+	assert.NotEqual(t, path, "/file<random_id>.txt")
+	cleanup()
 }
 
 func prepare() {
 	os.Mkdir(mount, os.ModePerm)
 	os.Mkdir(mount+"/folder1", os.ModePerm)
 	for i := 0; i < 5; i++ {
-		os.Create(mount + "/file" + strconv.Itoa(i) + ".txt")
+		file, _ := os.Create(mount + "/file" + strconv.Itoa(i) + ".txt")
+		defer file.Close()
 	}
 }
 
 func cleanup() {
 	os.RemoveAll(mount)
+}
+
+func reader() multipart.File {
+	src, _ := os.Open(mount + "/file1.txt")
+	return src
 }
