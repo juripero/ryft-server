@@ -31,7 +31,6 @@
 package utils
 
 import (
-	"errors"
 	"io"
 	"math/rand"
 	"mime/multipart"
@@ -48,24 +47,26 @@ type File struct {
 	Reader multipart.File
 }
 
-func DeleteDirs(mountPoint string, filepaths []string) error {
-	for _, filepath := range filepaths {
-		err := deleteDir(mountPoint + "/" + filepath)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+// DeleteDirs removes all the directories including all its content.
+// Returns list of errors (for each input directory).
+func DeleteDirs(mountPoint string, dirs []string) []error {
+	return deleteAll(mountPoint, dirs)
 }
 
-func DeleteFiles(mountPoint string, filepaths []string) error {
-	for _, filepath := range filepaths {
-		err := deleteFile(mountPoint + "/" + filepath)
-		if err != nil {
-			return err
-		}
+// DeleteFiles removes all the files from the input list.
+// Returns list of errors (for each input file).
+func DeleteFiles(mountPoint string, files []string) []error {
+	return deleteAll(mountPoint, files)
+}
+
+// remove directories or/and files
+func deleteAll(mountPoint string, items []string) []error {
+	res := make([]error, len(items))
+	for k, item := range items {
+		path := filepath.Join(mountPoint, item)
+		res[k] = os.RemoveAll(path)
 	}
-	return nil
+	return res
 }
 
 func CreateFile(mountPoint string, file File) (string, error) {
@@ -93,36 +94,6 @@ func CreateFile(mountPoint string, file File) (string, error) {
 	// return path to file without mountpoint
 	location, _ := filepath.Abs(strings.TrimPrefix(path, mountPoint))
 	return location, nil
-}
-
-func deleteFile(filepath string) error {
-	stat, err := os.Stat(filepath)
-
-	if err != nil {
-		return errors.New("Specified file does not exist")
-	}
-
-	if !stat.Mode().IsRegular() {
-		return errors.New("Specified path is not regular file")
-	}
-
-	err = os.Remove(filepath)
-	return err
-}
-
-func deleteDir(filepath string) error {
-	stat, err := os.Stat(filepath)
-
-	if os.IsNotExist(err) {
-		return errors.New("Specified directory doest not exist")
-	}
-
-	if !stat.IsDir() {
-		return errors.New("Specified path if not directory")
-	}
-
-	err = os.RemoveAll(filepath)
-	return err
 }
 
 func filePath(mountPoint, filename string) string {

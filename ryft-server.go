@@ -392,7 +392,7 @@ func main() {
 	router.GET("/count", server.count)
 	router.GET("/cluster/members", server.members)
 	router.GET("/files", server.files)
-	router.DELETE("/files/delete", server.deleteFiles)
+	router.DELETE("/files", server.deleteFiles)
 	router.PUT("/files/new", server.newFile)
 
 	// static asset

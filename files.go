@@ -8,11 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// FileParams query parameters for GET /files
 type FilesParams struct {
 	Dir   string `form:"dir" json:"dir"`
 	Local bool   `form:"local" json:"local"`
 }
 
+// GET /files method
 func (s *Server) files(c *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(c)
