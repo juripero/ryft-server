@@ -31,21 +31,14 @@
 package utils
 
 import (
+	"fmt"
 	"io"
-	"math/rand"
-	"mime/multipart"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
-
-type File struct {
-	Path   string
-	Reader multipart.File
-}
 
 // DeleteDirs removes all the directories including all its content.
 // Returns list of errors (for each input directory).
@@ -69,56 +62,57 @@ func deleteAll(mountPoint string, items []string) []error {
 	return res
 }
 
-func CreateFile(mountPoint string, file File) (string, error) {
-	path := filePath(mountPoint, file.Path)
+// CreateFile creates new file.
+// Unique file name could be generated if path contains special keywords.
+// Returns generated path and error if any.
+func CreateFile(mountPoint string, path string, content io.Reader) (string, error) {
+	rbase := randomizePath(path) // first replace all <random> tokens
+	rpath := rbase
 
-	// append random token if such file already exists
-	_, err := os.Stat(path)
-	if err == nil {
-		path = appendToFilename(path, randomToken())
-	}
-
-	createDirectoryTree(path)
-	outputFile, err := os.Create(path)
-	defer outputFile.Close()
-
+	// create all parent directories
+	pdir := filepath.Join(mountPoint, filepath.Dir(rpath))
+	err := os.MkdirAll(pdir, 0755)
 	if err != nil {
-		return "", err
+		return rpath, err
 	}
 
-	if _, err := io.Copy(outputFile, file.Reader); err != nil {
-		return "", err
+	// try to create file, if file already exists try with updated name
+	for k := 0; ; k++ {
+		fullpath := filepath.Join(mountPoint, rpath)
+		f, err := os.OpenFile(fullpath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		if err != nil {
+			if path != rbase && os.IsExist(err) {
+				// generate new unique name
+				ext := filepath.Ext(rbase)
+				base := strings.TrimSuffix(rbase, ext)
+				rpath = fmt.Sprintf("%s-%d%s", base, k+1, ext)
+
+				continue
+			}
+			return rpath, err
+		}
+		defer f.Close()
+
+		// copy the file content
+		_, err = io.Copy(f, content)
+		if err != nil {
+			// TODO: remove corrupted file?
+			return rpath, err
+		}
+
+		// return path to file without mountpoint
+		return rpath, nil // OK
 	}
-	file.Reader.Close()
-
-	// return path to file without mountpoint
-	location, _ := filepath.Abs(strings.TrimPrefix(path, mountPoint))
-	return location, nil
 }
 
-func filePath(mountPoint, filename string) string {
-	filename = randomizeFilename(filename)
-	return mountPoint + "/" + filename
-}
+// replace <random> sections of filename with random token.
+// random token is based on current unix time in nanoseconds.
+// multiple <random> are possible
+func randomizePath(path string) string {
+	token := func(string) string {
+		return fmt.Sprintf("%016x", time.Now().UnixNano())
+	}
 
-// replace <...> sections of filename with random token
-func randomizeFilename(filename string) string {
-	rand.Seed(time.Now().Unix())
-	result := regexp.MustCompile("([<])\\w+([>])").Split(filename, -1)
-	return strings.Join(result, randomToken())
-}
-
-func randomToken() string {
-	return strconv.Itoa(rand.Intn(2000)) + "-" + strconv.Itoa(int(time.Now().Unix()))
-}
-
-func appendToFilename(filename, token string) string {
-	ext := filepath.Ext(filename)
-	base := strings.TrimSuffix(filename, ext)
-	return base + token + ext
-}
-
-func createDirectoryTree(path string) {
-	dir := filepath.Dir(path)
-	os.MkdirAll(dir, os.ModePerm)
+	re := regexp.MustCompile("<random>")
+	return re.ReplaceAllStringFunc(path, token)
 }
