@@ -391,7 +391,7 @@ func main() {
 	router.GET("/search", server.search)
 	router.GET("/count", server.count)
 	router.GET("/cluster/members", server.members)
-	router.GET("/files", server.files)
+	router.GET("/files", server.getFiles)
 	router.DELETE("/files", server.deleteFiles)
 	router.POST("/files", server.newFile)
 
