@@ -87,7 +87,7 @@ and `NUMERIC` for numeric search.
 Ryft server also supports complex queries containing several search expressions of different types.
 For example `(RECORD.id CONTAINS "100") AND (RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
 This complex query contains two search expression: first one uses text search and the second one uses date search.
-Ryft server will split this query into two separate queries:
+Ryft server will split this expresssion into two separate queries:
 `(RECORD.id CONTAINS "100")` and `(RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`. It then calls
 Ryft hardware two times: the results of the first call are used as the input for the second call.
 
@@ -95,7 +95,7 @@ Multiple `AND` and `OR` operators are supported by the ryft server within comple
 Expression tree is built and each node is passed to the Ryft hardware. Then results are properly combined.
 
 Note, if search query contains two or more expressions of the same type (text, date, time, numeric) that query
-will not be splitted into subqueries because the Ryft hardware supports those type of queries direclty.
+will not be splitted into subqueries because the Ryft hardware supports those type of queries directly.
 
 
 # Structured search formats
