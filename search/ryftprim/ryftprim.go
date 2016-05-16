@@ -33,7 +33,6 @@ package ryftprim
 import (
 	"bufio"
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -42,6 +41,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftone"
 )
 
 // Prepare `ryftprim` command line arguments.
@@ -94,7 +94,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	}
 
 	// search query
-	args = append(args, "-q", engine.prepareQuery(cfg.Query))
+	args = append(args, "-q", ryftone.PrepareQuery(cfg.Query))
 
 	// files
 	for _, file := range cfg.Files {
@@ -103,16 +103,33 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 	// INDEX results file
 	if len(task.IndexFileName) != 0 {
-		// file path relative to `ryftone` mountpoint (including just instance)
-		file := filepath.Join(engine.Instance, task.IndexFileName)
-		args = append(args, "-oi", file)
+		if len(cfg.KeepIndexAs) != 0 {
+			task.IndexFileName = cfg.KeepIndexAs
+			task.KeepIndexFile = true
+			if !strings.HasSuffix(task.IndexFileName, ".txt") {
+				// ryft adds .txt anyway, so if this extension is missed
+				// other code won't properly work!
+				task.IndexFileName += ".txt"
+				task.log().WithField("index", task.IndexFileName).
+					Warnf("[%s]: index file name was updated to have TXT extension", TAG)
+			}
+		} else {
+			// file path relative to `ryftone` mountpoint (including just instance)
+			task.IndexFileName = filepath.Join(engine.Instance, task.IndexFileName)
+		}
+		args = append(args, "-oi", task.IndexFileName)
 	}
 
 	// DATA results file
 	if len(task.DataFileName) != 0 {
-		// file path relative to `ryftone` mountpoint (including just instance)
-		file := filepath.Join(engine.Instance, task.DataFileName)
-		args = append(args, "-od", file)
+		if len(cfg.KeepDataAs) != 0 {
+			task.DataFileName = cfg.KeepDataAs
+			task.KeepDataFile = true
+		} else {
+			// file path relative to `ryftone` mountpoint (including just instance)
+			task.DataFileName = filepath.Join(engine.Instance, task.DataFileName)
+		}
+		args = append(args, "-od", task.DataFileName)
 	}
 
 	// assign command line
@@ -157,8 +174,8 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
 func (engine *Engine) process(task *Task, res *search.Result) {
-	defer task.log().Debugf("[%s]: end TASK processing", TAG)
-	task.log().Debugf("[%s]: start TASK processing...", TAG)
+	//defer task.log().Debugf("[%s]: end TASK processing", TAG)
+	//task.log().Debugf("[%s]: start TASK processing...", TAG)
 
 	// wait for process done
 	cmd_done := make(chan error, 1)
@@ -264,27 +281,29 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// stop subtasks if processing enabled
 	if task.enableDataProcessing {
 		if err != nil || error_suppressed {
-			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
+			//task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
 			task.cancelData()
 		} else {
-			task.log().Debugf("[%s]: stopping INDEX&DATA processing...", TAG)
+			//task.log().Debugf("[%s]: stopping INDEX&DATA processing...", TAG)
 			task.stopIndex()
 			task.stopData()
 		}
 
-		task.log().Debugf("[%s]: waiting INDEX&DATA...", TAG)
+		//task.log().Debugf("[%s]: waiting INDEX&DATA...", TAG)
 		task.subtasks.Wait()
 
-		task.log().Debugf("[%s]: INDEX&DATA finished", TAG)
+		//task.log().Debugf("[%s]: INDEX&DATA finished", TAG)
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing
-	if !engine.KeepResultFiles {
+	if !engine.KeepResultFiles && !task.KeepIndexFile {
 		if err := engine.removeFile(task.IndexFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove INDEX file", TAG)
 			// WARN: error actually ignored!
 		}
+	}
+	if !engine.KeepResultFiles && !task.KeepDataFile {
 		if err := engine.removeFile(task.DataFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove DATA file", TAG)
 			// WARN: error actually ignored!
@@ -297,11 +316,11 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 	defer task.subtasks.Done()
 	defer close(task.indexChan)
 
-	defer task.log().Debugf("[%s]: end INDEX processing", TAG)
-	task.log().Debugf("[%s]: start INDEX processing...", TAG)
+	//defer task.log().Debugf("[%s]: end INDEX processing", TAG)
+	//task.log().Debugf("[%s]: start INDEX processing...", TAG)
 
 	// try to open INDEX file: if operation is cancelled `file` is nil
-	path := filepath.Join(engine.MountPoint, engine.Instance, task.IndexFileName)
+	path := filepath.Join(engine.MountPoint, task.IndexFileName)
 	file, err := task.openFile(path, engine.OpenFilePollTimeout, task.cancelIndexChan)
 	if err != nil {
 		task.log().WithError(err).WithField("path", path).
@@ -369,11 +388,11 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 func (engine *Engine) processData(task *Task, res *search.Result) {
 	defer task.subtasks.Done()
 
-	defer task.log().Debugf("[%s]: end DATA processing", TAG)
-	task.log().Debugf("[%s]: start DATA processing...", TAG)
+	//defer task.log().Debugf("[%s]: end DATA processing", TAG)
+	//task.log().Debugf("[%s]: start DATA processing...", TAG)
 
 	// try to open DATA file: if operation is cancelled `file` is nil
-	path := filepath.Join(engine.MountPoint, engine.Instance, task.DataFileName)
+	path := filepath.Join(engine.MountPoint, task.DataFileName)
 	file, err := task.openFile(path, engine.OpenFilePollTimeout, task.cancelDataChan)
 	if err != nil {
 		task.log().WithError(err).WithField("path", path).
@@ -420,24 +439,10 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	}
 }
 
-// prepareQuery checks for plain queries
-// plain queries converted to (RAW_TEXT CONTAINS query_in_hex_format)
-func (engine *Engine) prepareQuery(query string) string {
-	if strings.Contains(query, "RAW_TEXT") || strings.Contains(query, "RECORD") {
-		return query // just use it "as is"
-	} else {
-		// if no keywords - assume plain text query
-		// use hexadecimal encoding here to avoid escaping problems
-		return fmt.Sprintf("(RAW_TEXT CONTAINS %s)",
-			hex.EncodeToString([]byte(query)))
-	}
-}
-
 // removeFile removes INDEX or DATA file.
 func (engine *Engine) removeFile(name string) error {
 	if len(name) != 0 {
-		path := filepath.Join(engine.MountPoint,
-			engine.Instance, name) // full path
+		path := filepath.Join(engine.MountPoint, name) // full path
 		err := os.RemoveAll(path)
 		if err != nil {
 			return err

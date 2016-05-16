@@ -28,83 +28,95 @@
  * ============
  */
 
-package ryftmux
+package ryftdec
 
 import (
 	"fmt"
-
-	"github.com/Sirupsen/logrus"
-
-	"github.com/getryft/ryft-server/search"
+	"strings"
 )
 
-var (
-	// package logger instance
-	log = logrus.New()
+type QueryType int
 
-	TAG = "ryftmux"
+const (
+	QTYPE_SEARCH QueryType = iota
+	QTYPE_DATE
+	QTYPE_TIME
+	QTYPE_NUMERIC
+	QTYPE_AND
+	QTYPE_OR
+	QTYPE_XOR
 )
 
-// RyftMUX engine uses set of abstract engines as backends.
-type Engine struct {
-	Backends []search.Engine
-
-	IndexHost string // optional host in cluster mode
+type Node struct {
+	Expression string
+	Type       QueryType
+	Parent     *Node
+	SubNodes   []*Node
 }
 
-// NewEngine creates new RyftMUX search engine.
-func NewEngine(backends ...search.Engine) (*Engine, error) {
-	engine := new(Engine)
-	engine.Backends = backends
-	return engine, nil
+func (node *Node) New(expression string, parent *Node) *Node {
+	if isOperator(expression) {
+		node.Expression = strings.Trim(expression, " ")
+	} else {
+		node.Expression = "(" + expression + ")"
+	}
+	node.Type = expressionType(expression)
+	node.Parent = parent
+	return node
 }
 
-// String gets string representation of the engine.
-func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
-	// TODO: other parameters?
+func (node *Node) sameTypeSubnodes() bool {
+	return node.SubNodes[0].Type == node.SubNodes[1].Type
 }
 
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
+func (node *Node) subnodesAreQueries() bool {
+	return node.SubNodes[0].Type.IsSearch() && node.SubNodes[1].Type.IsSearch()
+}
+
+func (node *Node) hasSubnodes() bool {
+	return len(node.SubNodes) == 2
+}
+
+func (node Node) String() string {
+	return fmt.Sprintf("Expression: '%s'", node.Expression)
+}
+
+func (node *Node) isSearch() bool {
+	return node.Type.IsSearch()
+}
+
+func (node *Node) isOperator() bool {
+	return !node.Type.IsSearch()
+}
+
+// Map string operator value to constant
+func expressionType(expression string) QueryType {
+	expression = strings.Trim(expression, " ")
+	switch {
+	case expression == "AND":
+		return QTYPE_AND
+	case expression == "OR":
+		return QTYPE_OR
+	case expression == "XOR":
+		return QTYPE_XOR
+	case strings.Contains(expression, "DATE("):
+		return QTYPE_DATE
+	case strings.Contains(expression, "TIME("):
+		return QTYPE_TIME
+	case strings.Contains(expression, "NUMBER("):
+		return QTYPE_NUMERIC
+	default:
+		return QTYPE_SEARCH
 	}
 }
 
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
-	ll, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
+// IsSearch checks if query type is a search
+func (q QueryType) IsSearch() bool {
+	switch q {
+	case QTYPE_SEARCH, QTYPE_DATE,
+		QTYPE_TIME, QTYPE_NUMERIC:
+		return true
 	}
 
-	log.Level = ll
-	return nil // OK
-}
-
-// log returns task related logger.
-func (task *Task) log() *logrus.Entry {
-	return log.WithField("task", task.Identifier)
-}
-
-/*
-// factory creates RyftMUX engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
-	backends := parseOptions(opts)
-	engine, err := NewEngine(backends)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
-	}
-	return engine, nil
-}
-*/
-
-// package initialization
-func init() {
-	// should be created manually!
-	// search.RegisterEngine(TAG, factory)
-
-	// be silent by default
-	log.Level = logrus.WarnLevel
+	return false
 }

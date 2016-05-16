@@ -49,12 +49,14 @@ func main() {
 	// ryftprimLogLevel = "debug"
 	// ryfthttpLogLevel = "debug"
 
-	printSearchEngines(log)
+	//printSearchEngines(log)
 
 	//search1(false) // ryftprim
 	//search2(false) // HTTP
 	//search3(false) // MUX
 	//search4(false) // ryftone
+	//search5(false) // ryftdec
+	decomp0()
 
 	//count1(false) // ryftprim
 	//count2(false) // HTTP
@@ -119,9 +121,9 @@ func search0(concurent bool, engine search.Engine) {
 
 	_, _, _, _, _, _ = A, B, C, D, E, F
 
-	cfgs := []search.Config{}
-	cfgs = append(cfgs, *A, *B, *C)
-	cfgs = append(cfgs, *D, *E, *F)
+	cfgs := []search.Config{*E}
+	//cfgs = append(cfgs, *A, *B, *C)
+	//cfgs = append(cfgs, *D, *E, *F)
 	//cfgs = append(cfgs, *A, *B, *C)
 	//cfgs = append(cfgs, *D, *E, *F)
 
@@ -157,6 +159,12 @@ func search3(concurent bool) {
 // ryftone search
 func search4(concurent bool) {
 	search0(concurent, newRyftOne(log))
+}
+
+// ryftdec search
+func search5(concurent bool) {
+	ryftdecLogLevel = "debug"
+	search0(concurent, newRyftDec(log, newRyftPrim(log)))
 }
 
 // abstract count

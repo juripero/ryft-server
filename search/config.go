@@ -44,6 +44,10 @@ type Config struct {
 	Fuzziness     uint
 	CaseSensitive bool
 	Nodes         uint
+
+	// if not empty keep the index and/or data file
+	KeepDataAs  string
+	KeepIndexAs string
 }
 
 // NewEmptyConfig creates new empty search configuration.

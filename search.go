@@ -60,6 +60,8 @@ type SearchParams struct {
 	Stream        bool     `form:"stream" json:"stream"`
 	Spark         bool     `form:"spark" json:"spark"`
 	ErrorPrefix   bool     `form:"ep" json:"ep"`
+	KeepDataAs    string   `form:"data" json:"data"`
+	KeepIndexAs   string   `form:"index" json:"index"`
 }
 
 // Handle /search endpoint.
@@ -78,6 +80,10 @@ func (s *Server) search(ctx *gin.Context) {
 	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
 		panic(NewServerError(http.StatusBadRequest,
 			"format=xml could not be used without RECORD query"))
+	}
+	if params.Format == format.JSON && !strings.Contains(params.Query, "RECORD") {
+		panic(NewServerError(http.StatusBadRequest,
+			"format=json could not be used without RECORD query"))
 	}
 	// setting up transcoder to convert raw data
 	var tcode format.Format
@@ -126,6 +132,10 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Fuzziness = uint(params.Fuzziness)
 	cfg.CaseSensitive = params.CaseSensitive
 	cfg.Nodes = uint(params.Nodes)
+	cfg.KeepDataAs = params.KeepDataAs
+	cfg.KeepIndexAs = params.KeepIndexAs
+
+	log.Printf("search: %s", cfg)
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -219,7 +229,7 @@ func (s *Server) search(ctx *gin.Context) {
 				panic(err)
 			}
 
-			log.Printf("done: %s", res)
+			log.Printf("search done: %s", res)
 			return // stop
 		}
 	}

@@ -28,83 +28,76 @@
  * ============
  */
 
-package ryftmux
+package ryftdec
 
 import (
-	"fmt"
-
-	"github.com/Sirupsen/logrus"
-
-	"github.com/getryft/ryft-server/search"
+	"regexp"
+	"strings"
 )
 
-var (
-	// package logger instance
-	log = logrus.New()
+func validateQuery(query string) bool {
+	chars := []rune(query)
 
-	TAG = "ryftmux"
-)
-
-// RyftMUX engine uses set of abstract engines as backends.
-type Engine struct {
-	Backends []search.Engine
-
-	IndexHost string // optional host in cluster mode
-}
-
-// NewEngine creates new RyftMUX search engine.
-func NewEngine(backends ...search.Engine) (*Engine, error) {
-	engine := new(Engine)
-	engine.Backends = backends
-	return engine, nil
-}
-
-// String gets string representation of the engine.
-func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
-	// TODO: other parameters?
-}
-
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
-	}
-}
-
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
-	ll, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
+	if !validateQueryLength(chars) {
+		return false
 	}
 
-	log.Level = ll
-	return nil // OK
-}
-
-// log returns task related logger.
-func (task *Task) log() *logrus.Entry {
-	return log.WithField("task", task.Identifier)
-}
-
-/*
-// factory creates RyftMUX engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
-	backends := parseOptions(opts)
-	engine, err := NewEngine(backends)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
+	if !validateEmptyBrackets(query) {
+		return false
 	}
-	return engine, nil
+
+	if !validateBracketsBalance(chars) {
+		return false
+	}
+
+	return true
 }
-*/
 
-// package initialization
-func init() {
-	// should be created manually!
-	// search.RegisterEngine(TAG, factory)
+func validateBracketsBalance(chars []rune) bool {
+	count := 0
+	for i := 0; i < len(chars); i++ {
+		c := chars[i]
 
-	// be silent by default
-	log.Level = logrus.WarnLevel
+		if count < 0 {
+			return false
+		}
+
+		switch {
+		case c == '(':
+			count++
+		case c == ')':
+			count--
+		}
+	}
+
+	return count == 0
+}
+
+func validateQueryLength(chars []rune) bool {
+	return len(chars) > 2
+}
+
+func validateEmptyBrackets(query string) bool {
+	return !strings.Contains(query, "()")
+}
+
+func validateTokens(tokens []string) bool {
+	for _, token := range tokens {
+		if notParsable(token) && !isOperator(token) && !validateToken(token) {
+			return false
+		}
+	}
+	return true
+}
+
+func validateToken(token string) bool {
+	result, _ := regexp.MatchString(`^$|^[([\].a-zA-Z0-9_]+ [a-zA-Z-]+ [a-zA-Z0-9-"():=!<>/ ]+?$`, token)
+	return result
+}
+
+func validateTree(node *Node) bool {
+	if isOperator(node.Expression) && !node.hasSubnodes() {
+		return false
+	}
+	return true
 }

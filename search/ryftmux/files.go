@@ -36,7 +36,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// Files starts synchronous "/files" with RyftPrim engine.
+// Files starts synchronous "/files" with RyftMUX engine.
 func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	task := NewTask()
 

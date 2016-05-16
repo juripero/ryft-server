@@ -68,7 +68,72 @@ By default REST-server removes search results from ``/ryftone/RyftServer-PORT/``
 ryft-server --keep
 ```
 
+# Search mode and query decomposition
+
+Ryft supports several search modes:
+
+- `es` for exact search
+- `fhs` for fuzzy hamming search
+- `feds` for fuzzy edit distance search
+- `ds` for date search
+- `ts` for time search
+- `ns` for numeric search
+
+Is no any search mode provided fuzzy hamming search is used by default for simple queries.
+It is also possible to automatically detect search modes: if search query contains `DATE`
+keyword then date search will be used, `TIME` keyword is used for time search,
+and `NUMERIC` for numeric search.
+
+Ryft server also supports complex queries containing several search expressions of different types.
+For example `(RECORD.id CONTAINS "100") AND (RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
+This complex query contains two search expression: first one uses text search and the second one uses date search.
+Ryft hardware doesn't support such expressions yet. But Ryft server can split this query into two simple queries:
+`(RECORD.id CONTAINS "100")` and `(RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`. Then it calls
+Ryft hardware two times: the results of the first call are used as the input for the second call.
+
+Multiple `AND` and `OR` operators are supported by the ryft server within complex search queries.
+Expression tree is built and each node is passed to the Ryft hardware. Then results are properly combined.
+
+Note, if search query contains two or more expressions of the same type (text, date, time, numeric) that query
+will not be splitted into subqueries because the Ryft hardware supports that type of queries direclty.
+
+
+# Structured search formats
+
+By default structured search uses `raw` format. That means that found data is returned as base-64 encoded raw bytes.
+
+There are two other options: `xml` or `json`.
+
+If input file set contains XML data, the found records could be decoded. Just pass `format=xml` query parameter
+and records will be translated from XML to JSON. Moreover, to minimize output or to get just subset of fields
+the `fields=` query parameter could be used. For example to get identifier and date from a `*.pcrime` file
+pass `format=xml&fields=ID,Date`.
+
+The same is true for JSON data. Example: `format=json&fields=Name,AlterEgo`.
+
+
+# Preserve search results
+
+By default all search results are deleted from the Ryft server once they are delivered to user.
+But to have "search in the previous results" feature there are two query parameters: `data=` and `index=`.
+
+First `data=output.dat` parameter keeps the search results on the Ryft server under `/ryftone/output.dat`.
+It is possible to use that file as an input for the subsequent search call `files=output.dat`.
+
+Note, it is important to use consistent file extension for the structured search
+in order to let Ryft use appropriate RDF scheme!
+
+For now there is no way to delete such intermediate result file.
+At least until `DELETE /files` API endpoint will be implemented.
+
+Second `index=index.txt` parameter keeps the search index under `/ryftone/index.txt`.
+
+Note, according to Ryft API documentation index file should always have `.txt` extension!
+
+
 # API endpoints
+
+Check the `swagger.json` for detailed information.
 
 ## Search endpoint /search parameters :
 
@@ -78,7 +143,7 @@ ryft-server --keep
 | *files* | string | GET /search?query={QUERY}&files={FILE} | Input data set to be searched. Comma separated list of files or directories. Could contain wildcards. |
 | *fuzziness* | uint8 | GET /search?query={QUERY}&files={FILE}&fuzziness={VALUE} | The fuzzy search distance `[0..255]`. |
 | *cs* | boolean | GET /search?query={QUERY}&files={FILE}&cs=true | Case sensitive flag. Default `false`. |
-| *format* | string | GET /search?query={QUERY}&files={FILE}&apm;format={FORMAT} | Parameter for the structured search. Specify the input data format `xml` or `raw` (Default). |
+| *format* | string | GET /search?query={QUERY}&files={FILE}&apm;format={FORMAT} | Parameter for the structured search. Specify the input data format `xml`, `json` or `raw` (Default). |
 | *surrounding* | uint16 | GET /search?query={QUERY}&files={FILE}&surrounding={VALUE} | Parameter that specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text |
 | *fields* | string | GET /search?query={QUERY}&files={FILE}&format=xml&fields={FIELDS...} | For structured search specify the list of required fields. If omitted all fields are used. |
 | *nodes* | int | GET /search?query={QUERY}&files={FILE}&nodes={VALUE} | Parameter that specifies nodes count `[0..4]`. Default `4`, if nodes=0 system will use default value. |

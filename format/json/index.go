@@ -28,83 +28,28 @@
  * ============
  */
 
-package ryftmux
+package json
 
 import (
-	"fmt"
-
-	"github.com/Sirupsen/logrus"
-
+	"github.com/getryft/ryft-server/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
 
-var (
-	// package logger instance
-	log = logrus.New()
+// INDEX format specific data.
+// Is the same as RAW format index!
+type Index raw.Index
 
-	TAG = "ryftmux"
-)
-
-// RyftMUX engine uses set of abstract engines as backends.
-type Engine struct {
-	Backends []search.Engine
-
-	IndexHost string // optional host in cluster mode
+// NewIndex creates new format specific data.
+func NewIndex() interface{} {
+	return Index{}
 }
 
-// NewEngine creates new RyftMUX search engine.
-func NewEngine(backends ...search.Engine) (*Engine, error) {
-	engine := new(Engine)
-	engine.Backends = backends
-	return engine, nil
+// FromIndex converts INDEX to format specific data.
+func FromIndex(idx search.Index) Index {
+	return Index(raw.FromIndex(idx))
 }
 
-// String gets string representation of the engine.
-func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
-	// TODO: other parameters?
-}
-
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
-	}
-}
-
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
-	ll, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
-	}
-
-	log.Level = ll
-	return nil // OK
-}
-
-// log returns task related logger.
-func (task *Task) log() *logrus.Entry {
-	return log.WithField("task", task.Identifier)
-}
-
-/*
-// factory creates RyftMUX engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
-	backends := parseOptions(opts)
-	engine, err := NewEngine(backends)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
-	}
-	return engine, nil
-}
-*/
-
-// package initialization
-func init() {
-	// should be created manually!
-	// search.RegisterEngine(TAG, factory)
-
-	// be silent by default
-	log.Level = logrus.WarnLevel
+// ToIndex converts format specific data to INDEX.
+func ToIndex(idx Index) search.Index {
+	return raw.ToIndex(raw.Index(idx))
 }
