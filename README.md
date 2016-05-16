@@ -1,4 +1,4 @@
-# Clonning & Building
+# Cloning & Building
 
 > The instructions below assume you have a properly configured GO dev environment with GOPATH and GOROOT env variables configured.
 > If you starty from scratch we recommend to use this [automated installer](https://github.com/demon-xxi/tools).
@@ -87,15 +87,15 @@ and `NUMERIC` for numeric search.
 Ryft server also supports complex queries containing several search expressions of different types.
 For example `(RECORD.id CONTAINS "100") AND (RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
 This complex query contains two search expression: first one uses text search and the second one uses date search.
-Ryft hardware doesn't support such expressions yet. But Ryft server can split this query into two simple queries:
-`(RECORD.id CONTAINS "100")` and `(RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`. Then it calls
+Ryft server will split this query into two separate queries:
+`(RECORD.id CONTAINS "100")` and `(RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`. It then calls
 Ryft hardware two times: the results of the first call are used as the input for the second call.
 
 Multiple `AND` and `OR` operators are supported by the ryft server within complex search queries.
 Expression tree is built and each node is passed to the Ryft hardware. Then results are properly combined.
 
 Note, if search query contains two or more expressions of the same type (text, date, time, numeric) that query
-will not be splitted into subqueries because the Ryft hardware supports that type of queries direclty.
+will not be splitted into subqueries because the Ryft hardware supports those type of queries direclty.
 
 
 # Structured search formats
@@ -146,6 +146,8 @@ Check the `swagger.json` for detailed information.
 | *format* | string | GET /search?query={QUERY}&files={FILE}&apm;format={FORMAT} | Parameter for the structured search. Specify the input data format `xml`, `json` or `raw` (Default). |
 | *surrounding* | uint16 | GET /search?query={QUERY}&files={FILE}&surrounding={VALUE} | Parameter that specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text |
 | *fields* | string | GET /search?query={QUERY}&files={FILE}&format=xml&fields={FIELDS...} | For structured search specify the list of required fields. If omitted all fields are used. |
+| *data* | string | GET /search?query={QUERY}&files={FILE}&format=xml&data={dataFile} | Name of results data file to keep. WARNING: file will be overriden! |
+| *index* | string | GET /search?query={QUERY}&files={FILE}&format=xml&index={indexFile} | Name of results index file to keep. WARNING: file will be overriden! |
 | *nodes* | int | GET /search?query={QUERY}&files={FILE}&nodes={VALUE} | Parameter that specifies nodes count `[0..4]`. Default `4`, if nodes=0 system will use default value. |
 | *local* | boolean | GET /search?query={QUERY}&files={FILE}&local={VALUE} | Parameter that specifies cluster mode, set `true` to enable local search, set `false` for cluster mode search. Default `false`. |
 | *stats* | boolean | GET /search?query={QUERY}&files={FILE}&stats={VALUE} | Parameter that enables including statistics . Default `false`. |
