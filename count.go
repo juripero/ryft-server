@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 
@@ -79,6 +78,7 @@ func (s *Server) count(ctx *gin.Context) {
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 
+	log.WithField("config", cfg).Infof("start /count")
 	res, err := engine.Count(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -89,25 +89,27 @@ func (s *Server) count(ctx *gin.Context) {
 		select {
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				log.Printf("REC: %s", rec)
+				log.WithField("record", rec).Debugf("record ignored")
 				// ignore records
 			}
 
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
-				log.Printf("ERR: %s", err)
+				log.WithField("error", err).Debugf("error ignored")
 				// TODO: report error
 			}
 
 		case <-res.DoneChan:
+			log.WithField("result", res).Infof("/count done")
+
 			if res.Stat != nil {
-				log.Printf("DONE: %s", res.Stat)
 				stat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, stat)
 			} else {
 				panic(NewServerError(http.StatusInternalServerError,
 					"no search statistics available"))
 			}
+
 			return
 		}
 	}

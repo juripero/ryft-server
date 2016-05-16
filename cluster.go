@@ -32,7 +32,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -53,7 +52,7 @@ func (s *Server) members(c *gin.Context) {
 	if err != nil {
 		panic(NewServerError(http.StatusInternalServerError, err.Error()))
 	} else {
-		log.Printf("consul info: %#v", info)
+		log.WithField("info", info).Debug("consul information")
 		c.JSON(http.StatusOK, info)
 	}
 }

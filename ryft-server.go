@@ -33,7 +33,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
+
 	"math/rand"
 	"mime"
 	"net/http"
@@ -52,10 +52,16 @@ import (
 	"github.com/getryft/ryft-server/middleware/cors"
 	"github.com/getryft/ryft-server/middleware/gzip"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
 	"github.com/thoas/stats"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/yaml.v2"
+)
+
+var (
+	// logger instance
+	log = logrus.New()
 )
 
 var (
@@ -137,7 +143,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 			return nil, fmt.Errorf("failed to get consul services: %s", err)
 		}
 		local_node, remote_nodes := SplitToLocalAndRemote(nodes)
-		log.Printf("cluster search tags: %q", tags)
+		log.WithField("tags", tags).Debug("cluster search tags")
 
 		// if no tags required - use all nodes
 		all_nodes := (len(tags) == 0)
@@ -163,7 +169,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 
 		// prefer local service first...
 		if local_node != nil {
-			log.Printf("local node tags: %q", local_node.ServiceTags)
+			log.WithField("tags", local_node.ServiceTags).Debug("local node tags")
 			if all_nodes || update_tags(local_node.ServiceTags) > 0 {
 				// local node: just use normal backend
 				engine, err := s.getSearchEngine(true, files)
@@ -172,7 +178,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 				}
 				backends = append(backends, engine)
 			}
-			log.Printf("remain (local) tags required: %v", tags_required)
+			log.WithField("tags", tags_required).Debug("remain (local) tags required")
 		}
 
 		// ... then remote services (shuffled)
@@ -185,11 +191,11 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 			}
 
 			// skip if no required tags found
-			log.Printf("remote node tags: %q", service.ServiceTags)
+			log.WithField("tags", service.ServiceTags).Debug("remote node tags")
 			if !all_nodes && update_tags(service.ServiceTags) == 0 {
 				continue // no tags found, skip this node
 			}
-			log.Printf("remain (remote) tags required: %v", tags_required)
+			log.WithField("tags", tags_required).Debug("remain (remote) tags required")
 
 			// remote node: use RyftHTTP backend
 			port := service.ServicePort
@@ -230,7 +236,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 
 		if len(backends) > 0 {
 			engine, err := ryftmux.NewEngine(backends...)
-			log.Printf("cluster search with %s", engine)
+			log.WithField("engine", engine).Debug("cluster search")
 			return engine, err
 		}
 
@@ -316,15 +322,14 @@ var serverStats = stats.New()
 // RyftAPI include search, index, count
 func main() {
 
-	// set log timestamp format
-	log.SetFlags(log.Lmicroseconds)
-
 	// parse command line arguments
 	parseParams()
 
 	// be quiet and efficient in production
 	if !*debug {
 		gin.SetMode(gin.ReleaseMode)
+	} else {
+		log.Level = logrus.DebugLevel
 	}
 
 	// Create a rounter with default middleware: logger, recover
@@ -336,7 +341,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to read server configuration: %s", err)
 	}
-	log.Printf("CONFIG: %+v", server)
+	log.WithField("config", server).Infof("server configuration")
 
 	// Logging & error recovery
 	//	router.Use(gin.Logger())
@@ -362,8 +367,7 @@ func main() {
 	case "file":
 		auth, err := auth.AuthBasicFile(*authUsersFile)
 		if err != nil {
-			log.Printf("Error reading users file: %v", err)
-			os.Exit(1)
+			log.WithError(err).Fatal("Error reading users file")
 		}
 		router.Use(auth)
 		break

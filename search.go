@@ -32,7 +32,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -135,7 +134,7 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 
-	log.Printf("search: %s", cfg)
+	log.WithField("config", cfg).Infof("start /search")
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -229,7 +228,7 @@ func (s *Server) search(ctx *gin.Context) {
 				panic(err)
 			}
 
-			log.Printf("search done: %s", res)
+			log.WithField("result", res).Infof("/search done")
 			return // stop
 		}
 	}
