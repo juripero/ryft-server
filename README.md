@@ -35,12 +35,57 @@ make debian
 See [build and run](./docs/buildandrun.md) document for more details.
 
 
-# API endpoints
+# REST API
 
-See [here](./docs/restapi.md)
+`ryft-server` supports a few REST endpoints:
+
+  - [/version](./docs/restapi.md#version)
+  - [/search](./docs/restapi.md#search)
+  - [/count](./docs/restapi.md#count)
+  - [/files](./docs/restapi.md#files)
+
+All examples assume the `ryft-server` host name is `ryftone-777`.
+
+The main API endpoints are `/search` and `/count`. Both have almost the same parameters.
+But the second one do not transfer all found data, just prints the number of matches.
+Required parameters are search query and set of files where to find, so simplest request is:
+
+```{.sh}
+curl "http://ryftone-777:8765/search?query=Joe&files=*.txt"
+```
+
+Of course it's possible to customize search. The following command will use data surrounding of 5 bytes
+and fuzzy edit distance search (fuzziness=2) instead of fuzzy hamming search which was used by default:
+
+```{.sh}
+curl "http://ryftone-777:8765/search?query=Joe&files=*.txt&mode=feds&surrounding=5&fuzziness=2"
+# - or -
+curl --get --data-urlencode 'query=(RAW_TEXT CONTAINS "Joe")' \
+  "http://ryftone-777:8765/search?files=*.txt&mode=feds&surrounding=5&fuzziness=2"
+```
+
+By default cluster mode is used. To do search on a single node use `local` query parameter:
+
+```{.sh}
+curl "http://ryftone-777:8765/search?query=Joe&files=*.txt&local=true"
+```
+
+The `/version` endpoint is used to check server's version:
+
+```{.sh}
+curl "http://ryftone-777:8765/version"
+```
+
+This request prints current server version and corresponding git hash number.
+This information is extremelly useful for bug reporting.
 
 
-# Search mode and query decomposition
+See [REST API](./docs/restapi.md) document for more details.
+
+
+# Notes
+
+## Search mode and query decomposition
 
 Ryft supports several search modes:
 
@@ -70,7 +115,7 @@ Note, if search query contains two or more expressions of the same type (text, d
 will not be splitted into subqueries because the Ryft hardware supports those type of queries directly.
 
 
-# Structured search formats
+## Structured search formats
 
 By default structured search uses `raw` format. That means that found data is returned as base-64 encoded raw bytes.
 
@@ -84,7 +129,7 @@ pass `format=xml&fields=ID,Date`.
 The same is true for JSON data. Example: `format=json&fields=Name,AlterEgo`.
 
 
-# Preserve search results
+## Preserve search results
 
 By default all search results are deleted from the Ryft server once they are delivered to user.
 But to have "search in the previous results" feature there are two query parameters: `data=` and `index=`.

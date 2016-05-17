@@ -1,8 +1,8 @@
-# API endpoints
+This document contains information about REST API.
 
-Check the `swagger.json` for detailed information.
+# Search
 
-## Search endpoint /search parameters :
+endpoint /search parameters:
 
 | Method | Input type | Uri | Description |
 | --- | --- | --- | --- |
@@ -22,7 +22,7 @@ Check the `swagger.json` for detailed information.
 | *spark* | boolean | GET /search?query={QUERY}&files={FILE}&local={VALUE} | Parameter that specifies response format. Recommended to use with Spark. Default `false`. |
 | *ep* | boolean | GET /search?query={QUERY}&files={FILE}&local={VALUE} | Error Prefix. Parameter that specifies error prefix to find out from which node error comes. Recommended to use in cluster mode. Default `false`. |
 
-### Not structured request example
+## Not structured request example
 
 [/search?query=10&files=passengers.txt&surrounding=10&fuzziness=0&local=false](/search?query=10&files=passengers.txt&surrounding=10&fuzziness=0&local=false)
 
@@ -52,7 +52,7 @@ Check the `swagger.json` for detailed information.
 `data` is *base64* encoded bytes of search results.
 
 
-### Structured request example
+## Structured request example
 
 [/search?query=(RECORD.id EQUALS "10034183")&files=*.pcrime&surrounding=10&fuzziness=0&format=xml&local=true](/search?query=(RECORD.id%20EQUALS%20%2210034183%22)&files=*.pcrime&surrounding=10&fuzziness=0&format=xml&local=true)
 
@@ -91,7 +91,9 @@ Check the `swagger.json` for detailed information.
 ]
 ```
 
-## Count endpoint
+# Count
+
+/count endpoint parameters:
 
 | Method | Input type | Uri | Description |
 | --- | --- | --- | --- |
@@ -102,7 +104,7 @@ Check the `swagger.json` for detailed information.
 | *nodes* | int | GET /count?query={QUERY}&files={FILE}&nodes={VALUE} | Parameter that specifies nodes count `[0..4]`. Default `4`, if nodes=0 system will use default value. |
 | *local* | boolean | GET /search?query={QUERY}&files={FILE}&local={VALUE} | Parameter that specifies search mode, set `true` to enable local search, set `false` for cluster mode search. Default `false`. |
 
-### Count request example
+## Count request example
 
 [/count?query=(RECORD CONTAINS "a")OR(RECORD CONTAINS "b")&files=*.pcrime&local=true](/count?query=(RECORD%20CONTAINS%20%22a%22)OR(RECORD%20CONTAINS%20%22b%22)&files=*.pcrime&local=true)
 
@@ -117,11 +119,13 @@ Check the `swagger.json` for detailed information.
 ```
 
 
-## Version endpoint
+# Version
+
+endpoint parameters:
 
 Endpoint that allows to check the current build version
 
-### Version request example
+## Version request example
 
 [/version](/version)
 
@@ -133,14 +137,17 @@ Endpoint that allows to check the current build version
 ```
 
 
-## Files endpoint
+# Files
+
+endpoint parameters:
+
 | Method | Input type | Uri | Description |
 | --- | --- | --- | --- |
 | *local* | boolean | GET /files?local={VALUE} | Parameter that specifies search mode, set `true` to enable local search, set `false` for cluster mode search. Default `false` |
 | *dir* | string | GET /files?&dir={VALUE} | Parameter that specifies files directory. Default `/ryftone` |
 
 
-### Files request example
+## Files request example
 
 [/files](/files)
 
