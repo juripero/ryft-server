@@ -1,72 +1,44 @@
-# Cloning & Building
+The Ryft REST server runs as a daemon and provides access to the Ryft hardware.
+It is written in [Go](https://golang.org/) using [Gin](https://github.com/gin-gonic/gin) HTTP framework.
 
-> The instructions below assume you have a properly configured GO dev environment with GOPATH and GOROOT env variables configured.
-> If you starty from scratch we recommend to use this [automated installer](https://github.com/demon-xxi/tools).
+# Build and Run
 
-> To use `go get` command with private repositories use the following setting to force SSH protocol instead of HTTPS:
-> `git config --global url."git@github.com:".insteadOf "https://github.com/"`
-> Make sure you have configured [SSH token authentication](https://help.github.com/articles/generating-an-ssh-key/) for GitHub.
+To build `ryft-server` just use the following commands:
 
-```bash
-go get github.com/getryft/ryft-server
+```{.sh}
+go get -d -v github.com/getryft/ryft-server
 cd $GOPATH/src/github.com/getryft/ryft-server
 make
 ```
 
-To change git branch use combination of commands:
-```bash
-cd $GOPATH/src/github.com/getryft/ryft-server
-git checkout <branch-name>
-go get
+Running server is even simplier:
+
+```{.sh}
+./ryft-server
 ```
 
-For packaging into deb file just run `make debian`, see detailed instructions [here](./debian/README.md).
+Sometimes it's useful to run multiple instances on different ports:
 
-# Running & Command Line Parameters
-
+```{.sh}
+./ryft-server 0.0.0.0:9000 --debug
 ```
-usage: ryft-server [<flags>] [<address>]
 
-Flags:
-  --help           Show context-sensitive help (also try --help-long and --help-man).
-  -k, --keep       Keep search results temporary files.
-  -d, --debug      Run http server in debug mode.
-  -a, --auth=AUTH  Authentication type: none, file, ldap.
-  --users-file=USERS-FILE
-                   File with user credentials. Required for --auth=file.
-  --ldap-server=LDAP-SERVER
-                   LDAP Server address:port. Required for --auth=ldap.
-  --ldap-user=LDAP-USER
-                   LDAP username for binding. Required for --auth=ldap.
-  --ldap-pass=LDAP-PASS
-                   LDAP password for binding. Required for --auth=ldap.
-  --ldap-query="(&(uid=%s))"
-                   LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.
-  --ldap-basedn=LDAP-BASEDN
-                   LDAP BaseDN for lookups.'. Required for --auth=ldap.
+This command runs another server instance on port `9000` in debug mode.
+Debug mode is used for testing to get detailed server's log messages.
 
-  -t, --tls          
-                    Enable TLS/SSL. Default 'false'.
-  --tls-crt=TLS-CRT  
-                    Certificate file. Required for --tls=true.
-  --tls-key=TLS-KEY  
-                    Key-file. Required for --tls=true.
-  --tls-address=0.0.0.0:8766  
-                     Address:port to listen on HTTPS. Default is 0.0.0.0:8766
+It's also possible to create Debian package:
 
-Args:
-  [<address>]  Address:port to listen on. Default is 0.0.0.0:8765.
-
+```{.sh}
+make debian
 ```
-Default value ``port`` is ``8765``
 
-# Keeping search results
+See [build and run](./docs/buildandrun.md) document for more details.
 
-By default REST-server removes search results from ``/ryftone/RyftServer-PORT/``. But it behaviour may be prevented:
 
-```
-ryft-server --keep
-```
+# API endpoints
+
+See [here](./docs/restapi.md)
+
 
 # Search mode and query decomposition
 
@@ -129,8 +101,3 @@ At least until `DELETE /files` API endpoint will be implemented.
 Second `index=index.txt` parameter keeps the search index under `/ryftone/index.txt`.
 
 Note, according to Ryft API documentation index file should always have `.txt` extension!
-
-
-# API endpoints
-
-See [here](./docs/restapi.md)
