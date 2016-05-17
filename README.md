@@ -47,15 +47,15 @@ See [build and run](./docs/buildandrun.md) document for more details.
 All examples assume the `ryft-server` host name is `ryftone-777`.
 
 The main API endpoints are `/search` and `/count`. Both have almost the same parameters.
-But the second one do not transfer all found data, just prints the number of matches.
-Required parameters are search query and set of files where to find, so simplest request is:
+However, the /count endpoint does not transfer all found data, it will just print the number of matches and associated performance numbers.
+The minimum required parameters are search query and the set of files to search, so simplest request is:
 
 ```{.sh}
 curl "http://ryftone-777:8765/search?query=Joe&files=*.txt"
 ```
 
-Of course it's possible to customize search. The following command will use data surrounding of 5 bytes
-and fuzzy edit distance search (fuzziness=2) instead of fuzzy hamming search which was used by default:
+Of course it's possible to customize search. The following command will capture data surrounding of 5 bytes 
+and fuzzy edit distance search (fuzziness=2) instead of fuzzy hamming search which is used by default:
 
 ```{.sh}
 curl "http://ryftone-777:8765/search?query=Joe&files=*.txt&mode=feds&surrounding=5&fuzziness=2"
@@ -64,7 +64,7 @@ curl --get --data-urlencode 'query=(RAW_TEXT CONTAINS "Joe")' \
   "http://ryftone-777:8765/search?files=*.txt&mode=feds&surrounding=5&fuzziness=2"
 ```
 
-By default cluster mode is used. To do search on a single node use `local` query parameter:
+By default cluster mode is used. To execute a search on a single node use `local` query parameter:
 
 ```{.sh}
 curl "http://ryftone-777:8765/search?query=Joe&files=*.txt&local=true"
@@ -132,17 +132,17 @@ The same is true for JSON data. Example: `format=json&fields=Name,AlterEgo`.
 ## Preserve search results
 
 By default all search results are deleted from the Ryft server once they are delivered to user.
-But to have "search in the previous results" feature there are two query parameters: `data=` and `index=`.
+In order to preserve results thereby allowing for the ability to subsequently "search in the previous results", there are two query parameters available: `data=` and `index=`.
 
-First `data=output.dat` parameter keeps the search results on the Ryft server under `/ryftone/output.dat`.
+Using the first parameter, `data=output.dat` creates the search results on the Ryft server under `/ryftone/output.dat`.
 It is possible to use that file as an input for the subsequent search call `files=output.dat`.
 
 Note, it is important to use consistent file extension for the structured search
 in order to let Ryft use appropriate RDF scheme!
 
 For now there is no way to delete such intermediate result file.
-At least until `DELETE /files` API endpoint will be implemented.
+That function will be made available in the future when the `DELETE /files` API endpoint will be implemented.
 
-Second `index=index.txt` parameter keeps the search index under `/ryftone/index.txt`.
+Using the second parameter `index=index.txt` keeps the search index file under `/ryftone/index.txt`.
 
 Note, according to Ryft API documentation index file should always have `.txt` extension!
