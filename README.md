@@ -81,3 +81,23 @@ This information is extremelly useful for bug reporting.
 
 
 See [REST API](./docs/restapi.md) document for more details.
+
+
+# Command line tools
+
+## ryftrest tool
+
+`ryftrest` is a simple bash script which syntax is very similar to native `ryftprim` tool.
+But there are a few differences (try `ryftrest --help` for detailed syntax):
+
+- `ryftrest` can send requests to remote Ryft boxes (via `--address` option)
+- `ryftrest` supports complex search queries (because `ryft-server` does)
+- `ryftrest` can print found data records
+
+The last feature in conjunction with `jq` JSON command line processor may be very useful:
+
+```{.sh}
+ryftrest -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --local --format=xml --fields=ID,Date | jq ".results[].Date"
+```
+
+This command will print extracted list of date strings.
