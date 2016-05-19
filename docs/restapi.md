@@ -1,6 +1,6 @@
 This document contains information about REST API.
 
-`ryft-server` supports the following API endpoits:
+`ryft-server` supports the following API endpoints:
 
 - [/version](#version)
 - [/search](#search)
@@ -43,13 +43,13 @@ The list of supported query parameters are the following (check detailed descrip
 The first required parameter is the search expression `query`.
 It contains one or more subqueries connected using logical operators.
 
-To do text search for the "The Batman" the following search expression is used:
+To execute text search for "The Batman" use the following search expression:
 
 ```
 query=(RAW_TEXT CONTAINS "The Batman")
 ```
 
-For structured search another keyword should be applied:
+To execute structured search apply another keyword:
 
 ```
 query=(RECORD.AlterEgo CONTAINS "The Batman")
@@ -60,7 +60,7 @@ Check corresponding Ryft Open API for more details on search expressions.
 
 `ryft-server` supports simple plain queries - without any keywords.
 The `query=Batman` will be automatically converted to `query=(RAW_TEXT CONTAINS "Batman")`.
-Note, this works for text search only and not appropriate for structured search.
+NOTE: This only works for text search; it is not appropriate for structured search.
 (Actually, the query will be `query=(RAW_TEXT CONTAINS 4261746d616e)`,
 `ryft-server` uses hex encoding to avoid any possible escaping problems).
 
@@ -74,8 +74,8 @@ It then calls Ryft hardware two times: the results of the first call are used as
 Multiple `AND` and `OR` operators are supported by the `ryft-server` within complex search queries.
 Expression tree is built and each node is passed to the Ryft hardware. Then results are properly combined.
 
-Note, if search query contains two or more expressions of the same type (text, date, time, numeric) that query
-will not be splitted into subqueries because the Ryft hardware supports those type of queries directly.
+NOTE: If search query contains two or more expressions of the same type (text, date, time, numeric) that query
+will not be split into subqueries because the Ryft hardware supports those type of queries directly.
 
 
 ### Search `files` parameter
@@ -100,15 +100,15 @@ Multiple files can be provided as:
 - `ts` for time search
 - `ns` for numeric search
 
-If no any search mode provided fuzzy hamming search is used **by default** for simple queries.
+If no search mode is specified, fuzzy hamming search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
-keyword then date search will be used, `TIME` keyword is used for time search,
+keyword then date search will be used. It's the same when `TIME` keyword is used for time search,
 and `NUMERIC` for numeric search.
 
-In case of complex search queries provided mode is used for text or structured search only.
+In case of complex search queries, the mode specified is used for text or structured search only.
 Date, time and numeric search modes will be detected automatically by corresponding keywords.
 
-Note, the fuzzy edit distance search mode removes duplicates by default (`-r` option of ryftprim).
+NOTE: The fuzzy edit distance search mode removes duplicates by default (`-r` option of ryftprim).
 
 
 ### Search `surrounding` parameter
@@ -161,29 +161,29 @@ case is ignored entirely and all possible capitalizations of the text will be fo
 
 ### Search `fields` parameter
 
-The coma-separated list of fields for structured search. If omitted all fields are used.
+The comma-separated list of fields for structured search. If omitted, all fields are used.
 
 This parameter is used to minimize structured search output or to get just subset of fields.
-For example to get identifier and date from a `*.pcrime` file pass `format=xml&fields=ID,Date`.
+For example, to get identifier and date from a `*.pcrime` file pass `format=xml&fields=ID,Date`.
 
 The same is true for JSON data: `format=json&fields=Name,AlterEgo`.
 
 
 ### Search `data` and `index` parameters
 
-By default all search results are deleted from the Ryft server once they are delivered to user.
+By default, all search results are deleted from the Ryft server once they are delivered to user.
 In order to preserve results thereby allowing for the ability to subsequently
-"search in the previous results", there are two query parameters available: `data=` and `index=`.
+"search in the previous results", two query parameters are available: `data=` and `index=`.
 
 Using the first parameter, `data=output.dat` creates the search results on the Ryft server under `/ryftone/output.dat`.
 It is possible to use that file as an input for the subsequent search call `files=output.dat`.
 
-Note, it is important to use consistent file extension for the structured search
+NOTE: It is important to use consistent file extension for the structured search
 in order to let Ryft use appropriate RDF scheme!
 
 Using the second parameter `index=index.txt` keeps the search index file under `/ryftone/index.txt`.
 
-Note, according to Ryft API documentation index file should always have `.txt` extension!
+NOTE: According to Ryft API documentation, an index file should always have `.txt` extension!
 
 **WARNING:** Provided data or index files will be overriden!
 
@@ -241,8 +241,8 @@ with "results" array and "stats" object is reported. That format is used by Web-
 ```
 
 But this format is not efficient for cluster nodes communication. We cannot decode JSON object
-until whole data will be received. So we use "stream" format here - a sequence of JSON "tag-object" pairs
-to be able to decode input data of the fly:
+until whole data is received. So we use "stream" format here - a sequence of JSON "tag-object" pairs
+to be able to decode input data on the fly:
 
 ```{.json}
 "rec"
@@ -394,7 +394,7 @@ The list of supported query parameters are the following:
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 
-Note, most of the `/count` parameters are absolutely the same as `/search` parameters.
+NOTE: Most of the `/count` parameters are absolutely the same as `/search` parameters.
 Please check corresponding `/search` related sections.
 
 
