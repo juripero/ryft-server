@@ -43,6 +43,7 @@ REST specific:
 --spark          Use SPARK format.
 
 -v|--verbose     Tells curl to be verbose.
+-vv|--pretty     Get pretty formatting with jq.
 
 Examples:
 
@@ -78,6 +79,7 @@ SPARK=
 
 # be silent by default
 VERBOSE=-s
+PRETTY=
 
 # parse options
 while [[ $# > 0 ]]; do
@@ -202,8 +204,14 @@ while [[ $# > 0 ]]; do
 		SPARK="true"
 		shift
 		;;
+	-vv|--pretty)
+		VERBOSE="-s" # tell curl to be silent
+		PRETTY="jq ."
+		shift
+		;;
 	-v|--verbose)
 		VERBOSE="-v"
+		PRETTY=""
 		shift
 		;;
 	-h|--help)
@@ -239,6 +247,13 @@ done
 [[ ! -z "$STREAM" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stream=$STREAM")
 [[ ! -z "$SPARK" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "spark=$SPARK")
 
+# check dependencies
+[[ -z `which curl`  ]] && fail "no curl found, run 'apt-get install curl' to install it"
+[[ ! -z "$PRETTY" ]] && [[ -z `which jq`  ]] && fail "no jq found, run 'apt-get install jq' to install it"
 
 # do the search and print error/results
-curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
+if [[ -z "$PRETTY" ]]; then
+	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
+else
+	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | $PRETTY
+fi
