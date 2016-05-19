@@ -30,7 +30,7 @@
             },
             "name": "files",
             "x-go-name": "Files",
-            "description": "Source files",
+            "description": "Set of files to search. Wildcards are supported, for example: *.txt",
             "collectionFormat": "multi",
             "required": true
           },
@@ -45,8 +45,8 @@
           {
             "in": "query",
             "type": "integer",
-            "format": "uint16",
-            "maximum": 65000,
+            "format": "uint32",
+            "maximum": 262144,
             "minimum": 0,
             "name": "surrounding",
             "x-go-name": "Surrounding",
@@ -168,7 +168,7 @@
             },
             "name": "files",
             "x-go-name": "Files",
-            "description": "Source files",
+            "description": "Set of files to search. Wildcards are supported, for example: *.txt",
             "collectionFormat": "multi",
             "required": true
           },
@@ -183,8 +183,8 @@
           {
             "in": "query",
             "type": "integer",
-            "format": "uint16",
-            "maximum": 65000,
+            "format": "uint32",
+            "maximum": 262144,
             "minimum": 0,
             "name": "surrounding",
             "x-go-name": "Surrounding",
@@ -277,7 +277,6 @@
             "name": "local",
             "type": "boolean",
             "description": "Return file structure from local node only or whole cluster",
-            "required": false,
             "in": "query"
           }
         ],
