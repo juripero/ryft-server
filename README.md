@@ -34,6 +34,8 @@ make debian
 
 See [build and run](./docs/buildandrun.md) document for more details.
 
+There is also some information about [search engine](./docs/search.md) implementation.
+
 
 # REST API
 

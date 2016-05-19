@@ -1,10 +1,11 @@
 This document contains information about REST API.
 
 `ryft-server` supports the following API endpoits:
-  - [/version](#version)
-  - [/search](#search)
-  - [/count](#count)
-  - [/files](#files)
+
+- [/version](#version)
+- [/search](#search)
+- [/count](#count)
+- [/files](#files)
 
 The main API endpoints are `/search` and `/count`.
 
