@@ -69,6 +69,23 @@ go build -ldflags "-X main.Version=1.2.3 -X main.GitHash=51fcf47f0de217b0dfba4c4
 ```
 
 
+## Build tags
+
+On some development hosts there is no `libryftone` installed by default. In this case we can build
+`ryft-server` without `ryftone` search engine support (only `ryftprim` will be available):
+
+```{.sh}
+make GO_TAGS=noryftone
+```
+
+Note, for now `GO_TAGS=noryftone` tag is defined automatically by the `Makefile`.
+To disable this behaviour just pass empty tag:
+
+```{.sh}
+make GO_TAGS=
+```
+
+
 # Running
 
 Running server is quite simple assuming `$GOPATH/src/github.com/getryft/ryft-server` is current directory:
@@ -155,7 +172,7 @@ backendOptions:
                               # server instance directory will be: $ryftone-mount/$instance-name
 ```
 
-More information about search engines can be found [here](../search/README.md)
+More information about search engines can be found [here](./search.md)
 
 
 ## Authentication and security
