@@ -51,6 +51,8 @@ func TestValidQueries(t *testing.T) {
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
+		`(RAW_TEXT CONTAINS "?")`,
+		`(RAW_TEXT CONTAINS "he"??"o")`,
 	}
 
 	for _, q := range queries {
