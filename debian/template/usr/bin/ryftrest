@@ -28,26 +28,33 @@ Search specific:
 REST specific:
 -a|--address     Specifies the ryft-server address.
                    "http://localhost:8765" by default.
---search         Use /search endpoint (used by default)
---count          Use /count endpoint instead of /search
+--search         Use /search endpoint (used by default) to print all found items.
+--count          Use /count endpoint instead of /search to print just statistics.
 --local          Specifies the local search. Opposite to --cluster.
 --cluster        Specifies the cluster search. Opposite to --local. Used by default.
 --format         Specifies format of the result records, can be:
                      - raw - base-64 encoded data, by default.
                      - xml - decode XML records
                      - json - decode JSON objects
---fields         Specifies coma-separated list of fields to return.
+--fields         Specifies comma-separated list of fields to return.
                  This parameter is useful with XML and JSON formats.
 --no-stats       Disable statistics output.
---stream         Use stream format (is used for node communication within cluster).
---spark          Use SPARK format.
+--stream         Use stream output format (is used for node communication within cluster).
+--spark          Use SPARK output format (deprecated).
 
 -v|--verbose     Tells curl to be verbose.
--vv|--pretty     Get pretty formatting with jq.
+-vv|--pretty     Get pretty (properly indented) formatting with jq.
 
 Examples:
 
-$0 -q=Joe -f=*.txt
+$0 -q 'Joe' -f '*.txt' -vv
+  will search and print all 'Joe' occurences in text files.
+
+$0 -q 'Joe' -f '*.txt' -vv --count
+  will just print the number of matches and some performance numbers.
+
+$0 -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --format=xml --fields=ID,Date -vv
+  will launch a structured search in pcrime files.
 EOF
 }
 
