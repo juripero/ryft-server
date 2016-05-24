@@ -72,6 +72,13 @@ By default cluster mode is used. To execute a search on a single node use `local
 curl "http://ryftone-777:8765/search?query=Joe&files=*.txt&local=true"
 ```
 
+To get human readably data (instead of base-64 encoded bytes) `format=utf8` can be used.
+This parameter asks `ryft-server` to interpret found bytes as UTF-8 string:
+
+```{.sh}
+curl "http://ryftone-777:8765/search?query=Joe&files=*.txt&format=utf8"
+```
+
 The `/version` endpoint is used to check server's version:
 
 ```{.sh}

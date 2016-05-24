@@ -146,6 +146,25 @@ The same is true for JSON data.
 
 See also [fields parameter](#search-fields-parameter).
 
+For the text search there is `format=utf8` option. It interprets raw bytes as
+UTF-8 string so it's easy to take a quick look at the results:
+
+```{.json}
+{
+  "data": ",310-555-3425",
+  "_index": {}
+}
+```
+
+instead of `format=raw` - base-64 encoded raw bytes:
+
+```{.json}
+{
+  "data": "LDMxMC01NTUtMzQyNQ==",
+  "_index": {}
+}
+```
+
 
 ### Search `cs` parameter
 
