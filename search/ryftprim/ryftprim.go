@@ -73,6 +73,11 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// enable verbose mode to grab statistics
 	args = append(args, "-v")
 
+	// enable legacy mode to get machine readable statistics
+	if engine.LegacyMode {
+		args = append(args, "-l")
+	}
+
 	// case sensitivity
 	if !cfg.CaseSensitive {
 		args = append(args, "-i")

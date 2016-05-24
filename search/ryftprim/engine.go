@@ -51,6 +51,7 @@ var (
 type Engine struct {
 	Instance   string // empty by default. might be some server instance name like ".server-1234"
 	ExecPath   string // "/usr/bin/ryftprim" by default
+	LegacyMode bool   // legacy mode to get machine readable statistics
 	MountPoint string // "/ryftone" by default
 
 	KeepResultFiles bool // false by default

@@ -102,6 +102,7 @@ via [search configuration file](./buildandrun.md#search-configuration)):
 
 - `instance-name` - the search engine instance name. This name is used to distinguish different instances.
 - `ryftprim-exec` - path to the `ryftprim` tool. By default it is `/usr/bin/ryftprim`.
+- `ryftprim-legacy` - use `ryftprim` legacy mode to get machine-readable statistics. By default it is `true`.
 - `ryftone-mount` - Ryft main volume. By default it is `/ryftone`.
 - `open-poll` - open file poll timeout. By default it is "50ms".
   The engine will try to open index or data file many times using this timeout.
