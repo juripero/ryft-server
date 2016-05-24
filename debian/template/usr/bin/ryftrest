@@ -41,8 +41,9 @@ REST specific:
 --fields         Specifies comma-separated list of fields to return.
                  This parameter is useful with XML and JSON formats.
 --no-stats       Disable statistics output.
---stream         Use stream output format (is used for node communication within cluster).
---spark          Use SPARK output format (deprecated).
+--stream         Use stream output format. Provides a sequence of JSON
+                 "tag-object" pairs to be able to decode input data on the fly
+                 (is used for node communication within cluster).
 
 -v|--verbose     Tells curl to be verbose.
 -vv|--pretty     Get pretty (properly indented) formatting with jq.
