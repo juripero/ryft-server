@@ -31,259 +31,205 @@
 package main
 
 import (
-	"github.com/getryft/ryft-server/crpoll"
-	"github.com/getryft/ryft-server/encoder"
-	"github.com/getryft/ryft-server/names"
-	"github.com/getryft/ryft-server/records"
-	"io"
-	"log"
+	"fmt"
 	"net/http"
-	"os"
+	"net/url"
 	"strings"
-	"time"
-	//	"github.com/getryft/ryft-server/rol"
-	"github.com/getryft/ryft-server/srverr"
-	"github.com/getryft/ryft-server/transcoder"
+
+	"github.com/getryft/ryft-server/codec"
+	"github.com/getryft/ryft-server/format"
+	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
 )
 
-func cleanup(file *os.File) {
-	if file != nil {
-		log.Printf(" Close file %v", file.Name())
-		file.Close()
-		if !*KeepResults {
-			os.Remove(file.Name())
-		}
-	}
-}
-
-const sepSign string = ","
-
-// SearchParams - parameters that we get from the query to setup search
+// SearchParams contains all the bound parameters
+// for the /search endpoint.
 type SearchParams struct {
-	Query         string   `form:"query" binding:"required"` // Search query, for example: ( RAW_TEXT CONTAINS "night" )
-	Files         []string `form:"files" binding:"required"` // Source files
-	Surrounding   uint16   `form:"surrounding"`              // Specifies the number of characters before the match and after the match that will be returned when the input specifier type is raw text
-	Fuzziness     uint8    `form:"fuzziness"`                // Is the fuzziness of the search. Measured as the maximum Hamming distance.
-	Format        string   `form:"format"`                   // Source format parser name
-	CaseSensitive bool     `form:"cs"`                       // Case sensitive flag
-	Fields        string   `form:"fields"`
-	Keys          []string
-	Nodes         uint8 `form:"nodes"` //Active Nodes Count
+	Query         string   `form:"query" json:"query" binding:"required"`
+	Files         []string `form:"files" json:"files" binding:"required"`
+	Mode          string   `form:"mode" json:"mode"`
+	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
+	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
+	Format        string   `form:"format" json:"format"`
+	CaseSensitive bool     `form:"cs" json:"cs"`
+	Fields        string   `form:"fields" json:"fields"`
+	Nodes         uint8    `form:"nodes" json:"nodes"`
+	Local         bool     `form:"local" json:"local"`
+	Stats         bool     `form:"stats" json:"stats"`
+	Stream        bool     `form:"stream" json:"stream"`
+	Spark         bool     `form:"spark" json:"spark"`
+	ErrorPrefix   bool     `form:"ep" json:"ep"`
+	KeepDataAs    string   `form:"data" json:"data"`
+	KeepIndexAs   string   `form:"index" json:"index"`
 }
 
-func NewSearchParams() (p SearchParams) {
-	p.Format = transcoder.RAWTRANSCODER
-
-	return
-}
-
-func search(c *gin.Context) {
-
-	defer srverr.DeferRecover(c)
+// Handle /search endpoint.
+func (s *Server) search(ctx *gin.Context) {
+	// recover from panics if any
+	defer RecoverFromPanic(ctx)
 
 	var err error
 
 	// parse request parameters
-	params := NewSearchParams()
-	if err = c.Bind(&params); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	params := SearchParams{Format: format.RAW}
+	if err := ctx.Bind(&params); err != nil {
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to parse request parameters"))
+	}
+	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
+		panic(NewServerError(http.StatusBadRequest,
+			"format=xml could not be used without RECORD query"))
+	}
+	if params.Format == format.JSON && !strings.Contains(params.Query, "RECORD") {
+		panic(NewServerError(http.StatusBadRequest,
+			"format=json could not be used without RECORD query"))
+	}
+	// setting up transcoder to convert raw data
+	var tcode format.Format
+	tcode_opts := map[string]interface{}{
+		"fields": params.Fields,
+	}
+	if tcode, err = format.New(params.Format, tcode_opts); err != nil {
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to get transcoder"))
 	}
 
-	accept := c.NegotiateFormat(encoder.GetSupportedMimeTypes()...)
+	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
 	// default to JSON
 	if accept == "" {
-		accept = encoder.MIMEJSON
+		accept = codec.MIME_JSON
 	}
+	ctx.Header("Content-Type", accept)
 
 	// setting up encoder to respond with requested format
-	var enc encoder.Encoder
-	if enc, err = encoder.GetByMimeType(accept); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
-	}
-	c.Header("Content-Type", accept)
-
-	// setting up transcoder to convert raw data
-	var tcode transcoder.Transcoder
-	if tcode, err = transcoder.GetByFormat(params.Format); err != nil {
-		panic(srverr.New(http.StatusBadRequest, err.Error()))
+	// we can use two formats:
+	// - with tags to report data records and the statistics in one stream
+	// - without tags to report just data records (this format is used by Spark)
+	enc, err := codec.NewEncoder(ctx.Writer, accept, params.Stream, params.Spark)
+	if err != nil {
+		panic(NewServerError(http.StatusBadRequest, err.Error()))
 	}
 
-	// get a new unique search index
-	n := names.New()
-	log.Printf("SEARCH(%d): %s", n.Index, c.Request.URL.String())
-
-	p := ryftprim(&params, &n)
-
-	// read an index file
-	var idx, res *os.File
-	if idx, err = crpoll.OpenFile(names.ResultsDirPath(n.IdxFile), p); err != nil {
-		if serr, ok := err.(*srverr.ServerError); ok {
-			panic(serr)
-		} else {
-			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-		}
+	// get search engine
+	engine, err := s.getSearchEngine(params.Local, params.Files)
+	if err != nil {
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to get search engine"))
 	}
-	defer cleanup(idx)
 
-	//read a results file
-	if res, err = crpoll.OpenFile(names.ResultsDirPath(n.ResultFile), p); err != nil {
-		if serr, ok := err.(*srverr.ServerError); ok {
-			panic(serr)
-		} else {
-			panic(srverr.New(http.StatusInternalServerError, err.Error()))
-		}
-	}
-	defer cleanup(res)
-
-	indexes, drop := records.Poll(idx, p)
-	recs := dataPoll(indexes, res)
-	items, _ := tcode.Transcode(recs)
-
-	_ = drop
-
-	if params.Format == "xml" && params.Fields != "" {
-		params.Keys = strings.Split(params.Fields, sepSign)
-		streamSmplRecords(c, enc, items, params.Keys)
+	// search configuration
+	cfg := search.NewEmptyConfig()
+	if q, err := url.QueryUnescape(params.Query); err != nil {
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to unescape query"))
 	} else {
-		streamAllRecords(c, enc, items)
+		cfg.Query = q
 	}
-}
+	cfg.AddFiles(params.Files) // TODO: unescape?
+	cfg.Mode = params.Mode
+	cfg.Surrounding = uint(params.Surrounding)
+	cfg.Fuzziness = uint(params.Fuzziness)
+	cfg.CaseSensitive = params.CaseSensitive
+	cfg.Nodes = uint(params.Nodes)
+	cfg.KeepDataAs = params.KeepDataAs
+	cfg.KeepIndexAs = params.KeepIndexAs
 
-func logErrors(format string, errors chan error) {
-	for err := range errors {
+	log.WithField("config", cfg).Infof("start /search")
+	res, err := engine.Search(cfg)
+	if err != nil {
+		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+			err.Error(), "failed to start search"))
+	}
+
+	// ctx.Stream() logic
+	writer := ctx.Writer
+	gone := writer.CloseNotify()
+	var last_error error
+	num_records := 0
+	num_errors := 0
+
+	// error prefix
+	var errorPrefix string
+	if params.ErrorPrefix {
+		errorPrefix = getHostName()
+	}
+
+	// put error to stream
+	putErr := func(err_ error) {
+		// to distinguish nodes in cluster mode
+		// mark all errors with a prefix
+		if len(errorPrefix) != 0 {
+			err_ = fmt.Errorf("[%s]: %s", errorPrefix, err_)
+		}
+		err := enc.EncodeError(err_)
 		if err != nil {
-			log.Printf(format, err.Error())
+			panic(err)
+		}
+		last_error = err_
+		num_errors += 1
+	}
+	// put record to stream
+	putRec := func(rec *search.Record) {
+		xrec := tcode.FromRecord(rec)
+		if xrec != nil {
+			err = enc.EncodeRecord(xrec)
+			if err != nil {
+				panic(err)
+			}
+			num_records += 1
+			writer.Flush()
 		}
 	}
-}
 
-func streamAllRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}) {
-	first := true
-	c.Stream(func(w io.Writer) bool {
-		if first {
-			enc.Begin(w)
-			first = false
-		}
+	// process results!
+	for {
+		select {
+		case <-gone:
+			res.Cancel() // cancel processing
+			return
 
-		if record, ok := <-recs; ok {
-			if err := enc.Write(w, record); err != nil {
-				log.Panicln(err)
-			} else {
-				c.Writer.Flush()
+		case rec, ok := <-res.RecordChan:
+			if ok && rec != nil {
+				putRec(rec)
 			}
-			return true
-		} else {
-			enc.End(w)
-			return false
-		}
-	})
-}
 
-func streamSmplRecords(c *gin.Context, enc encoder.Encoder, recs chan interface{}, sample []string) {
-	first := true
+		case err, ok := <-res.ErrorChan:
+			if ok && err != nil {
+				putErr(err)
+			}
 
-	c.Stream(func(w io.Writer) bool {
-		if first {
-			enc.Begin(w)
-			first = false
-		}
+		case <-res.DoneChan:
+			// drain the channels
+			for rec := range res.RecordChan {
+				putRec(rec)
+			}
+			for err := range res.ErrorChan {
+				putErr(err)
+			}
 
-		if record, ok := <-recs; ok {
-			rec := map[string]interface{}{}
+			// special case: if no records and no stats were received
+			// but just an error, we panic to return 500 status code
+			if num_records == 0 && res.Stat == nil &&
+				num_errors == 1 && last_error != nil {
+				panic(last_error)
+			}
 
-			for i := range sample {
-				value, ok := record.(map[string]interface{})[sample[i]]
-				if ok {
-					rec[sample[i]] = value
+			if params.Stats && res.Stat != nil {
+				xstat := tcode.FromStat(res.Stat)
+				err := enc.EncodeStat(xstat)
+				if err != nil {
+					panic(err)
 				}
 			}
-			if err := enc.Write(w, rec); err != nil {
-				log.Panicln(err)
-			} else {
-				c.Writer.Flush()
+
+			// close encoder
+			err := enc.Close()
+			if err != nil {
+				panic(err)
 			}
 
-			return true
-
-		} else {
-			enc.End(w)
-			return false
-		}
-	})
-}
-
-const (
-	PollingInterval    = time.Millisecond * 50
-	PollBufferCapacity = 64
-)
-
-func dataPoll(input chan records.IdxRecord, dataFile *os.File) chan records.IdxRecord {
-	output := make(chan records.IdxRecord, PollBufferCapacity)
-	go func() {
-		for rec := range input {
-			rec.Data = nextData(dataFile, rec.Length)
-			output <- rec
-		}
-		close(output)
-	}()
-	return output
-}
-
-func nextData(res *os.File, length uint16) (result []byte) {
-	var total uint16 = 0
-	for total < length {
-		data := make([]byte, length-total)
-		n, _ := res.Read(data)
-		if n != 0 {
-			result = append(result, data...)
-			total = total + uint16(n)
-		} else {
-			time.Sleep(PollingInterval)
+			log.WithField("result", res).Infof("/search done")
+			return // stop
 		}
 	}
-	return
 }
-
-//func progress(s *SearchParams, n names.Names) (ch chan error) {
-//	ch = make(chan error, 1)
-//	// num := runtime.NumGoroutine()
-//	log.Printf("Routine number = %v", s)
-//	go func() {
-//		pid := os.Getpid()
-//		log.Printf("Process pid = %v", pid)
-//		var ds *rol.RolDS
-//		if s.Nodes == 0 {
-//			ds = rol.RolDSCreate()
-//		} else {
-//			ds = rol.RolDSCreateNodes(s.Nodes)
-//		}
-//		defer ds.Delete()
-
-//		for _, f := range s.Files {
-//			ok := ds.AddFile(f)
-//			if !ok {
-//				ch <- srverr.New(http.StatusNotFound, "Could not add file "+f)
-//				return
-//			}
-//		}
-
-//		idxFile := names.PathInRyftoneForResultDir(n.IdxFile)
-
-//		resultsDs := ds.SearchFuzzyHamming(names.PathInRyftoneForResultDir(n.ResultFile), s.Query, s.Surrounding, s.Fuzziness, "", &idxFile, s.CaseSensitive)
-//		log.Printf("PROGRESS(%d): COMPLETE.", n.Index)
-
-//		defer resultsDs.Delete()
-
-//		if err := resultsDs.HasErrorOccured(); err != nil {
-//			if !err.IsStrangeError() {
-//				ch <- srverr.New(http.StatusInternalServerError, err.Error())
-//				return
-//			}
-//		}
-
-//		ch <- nil
-
-//	}()
-//	return
-//}
