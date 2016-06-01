@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#
+# RyftOne command line maintenance tool
+#
+
 tailLines="-40"
 
 #
@@ -7,7 +11,6 @@ tailLines="-40"
 #
 status=0				# error counter, used as exit status 
 hostname=`hostname`
-expectedProcessCount=4			# tlogd, rhfsd, ccc_mgr, ryft-server
 redAttributeON="\\033[1;31m"
 greenAttributeON="\\033[1;32m"
 attributesOFF="\\033[0m"
@@ -19,7 +22,7 @@ debug=0
 
 function usage() {
 	echo 
-	echo "usage:	ryft_status [-help|-?|-v|-verbose|-smoke|-start|-stop|-m|-menu]"
+	echo "usage:	ryft_status [-help|-?|-v|-verbose|-smoke|-start|-stop|-m|-menu|-fix]"
 	echo
 	echo "ryft_status -help"
 	echo "          this usage display"
@@ -33,10 +36,30 @@ function usage() {
 	echo "		checks status and stop processes" 
 	echo "ryft_status -m"
 	echo "          -menu option"
+	echo "ryft_status -fix"
+	echo "          -fix problem when recommended by ryft_status"
 	echo
 	echo "Returns # of problems found as exit code"
 	echo
 
+}
+
+
+ryft_boot_enabled() {
+	local returnValue=0
+	local i=$1
+
+	initctl show-config $i >>/dev/null 2>&1 
+	if [ $? = 0 ]
+	then
+		x=`initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
+		#echo "x=$x"
+		if [ $x = "boot_on" ]
+		then
+			returnValue=1
+		fi
+	fi
+	echo $returnValue
 }
 
 function ryft_boot_status() {
@@ -132,6 +155,15 @@ function ryft_menu()
 	return
   fi
 
+  # sanity check for max size
+  local ryft_menu_max_entries=33
+  if [ ${#MENU_TEXT[@]} -gt $ryft_menu_max_entries ]
+  then
+	echo "menu \"$MENU_TITLE\" has too many entries. Max $ryft_menu_max_entries"
+	echo
+	return
+  fi
+
   while [ true ]
   do  	
     if [ MENU_COMMAND != "" ]
@@ -143,10 +175,15 @@ function ryft_menu()
   
     # Display items
     local -i I=0
+    #                        1         2         3
+    #               123456789012345678901234567890123
+    local alphabet="0123456789ABCDEFGHIJKLMNOPQRSTUVW"
     echo "########> " $hostname $MENU_TITLE " <########"
     while [ $I -lt ${#MENU_ACTIONS[@]} ]
     do
-        echo "$I) ${MENU_TEXT[$I]}"
+	select=${alphabet:$I:1}
+        echo "$select) ${MENU_TEXT[$I]}"
+        #echo "$I) ${MENU_TEXT[$I]}"
         (( I += 1 ))
     done
 
@@ -174,12 +211,32 @@ function ryft_menu()
 	echo
         return
     fi 
-    
+
+    # A..W map to 10+
+    if [ $ORD_VALUE -gt 48 -a $ORD_VALUE -lt 72 ] 
+    then
+	# like hexadecimal
+	# A 49 -> 10
+	# B 50 -> 11
+	# C 51 -> 12
+	(( ORD_VALUE -= 39 ))
+    fi
+
+    # a..w map to 10+
+    if [ $ORD_VALUE -gt 16 -a $ORD_VALUE -lt 40 ] 
+    then
+	# like hexadecimal
+	# a 17 -> 10
+	# b 18 -> 11
+	# b 19 -> 11
+	(( ORD_VALUE -= 7 ))
+    fi
+	
     # Check if the index is valid
     if [ $ORD_VALUE -ge 0 -a $ORD_VALUE -lt ${#MENU_ACTIONS[@]} ]
     then
 	# valid selection returns or evaluates action
-	echo "selected ${ORD_VALUE} ${MENU_TEXT[${ORD_VALUE}]}"
+	echo "selected ${SELECTION} ${MENU_TEXT[${ORD_VALUE}]}"
 	echo
   	
 	# 0 ?
@@ -191,7 +248,7 @@ function ryft_menu()
 	fi
     else
         # invalid selection
-        echo "-> ${ORD_VALUE} is an INVALID SELECTION"
+        echo "-> ${SELECTION} is an INVALID SELECTION"
 	echo
     fi
   done
@@ -206,14 +263,15 @@ function ryft_start
     for service in `echo $serviceList`
     do
 	# start process if not already running
+	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
 	service $service status|grep process
 	if [ $? != 0 -o $service = "ryft1_odbcd" ]
 	then
 	    if [ $service = "ryft1_odbcd" ]
 	    then
-    		sudo /usr/local/ryft/bin/x8664/ryft1_odbcctl -s
+    		ryft_showCommand "sudo /usr/local/ryft/bin/x8664/ryft1_odbcctl -s"
 	    else
-    		sudo service $service start
+    		ryft_showCommand "sudo service $service start"
 	    fi
 	fi
 	echo
@@ -234,7 +292,7 @@ function ryft_start_menu
     
     local -a START_MENU_ACTIONS
     START_MENU_ACTIONS[0]="exit"
-    START_MENU_ACTIONS[1]="ryft_start \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\""
+    START_MENU_ACTIONS[1]="ryft_separator; ryft_start \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\"; ryft_separator"
     START_MENU_ACTIONS[2]="ryft_start ryft-server-d"
     START_MENU_ACTIONS[3]="ryft_start ryftwebapidemo"
     START_MENU_ACTIONS[4]="ryft_start ryft1_odbcd"
@@ -254,14 +312,15 @@ function ryft_stop
     for service in `echo $serviceList`
     do
 	# stop process if running 
+	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
 	service $service status|grep process
 	if [ $? = 0 -o $service = "ryft1_odbcd" ]
 	then
 	    if [ $service = "ryft1_odbcd" ]
 	    then
-    		sudo /usr/local/ryft/bin/x8664/ryft1_odbcctl -k
+    		ryft_showCommand "sudo /usr/local/ryft/bin/x8664/ryft1_odbcctl -k"
 	    else
-    		sudo service $service stop
+    		ryft_showCommand "sudo service $service stop"
 	    fi
 	fi
 	echo
@@ -282,7 +341,7 @@ function ryft_stop_menu
     
     local -a STOP_MENU_ACTIONS
     STOP_MENU_ACTIONS[0]="exit"
-    STOP_MENU_ACTIONS[1]="ryft_stop \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\"";
+    STOP_MENU_ACTIONS[1]="ryft_separator; ryft_stop \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\"; ryft_separator";
     STOP_MENU_ACTIONS[2]="ryft_stop ryft-server-d"
     STOP_MENU_ACTIONS[3]="ryft_stop ryftwebapidemo"
     STOP_MENU_ACTIONS[4]="ryft_stop ryft1_odbcd"
@@ -303,9 +362,9 @@ function ryft_restart
     do
 	if [ $service = "ryft1_odbcd" ]
 	then
-    		sudo /usr/local/ryft/bin/x8664/ryft1_odbcctl -s
+    		ryft_showCommand "sudo /usr/local/ryft/bin/x8664/ryft1_odbcctl -s"
 	else
-    		sudo service $service restart
+    		ryft_showCommand "sudo service $service restart"
 	fi
     done
 }
@@ -346,13 +405,15 @@ function ryft_boot_off
 	# disable start at boot
     	echo "boot_off $service"
 	f=/etc/init/${service}.override
+	echo -e "${greenAttributeON}echo \"manual\" | sudo tee ${f}${attributesOFF}"
 	echo "manual"|sudo tee ${f}
 
 	# restart process if running	
+	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
 	service $service status|grep process
 	if [ $? = 0 ]
 	then
-    		sudo service $service restart
+    		ryft_showCommand "sudo service $service restart"
 	fi
 	echo
     done
@@ -368,13 +429,14 @@ function ryft_boot_on
 	# enable start at boot
     	echo "boot_on $service"
 	f=/etc/init/${service}.override
-        sudo rm -f ${f}
+        ryft_showCommand "sudo rm -f ${f}"
 
 	# restart process if running
+	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
 	service $service status|grep process
 	if [ $? = 0 ]
 	then
-    		sudo service $service restart
+    		ryft_showCommand "sudo service $service restart"
 	fi
 	echo
     done
@@ -412,7 +474,7 @@ function ryft_boot_toggle_menu
     
     local -a BOOT_TOGGLE_MENU_ACTIONS
     BOOT_TOGGLE_MENU_ACTIONS[0]="exit"
-    BOOT_TOGGLE_MENU_ACTIONS[1]="ryft_boot_toggle \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\""
+    BOOT_TOGGLE_MENU_ACTIONS[1]="ryft_separator; ryft_boot_toggle \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\"; ryft_separator;"
     BOOT_TOGGLE_MENU_ACTIONS[2]="ryft_boot_toggle ryft-server-d"
     BOOT_TOGGLE_MENU_ACTIONS[3]="ryft_boot_toggle ryftwebapidemo"
     BOOT_TOGGLE_MENU_ACTIONS[4]="ryft_boot_toggle ryft1_odbcd"
@@ -437,7 +499,7 @@ function ryft_boot_on_menu
     
     local -a BOOT_ON_MENU_ACTIONS
     BOOT_ON_MENU_ACTIONS[0]="exit"
-    BOOT_ON_MENU_ACTIONS[1]="ryft_boot_on \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\""
+    BOOT_ON_MENU_ACTIONS[1]="ryft_separator; ryft_boot_on \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\"; ryft_separator;"
     BOOT_ON_MENU_ACTIONS[2]="ryft_boot_on ryft-server-d"
     BOOT_ON_MENU_ACTIONS[3]="ryft_boot_on ryftwebapidemo"
     BOOT_ON_MENU_ACTIONS[4]="ryft_boot_on ryft1_odbcd"
@@ -462,7 +524,7 @@ function ryft_boot_off_menu
 
     local -a BOOT_OFF_MENU_ACTIONS
     BOOT_OFF_MENU_ACTIONS[0]="exit"
-    BOOT_OFF_MENU_ACTIONS[1]="ryft_boot_off \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\""
+    BOOT_OFF_MENU_ACTIONS[1]="ryft_separator; ryft_boot_off \"ryft-server-d ryftwebapidemo ryft1_odbcd consul\"; ryft_separator"
     BOOT_OFF_MENU_ACTIONS[2]="ryft_boot_off ryft-server-d"
     BOOT_OFF_MENU_ACTIONS[3]="ryft_boot_off ryftwebapidemo"
     BOOT_OFF_MENU_ACTIONS[4]="ryft_boot_off ryft1_odbc"
@@ -630,11 +692,11 @@ function ryft_maintenance_menu
 
     local -a MAINTENANCE_MENU_TEXT
     MAINTENANCE_MENU_TEXT[0]="Exit"
-    MAINTENANCE_MENU_TEXT[1]="RyftONE maintenance"
-    MAINTENANCE_MENU_TEXT[2]="ryft-server-d maintenance"
-    MAINTENANCE_MENU_TEXT[3]="ryftwebapidemo maintenance"
-    MAINTENANCE_MENU_TEXT[4]="ryft1_odbcd maintenance"
-    MAINTENANCE_MENU_TEXT[5]="consul maintenance"
+    MAINTENANCE_MENU_TEXT[1]="RyftONE Maintenance"
+    MAINTENANCE_MENU_TEXT[2]="ryft-server-d Maintenance"
+    MAINTENANCE_MENU_TEXT[3]="ryftwebapidemo Maintenance"
+    MAINTENANCE_MENU_TEXT[4]="ryft1_odbcd Maintenance"
+    MAINTENANCE_MENU_TEXT[5]="consul Maintenance"
     
     local -a MAINTENANCE_MENU_ACTIONS
     MAINTENANCE_MENU_ACTIONS[0]="exit"
@@ -650,6 +712,23 @@ function ryft_maintenance_menu
 }
 
 ####################################
+function ryft_showCommand() {
+	echo -e "${greenAttributeON}$1${attributesOFF}"
+	$1
+}
+
+function ryftone_clean_logs()
+{
+	ryft_showCommand "sudo service rhfsd stop" 
+	ryft_showCommand "sudo service ccc_mgr stop" 
+	ryft_showCommand "sudo service tlogd stop" 
+	ryft_showCommand "sudo rm -f /var/log/ryft/ryftone.log"
+	ryft_showCommand "sudo service tlogd start" 
+	ryft_showCommand "sudo service rhfsd start"
+	ryft_showCommand "sleep 2s" 
+	ryft_showCommand "sudo service ccc_mgr start" 
+}
+
 function ryft_separator() 
 {
     echo "-----------------------------------------------"
@@ -667,12 +746,13 @@ function ryft_logs_menu
 
     local -a LOGS_MENU_TEXT
     LOGS_MENU_TEXT[0]="Exit"
-    LOGS_MENU_TEXT[1]="RyftOne log           (tail ${tailLines} $ryftoneLog)"
-    LOGS_MENU_TEXT[2]="ryft-server-d log     (tail ${tailLines} $ryft_server_dLog)"
-    LOGS_MENU_TEXT[3]="ryftwebapidemo log    (tail ${tailLines} $ryftwebapidemoLog)"
-    LOGS_MENU_TEXT[4]="ryft1_odbcd log       (tail ${tailLines} $ryft1_odbcdLog)"
-    LOGS_MENU_TEXT[5]="consul log            (tail ${tailLines} $consulLog)"
-    LOGS_MENU_TEXT[6]="Ryft diagnostic dump  (sudo ryft_diagnostics_dump)"
+    LOGS_MENU_TEXT[1]="RyftOne log              (tail ${tailLines} $ryftoneLog)"
+    LOGS_MENU_TEXT[2]="ryft-server-d log        (tail ${tailLines} $ryft_server_dLog)"
+    LOGS_MENU_TEXT[3]="ryftwebapidemo log       (tail ${tailLines} $ryftwebapidemoLog)"
+    LOGS_MENU_TEXT[4]="ryft1_odbcd log          (tail ${tailLines} $ryft1_odbcdLog)"
+    LOGS_MENU_TEXT[5]="consul log               (tail ${tailLines} $consulLog)"
+    LOGS_MENU_TEXT[6]="RyftOne diagnostic dump  (sudo ryft_diagnostics_dump)"
+    LOGS_MENU_TEXT[7]="RyftOne clean log        (from Admin Guide - TroubleShooting Section)"
     
     local -a LOGS_MENU_ACTIONS
     LOGS_MENU_ACTIONS[0]="exit"
@@ -681,7 +761,8 @@ function ryft_logs_menu
     LOGS_MENU_ACTIONS[3]="ryft_separator; tail ${tailLines} $ryftwebapidemoLog; ryft_separator"
     LOGS_MENU_ACTIONS[4]="ryft_separator; tail ${tailLines} $ryft1_odbcdLog; ryft_separator"
     LOGS_MENU_ACTIONS[5]="ryft_separator; tail ${tailLines} $consulLog; ryft_separator"
-    LOGS_MENU_ACTIONS[6]="ryft_separator; sudo ryft_diagnostics_dump && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
+    LOGS_MENU_ACTIONS[6]="ryft_separator; ryft_showCommand \"sudo ryft_diagnostics_dump\" && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
+    LOGS_MENU_ACTIONS[7]="ryft_ays \"Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.\" && ryft_separator && ryftone_clean_logs && ryft_separator"
 
     local LOGS_MENU_COMMAND="ryft_boot_status; ryft_status;"
 
@@ -695,14 +776,14 @@ function ryft_main_menu
 
     local -a MAIN_MENU_TEXT
     MAIN_MENU_TEXT[0]="Exit"
-    MAIN_MENU_TEXT[1]="Start menu"
-    MAIN_MENU_TEXT[2]="Stop menu"
-    MAIN_MENU_TEXT[3]="Restart menu"
-    MAIN_MENU_TEXT[4]="Boot on menu"
-    MAIN_MENU_TEXT[5]="Boot off menu"
-    #MAIN_MENU_TEXT[6]="boot toggle menu"
-    MAIN_MENU_TEXT[6]="Maintenance menu"
-    MAIN_MENU_TEXT[7]="Ryft logs menu"
+    MAIN_MENU_TEXT[1]="Start Menu"
+    MAIN_MENU_TEXT[2]="Stop Menu"
+    MAIN_MENU_TEXT[3]="Restart Menu"
+    MAIN_MENU_TEXT[4]="Boot on Menu"
+    MAIN_MENU_TEXT[5]="Boot off Menu"
+    #MAIN_MENU_TEXT[6]="boot toggle Menu"
+    MAIN_MENU_TEXT[6]="Maintenance Menu"
+    MAIN_MENU_TEXT[7]="Ryft logs Menu"
     
     local -a MAIN_MENU_ACTIONS
     MAIN_MENU_ACTIONS[0]="exit"
@@ -733,6 +814,7 @@ helpFlag=0
 startFlag=0
 stopFlag=0
 menuFlag=0
+fixFlag=0
 while [[ $# > 0 ]]; do
 	okay=0
 
@@ -776,7 +858,12 @@ while [[ $# > 0 ]]; do
 		ryft_main_menu
 		exit
 	fi
-
+	
+	if [ "$1" == "-fix" ]
+	then
+		fixFlag=1
+		okay=1
+	fi
 
 	if [ $okay = 0 ]
 	then
@@ -794,6 +881,7 @@ done
 ryft_ps_filename=/tmp/ryft_ps_$$
 ryft_status_filename=/tmp/ryft_status_$$
 ryft_status_verbose=/tmp/ryft_status_verbose_$$
+ryft_ryftone_files=/tmp/ryft_ryftone_files_$$
 detect_process() {
 	returnValue=`cat $ryft_ps_filename|egrep "$1"|wc -l`
 	echo $returnValue
@@ -806,11 +894,72 @@ cleanup() {
 	rm -f $ryft_ps_filename
 	rm -f $ryft_status_filename
 	rm -f $ryft_status_verbose
+	rm -f $ryft_ryftone_files
 }
 
 #
 # ryft status items
 #
+
+
+#
+# filesystem won't mount
+#
+filesystem_filecount=1
+filesystem_filecount_reset() {
+	filesystem_filecount=1
+}
+filesystem_filecount_fix() {
+	local stat=0
+
+	if [ -e /ryftone ]
+	then
+		local suffix=`date "+%Y%m%d-%H%M%S"`
+		echo "#move /ryftone"
+
+		echo "sudo mv /ryftone /ryftone.$suffix"
+		sudo mv /ryftone /ryftone.$suffix
+		stat=$?
+	fi
+
+	if [ $stat = 0 ]
+	then
+		echo "#create new /ryftone"
+
+		echo "sudo mkdir /ryftone" &&
+		sudo mkdir /ryftone &&
+		echo "sudo chmod 775 /ryftone" &&
+		sudo chmod 775 /ryftone &&
+		echo "sudo chown ryftone.ryftone /ryftone"
+		sudo chown ryftone.ryftone /ryftone
+		stat=$?
+
+		if [ $stat = 0 ]
+		then
+			sudo service rhfsd start &&
+			sudo service ccc_mgr start 
+			#stat=$?
+		fi
+	fi
+
+	if [ $stat != 0 ]
+	then
+		echo "Encountered an error creating /ryftone "
+	fi
+}
+show_filesystem_filecount_error() {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* /ryftone filesystem not found or will not mount with files present. ${attributesOFF}Issue following command to fix problem (existing files will be moved to /ryftone.<YYYYmmdd-HHMMSS>):"
+	echo "	'ryft_status -fix"
+	if [ $filesystem_filecount != 0 ]
+	then
+		echo "The following /ryftone files were found: "
+		cat $ryft_ryftone_files|sed 's/^/	/g'
+	else
+		echo "No /ryftone files were found."
+	fi
+}
+
 
 #
 filesystem_status=0
@@ -822,7 +971,7 @@ show_filesystem_error () {
 	echo "Follow corrective actions in following order:"
 	echo "1. command: '(cd ~ryftuser/ryft/regression/util;./cpc;./recycle)'"
 	echo "   Repeat command if 'ryft_status' doesn't indicate OKAY"
-        echo "   If ryft_status is not OKAY, issue "sudo fsck_rhfs -y -Y"
+        echo "   If ryft_status is not OKAY, issue 'sudo fsck_rhfs -y -Y'"
  	echo "   If ryft_status is not OKAY, advance to step #2."
 	echo "   If OKAY, 'ryft_status -smoke' should show no problems."
 	echo "   if 'ryft_status -smoke' problems persist, advance to next step."
@@ -844,6 +993,7 @@ show_filesystem_error () {
 	#echo "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
 
 }
+
 
 #
 tlogd_status=0
@@ -876,6 +1026,13 @@ show_ccc_mgr_error () {
 	echo "	'~ryftuser/ryft/regression/util/recycle'"
 }
 
+ryftServer=NotInstalled
+test -e /usr/bin/ryft-server
+if [ $? == 0 ] 
+then
+	ryftServer=Installed
+fi
+ryftServer_boot=`ryft_boot_enabled ryft-server-d`
 ryftServer_status=0
 ryftServer_error=0
 ryftServer_startCommand="sudo service ryft-server-d start"
@@ -910,11 +1067,11 @@ test -d /usr/local/ryft/bin
 if [ $? == 0 ] 
 then
 	ryft1_odbcd=Installed
-	expectedProcessCount=$((expectedProcessCount+1))
 fi
+ryft1_odbcd_boot=`ryft_boot_enabled ryft1_odbcd`
 if [ $debug != 0 ]
 then
-	echo "ryft1_odbcd=$ryft1_odbcd, expectedProcessCount=$expectedProcessCount"
+	echo "ryft1_odbcd=$ryft1_odbcd"
 fi
 ryft1_odbcd_status=0
 ryft1_odbcd_error=0
@@ -945,12 +1102,12 @@ test -d /opt/consul/bin
 if [ $? == 0 ] 
 then
 	consul=Installed
-	expectedProcessCount=$((expectedProcessCount+1))
 fi
 if [ $debug != 0 ]
 then
-	echo "consul=$consul, expectedProcessCount=$expectedProcessCount"
+	echo "consul=$consul"
 fi
+consul_boot=`ryft_boot_enabled consul`
 consul_status=0
 consul_error=0
 consul_startCommand="sudo service consul start"
@@ -976,12 +1133,12 @@ test -d ~ryftuser/ryft/apidemo || test -d /opt/ryft-demo
 if [ $? == 0 ] 
 then
 	apidemo=Installed
-	expectedProcessCount=$((expectedProcessCount+1))
 fi
 if [ $debug != 0 ]
 then
-	echo "apidemo=$apidemo, expectedProcessCount=$expectedProcessCount"
+	echo "apidemo=$apidemo"
 fi
+apidemo_boot=`ryft_boot_enabled ryftwebapidemo`
 apidemo_status=0
 apidemo_error=0
 apidemo_startCommand="sudo service ryftwebapidemo start"
@@ -1006,8 +1163,10 @@ show_apidemo_error () {
 showErrorDisplay() {
 	echo 
 	echo "show error display ---------------------------"
-	show_ryftServer_error 
-
+	if [ $ryft1Server == "Installed" ]
+	then
+		show_ryftServer_error 
+	fi
 	if [ $ryft1_odbcd == "Installed" ]
 	then
 		show_ryft1_odbcd_error 
@@ -1083,6 +1242,8 @@ then
 fi
 
 ryft_status() {
+	expectedProcessCount=3		# rhfsd, ccc_mgr, tlogd
+
 	#
 	# start status colleciton
 	#
@@ -1092,6 +1253,8 @@ ryft_status() {
 	# reset status and error conditions
 	#
 	status=0
+
+	filesystem_filecount_reset
 
 	filesystem_status=0
 	filesystem_error=0
@@ -1106,15 +1269,35 @@ ryft_status() {
 
 	ryftServer_status=0
 	ryftServer_error=0
+	ryftServer_boot=`ryft_boot_enabled ryft-server-d`
+	if [ $ryftServer_boot = 1 ]
+	then
+		expectedProcessCount=$((expectedProcessCount+1))
+	fi
 
 	ryft1_odbcd_status=0
 	ryft1_odbcd_error=0
+	ryft1_odbcd_boot=`ryft_boot_enabled ryft1_odbcd`
+	if [ $ryft1_odbcd_boot = 1 ]
+	then
+		expectedProcessCount=$((expectedProcessCount+1))
+	fi
 
 	consul_status=0
 	consul_error=0
+	consul_boot=`ryft_boot_enabled consul`
+	if [ $consul_boot = 1 ]
+	then
+		expectedProcessCount=$((expectedProcessCount+1))
+	fi
 
 	apidemo_status=0
 	apidemo_error=0
+	apidemo_boot=`ryft_boot_enabled ryftwebapidemo`
+	if [ $apidemo_boot = 1 ]
+	then
+		expectedProcessCount=$((expectedProcessCount+1))
+	fi
 
 	ryft_statusCount=$((ryft_statusCount+1))
 	if [ $ryft_statusCount != 1 ]
@@ -1137,6 +1320,13 @@ ryft_status() {
 	then
 		filesystem_error=1
 		status=$((status+1))
+
+		filesystem_filecount=`find /ryftone 2>/dev/null|wc -l`
+		if [ $filesystem_filecount != 1 ]
+		then
+			#status=$((status+1))
+			find /ryftone/ >$ryft_ryftone_files 2>/dev/null
+		fi
 	fi
 	
 	#
@@ -1160,7 +1350,7 @@ ryft_status() {
 	ccc_mgr_status=`detect_process "ccc_mgr"`
 	# echo "ccc_mgr_status=$ccc_mgr_status"
 	ryftServer_status=`detect_process "ryft-server"`
-	# echo "ryftServer_status=$ryftServer_status"
+	#echo "ryftServer_status=$ryftServer_status"
 	ryft1_odbcd_status=`detect_process "ryft1_odbcd"`
 	# echo "ryft1_odbcd_status=$ryft1_odbcd_status"
 	consul_status=`detect_process "/opt/consul/bin/consul"`
@@ -1176,29 +1366,40 @@ ryft_status() {
 	if [ $rhfsd_status = 0 ]
 	then
 		rhfsd_error=1
-		status=$((status+1))
+		if [ $filesystem_filecount = 1 ]
+		then
+			status=$((status+1))
+		fi
 	fi
 	if [ $ccc_mgr_status = 0 ]
 	then
 		ccc_mgr_error=1
 		status=$((status+1))
 	fi
-	if [ $ryftServer_status = 0 ]
+
+	#echo "ryftServer=$ryftServer, ryftServer_boot=$ryftServer_boot, ryftServer_status=$ryftServer_status"
+	if [ $ryftServer = "Installed"  -a $ryftServer_boot != 0  -a $ryftServer_status = 0 ]
 	then
 		ryftServer_error=1
 		status=$((status+1))
 	fi
-	if [ $ryft1_odbcd = "Installed" -a $ryft1_odbcd_status = 0 ]
+
+	#echo "ryft1_odbcd=$ryft1_odbcd, ryft1_odbcd_boot=$ryft1_odbcd_boot, ryft1_odbcd_status=$ryft1_odbcd_status"
+	if [ $ryft1_odbcd = "Installed" -a $ryft1_odbcd_boot != 0 -a $ryft1_odbcd_status = 0 ]
 	then
 		ryft1_odbcd_error=1
 		status=$((status+1))
 	fi
-	if [ $consul = "Installed" -a $consul_status = 0 ]
+
+	#echo "consul=$consul, consul_boot=$consul_boot, consul_status=$consul_status"
+	if [ $consul = "Installed"      -a $consul_boot != 0      -a $consul_status = 0 ]
 	then
 		consul_error=1
 		status=$((status+1))
 	fi
-	if [ $apidemo = "Installed" -a $apidemo_status = 0 ]
+
+	#echo "apidemo=$apidemo, apidemo_boot=$apidemo_boot, apidemo_status=$apidemo_status"
+	if [ $apidemo = "Installed"      -a $apidemo_boot != 0    -a $apidemo_status = 0 ]
 	then
 		apidemo_error=1
 		status=$((status+1))
@@ -1254,21 +1455,26 @@ ryft_status() {
 		#
 		# error handling
 		#
-		if [ $filesystem_error != 0 ]
+		if [ $filesystem_filecount != 1 ]
 		then
-			show_filesystem_error
-		fi
-		if [ $tlogd_error != 0 ]
-		then
-			show_tlogd_error
-		fi
-		if [ $rhfsd_error != 0 ]
-		then
-			show_rhfsd_error
+			show_filesystem_filecount_error
+		else
+			if [ $filesystem_error != 0 ]
+			then
+				show_filesystem_error
+			fi
+			if [ $rhfsd_error != 0 ]
+			then
+				show_rhfsd_error
+			fi
 		fi
 		if [ $ccc_mgr_error != 0 ]
 		then
 			show_ccc_mgr_error
+		fi
+		if [ $tlogd_error != 0 ]
+		then
+			show_tlogd_error
 		fi
 	
 		if [ $ryftServer_error != 0 ]
@@ -1342,6 +1548,51 @@ then
 	then
 		sleep $sleepValue 
 		finalStatus=0
+		ryft_status
+	fi
+fi
+
+#
+# fixFlag detection
+#
+if [ $fixFlag = 1 ]
+then
+	#
+	# fix case where /ryftone will not mount due to files present 
+	#
+	if [ $filesystem_filecount != 1 -a $filesystem_error != 0 -a $rhfsd_error != 0 ] 
+	then
+		filesystem_filecount_fix
+
+		sleep $sleepValue 
+		finalStatus=0
+
+		ryft_status
+	fi
+
+	#
+	# fix by starting missing processes
+	#
+	count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $apidemo_error" | bc` 
+	if [ $count != 0 -a $filesystem_error = 0 -a $rhfsd_error = 0 -a $ccc_mgr_error = 0 ] 
+	then
+		if [ $ryftServer_error != 0 ]
+		then
+			ryftServer_start
+		fi
+		if [ $ryft1_odbcd_error != 0 ]
+		then
+			ryft1_odbcd_start
+		fi
+		if [ $consul_error != 0 ]
+		then
+			consul_start
+		fi
+		if [ $apidemo_error != 0 ]
+		then
+			apidemo_start
+		fi
+
 		ryft_status
 	fi
 fi
