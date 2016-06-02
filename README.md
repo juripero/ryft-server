@@ -110,3 +110,6 @@ ryftrest -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --local --format=xml -
 ```
 
 This command will print extracted list of date strings.
+
+For more detailed examples see:
+[ryftrest sample 1](./docs/demo-2015-04-28.md) and [ryftrest sample 2](./docs/demo-2015-05-12.md)
