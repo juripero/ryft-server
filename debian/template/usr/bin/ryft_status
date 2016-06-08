@@ -66,8 +66,7 @@ function ryft_boot_status() {
 	echo
 	printf "%-15s" "SERVICE" "BOOT_STATUS" "RUNNING_STATUS" 
 	echo
-	#for i in rhfsd ccc_mgr tlogd ryft-server-d ryftwebapidemo consul ryft1_odbcd;
-	for i in ryft-server-d ryftwebapidemo consul ryft1_odbcd;
+	for i in ryft-server-d ryftwebapidemo consul
 	do
 		printf "%-15s" $i
 		initctl show-config $i >>/dev/null 2>&1 
@@ -99,6 +98,20 @@ function ryft_boot_status() {
 			printf "${redAttributeON}%-15s${attributesOFF}\n" "not_installed" 
 		fi
 	done
+	# ryft1_odbcd
+	odbcd_workaround=1
+	if [ $odbcd_workaround = 1 ]
+	then
+		printf "%-15s" ryft1_odbcd 
+		printf "${greenAttributeON}%-15s${attributesOFF}" manual
+		ryft_ps >/tmp/ryft_status_$$
+		runningCount=`cat /tmp/ryft_status_$$|egrep ryft1_odbcd|wc -l`
+		if [ $runningCount -gt 0 ]
+		then
+			ryft1_odbcd_status=`cat /tmp/ryft_status_$$|egrep ryft1_odbcd|awk '{print $2}'`
+			printf "${greenAttributeON}%-15s${attributesOFF}" "process $ryft1_odbcd_status"
+		fi
+        fi
 }
 
 
