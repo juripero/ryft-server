@@ -52,6 +52,7 @@ ryft_app_logs() {
 	local i
 	
 	# generate a list of log files
+	rm -f $tarList
 	for i in /var/log/ryft/ryftone.log /home/ryftuser/ryft-server-d-start.log /tmp/apidemo.log /usr/local/ryft/bin/x8664/ryftone_server.log /usr/local/ryft/bin/x8664/ryftone_server*.log /var/log/consul /looney/balooney
 	do
 		if [ -e $i ] 
@@ -79,7 +80,7 @@ ryft_app_logs() {
 	
 	# ryft_showCommand
 	echo -e "${greenAttributeON}rm ${tarList}${attributesOFF}"
-	rm $tarList
+	rm -f $tarList
 }
 
 
