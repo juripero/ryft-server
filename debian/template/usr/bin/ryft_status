@@ -44,6 +44,44 @@ function usage() {
 
 }
 
+ryft_app_logs() {
+	local dateHandle=`date '+%Y%m%d_%H%M'`
+	local hostHandle=`hostname`
+	local tarFile=./${hostHandle}_${dateHandle}_app_logs.tar
+	local tarList=./${hostHandle}_${dateHandle}_app_logs_list.txt_$$
+	local i
+	
+	# generate a list of log files
+	for i in /var/log/ryft/ryftone.log /home/ryftuser/ryft-server-d-start.log /tmp/apidemo.log /usr/local/ryft/bin/x8664/ryftone_server.log /usr/local/ryft/bin/x8664/ryftone_server*.log /var/log/consul /looney/balooney
+	do
+		if [ -e $i ] 
+		then
+			echo $i >>$tarList 
+		fi
+	done
+	
+	# tar/bzip2 files
+	local tarFileCount=`cat $tarList|wc -l`
+	if [ $tarFileCount != 0 ] 
+	then
+		echo "gathering $tarFileCount files into ${tarFile}.bz2"
+
+		# ryft_showCommand
+		echo -e "${greenAttributeON}tar -cvjSf ${tarFile}.bz2 -T $tarList >/dev/null 2>&1${attributesOFF}"
+		tar -cvjSf ${tarFile}.bz2 -T $tarList >/dev/null 2>&1
+
+		# ryft_showCommand
+		echo -e "${greenAttributeON}ls -al ${tarFile}.bz2${attributesOFF}"
+		ls -al ${tarFile}.bz2
+	else
+		echo "No log files found for gathering"
+	fi
+	
+	# ryft_showCommand
+	echo -e "${greenAttributeON}rm ${tarList}${attributesOFF}"
+	rm $tarList
+}
+
 
 ryft_boot_enabled() {
 	local returnValue=0
@@ -276,6 +314,7 @@ function ryft_start
     for service in `echo $serviceList`
     do
 	# start process if not already running
+	# ryft_showCommand
 	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
 	service $service status|grep process
 	if [ $? != 0 -o $service = "ryft1_odbcd" ]
@@ -325,6 +364,7 @@ function ryft_stop
     for service in `echo $serviceList`
     do
 	# stop process if running 
+	# ryft_showCommand
 	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
 	service $service status|grep process
 	if [ $? = 0 -o $service = "ryft1_odbcd" ]
@@ -418,10 +458,12 @@ function ryft_boot_off
 	# disable start at boot
     	echo "boot_off $service"
 	f=/etc/init/${service}.override
+	# ryft_showCommand
 	echo -e "${greenAttributeON}echo \"manual\" | sudo tee ${f}${attributesOFF}"
 	echo "manual"|sudo tee ${f}
 
 	# restart process if running	
+	# ryft_showCommand
 	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
 	service $service status|grep process
 	if [ $? = 0 ]
@@ -445,6 +487,7 @@ function ryft_boot_on
         ryft_showCommand "sudo rm -f ${f}"
 
 	# restart process if running
+	# ryft_showCommand
 	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
 	service $service status|grep process
 	if [ $? = 0 ]
@@ -766,6 +809,7 @@ function ryft_logs_menu
     LOGS_MENU_TEXT[5]="consul log               (tail ${tailLines} $consulLog)"
     LOGS_MENU_TEXT[6]="RyftOne diagnostic dump  (sudo ryft_diagnostics_dump)"
     LOGS_MENU_TEXT[7]="RyftOne clean log        (from Admin Guide - TroubleShooting Section)"
+    LOGS_MENU_TEXT[8]="RyftOne App Logs dump    (tar all application logs, menu selection #1,2,3,4,5)"
     
     local -a LOGS_MENU_ACTIONS
     LOGS_MENU_ACTIONS[0]="exit"
@@ -776,6 +820,7 @@ function ryft_logs_menu
     LOGS_MENU_ACTIONS[5]="ryft_separator; tail ${tailLines} $consulLog; ryft_separator"
     LOGS_MENU_ACTIONS[6]="ryft_separator; ryft_showCommand \"sudo ryft_diagnostics_dump\" && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
     LOGS_MENU_ACTIONS[7]="ryft_ays \"Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.\" && ryft_separator && ryftone_clean_logs && ryft_separator"
+    LOGS_MENU_ACTIONS[8]="ryft_separator; ryft_app_logs; ryft_separator; echo -n \" App Logs dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
 
     local LOGS_MENU_COMMAND="ryft_boot_status; ryft_status;"
 
@@ -962,6 +1007,7 @@ filesystem_filecount_fix() {
 }
 show_filesystem_filecount_error() {
 	problemCounter=$((problemCounter+1))
+	# ryft_showCommand
 	echo -e "${redAttributeON}*${problemCounter}* /ryftone filesystem not found or will not mount with files present. ${attributesOFF}Issue following command to fix problem (existing files will be moved to /ryftone.<YYYYmmdd-HHMMSS>):"
 	echo "	'ryft_status -fix"
 	if [ $filesystem_filecount != 0 ]
