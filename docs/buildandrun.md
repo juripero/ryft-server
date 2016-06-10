@@ -68,7 +68,8 @@ $ make VERSION=1.2.3
 go build -ldflags "-X main.Version=1.2.3 -X main.GitHash=51fcf47f0de217b0dfba4c4e2ed83ed172e123ae"
 ```
 
-Same applies to debian builds regarding version number generation.
+Same VERSION handling applies to debian builds regarding version number generation.
+
 Automatic version number based on build and git:
 
 ```{.sh}
