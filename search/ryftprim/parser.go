@@ -72,7 +72,7 @@ func ParseStat(buf []byte) (stat *search.Statistics, err error) {
 
 	// Total Bytes
 	if x, ok := v["Total Bytes"]; ok {
-		stat.TotalBytes, err = utils.AsUint64(x)
+		stat.TotalBytes, err = parseBytes(x)
 		if err != nil {
 			return nil, fmt.Errorf(`failed to parse "Total Bytes" stat: %s`, err)
 		}
@@ -136,23 +136,29 @@ func ParseStat(buf []byte) (stat *search.Statistics, err error) {
 	return stat, nil // OK
 }
 
-// parse data rate in MS/s
+// parse data rate in MB/s
 // "inf" actually means that duration is zero (dataRate=length/duration)
+// NOTE: need to sync all units with ryftprim!
 func parseDataRate(s string) (float64, error) {
 	s = strings.TrimSpace(s)
+	s = strings.ToLower(s) // case insensitive
 
 	// trim suffix: KB, MB or GB
 	scale := 1.0
-	if t := strings.TrimSuffix(s, "KB/sec"); t != s {
+	if t := strings.TrimSuffix(s, "kb/sec"); t != s {
 		scale /= 1024
 		s = t
 	}
-	if t := strings.TrimSuffix(s, "MB/sec"); t != s {
+	if t := strings.TrimSuffix(s, "mb/sec"); t != s {
 		// scale = 1.0
 		s = t
 	}
-	if t := strings.TrimSuffix(s, "GB/sec"); t != s {
+	if t := strings.TrimSuffix(s, "gb/sec"); t != s {
 		scale *= 1024
+		s = t
+	}
+	if t := strings.TrimSuffix(s, "tb/sec"); t != s {
+		scale *= 1024 * 1024
 		s = t
 	}
 
@@ -166,6 +172,74 @@ func parseDataRate(s string) (float64, error) {
 	// filter out any of +Int, -Inf, NaN
 	if math.IsInf(r, 0) || math.IsNaN(r) {
 		return 0.0, nil // report as zero!
+	}
+
+	return r * scale, nil // OK
+}
+
+// parse total bytes
+// "inf" on "nan" mean zero
+// NOTE: need to sync all units with ryftprim!
+func parseBytes(x interface{}) (uint64, error) {
+	// first try to parse as an integer
+	tb, err := utils.AsUint64(x)
+	if err == nil {
+		return tb, nil // OK
+	}
+
+	// then try to parse as a string
+	s, err := utils.AsString(x)
+	if err != nil {
+		return 0, err
+	}
+	s = strings.TrimSpace(s)
+	s = strings.ToLower(s) // case insensitive
+
+	// trim suffix: KB, MB or GB
+	scale := uint64(1)
+	if t := strings.TrimSuffix(s, "bytes"); t != s {
+		// scale = 1
+		s = t
+	}
+	if t := strings.TrimSuffix(s, "kb"); t != s {
+		scale *= 1024
+		s = t
+	}
+	if t := strings.TrimSuffix(s, "mb"); t != s {
+		scale *= 1024 * 1024
+		s = t
+	}
+	if t := strings.TrimSuffix(s, "gb"); t != s {
+		scale *= 1024 * 1024
+		scale *= 1024
+		s = t
+	}
+	if t := strings.TrimSuffix(s, "tb"); t != s {
+		scale *= 1024 * 1024
+		scale *= 1024 * 1024
+		s = t
+	}
+
+	s = strings.TrimSpace(s)
+	if strings.ContainsAny(s, ".,e") {
+		// value is float, parse as float64 ("inf" is parsed as +Inf)
+		r, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, err
+		}
+
+		// filter out any of +Int, -Inf, NaN
+		if math.IsInf(r, 0) || math.IsNaN(r) {
+			return 0, nil // report as zero!
+		}
+
+		return uint64(r * float64(scale)), nil // OK
+	}
+
+	// value is integer, parse as uint64!
+	r, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return 0, err
 	}
 
 	return r * scale, nil // OK

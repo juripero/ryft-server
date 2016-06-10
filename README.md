@@ -11,7 +11,7 @@ cd $GOPATH/src/github.com/getryft/ryft-server
 make
 ```
 
-Running server is even simplier:
+Running server is even simpler:
 
 ```{.sh}
 ./ryft-server
@@ -26,7 +26,7 @@ Sometimes it's useful to run multiple instances on different ports:
 This command runs another server instance on port `9000` in debug mode.
 Debug mode is used for testing to get detailed server's log messages.
 
-It's also possible to create Debian package:
+It's also possible to create a Debian package:
 
 ```{.sh}
 make debian
@@ -49,15 +49,14 @@ There is also some information about [search engine](./docs/search.md) implement
 All examples assume the `ryft-server` host name is `ryftone-777`.
 
 The main API endpoints are `/search` and `/count`. Both have almost the same parameters.
-However, the /count endpoint does not transfer all found data, it will just print the number of matches and associated performance numbers.
-The minimum required parameters are search query and the set of files to search, so simplest request is:
+However, the /count endpoint does not transfer all found data. Instead, it prints the number of matches and associated performance numbers.
+The minimum required parameters are search query and the set of files to search. Here's an example of a simple request:
 
 ```{.sh}
 curl "http://ryftone-777:8765/search?query=Joe&files=*.txt"
 ```
 
-Of course it's possible to customize search. The following command will capture data surrounding of 5 bytes 
-and fuzzy edit distance search (fuzziness=2) instead of fuzzy hamming search which is used by default:
+Of course it's possible to customize the search. The following command captures 5 bytes of data surrounding the search value, and executtes a fuzzy edit distance search (fuzziness=2) instead of fuzzy hamming search, which is used by default:
 
 ```{.sh}
 curl "http://ryftone-777:8765/search?query=Joe&files=*.txt&mode=feds&surrounding=5&fuzziness=2"
@@ -66,13 +65,13 @@ curl --get --data-urlencode 'query=(RAW_TEXT CONTAINS "Joe")' \
   "http://ryftone-777:8765/search?files=*.txt&mode=feds&surrounding=5&fuzziness=2"
 ```
 
-By default cluster mode is used. To execute a search on a single node use `local` query parameter:
+By default, cluster mode is used. To execute a search on a single node use `local` query parameter:
 
 ```{.sh}
 curl "http://ryftone-777:8765/search?query=Joe&files=*.txt&local=true"
 ```
 
-To get human readably data (instead of base-64 encoded bytes) `format=utf8` can be used.
+To get human readable data (instead of base-64 encoded bytes) `format=utf8` can be used.
 This parameter asks `ryft-server` to interpret found bytes as UTF-8 string:
 
 ```{.sh}
@@ -96,7 +95,7 @@ See [REST API](./docs/restapi.md) document for more details.
 
 ## ryftrest tool
 
-`ryftrest` is a simple bash script which syntax is very similar to native `ryftprim` tool.
+`ryftrest` is a simple bash script with syntax that is very similar to the native `ryftprim` tool.
 But there are a few differences (try `ryftrest --help` for detailed syntax):
 
 - `ryftrest` can send requests to remote Ryft boxes (via `--address` option)
@@ -110,3 +109,6 @@ ryftrest -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --local --format=xml -
 ```
 
 This command will print extracted list of date strings.
+
+For more detailed examples see:
+[ryftrest sample 1](./docs/demo-2015-04-28.md) and [ryftrest sample 2](./docs/demo-2015-05-12.md)
