@@ -1372,7 +1372,7 @@ ryft_status() {
 	#
 	#echo
 	(echo "$hostname Filesystem" `date` 
-	df -h|egrep '^Filesystem|/storage|/ryftone' >$ryft_status_filename
+	df -h /storage/* /ryftone >$ryft_status_filename
 	cat $ryft_status_filename
 	)>>$ryft_status_verbose
 	ryftoneMounted=`cat $ryft_status_filename|grep "/ryftone"|grep "/dev/fuse"|wc -l`
