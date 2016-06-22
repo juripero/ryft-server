@@ -1099,20 +1099,20 @@ if [ $? == 0 ]
 then
 	ryft1_odbcd=Installed
 fi
-ryft1_odbcd_boot=`ryft_boot_enabled ryft1_odbcd`
+ryft1_odbcd_boot=`ryft_boot_enabled ryftodbcd`
 if [ $debug != 0 ]
 then
 	echo "ryft1_odbcd=$ryft1_odbcd"
 fi
 ryft1_odbcd_status=0
 ryft1_odbcd_error=0
-ryft1_odbcd_startCommand="/usr/local/ryft/bin/x8664/ryft1_odbcctl -s"
+ryft1_odbcd_startCommand="sudo service ryftodbcd start"
 ryft1_odbcd_start() {
 	echo "--------------------"
 	echo "starting ryft1_odbcd with $ryft1_odbcd_startCommand"
 	${ryft1_odbcd_startCommand}
 }
-ryft1_odbcd_stopCommand="/usr/local/ryft/bin/x8664/ryft1_odbcctl -k"
+ryft1_odbcd_stopCommand="sudo service ryftodbcd stop"
 ryft1_odbcd_stop() {
 	echo "--------------------"
 	echo "stoppng ryft1_odbcd with $ryft1_odbcd_stopCommand"
@@ -1308,7 +1308,7 @@ ryft_status() {
 
 	ryft1_odbcd_status=0
 	ryft1_odbcd_error=0
-	ryft1_odbcd_boot=`ryft_boot_enabled ryft1_odbcd`
+	ryft1_odbcd_boot=`ryft_boot_enabled ryftodbcd`
 	if [ $ryft1_odbcd_boot = 1 ]
 	then
 		expectedProcessCount=$((expectedProcessCount+1))
