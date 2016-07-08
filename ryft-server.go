@@ -143,116 +143,114 @@ func (s *Server) getSearchEngine(localOnly bool, files []string, authToken strin
 
 // get cluster's search engine
 func (s *Server) getClusterSearchEngine(files []string, authToken string, homeDir string) (search.Engine, error) {
-	if true { // TODO: remove this line!
-		// for each service create corresponding search engine
-		backends := []search.Engine{}
-		nodes, tags, err := GetConsulInfo(files)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get consul services: %s", err)
+	// for each service create corresponding search engine
+	backends := []search.Engine{}
+	nodes, tags, err := GetConsulInfo(files)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get consul services: %s", err)
+	}
+	local_node, remote_nodes := SplitToLocalAndRemote(nodes)
+	log.WithField("tags", tags).Debug("cluster search tags")
+
+	// if no tags required - use all nodes
+	all_nodes := (len(tags) == 0)
+
+	// list of tags required
+	tags_required := make(map[string]bool)
+	for _, t := range tags {
+		tags_required[t] = true
+	}
+
+	// go through service tags and update `tags_required` map
+	// return match count, matched tags are removed
+	update_tags := func(serviceTags []string) int {
+		count := 0
+		for _, s := range serviceTags {
+			if _, ok := tags_required[s]; ok {
+				delete(tags_required, s)
+				count += 1
+			}
 		}
-		local_node, remote_nodes := SplitToLocalAndRemote(nodes)
-		log.WithField("tags", tags).Debug("cluster search tags")
+		return count
+	}
 
-		// if no tags required - use all nodes
-		all_nodes := (len(tags) == 0)
-
-		// list of tags required
-		tags_required := make(map[string]bool)
-		for _, t := range tags {
-			tags_required[t] = true
-		}
-
-		// go through service tags and update `tags_required` map
-		// return match count, matched tags are removed
-		update_tags := func(serviceTags []string) int {
-			count := 0
-			for _, s := range serviceTags {
-				if _, ok := tags_required[s]; ok {
-					delete(tags_required, s)
-					count += 1
-				}
-			}
-			return count
-		}
-
-		// prefer local service first...
-		if local_node != nil {
-			log.WithField("tags", local_node.ServiceTags).Debug("local node tags")
-			if all_nodes || update_tags(local_node.ServiceTags) > 0 {
-				// local node: just use normal backend
-				engine, err := s.getLocalSearchEngine(homeDir)
-				if err != nil {
-					return nil, err
-				}
-				backends = append(backends, engine)
-			}
-			log.WithField("tags", tags_required).Debug("remain (local) tags required")
-		}
-
-		// ... then remote services (shuffled)
-		for _, k := range rand.Perm(len(remote_nodes)) {
-			service := remote_nodes[k]
-
-			// stop if no more tags required
-			if !all_nodes && len(tags_required) == 0 {
-				break
-			}
-
-			// skip if no required tags found
-			log.WithField("tags", service.ServiceTags).Debug("remote node tags")
-			if !all_nodes && update_tags(service.ServiceTags) == 0 {
-				continue // no tags found, skip this node
-			}
-			log.WithField("tags", tags_required).Debug("remain (remote) tags required")
-
-			// remote node: use RyftHTTP backend
-			port := service.ServicePort
-			scheme := "http"
-			var url string
-			if port == 0 { // TODO: review the URL building!
-				url = fmt.Sprintf("%s://%s:%s", scheme, service.Address, DefaultPort)
-			} else {
-				url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-			}
-
-			opts := map[string]interface{}{
-				"server-url": url,
-				"auth-token": authToken,
-				"local-only": true,
-				"skip-stat":  false,
-				"index-host": url,
-			}
-			// log level
-			if _, ok := opts["log-level"]; !ok && *debug {
-				opts["log-level"] = "debug"
-			}
-
-			engine, err := search.NewEngine("ryfthttp", opts)
+	// prefer local service first...
+	if local_node != nil {
+		log.WithField("tags", local_node.ServiceTags).Debug("local node tags")
+		if all_nodes || update_tags(local_node.ServiceTags) > 0 {
+			// local node: just use normal backend
+			engine, err := s.getLocalSearchEngine(homeDir)
 			if err != nil {
 				return nil, err
 			}
 			backends = append(backends, engine)
 		}
-
-		// fail if there is remaining required tags
-		if !all_nodes && len(tags_required) > 0 {
-			rem := []string{} // remaining tags
-			for k, _ := range tags_required {
-				rem = append(rem, k)
-			}
-			return nil, fmt.Errorf("no services found for tags: %q", rem)
-		}
-
-		if len(backends) > 0 {
-			engine, err := ryftmux.NewEngine(backends...)
-			log.WithField("engine", engine).Debug("cluster search")
-			return engine, err
-		}
-
-		// no services from consule, just use local search as a fallback
-		log.Printf("no cluster built, use local search as fallback")
-		return s.getLocalSearchEngine(homeDir)
+		log.WithField("tags", tags_required).Debug("remain (local) tags required")
 	}
+
+	// ... then remote services (shuffled)
+	for _, k := range rand.Perm(len(remote_nodes)) {
+		service := remote_nodes[k]
+
+		// stop if no more tags required
+		if !all_nodes && len(tags_required) == 0 {
+			break
+		}
+
+		// skip if no required tags found
+		log.WithField("tags", service.ServiceTags).Debug("remote node tags")
+		if !all_nodes && update_tags(service.ServiceTags) == 0 {
+			continue // no tags found, skip this node
+		}
+		log.WithField("tags", tags_required).Debug("remain (remote) tags required")
+
+		// remote node: use RyftHTTP backend
+		port := service.ServicePort
+		scheme := "http"
+		var url string
+		if port == 0 { // TODO: review the URL building!
+			url = fmt.Sprintf("%s://%s:%s", scheme, service.Address, DefaultPort)
+		} else {
+			url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+		}
+
+		opts := map[string]interface{}{
+			"server-url": url,
+			"auth-token": authToken,
+			"local-only": true,
+			"skip-stat":  false,
+			"index-host": url,
+		}
+		// log level
+		if _, ok := opts["log-level"]; !ok && *debug {
+			opts["log-level"] = "debug"
+		}
+
+		engine, err := search.NewEngine("ryfthttp", opts)
+		if err != nil {
+			return nil, err
+		}
+		backends = append(backends, engine)
+	}
+
+	// fail if there is remaining required tags
+	if !all_nodes && len(tags_required) > 0 {
+		rem := []string{} // remaining tags
+		for k, _ := range tags_required {
+			rem = append(rem, k)
+		}
+		return nil, fmt.Errorf("no services found for tags: %q", rem)
+	}
+
+	if len(backends) > 0 {
+		engine, err := ryftmux.NewEngine(backends...)
+		log.WithField("engine", engine).Debug("cluster search")
+		return engine, err
+	}
+
+	// no services from consule, just use local search as a fallback
+	log.Printf("no cluster built, use local search as fallback")
+	return s.getLocalSearchEngine(homeDir)
 }
 
 // get local search engine
