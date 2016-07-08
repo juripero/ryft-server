@@ -133,10 +133,17 @@ func ensureDefault(flag *string, message string) {
 }
 
 // get search backend with options
-func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine, error) {
+func (s *Server) getSearchEngine(localOnly bool, files []string, authToken string, homeDir string) (search.Engine, error) {
 	if !localOnly {
-		// cluster search
+		return s.getClusterSearchEngine(files, authToken, homeDir)
+	}
 
+	return s.getLocalSearchEngine(homeDir)
+}
+
+// get cluster's search engine
+func (s *Server) getClusterSearchEngine(files []string, authToken string, homeDir string) (search.Engine, error) {
+	if true { // TODO: remove this line!
 		// for each service create corresponding search engine
 		backends := []search.Engine{}
 		nodes, tags, err := GetConsulInfo(files)
@@ -173,7 +180,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 			log.WithField("tags", local_node.ServiceTags).Debug("local node tags")
 			if all_nodes || update_tags(local_node.ServiceTags) > 0 {
 				// local node: just use normal backend
-				engine, err := s.getSearchEngine(true, files)
+				engine, err := s.getLocalSearchEngine(homeDir)
 				if err != nil {
 					return nil, err
 				}
@@ -210,6 +217,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 
 			opts := map[string]interface{}{
 				"server-url": url,
+				"auth-token": authToken,
 				"local-only": true,
 				"skip-stat":  false,
 				"index-host": url,
@@ -243,10 +251,12 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 
 		// no services from consule, just use local search as a fallback
 		log.Printf("no cluster built, use local search as fallback")
-		return s.getSearchEngine(true, files)
+		return s.getLocalSearchEngine(homeDir)
 	}
+}
 
-	// local node search
+// get local search engine
+func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	opts := s.BackendOptions
 
 	// some auto-options
@@ -254,7 +264,12 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 	case "ryftprim":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
-			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+			opts["instance-name"] = fmt.Sprintf(".rest-%d", (*listenAddress).Port)
+		}
+
+		// home-dir (override settings)
+		if _, ok := opts["home-dir"]; !ok || len(homeDir) > 0 {
+			opts["home-dir"] = homeDir
 		}
 
 		// keep-files
@@ -283,6 +298,20 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 		ryftdec.SetLogLevel("debug")
 	}
 	return ryftdec.NewEngine(backend)
+}
+
+// parse authentication token and home directory from context
+func (s *Server) parseAuthAndHome(ctx *gin.Context) (authToken string, homeDir string) {
+	authToken = ctx.Request.Header.Get("Authorization") // may be empty
+
+	// get home directory
+	if v, exists := ctx.Get(gin.AuthUserKey); exists && v != nil {
+		if user, ok := v.(*auth.UserInfo); ok {
+			homeDir = user.Home
+		}
+	}
+
+	return
 }
 
 // get local host name

@@ -41,6 +41,7 @@ import (
 func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{
 		"server-url": engine.ServerURL,
+		"auth-token": engine.AuthToken,
 		"local-only": engine.LocalOnly,
 		"skip-stat":  engine.SkipStat,
 		"index-host": engine.IndexHost,
@@ -60,6 +61,16 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	}
 	if _, err := url.Parse(engine.ServerURL); err != nil {
 		return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
+	}
+
+	// auth token
+	if v, ok := opts["auth-token"]; ok {
+		engine.AuthToken, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "auth-token" option: %s`, err)
+		}
+	} else {
+		engine.AuthToken = ""
 	}
 
 	// local only flag

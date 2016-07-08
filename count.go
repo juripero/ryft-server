@@ -55,7 +55,8 @@ func (s *Server) count(ctx *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local, params.Files)
+	authToken, homeDir := s.parseAuthAndHome(ctx)
+	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))

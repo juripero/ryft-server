@@ -60,6 +60,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	// we expect MSGPACK format for streaming
 	req.Header.Set("Accept", codec.MIME)
 
+	// authorization
+	if len(engine.AuthToken) != 0 {
+		req.Header.Set("Authorization", engine.AuthToken)
+	}
+
 	res := search.NewResult()
 
 	// handle GET response

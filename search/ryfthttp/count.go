@@ -59,6 +59,11 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	// we expect JSON format, no streaming required
 	req.Header.Set("Accept", "application/json")
 
+	// authorization
+	if len(engine.AuthToken) != 0 {
+		req.Header.Set("Authorization", engine.AuthToken)
+	}
+
 	res := search.NewResult()
 
 	// handle GET response
