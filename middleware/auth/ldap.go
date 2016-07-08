@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 
 	"crypto/tls"
 
@@ -21,15 +20,13 @@ import (
 //AuthUserKey needed for HTTP response header
 const AuthUserKey = "user"
 
-type (
-	ldapSettings struct {
-		Address      string
-		Query        string
-		BindUsername string
-		BindPassword string
-		BaseDN       string
-	}
-)
+type ldapSettings struct {
+	Address      string
+	Query        string
+	BindUsername string
+	BindPassword string
+	BaseDN       string
+}
 
 // BasicAuthLDAPForRealm returns a Basic HTTP Authorization middleware. It takes as arguments a map[string]string where
 // the key is the user name and the value is the password, as well as the name of the Realm.
@@ -85,7 +82,7 @@ func authorizationHeader(user, password string) string {
 func bindLDAP(settings ldapSettings, userdata string) (string, bool, int) {
 
 	// The username and password we want to check
-	username, password, ok := parseBasicAuth(userdata)
+	username, password, ok, _ := parseBasicAuth(userdata)
 
 	if !ok {
 		log.Printf("AUTH: Invalid username or password, couldn't parse '%v'\n", userdata)
@@ -144,22 +141,4 @@ func bindLDAP(settings ldapSettings, userdata string) (string, bool, int) {
 	}
 
 	return "authorizationHeader(username, password)", true, 200
-}
-
-//Decode string in Base64 to get username and password
-func parseBasicAuth(auth string) (username, password string, ok bool) {
-	const prefix = "Basic "
-	if !strings.HasPrefix(auth, prefix) {
-		return
-	}
-	c, err := base64.StdEncoding.DecodeString(auth[len(prefix):])
-	if err != nil {
-		return
-	}
-	cs := string(c)
-	s := strings.IndexByte(cs, ':')
-	if s < 0 {
-		return
-	}
-	return cs[:s], cs[s+1:], true
 }

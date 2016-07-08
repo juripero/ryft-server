@@ -56,6 +56,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thoas/stats"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/appleboy/gin-jwt.v1"
 	"gopkg.in/yaml.v2"
 )
 
@@ -73,6 +74,7 @@ var (
 
 	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
 	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
+	authJwtSecret = kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").String()
 
 	authLdapServer = kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").TCP()
 	authLdapUser   = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
@@ -362,19 +364,53 @@ func main() {
 	// Enable GZip compression support
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
+	// private endpoints
+	private := router.Group("")
+
 	// Enable authentication if configured
 	switch *authType {
 	case "file":
-		auth, err := auth.AuthBasicFile(*authUsersFile)
+		file, err := auth.NewFile(*authUsersFile)
 		if err != nil {
-			log.WithError(err).Fatal("Error reading users file")
+			log.WithError(err).Fatal("Failed to read users file")
 		}
-		router.Use(auth)
-		break
+		private.Use(auth.MiddlewareFunc(file, ""))
 	case "ldap":
-		router.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
-			*authLdapPass, *authLdapQuery, *authLdapBase))
-		break
+
+		//		private.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
+		//			*authLdapPass, *authLdapQuery, *authLdapBase))
+
+	case "jwt":
+		// the jwt middleware
+		auth := &jwt.GinJWTMiddleware{
+			Realm:      "test zone",
+			Key:        []byte("ryft secret key"),
+			Timeout:    time.Hour,
+			MaxRefresh: time.Hour * 24,
+			Authenticator: func(userId string, password string, c *gin.Context) (string, bool) {
+				if (userId == "admin" && password == "admin") || (userId == "test" && password == "test") {
+					return userId, true
+				}
+
+				return userId, false
+			},
+			Authorizator: func(userId string, c *gin.Context) bool {
+				if userId == "admin" {
+					return true
+				}
+
+				return false
+			},
+			Unauthorized: func(c *gin.Context, code int, message string) {
+				c.JSON(code, gin.H{
+					"code":    code,
+					"message": message,
+				})
+			},
+		}
+
+		router.POST("/login", auth.LoginHandler)
+		private.Use(auth.MiddlewareFunc())
 	}
 
 	// Configure routes
@@ -392,10 +428,10 @@ func main() {
 		c.JSON(http.StatusOK, serverStats.Data())
 	})
 
-	router.GET("/search", server.search)
-	router.GET("/count", server.count)
-	router.GET("/cluster/members", server.members)
-	router.GET("/files", server.files)
+	private.GET("/search", server.search)
+	private.GET("/count", server.count)
+	private.GET("/cluster/members", server.members)
+	private.GET("/files", server.files)
 
 	// static asset
 	for _, asset := range AssetNames() {
@@ -411,8 +447,6 @@ func main() {
 	router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
-
-	// Startup preparatory
 
 	// start listening on HTTP or HTTPS ports
 	if *tlsEnabled {

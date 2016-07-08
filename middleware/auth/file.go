@@ -32,50 +32,74 @@ package auth
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io/ioutil"
+	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v2"
-
-	"path/filepath"
-
-	"github.com/gin-gonic/gin"
 )
 
-const (
-	constJson = ".json"
-	constYml  = ".yml"
-	constYaml = ".yaml"
-)
+// FileAuth contains file related
+type FileAuth struct {
+	Users map[string]*UserInfo
+}
 
-func AuthBasicFile(fileName string) (gin.HandlerFunc, error) {
+// TODO: relead credentials file on the fly?
+
+// NewFile returns new File based credentials
+func NewFile(fileName string) (*FileAuth, error) {
 	users, err := readUsersFile(fileName)
 	if err != nil {
 		return nil, err
 	}
-	return gin.BasicAuth(users), nil
 
+	// check for duplicates
+	unique := make(map[string]*UserInfo, len(users))
+	for _, u := range users {
+		if unique[u.Name] != nil {
+			return nil, fmt.Errorf("%q duplicate user info", u.Name)
+		}
+		unique[u.Name] = u
+	}
+
+	return &FileAuth{Users: unique}, nil // OK
 }
 
-func readUsersFile(fileName string) (map[string]string, error) {
-	var users map[string]string
+// verify user credentials
+func (f *FileAuth) Verify(username, password string) *UserInfo {
+	if u, ok := f.Users[username]; ok {
+		if u.Password == password {
+			return u // verified!
+		}
+	}
 
-	ext := filepath.Ext(fileName)
+	return nil // not found or invalid password
+}
 
+// read user credentials from a text file (JSON or YAML)
+// no duplicates are allowed
+func readUsersFile(fileName string) ([]*UserInfo, error) {
+	// read whole file
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, err
 	}
-	if ext == constJson {
+
+	users := make([]*UserInfo, 0)
+	ext := filepath.Ext(fileName)
+	switch strings.ToLower(ext) {
+	case ".json":
 		err = json.Unmarshal(data, &users)
-	} else if ext == constYaml || ext == constYml {
+	case ".yaml", ".yml":
 		err = yaml.Unmarshal(data, &users)
-	} else {
-		err = errors.New("Unrecognized file extention " + ext)
+	default:
+		err = fmt.Errorf("%q is unknown credentials file extention", ext)
 	}
 
 	if err != nil {
 		return nil, err
 	}
-	return users, nil
+
+	return users, nil // OK
 }
