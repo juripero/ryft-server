@@ -56,7 +56,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thoas/stats"
 	"gopkg.in/alecthomas/kingpin.v2"
-	"gopkg.in/appleboy/gin-jwt.v1"
 	"gopkg.in/yaml.v2"
 )
 
@@ -298,6 +297,7 @@ func parseParams() {
 	switch *authType {
 	case "file":
 		ensureDefault(authUsersFile, "users-file is required for file authentication.")
+		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
 		break
 	case "ldap":
 		if (*authLdapServer) == nil {
@@ -310,7 +310,7 @@ func parseParams() {
 		ensureDefault(authLdapUser, "ldap-user is required for ldap authentication.")
 		ensureDefault(authLdapPass, "ldap-pass is required for ldap authentication.")
 		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
-
+		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
 		break
 	}
 	if *tlsEnabled {
@@ -341,7 +341,7 @@ func main() {
 	var server Server
 	err := server.parseConfig(*serverConfig)
 	if err != nil {
-		log.Fatalf("Failed to read server configuration: %s", err)
+		log.WithError(err).Fatalf("Failed to read server configuration")
 	}
 	log.WithField("config", server).Infof("server configuration")
 
@@ -368,52 +368,30 @@ func main() {
 	private := router.Group("")
 
 	// Enable authentication if configured
+	var auth_provider auth.Provider
 	switch *authType {
 	case "file":
 		file, err := auth.NewFile(*authUsersFile)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to read users file")
 		}
-		private.Use(auth.MiddlewareFunc(file, ""))
+		auth_provider = file
 	case "ldap":
-
 		//		private.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
 		//			*authLdapPass, *authLdapQuery, *authLdapBase))
-
-	case "jwt":
-		// the jwt middleware
-		auth := &jwt.GinJWTMiddleware{
-			Realm:      "test zone",
-			Key:        []byte("ryft secret key"),
-			Timeout:    time.Hour,
-			MaxRefresh: time.Hour * 24,
-			Authenticator: func(userId string, password string, c *gin.Context) (string, bool) {
-				if (userId == "admin" && password == "admin") || (userId == "test" && password == "test") {
-					return userId, true
-				}
-
-				return userId, false
-			},
-			Authorizator: func(userId string, c *gin.Context) bool {
-				if userId == "admin" {
-					return true
-				}
-
-				return false
-			},
-			Unauthorized: func(c *gin.Context, code int, message string) {
-				c.JSON(code, gin.H{
-					"code":    code,
-					"message": message,
-				})
-			},
-		}
-
-		router.POST("/login", auth.LoginHandler)
-		private.Use(auth.MiddlewareFunc())
 	}
 
-	// Configure routes
+	// authentication enabled
+	if auth_provider != nil {
+		mw := auth.NewMiddleware(auth_provider, "")
+		secret, err := auth.ParseSecret(*authJwtSecret)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to parse JWT secret")
+		}
+		mw.EnableJwt(secret)
+		router.POST("/login", mw.LoginHandler())
+		private.Use(mw.Authentication())
+	}
 
 	router.GET("/version", func(ctx *gin.Context) {
 		info := map[string]interface{}{

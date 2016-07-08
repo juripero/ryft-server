@@ -31,6 +31,8 @@
 package auth
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -102,4 +104,17 @@ func readUsersFile(fileName string) ([]*UserInfo, error) {
 	}
 
 	return users, nil // OK
+}
+
+// ParseSecret string
+func ParseSecret(secret string) ([]byte, error) {
+	if strings.HasPrefix(secret, "@") {
+		return ioutil.ReadFile(strings.TrimPrefix(secret, "@"))
+	} else if strings.HasPrefix(secret, "base64:") {
+		return base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, "base64:"))
+	} else if strings.HasPrefix(secret, "hex:") {
+		return hex.DecodeString(strings.TrimPrefix(secret, "hex:"))
+	}
+
+	return []byte(secret), nil // OK
 }

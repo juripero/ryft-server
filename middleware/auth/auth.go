@@ -36,8 +36,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"gopkg.in/appleboy/gin-jwt.v1"
 )
 
 // UserInfo is a user credentials and related information such a home directory.
@@ -51,25 +53,56 @@ type Provider interface {
 	Verify(username string, password string) *UserInfo
 }
 
-func MiddlewareFunc(provider Provider, realm string) gin.HandlerFunc {
+type Middleware struct {
+	provider Provider
+	realm    string
+	jwt      *jwt.GinJWTMiddleware
+}
+
+func NewMiddleware(provider Provider, realm string) *Middleware {
 	if len(realm) == 0 {
 		realm = "Authorization Required"
 	}
-	realm = "Basic realm=" + strconv.Quote(realm)
 
+	mw := new(Middleware)
+	mw.provider = provider
+	mw.realm = realm
+
+	return mw
+}
+
+func (mw *Middleware) EnableJwt(key []byte) {
+	mw.jwt = new(jwt.GinJWTMiddleware)
+	// mw.jwt.SigningAlgorithm
+	// mw.jwt.PayloadFunc = mw.payload
+	mw.jwt.Realm = mw.realm
+	mw.jwt.Key = key
+	mw.jwt.Timeout = time.Hour
+	mw.jwt.MaxRefresh = time.Hour * 24
+	mw.jwt.Authenticator = mw.authenticator
+	mw.jwt.Authorizator = mw.authorizator
+	mw.jwt.Unauthorized = mw.unauthorized
+}
+
+// Login handler for JWT
+func (mw *Middleware) LoginHandler() gin.HandlerFunc {
+	return mw.jwt.LoginHandler
+}
+
+// Authentication middleware function
+// tries Basic Auth first, then JWT
+func (mw *Middleware) Authentication() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Search user in the slice of allowed credentials
 		h := c.Request.Header.Get("Authorization")
 
 		username, password, ok, err := parseBasicAuth(h)
-		fmt.Printf("auth: h:%q %q:%q %v %v\n", h, username, password, ok, err)
-		if ok && err == nil { // basic
+		if ok && err == nil { // basic authentication
 			// Search user in the slice of allowed credentials
-			fmt.Printf("users: %+v\n", provider)
-			user := provider.Verify(username, password)
+			user := mw.provider.Verify(username, password)
 			if user == nil {
 				// Credentials doesn't match, we return 401 and abort handlers chain.
-				c.Header("WWW-Authenticate", realm)
+				c.Header("WWW-Authenticate", "Basic realm="+strconv.Quote(mw.realm))
 				c.AbortWithStatus(http.StatusUnauthorized)
 				fmt.Printf("reported 401\n")
 			} else {
@@ -79,13 +112,36 @@ func MiddlewareFunc(provider Provider, realm string) gin.HandlerFunc {
 				c.Set(gin.AuthUserKey, user)
 				fmt.Printf("authenticated to %v\n", user)
 			}
+		} else if mw.jwt != nil && len(h) != 0 {
+			f := mw.jwt.MiddlewareFunc()
+			f(c) // JWT work
 		} else {
-			// TODO: JWT
-			c.Header("WWW-Authenticate", realm)
+			c.Header("WWW-Authenticate", "Basic realm="+strconv.Quote(mw.realm))
 			c.AbortWithStatus(http.StatusUnauthorized)
-			fmt.Printf("JWT: reported 401\n")
 		}
 	}
+}
+
+// authenticator: checks userId exists and password is correct
+func (mw *Middleware) authenticator(userId string, password string, c *gin.Context) (string, bool) {
+	user := mw.provider.Verify(userId, password)
+	if user != nil {
+		c.Set(gin.AuthUserKey, user)
+	}
+	return userId, user != nil
+}
+
+// authorizator: all logged in users have access
+func (mw *Middleware) authorizator(userId string, c *gin.Context) bool {
+	return true
+}
+
+// report unauthorized access
+func (mw *Middleware) unauthorized(c *gin.Context, code int, message string) {
+	c.JSON(code, gin.H{
+		"code":    code,
+		"message": message,
+	})
 }
 
 // Try to decode Authorization header (basic) to get username and password
