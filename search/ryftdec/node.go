@@ -42,6 +42,7 @@ const (
 	QTYPE_DATE
 	QTYPE_TIME
 	QTYPE_NUMERIC
+	QTYPE_CURRENCY
 	QTYPE_AND
 	QTYPE_OR
 	QTYPE_XOR
@@ -105,6 +106,8 @@ func expressionType(expression string) QueryType {
 		return QTYPE_TIME
 	case strings.Contains(expression, "NUMBER("):
 		return QTYPE_NUMERIC
+	case strings.Contains(expression, "CURRENCY("):
+		return QTYPE_CURRENCY
 	default:
 		return QTYPE_SEARCH
 	}
@@ -114,7 +117,7 @@ func expressionType(expression string) QueryType {
 func (q QueryType) IsSearch() bool {
 	switch q {
 	case QTYPE_SEARCH, QTYPE_DATE,
-		QTYPE_TIME, QTYPE_NUMERIC:
+		QTYPE_TIME, QTYPE_NUMERIC, QTYPE_CURRENCY:
 		return true
 	}
 
