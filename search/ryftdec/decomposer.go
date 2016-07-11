@@ -36,7 +36,7 @@ import (
 
 var (
 	delimiters     = []string{" AND ", " OR "}
-	markers        = []string{" DATE(", " TIME(", "NUMBER("}
+	markers        = []string{" DATE(", " TIME(", " NUMBER(", " FHS(", " FED(", " CURRENCY("}
 	maxDepth   int = 1
 )
 
@@ -172,11 +172,17 @@ func addChildToNode(currentNode *Node, expression string) *Node {
 
 func notParsable(expression string) bool {
 	twoBrackets := (strings.Count(expression, "(") == 1) && (strings.Count(expression, ")") == 1)
-	dateExpression := strings.Contains(expression, "DATE(")
-	timeExpression := strings.Contains(expression, "TIME(")
-	numberExpression := strings.Contains(expression, "NUMBER(")
 	noBrackets := (strings.Count(expression, "(") == 0) && (strings.Count(expression, ")") == 0)
-	return noBrackets || (twoBrackets && dateExpression) || (twoBrackets && timeExpression) || (twoBrackets && numberExpression)
+	return noBrackets || (twoBrackets && isSearchQuery(expression))
+}
+
+func isSearchQuery(expression string) bool {
+	for _, v := range markers {
+		if strings.Contains(expression, v) {
+			return true
+		}
+	}
+	return false
 }
 
 func isOperator(token string) bool {
