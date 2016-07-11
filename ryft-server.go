@@ -74,7 +74,10 @@ var (
 
 	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
 	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
-	authJwtSecret = kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").String()
+
+	authJwtSecret   = kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").String()
+	authJwtAlg      = kingpin.Flag("jwt-alg", "JWT signing algorithm.").String()
+	authJwtLifetime = kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").Duration()
 
 	authLdapServer = kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").TCP()
 	authLdapUser   = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
@@ -421,7 +424,7 @@ func main() {
 		if err != nil {
 			log.WithError(err).Fatalf("Failed to parse JWT secret")
 		}
-		mw.EnableJwt(secret)
+		mw.EnableJwt(secret, *authJwtAlg, *authJwtLifetime)
 		private.Use(mw.Authentication())
 		private.GET("/token/refresh", mw.RefreshHandler())
 		router.POST("/login", mw.LoginHandler())

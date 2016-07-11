@@ -72,14 +72,16 @@ func NewMiddleware(provider Provider, realm string) *Middleware {
 	return mw
 }
 
-func (mw *Middleware) EnableJwt(key []byte) {
+// Enable JWT authentication
+// `alg` - signing algorithm
+func (mw *Middleware) EnableJwt(key []byte, alg string, tokenLifetime time.Duration) {
 	mw.jwt = new(jwt.GinJWTMiddleware)
-	// mw.jwt.SigningAlgorithm
-	// mw.jwt.PayloadFunc = mw.payload
+	mw.jwt.SigningAlgorithm = alg
+	mw.jwt.PayloadFunc = mw.payload
 	mw.jwt.Realm = mw.realm
 	mw.jwt.Key = key
-	mw.jwt.Timeout = time.Hour
-	mw.jwt.MaxRefresh = time.Hour * 24
+	mw.jwt.Timeout = tokenLifetime
+	mw.jwt.MaxRefresh = 10 * tokenLifetime
 	mw.jwt.Authenticator = mw.authenticator
 	mw.jwt.Authorizator = mw.authorizator
 	mw.jwt.Unauthorized = mw.unauthorized
@@ -145,6 +147,11 @@ func (mw *Middleware) unauthorized(c *gin.Context, code int, message string) {
 		"code":    code,
 		"message": message,
 	})
+}
+
+// get additional payload
+func (mw *Middleware) payload(userId string) map[string]interface{} {
+	return nil // no payload yet
 }
 
 // Try to decode Authorization header (basic) to get username and password
