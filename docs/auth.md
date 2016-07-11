@@ -46,3 +46,52 @@ return the following:
 {"expire":"2016-07-11T08:13:09-04:00",
 "token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE0NjgyMzkxODksImlkIjoiYWRtaW4iLCJvcmlnX2lhdCI6MTQ2ODIzNTU4OX0.X_sO1pimiDQ9XGg37PzTYIB9ohu4DJM8VG9lgqd4sqg"}
 ```
+
+## JWT secret
+
+To pass JWT secret to the server the `--jwt-secret` command line argument is used:
+
+```{.sh}
+ryft-server --jwt-secret=my-secret-key
+ryft-server --jwt-secret=@my-secret-file
+ryft-server --jwt-secret=hex:6D792D7365637265742D6B6579
+ryft-server --jwt-secret=base64:bXktc2VjcmV0LWtleQ==
+```
+
+## LDAP
+
+TBD
+
+## Simple text file
+
+simple text file may be used as a list of user credentials.
+
+YAML format:
+
+```{.yaml}
+- username: "admin"
+  password: "admin"
+  home: "/"
+- username: "test"
+  password: "test"
+  home: "/test"
+- username: "foo"
+  password: "foo"
+  home: "/foo"
+```
+
+JSON format:
+
+```{.json}
+[
+  {"username":"admin", "password":"admin", "home":"/"},
+  {"username":"test", "password":"test", "home":"/test"},
+  {"username":"foo", "password":"foo", "home":"/foo"}
+]
+```
+
+To run server use the following command line:
+
+```{.sh}
+ryft-server --auth=file --users-file ryft-auth.yaml
+```
