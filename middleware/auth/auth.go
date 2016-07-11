@@ -50,6 +50,7 @@ type UserInfo struct {
 }
 
 type Provider interface {
+	Reload() error
 	Verify(username string, password string) *UserInfo
 }
 
@@ -89,6 +90,11 @@ func (mw *Middleware) LoginHandler() gin.HandlerFunc {
 	return mw.jwt.LoginHandler
 }
 
+// Refresh token handler for JWT
+func (mw *Middleware) RefreshHandler() gin.HandlerFunc {
+	return mw.jwt.RefreshHandler
+}
+
 // Authentication middleware function
 // tries Basic Auth first, then JWT
 func (mw *Middleware) Authentication() gin.HandlerFunc {
@@ -98,19 +104,16 @@ func (mw *Middleware) Authentication() gin.HandlerFunc {
 
 		username, password, ok, err := parseBasicAuth(h)
 		if ok && err == nil { // basic authentication
-			// Search user in the slice of allowed credentials
 			user := mw.provider.Verify(username, password)
 			if user == nil {
 				// Credentials doesn't match, we return 401 and abort handlers chain.
 				c.Header("WWW-Authenticate", "Basic realm="+strconv.Quote(mw.realm))
 				c.AbortWithStatus(http.StatusUnauthorized)
-				fmt.Printf("reported 401\n")
 			} else {
 				// The user credentials was found!
 				// pass user info as key "user" in this context
 				// the user can be read later using c.MustGet(gin.AuthUserKey)
 				c.Set(gin.AuthUserKey, user)
-				fmt.Printf("authenticated to %v\n", user)
 			}
 		} else if mw.jwt != nil && len(h) != 0 {
 			f := mw.jwt.MiddlewareFunc()

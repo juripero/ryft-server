@@ -44,10 +44,9 @@ import (
 
 // FileAuth contains file related
 type FileAuth struct {
-	Users map[string]*UserInfo
+	Users    map[string]*UserInfo
+	FileName string
 }
-
-// TODO: relead credentials file on the fly?
 
 // NewFile returns new File based credentials
 func NewFile(fileName string) (*FileAuth, error) {
@@ -57,15 +56,32 @@ func NewFile(fileName string) (*FileAuth, error) {
 	}
 
 	// check for duplicates
-	unique := make(map[string]*UserInfo, len(users))
-	for _, u := range users {
-		if unique[u.Name] != nil {
-			return nil, fmt.Errorf("%q duplicate user info", u.Name)
-		}
-		unique[u.Name] = u
+	unique, err := checkForDuplicates(users)
+	if err != nil {
+		return nil, err
 	}
 
-	return &FileAuth{Users: unique}, nil // OK
+	f := new(FileAuth)
+	f.Users = unique
+	f.FileName = fileName
+	return f, nil // OK
+}
+
+// reload user credentials
+func (f *FileAuth) Reload() error {
+	users, err := readUsersFile(f.FileName)
+	if err != nil {
+		return err
+	}
+
+	// check for duplicates
+	unique, err := checkForDuplicates(users)
+	if err != nil {
+		return err
+	}
+
+	f.Users = unique
+	return nil // OK
 }
 
 // verify user credentials
@@ -104,6 +120,20 @@ func readUsersFile(fileName string) ([]*UserInfo, error) {
 	}
 
 	return users, nil // OK
+}
+
+// check for duplicated and build users map
+func checkForDuplicates(users []*UserInfo) (map[string]*UserInfo, error) {
+	// check for duplicates
+	unique := make(map[string]*UserInfo, len(users))
+	for _, u := range users {
+		if unique[u.Name] != nil {
+			return nil, fmt.Errorf("%q duplicate user info", u.Name)
+		}
+		unique[u.Name] = u
+	}
+
+	return unique, nil // OK
 }
 
 // ParseSecret string

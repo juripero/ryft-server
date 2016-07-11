@@ -1,0 +1,48 @@
+This document contains detailed authentication description.
+
+The following types of authentication are supported:
+
+- [basic](https://en.wikipedia.org/wiki/Basic_access_authentication)
+- [JWT](https://jwt.io/introduction/)
+
+To verify provided user credentials the LDAP service or simple file may be used.
+
+The following endpoints are protected:
+
+- [/search](./restapi.md#search)
+- [/count](./restapi.md#count)
+- [/files](./restapi.md#files)
+
+
+# Authentication
+
+If authentication is enabled the ryft server checks for `Authorization` HTTP header.
+
+If `Authorization` header contains `Basic` keyword the basic authentication is used.
+The ryft server extracts username and password from the header and checks them.
+
+Otherwise if `Authorization` header contains `Bearer` keyword the JWT is used.
+The ryft server extracts JWT token from the header and checks it.
+
+There are two special endpoints for JWT authentication:
+
+- `/login` is used to get JWT token.
+- `/token/refresh` is used to refresh existing token.
+
+## JWT Login
+
+The `/login` endpoint expects `{"username":"login", "password":"password"}` JSON
+structure as an input. If credentials are valid the JWT token is provided as a result.
+
+For example:
+
+```{.sh}
+curl -d '{"username":"admin","password":"admin"}' "localhost:8765/login"
+```
+
+return the following:
+
+```{.sh}
+{"expire":"2016-07-11T08:13:09-04:00",
+"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE0NjgyMzkxODksImlkIjoiYWRtaW4iLCJvcmlnX2lhdCI6MTQ2ODIzNTU4OX0.X_sO1pimiDQ9XGg37PzTYIB9ohu4DJM8VG9lgqd4sqg"}
+```

@@ -39,6 +39,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
@@ -396,7 +397,7 @@ func main() {
 
 	// Enable authentication if configured
 	var auth_provider auth.Provider
-	switch *authType {
+	switch strings.ToLower(*authType) {
 	case "file":
 		file, err := auth.NewFile(*authUsersFile)
 		if err != nil {
@@ -404,8 +405,13 @@ func main() {
 		}
 		auth_provider = file
 	case "ldap":
-		//		private.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
-		//			*authLdapPass, *authLdapQuery, *authLdapBase))
+	// ldap, err := auth.NewLdap(...)
+	//		private.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
+	//			*authLdapPass, *authLdapQuery, *authLdapBase))
+	case "none":
+		break
+	default:
+		log.WithField("auth", *authType).Fatalf("unknown authentication type")
 	}
 
 	// authentication enabled
@@ -416,8 +422,9 @@ func main() {
 			log.WithError(err).Fatalf("Failed to parse JWT secret")
 		}
 		mw.EnableJwt(secret)
-		router.POST("/login", mw.LoginHandler())
 		private.Use(mw.Authentication())
+		private.GET("/token/refresh", mw.RefreshHandler())
+		router.POST("/login", mw.LoginHandler())
 	}
 
 	router.GET("/version", func(ctx *gin.Context) {
