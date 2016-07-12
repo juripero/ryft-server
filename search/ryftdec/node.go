@@ -59,6 +59,11 @@ type Options struct {
 
 func NewOptions(expression string) Options {
 	expr, cs, dist, width := parseOptions(expression)
+
+	if expressionType(expr).IsSearch() {
+		expr = fmt.Sprint("(", expr, ")")
+	}
+
 	return Options{
 		Expression: expr,
 		Cs:         cs,
@@ -68,25 +73,37 @@ func NewOptions(expression string) Options {
 }
 
 func parseOptions(expression string) (string, bool, int, int) {
+	var (
+		cs    bool
+		dist  int
+		width int
+	)
+
 	searchPrimitives := []string{"FHS", "FEDS"}
 	primitive := containsAnySubString(expression, searchPrimitives)
 
 	if primitive != "" {
 		// Capture search query
-		regex := regexp.MustCompile(`(.+) (FHS|FEDS)\(((\".+\"),?(.+)?)\)`)
+		regex := regexp.MustCompile(`(.+) (FHS|FEDS)\((([\"\']{1}.+[\"\']{1}),?(.+)?)\)`)
 		matches := regex.FindAllStringSubmatch(expression, -1)
 
 		args := strings.Split(matches[0][3], ",")
-		cs, _ := strconv.ParseBool(strings.TrimSpace(args[1]))
-		dist, _ := strconv.ParseInt(strings.TrimSpace(args[2]), 10, 0)
-		width, _ := strconv.ParseInt(strings.TrimSpace(args[3]), 10, 0)
+		cs, _ = strconv.ParseBool(strings.TrimSpace(args[1]))
 
-		replacedExp := matches[0][1] + " " + matches[0][4]
+		if len(args) > 2 {
+			dist64, _ := strconv.ParseInt(strings.TrimSpace(args[2]), 10, 0)
+			dist = int(dist64)
+		}
 
-		return replacedExp, cs, int(dist), int(width)
-	} else {
-		return expression, true, 0, 0
+		if len(args) > 3 {
+			width64, _ := strconv.ParseInt(strings.TrimSpace(args[3]), 10, 0)
+			width = int(width64)
+		}
+
+		expression = fmt.Sprint(matches[0][1], " ", matches[0][4])
 	}
+
+	return expression, cs, dist, width
 }
 
 type Node struct {
@@ -117,7 +134,7 @@ func (node *Node) hasSubnodes() bool {
 }
 
 func (node Node) String() string {
-	return fmt.Sprintf("Expression: '%s', options: '%s'", node.Expression, node.Options)
+	return fmt.Sprintf("Expression: '%s'", node.Expression)
 }
 
 func (node *Node) isSearch() bool {
