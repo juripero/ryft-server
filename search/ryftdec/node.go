@@ -86,9 +86,11 @@ func parseOptions(expression string) (string, bool, int, int) {
 		// Capture search query
 		regex := regexp.MustCompile(`(.+) (FHS|FEDS)\((([\"\']{1}.+[\"\']{1}),?(.+)?)\)`)
 		matches := regex.FindAllStringSubmatch(expression, -1)
-
 		args := strings.Split(matches[0][3], ",")
-		cs, _ = strconv.ParseBool(strings.TrimSpace(args[1]))
+
+		if len(args) > 1 {
+			cs, _ = strconv.ParseBool(strings.TrimSpace(args[1]))
+		}
 
 		if len(args) > 2 {
 			dist64, _ := strconv.ParseInt(strings.TrimSpace(args[2]), 10, 0)

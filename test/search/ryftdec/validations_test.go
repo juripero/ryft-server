@@ -56,6 +56,7 @@ func TestValidQueries(t *testing.T) {
 		`(RECORD.body CONTAINS FEDS("test", false, 10, 100))`,
 		`(RECORD.body CONTAINS FEDS("test",false,10,100))`,
 		`(RECORD.body CONTAINS FEDS('test',false,10,100))`,
+		`(RECORD.body CONTAINS FEDS('test',false,10,100)) AND (RECORD.body CONTAINS FHS("test", true, 10, 100))`,
 	}
 
 	for _, q := range queries {
