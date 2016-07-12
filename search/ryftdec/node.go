@@ -64,12 +64,7 @@ func NewOptions(expression string) Options {
 		expr = fmt.Sprint("(", expr, ")")
 	}
 
-	return Options{
-		Expression: expr,
-		Cs:         cs,
-		Dist:       dist,
-		Width:      width,
-	}
+	return Options{Expression: expr, Cs: cs, Dist: dist, Width: width}
 }
 
 func parseOptions(expression string) (string, bool, int, int) {
@@ -77,28 +72,36 @@ func parseOptions(expression string) (string, bool, int, int) {
 		cs    bool
 		dist  int
 		width int
+		err   error
 	)
 
-	searchPrimitives := []string{"FHS", "FEDS"}
-	primitive := containsAnySubString(expression, searchPrimitives)
+	regex := regexp.MustCompile(`(.+) (FHS|FEDS)\((([\"\']{1}.+[\"\']{1}),?(.+)?)\)`)
+	matches := regex.FindAllStringSubmatch(expression, -1)
 
-	if primitive != "" {
+	if len(matches) > 0 {
 		// Capture search query
-		regex := regexp.MustCompile(`(.+) (FHS|FEDS)\((([\"\']{1}.+[\"\']{1}),?(.+)?)\)`)
-		matches := regex.FindAllStringSubmatch(expression, -1)
 		args := strings.Split(matches[0][3], ",")
 
 		if len(args) > 1 {
-			cs, _ = strconv.ParseBool(strings.TrimSpace(args[1]))
+			cs, err = strconv.ParseBool(strings.TrimSpace(args[1]))
+			if err != nil {
+				panic(err)
+			}
 		}
 
 		if len(args) > 2 {
-			dist64, _ := strconv.ParseInt(strings.TrimSpace(args[2]), 10, 0)
+			dist64, err := strconv.ParseInt(strings.TrimSpace(args[2]), 10, 0)
+			if err != nil {
+				panic(err)
+			}
 			dist = int(dist64)
 		}
 
 		if len(args) > 3 {
-			width64, _ := strconv.ParseInt(strings.TrimSpace(args[3]), 10, 0)
+			width64, err := strconv.ParseInt(strings.TrimSpace(args[3]), 10, 0)
+			if err != nil {
+				panic(err)
+			}
 			width = int(width64)
 		}
 

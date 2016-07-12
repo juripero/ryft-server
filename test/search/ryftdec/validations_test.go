@@ -20,6 +20,7 @@ func TestInvalidQueries(t *testing.T) {
 		`() AND OR" "() MOR ()`,
 		`(((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`,
 		`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301")))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`,
+		`(RAW_TEXT CONTAINS FHS("text",123, 100, 2000))`,
 	}
 
 	for _, q := range queries {
@@ -57,6 +58,7 @@ func TestValidQueries(t *testing.T) {
 		`(RECORD.body CONTAINS FEDS("test",false,10,100))`,
 		`(RECORD.body CONTAINS FEDS('test',false,10,100))`,
 		`(RECORD.body CONTAINS FEDS('test',false,10,100)) AND (RECORD.body CONTAINS FHS("test", true, 10, 100))`,
+		`(RECORD.body CONTAINS "FEDS")`,
 	}
 
 	for _, q := range queries {

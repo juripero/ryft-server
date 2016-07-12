@@ -31,6 +31,7 @@
 package ryftdec
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -40,19 +41,29 @@ var (
 	maxDepth   int = 1
 )
 
-func Decompose(originalQuery string) (*Node, error) {
+func Decompose(originalQuery string) (node *Node, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("Decomposer: %v", r)
+			}
+		}
+	}()
+
 	rootNode := Node{SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 
-	_, err := parse(&rootNode, originalQuery)
+	_, err = parse(&rootNode, originalQuery)
 	if err != nil {
 		return nil, err
 	}
 
-	node := rootNode.SubNodes[0]
+	node = rootNode.SubNodes[0]
 	normalizeTree(node)
 
-	return node, nil // Return first node with value
+	return
 }
 
 func formatQuery(query string) string {
