@@ -100,14 +100,14 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 	var indexFile string
 	if len(task.IndexFileName) != 0 {
 		// file path relative to `ryftone` mountpoint (including just instance)
-		indexFile = filepath.Join(engine.Instance, task.IndexFileName)
+		indexFile = filepath.Join(engine.HomeDir, engine.Instance, task.IndexFileName)
 	}
 
 	// DATA results file
 	var dataFile string
 	if len(task.DataFileName) != 0 {
 		// file path relative to `ryftone` mountpoint (including just instance)
-		dataFile = filepath.Join(engine.Instance, task.DataFileName)
+		dataFile = filepath.Join(engine.HomeDir, engine.Instance, task.DataFileName)
 	}
 
 	// TODO: use cfg.Mode to run specific search!

@@ -109,7 +109,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// INDEX results file
 	if len(task.IndexFileName) != 0 {
 		if len(cfg.KeepIndexAs) != 0 {
-			task.IndexFileName = cfg.KeepIndexAs
+			task.IndexFileName = filepath.Join(engine.HomeDir, cfg.KeepIndexAs)
 			task.KeepIndexFile = true
 			if !strings.HasSuffix(task.IndexFileName, ".txt") {
 				// ryft adds .txt anyway, so if this extension is missed
@@ -128,7 +128,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// DATA results file
 	if len(task.DataFileName) != 0 {
 		if len(cfg.KeepDataAs) != 0 {
-			task.DataFileName = cfg.KeepDataAs
+			task.DataFileName = filepath.Join(engine.HomeDir, cfg.KeepDataAs)
 			task.KeepDataFile = true
 		} else {
 			// file path relative to `ryftone` mountpoint (including just instance)
