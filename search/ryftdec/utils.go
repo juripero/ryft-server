@@ -34,6 +34,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 func containsString(slice []string, item string) bool {
@@ -43,6 +44,15 @@ func containsString(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func containsAnySubString(s string, subs []string) string {
+	for _, v := range subs {
+		if strings.Contains(s, v) {
+			return v
+		}
+	}
+	return ""
 }
 
 // Detect extension using input file set.

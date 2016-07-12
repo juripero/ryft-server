@@ -32,6 +32,8 @@ package ryftdec
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -48,19 +50,55 @@ const (
 	QTYPE_XOR
 )
 
-type Node struct {
+type Options struct {
 	Expression string
-	Type       QueryType
-	Parent     *Node
-	SubNodes   []*Node
+	Cs         bool
+	Dist       int
+	Width      int
+}
+
+func NewOptions(expression string) Options {
+	expr, cs, dist, width := parseOptions(expression)
+	return Options{
+		Expression: expr,
+		Cs:         cs,
+		Dist:       dist,
+		Width:      width,
+	}
+}
+
+func parseOptions(expression string) (string, bool, int, int) {
+	searchPrimitives := []string{"FHS", "FEDS"}
+	primitive := containsAnySubString(expression, searchPrimitives)
+
+	if primitive != "" {
+		// Capture search query
+		regex := regexp.MustCompile(`(.+) (FHS|FEDS)\(((\".+\"),?(.+)?)\)`)
+		matches := regex.FindAllStringSubmatch(expression, -1)
+
+		args := strings.Split(matches[0][3], ",")
+		cs, _ := strconv.ParseBool(strings.TrimSpace(args[1]))
+		dist, _ := strconv.ParseInt(strings.TrimSpace(args[2]), 10, 0)
+		width, _ := strconv.ParseInt(strings.TrimSpace(args[3]), 10, 0)
+
+		replacedExp := matches[0][1] + " " + matches[0][4]
+
+		return replacedExp, cs, int(dist), int(width)
+	} else {
+		return expression, true, 0, 0
+	}
+}
+
+type Node struct {
+	//Expression string
+	Type     QueryType
+	Parent   *Node
+	SubNodes []*Node
+	Options
 }
 
 func (node *Node) New(expression string, parent *Node) *Node {
-	if isOperator(expression) {
-		node.Expression = strings.Trim(expression, " ")
-	} else {
-		node.Expression = "(" + expression + ")"
-	}
+	node.Options = NewOptions(expression)
 	node.Type = expressionType(expression)
 	node.Parent = parent
 	return node
@@ -79,7 +117,7 @@ func (node *Node) hasSubnodes() bool {
 }
 
 func (node Node) String() string {
-	return fmt.Sprintf("Expression: '%s'", node.Expression)
+	return fmt.Sprintf("Expression: '%s', options: '%s'", node.Expression, node.Options)
 }
 
 func (node *Node) isSearch() bool {
