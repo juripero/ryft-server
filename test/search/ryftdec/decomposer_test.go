@@ -173,4 +173,19 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `((RECORD.id CONTAINS NUMBER(NUM < 7))   AND   (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
 		`[ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8))`)
 
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 0, 0)))`,
+		`[    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
+
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 0, 0)) OR (RECORD.id CONTAINS DATE("200301")))`,
+		`[  OR]:
+  [    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")
+  [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+
+	testQueryTree(t, `(RECORD.body CONTAINS FEDS('test',false,10,100)) AND ((RAW_TEXT CONSTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
+		`[ AND]:
+  [    ]: (RECORD.body CONTAINS 'test')
+  [  OR]:
+    [    ]: (RAW_TEXT CONSTAINS "text")
+    [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+
 }
