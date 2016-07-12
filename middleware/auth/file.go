@@ -42,7 +42,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// FileAuth contains file related
+// FileAuth contains dictionary of users
 type FileAuth struct {
 	Users    map[string]*UserInfo
 	FileName string

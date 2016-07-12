@@ -1,144 +1,132 @@
+/*
+ * ============= Ryft-Customized BSD License ============
+ * Copyright (c) 2015, Ryft Systems, Inc.
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *   this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation and/or
+ *   other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
+ *   This product includes software developed by Ryft Systems, Inc.
+ * 4. Neither the name of Ryft Systems, Inc. nor the names of its contributors may be used
+ *   to endorse or promote products derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY RYFT SYSTEMS, INC. ''AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL RYFT SYSTEMS, INC. BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * ============
+ */
+
 package auth
 
-////////
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
-// Use of this source code is governed by a MIT style
-// license that can be found in the LICENSE file.
-
 import (
-	"encoding/base64"
-	"fmt"
-	"log"
-	"strconv"
-
 	"crypto/tls"
+	"fmt"
 
-	"github.com/gin-gonic/gin"
 	"gopkg.in/ldap.v2"
 )
 
-//AuthUserKey needed for HTTP response header
-const AuthUserKey = "user"
-
-type ldapSettings struct {
+// LdapAuth contains LDAP related information
+type LdapAuth struct {
 	Address      string
-	Query        string
+	QueryFormat  string
 	BindUsername string
 	BindPassword string
 	BaseDN       string
+
+	// TODO: conn *ldap.Conn for caching
 }
 
-// BasicAuthLDAPForRealm returns a Basic HTTP Authorization middleware. It takes as arguments a map[string]string where
-// the key is the user name and the value is the password, as well as the name of the Realm.
-// If the realm is empty, "Authorization Required" will be used by default.
-// (see http://tools.ietf.org/html/rfc2617#section-1.2)
-func BasicAuthLDAPForRealm(settings ldapSettings, realm string) gin.HandlerFunc {
+// NewLDAP returns new LDAP based credentials
+func NewLDAP(address, username, password, query, baseDN string) (*LdapAuth, error) {
+	a := new(LdapAuth)
+	a.Address = address
+	a.QueryFormat = query
+	a.BindUsername = username
+	a.BindPassword = password
+	a.BaseDN = baseDN
 
-	if realm == "" {
-		realm = "Authorization Required"
-	}
-	realm = "Basic realm=" + strconv.Quote(realm)
-
-	return func(c *gin.Context) {
-
-		// Search user in the slice of allowed credentials
-		user, binded, code := bindLDAP(settings, c.Request.Header.Get("Authorization"))
-
-		if !binded {
-			// Credentials doesn't match, we return 401 and abort handlers chain.
-			setError(c, realm, code)
-
-		} else {
-			// The user credentials was found, set user's id to key AuthUserKey in this context, the userId can be read later using
-			// c.MustGet(gin.AuthUserKey)
-			c.Set(AuthUserKey, user)
-		}
-	}
+	return a, nil // OK
 }
 
-func setError(c *gin.Context, realm string, code int) {
-	c.Header("WWW-Authenticate", realm)
-	c.AbortWithStatus(code)
+// reload user credentials
+func (a *LdapAuth) Reload() error {
+	// TODO: update LDAP options?
+	return nil // OK
 }
 
-// BasicAuthLDAP returns a Basic HTTP Authorization middleware. It takes as argument a map[string]string where
-// the key is the user name and the value is the password.
-func BasicAuthLDAP(address, username, password, query, baseDN string) gin.HandlerFunc {
-	settings := ldapSettings{
-		address,
-		query,
-		username,
-		password,
-		baseDN,
-	}
-	return BasicAuthLDAPForRealm(settings, "")
-}
-
-func authorizationHeader(user, password string) string {
-	base := user + ":" + password
-	return "Basic " + base64.StdEncoding.EncodeToString([]byte(base))
-}
-
-func bindLDAP(settings ldapSettings, userdata string) (string, bool, int) {
-
-	// The username and password we want to check
-	username, password, ok, _ := parseBasicAuth(userdata)
-
-	if !ok {
-		log.Printf("AUTH: Invalid username or password, couldn't parse '%v'\n", userdata)
-		return "", false, 401
-	}
-
-	// Connect to LDAP server
-	l, err := ldap.Dial("tcp", settings.Address)
+// verify user credentials
+func (a *LdapAuth) Verify(username, password string) *UserInfo {
+	user, err := a.verify(username, password)
 	if err != nil {
-		log.Printf("Error Dialing LDAP: %v", err)
-		return "", false, 500
+		return nil // not found or invalid password
+		// or failed to dial LDAP server
 	}
-	defer l.Close()
+
+	return user
+}
+
+// check LDAP server
+func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
+	// Connect to LDAP server
+	conn, err := ldap.Dial("tcp", a.Address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial LDAP: %s", err)
+	}
+	defer conn.Close()
 
 	// Reconnect with TLS
-	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+	err = conn.StartTLS(&tls.Config{InsecureSkipVerify: true}) // TODO: remove this flag! UNSECURE!!
 	if err != nil {
-		log.Printf("Error using TLS: %v", err)
-		return "", false, 500
+		return nil, fmt.Errorf("failed to use TLS: %s", err)
 	}
 
 	// First bind with a read only user
-	err = l.Bind(settings.BindUsername, settings.BindPassword)
+	err = conn.Bind(a.BindUsername, a.BindPassword)
 	if err != nil {
-		log.Printf("Error Binding readonly: %v", err)
-		return "", false, 500
+		return nil, fmt.Errorf("failed to bind readonly: %s", err)
 	}
 
 	// Search for the given username
-	searchRequest := ldap.NewSearchRequest(
-		settings.BaseDN,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf(settings.Query, username),
+	req := ldap.NewSearchRequest(a.BaseDN, ldap.ScopeWholeSubtree,
+		ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf(a.QueryFormat, username),
 		[]string{"dn"},
 		nil,
 	)
 
-	sr, err := l.Search(searchRequest)
+	resp, err := conn.Search(req)
 	if err != nil {
-		log.Printf("Error Searching: %v", err)
-		return "", false, 500
+		return nil, fmt.Errorf("failed to search: %s", err)
 	}
 
-	if len(sr.Entries) != 1 {
-		log.Printf("User does not exist or too many entries returned: %v", searchRequest)
-		return "", false, 401
+	if len(resp.Entries) != 1 {
+		return nil, fmt.Errorf("user does not exist or too many entries returned: %v", req)
 	}
 
-	userdn := sr.Entries[0].DN
+	userdn := resp.Entries[0].DN
 
 	// Bind as the user to verify their password
-	err = l.Bind(userdn, password)
+	err = conn.Bind(userdn, password)
 	if err != nil {
-		log.Printf("Error binding User: %v", err)
-		return "", false, 401
+		return nil, fmt.Errorf("failed to bind user: %s", err)
 	}
 
-	return "authorizationHeader(username, password)", true, 200
+	user := new(UserInfo)
+	user.Name = userdn
+	user.Password = password
+	user.Home = "/" // TODO: get from LDAP!!!s
+
+	return user, nil // OK
 }

@@ -408,9 +408,12 @@ func main() {
 		}
 		auth_provider = file
 	case "ldap":
-	// ldap, err := auth.NewLdap(...)
-	//		private.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
-	//			*authLdapPass, *authLdapQuery, *authLdapBase))
+		ldap, err := auth.NewLDAP((*authLdapServer).String(), *authLdapUser,
+			*authLdapPass, *authLdapQuery, *authLdapBase)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to init LDAP authentication")
+		}
+		auth_provider = ldap
 	case "none":
 		break
 	default:
