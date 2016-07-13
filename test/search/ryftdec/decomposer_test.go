@@ -185,11 +185,11 @@ func TestQueries(t *testing.T) {
   [    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")
   [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
-	testQueryTree(t, `(RECORD.body CONTAINS FEDS('test',false,10,100)) AND ((RAW_TEXT CONSTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
+	testQueryTree(t, `(RECORD.body CONTAINS FEDS('test',false,10,100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
 		`[ AND]:
   [    ]: (RECORD.body CONTAINS 'test')
   [  OR]:
-    [    ]: (RAW_TEXT CONSTAINS "text")
+    [    ]: (RAW_TEXT CONTAINS "text")
     [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
 	testQueryTree(t, `((RAW_TEXT CONTAINS REGEX("\w+", CASELESS)) OR (RECORD.id CONTAINS DATE("200301")))`,
