@@ -75,37 +75,36 @@ func parseOptions(expression string) (string, bool, int, int) {
 		err   error
 	)
 
-	regex := regexp.MustCompile(`(.+) (FHS|FEDS)\((([\"\']{1}.+[\"\']{1}),?(.+)?)\)`)
+	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\(([\w"']+),?\s?([\s\w]+)?,?\s?(\d*)?,?\s?(\d*)?\)`)
 	matches := regex.FindAllStringSubmatch(expression, -1)
 
 	if len(matches) > 0 {
-		// Capture search query
-		args := strings.Split(matches[0][3], ",")
+		match := matches[0]
 
-		if len(args) > 1 {
-			cs, err = strconv.ParseBool(strings.TrimSpace(args[1]))
+		if match[4] != "" {
+			cs, err = strconv.ParseBool(strings.TrimSpace(match[4]))
 			if err != nil {
 				panic(err)
 			}
 		}
 
-		if len(args) > 2 {
-			dist64, err := strconv.ParseInt(strings.TrimSpace(args[2]), 10, 0)
+		if match[5] != "" {
+			dist64, err := strconv.ParseInt(strings.TrimSpace(match[5]), 10, 0)
 			if err != nil {
 				panic(err)
 			}
 			dist = int(dist64)
 		}
 
-		if len(args) > 3 {
-			width64, err := strconv.ParseInt(strings.TrimSpace(args[3]), 10, 0)
+		if match[6] != "" {
+			width64, err := strconv.ParseInt(strings.TrimSpace(match[6]), 10, 0)
 			if err != nil {
 				panic(err)
 			}
 			width = int(width64)
 		}
 
-		expression = fmt.Sprint(matches[0][1], " ", matches[0][4])
+		expression = fmt.Sprint(match[1], " ", match[3])
 	}
 
 	return expression, cs, dist, width
