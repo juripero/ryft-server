@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/demon-xxi/wildmatch"
@@ -47,7 +48,7 @@ func (s *Server) members(c *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(c)
 
-	info, _, err := GetConsulInfo(nil)
+	info, _, err := GetConsulInfo("", nil) // no user tag, no files
 
 	if err != nil {
 		panic(NewServerError(http.StatusInternalServerError, err.Error()))
@@ -69,7 +70,7 @@ func (s *Server) members(c *gin.Context) {
 
 // GetConsulInfo gets the list of ryft services and
 // the service tags related to requested set of files.
-func GetConsulInfo(files []string) (services []*consul.CatalogService, tags []string, err error) {
+func GetConsulInfo(userTag string, files []string) (services []*consul.CatalogService, tags []string, err error) {
 	config := consul.DefaultConfig()
 	// TODO: get some data from server's configuration
 	config.Datacenter = "dc1"
@@ -86,7 +87,7 @@ func GetConsulInfo(files []string) (services []*consul.CatalogService, tags []st
 	}
 
 	if len(files) != 0 {
-		tags, err = findBestMatch(client, files)
+		tags, err = findBestMatch(client, userTag, files)
 		if err != nil {
 			return services, nil, fmt.Errorf("failed to get match tags: %s", err)
 		}
@@ -111,13 +112,14 @@ func SplitToLocalAndRemote(services []*consul.CatalogService) (local *consul.Cat
 }
 
 // find best matched service tags for the file list
-func findBestMatch(client *consul.Client, files []string) ([]string, error) {
+// userTag is used for multitenancy support
+func findBestMatch(client *consul.Client, userTag string, files []string) ([]string, error) {
 	if len(files) == 0 {
 		return nil, nil // no files - no tags
 	}
 
 	// get all wildcards (keys) and tags
-	prefix := "partitions/"
+	prefix := filepath.Join("partitions/", userTag)
 	pairs, _, err := client.KV().List(prefix, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tags from KV: %s", err)

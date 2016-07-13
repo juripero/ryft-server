@@ -137,19 +137,19 @@ func ensureDefault(flag *string, message string) {
 }
 
 // get search backend with options
-func (s *Server) getSearchEngine(localOnly bool, files []string, authToken string, homeDir string) (search.Engine, error) {
+func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, homeDir, userTag string) (search.Engine, error) {
 	if !localOnly {
-		return s.getClusterSearchEngine(files, authToken, homeDir)
+		return s.getClusterSearchEngine(files, authToken, homeDir, userTag)
 	}
 
 	return s.getLocalSearchEngine(homeDir)
 }
 
 // get cluster's search engine
-func (s *Server) getClusterSearchEngine(files []string, authToken string, homeDir string) (search.Engine, error) {
+func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, userTag string) (search.Engine, error) {
 	// for each service create corresponding search engine
 	backends := []search.Engine{}
-	nodes, tags, err := GetConsulInfo(files)
+	nodes, tags, err := GetConsulInfo(userTag, files)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get consul services: %s", err)
 	}
@@ -303,13 +303,14 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 }
 
 // parse authentication token and home directory from context
-func (s *Server) parseAuthAndHome(ctx *gin.Context) (authToken string, homeDir string) {
+func (s *Server) parseAuthAndHome(ctx *gin.Context) (authToken string, homeDir string, userTag string) {
 	authToken = ctx.Request.Header.Get("Authorization") // may be empty
 
 	// get home directory
 	if v, exists := ctx.Get(gin.AuthUserKey); exists && v != nil {
 		if user, ok := v.(*auth.UserInfo); ok {
 			homeDir = user.Home
+			userTag = user.ClusterTag
 		}
 	}
 

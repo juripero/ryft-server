@@ -44,9 +44,10 @@ import (
 
 // UserInfo is a user credentials and related information such a home directory.
 type UserInfo struct {
-	Name     string `json:"username" yaml:"username"`
-	Password string `json:"password" yaml:"password"`
-	Home     string `json:"home" yaml:"home"`
+	Name       string `json:"username" yaml:"username"`
+	Password   string `json:"password" yaml:"password"`
+	Home       string `json:"home" yaml:"home"`
+	ClusterTag string `json:"clusterTag,omitempty" yaml:"clusterTag,omitempty"`
 }
 
 type Provider interface {
