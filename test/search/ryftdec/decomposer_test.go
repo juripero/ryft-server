@@ -22,6 +22,8 @@ func dumpType(q ryftdec.QueryType) string {
 		return "TIME"
 	case ryftdec.QTYPE_NUMERIC:
 		return " NUM"
+	case ryftdec.QTYPE_CURRENCY:
+		return "CURR"
 	case ryftdec.QTYPE_AND:
 		return " AND"
 	case ryftdec.QTYPE_OR:
@@ -194,5 +196,8 @@ func TestQueries(t *testing.T) {
 		`[  OR]:
   [  RE]: (RAW_TEXT CONTAINS REGEX("\w+", CASELESS))
   [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+
+	testQueryTree(t, `(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
+		`[CURR]: (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`)
 
 }
