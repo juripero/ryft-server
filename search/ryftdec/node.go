@@ -54,25 +54,56 @@ const (
 
 type Options struct {
 	Expression string
-	Cs         bool
-	Dist       int
-	Width      int
+	Values     map[string]interface{}
+}
+
+func (o *Options) Cs() (value bool, present bool) {
+	val := o.Values["cs"]
+	cs, ok := val.(bool)
+
+	if ok {
+		return cs, true
+	} else {
+		return false, false
+	}
+}
+
+func (o *Options) Dist() (value int, present bool) {
+	val := o.Values["dist"]
+	dist, ok := val.(int)
+
+	if ok {
+		return dist, true
+	} else {
+		return 0, false
+	}
+}
+
+func (o *Options) Width() (value int, present bool) {
+	val := o.Values["width"]
+	width, ok := val.(int)
+
+	if ok {
+		return width, true
+	} else {
+		return 0, false
+	}
 }
 
 func NewOptions(expression string) Options {
-	expr, cs, dist, width := parseOptions(expression)
+	expr, optionValues := parseOptions(expression)
 
 	if expressionType(expr).IsSearch() {
 		expr = fmt.Sprint("(", expr, ")")
 	}
 
-	return Options{Expression: expr, Cs: cs, Dist: dist, Width: width}
+	return Options{Expression: expr, Values: optionValues}
 }
 
-func parseOptions(expression string) (cleanExpression string, cs bool, dist int, width int) {
-	var err error
-
+func parseOptions(expression string) (cleanExpression string, values map[string]interface{}) {
+	values = make(map[string]interface{})
 	cleanExpression = expression
+
 	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\((.+?),?\s?([\s\w]+)?,?\s?(\d*)?,?\s?(\d*)?\)`)
 	matches := regex.FindAllStringSubmatch(expression, -1)
 
@@ -80,10 +111,11 @@ func parseOptions(expression string) (cleanExpression string, cs bool, dist int,
 		match := matches[0]
 
 		if match[4] != "" {
-			cs, err = strconv.ParseBool(strings.TrimSpace(match[4]))
+			cs, err := strconv.ParseBool(strings.TrimSpace(match[4]))
 			if err != nil {
 				panic(err)
 			}
+			values["cs"] = cs
 		}
 
 		if match[5] != "" {
@@ -91,7 +123,7 @@ func parseOptions(expression string) (cleanExpression string, cs bool, dist int,
 			if err != nil {
 				panic(err)
 			}
-			dist = int(dist64)
+			values["dist"] = int(dist64)
 		}
 
 		if match[6] != "" {
@@ -99,8 +131,9 @@ func parseOptions(expression string) (cleanExpression string, cs bool, dist int,
 			if err != nil {
 				panic(err)
 			}
-			width = int(width64)
+			values["width"] = int(width64)
 		}
+
 		cleanExpression = fmt.Sprint(match[1], " ", match[3])
 	}
 
