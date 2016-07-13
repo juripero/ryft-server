@@ -69,14 +69,10 @@ func NewOptions(expression string) Options {
 	return Options{Expression: expr, Cs: cs, Dist: dist, Width: width}
 }
 
-func parseOptions(expression string) (string, bool, int, int) {
-	var (
-		cs    bool
-		dist  int
-		width int
-		err   error
-	)
+func parseOptions(expression string) (cleanExpression string, cs bool, dist int, width int) {
+	var err error
 
+	cleanExpression = expression
 	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\((.+?),?\s?([\s\w]+)?,?\s?(\d*)?,?\s?(\d*)?\)`)
 	matches := regex.FindAllStringSubmatch(expression, -1)
 
@@ -105,10 +101,10 @@ func parseOptions(expression string) (string, bool, int, int) {
 			}
 			width = int(width64)
 		}
-		expression = fmt.Sprint(match[1], " ", match[3])
+		cleanExpression = fmt.Sprint(match[1], " ", match[3])
 	}
 
-	return expression, cs, dist, width
+	return
 }
 
 type Node struct {
