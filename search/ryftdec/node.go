@@ -77,7 +77,7 @@ func parseOptions(expression string) (string, bool, int, int) {
 		err   error
 	)
 
-	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\(([\w"']+),?\s?([\s\w]+)?,?\s?(\d*)?,?\s?(\d*)?\)`)
+	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\((.+?),?\s?([\s\w]+)?,?\s?(\d*)?,?\s?(\d*)?\)`)
 	matches := regex.FindAllStringSubmatch(expression, -1)
 
 	if len(matches) > 0 {
@@ -105,7 +105,6 @@ func parseOptions(expression string) (string, bool, int, int) {
 			}
 			width = int(width64)
 		}
-
 		expression = fmt.Sprint(match[1], " ", match[3])
 	}
 

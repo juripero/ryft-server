@@ -16,6 +16,8 @@ func dumpType(q ryftdec.QueryType) string {
 		return "    " // general search (es, fhs, feds)
 	case ryftdec.QTYPE_DATE:
 		return "DATE"
+	case ryftdec.QTYPE_REGEX:
+		return "  RE"
 	case ryftdec.QTYPE_TIME:
 		return "TIME"
 	case ryftdec.QTYPE_NUMERIC:
@@ -187,5 +189,10 @@ func TestQueries(t *testing.T) {
   [  OR]:
     [    ]: (RAW_TEXT CONSTAINS "text")
     [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+
+	testQueryTree(t, `((RAW_TEXT CONTAINS REGEX("\w+", CASELESS)) OR (RECORD.id CONTAINS DATE("200301")))`,
+		`[  OR]:
+  [  RE]: (RAW_TEXT CONTAINS REGEX("\w+", CASELESS))
+  [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
 }
