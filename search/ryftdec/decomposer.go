@@ -37,7 +37,7 @@ import (
 
 var (
 	delimiters     = []string{" AND ", " OR "}
-	markers        = []string{" DATE(", " TIME(", " NUMBER(", " FHS(", " FEDS(", " CURRENCY("}
+	markers        = []string{" DATE(", " TIME(", " NUMBER(", " FHS(", " FEDS(", " CURRENCY(", "REGEX("}
 	maxDepth   int = 1
 )
 
