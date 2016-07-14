@@ -211,4 +211,11 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FHS("123")))`,
 		`[    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
+
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   ((RECORD.id CONTAINS FEDS("123")) AND (RECORD.id CONTAINS DATE("200301"))))`,
+		`[ AND]:
+  [    ]: (RECORD.id CONTAINS "test")
+  [ AND]:
+    [    ]: (RECORD.id CONTAINS "123")
+    [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 }
