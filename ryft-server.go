@@ -415,7 +415,7 @@ func main() {
 			log.WithError(err).Fatal("Failed to init LDAP authentication")
 		}
 		auth_provider = ldap
-	case "none":
+	case "none", "":
 		break
 	default:
 		log.WithField("auth", *authType).Fatalf("unknown authentication type")

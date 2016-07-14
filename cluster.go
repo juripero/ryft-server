@@ -119,7 +119,7 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 	}
 
 	// get all wildcards (keys) and tags
-	prefix := filepath.Join("partitions/", userTag)
+	prefix := filepath.Join(userTag, "partitions/")
 	pairs, _, err := client.KV().List(prefix, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tags from KV: %s", err)
