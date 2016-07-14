@@ -91,6 +91,17 @@ func (o *Options) Width() (value uint) {
 	}
 }
 
+func (o *Options) Mode() (value string) {
+	val := o.Values["mode"]
+	mode, ok := val.(string)
+
+	if ok {
+		return mode
+	} else {
+		return o.DefaultValues.Mode
+	}
+}
+
 func NewOptions(expression string, globalOpts GlobalOptions) Options {
 	expr, optionValues := parseOptions(expression)
 
@@ -135,6 +146,7 @@ func parseOptions(expression string) (cleanExpression string, values map[string]
 			values["width"] = int(width64)
 		}
 
+		values["mode"] = match[2]
 		cleanExpression = fmt.Sprint(match[1], " ", match[3])
 	}
 
