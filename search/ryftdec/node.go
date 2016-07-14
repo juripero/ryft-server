@@ -53,51 +53,52 @@ const (
 )
 
 type Options struct {
-	Expression string
-	Values     map[string]interface{}
+	Expression    string
+	Values        map[string]interface{}
+	DefaultValues *GlobalOptions
 }
 
-func (o *Options) Cs() (value bool, present bool) {
+func (o *Options) Cs() (value bool) {
 	val := o.Values["cs"]
 	cs, ok := val.(bool)
 
 	if ok {
-		return cs, true
+		return cs
 	} else {
-		return false, false
+		return o.DefaultValues.Cs
 	}
 }
 
-func (o *Options) Dist() (value int, present bool) {
+func (o *Options) Dist() (value uint) {
 	val := o.Values["dist"]
-	dist, ok := val.(int)
+	dist, ok := val.(uint)
 
 	if ok {
-		return dist, true
+		return dist
 	} else {
-		return 0, false
+		return o.DefaultValues.Dist
 	}
 }
 
-func (o *Options) Width() (value int, present bool) {
+func (o *Options) Width() (value uint) {
 	val := o.Values["width"]
-	width, ok := val.(int)
+	width, ok := val.(uint)
 
 	if ok {
-		return width, true
+		return width
 	} else {
-		return 0, false
+		return o.DefaultValues.Width
 	}
 }
 
-func NewOptions(expression string) Options {
+func NewOptions(expression string, globalOpts GlobalOptions) Options {
 	expr, optionValues := parseOptions(expression)
 
 	if expressionType(expr).IsSearch() {
 		expr = fmt.Sprint("(", expr, ")")
 	}
 
-	return Options{Expression: expr, Values: optionValues}
+	return Options{Expression: expr, Values: optionValues, DefaultValues: &globalOpts}
 }
 
 func parseOptions(expression string) (cleanExpression string, values map[string]interface{}) {
@@ -148,8 +149,8 @@ type Node struct {
 	Options
 }
 
-func (node *Node) New(expression string, parent *Node) *Node {
-	node.Options = NewOptions(expression)
+func (node *Node) New(expression string, parent *Node, globalOpts GlobalOptions) *Node {
+	node.Options = NewOptions(expression, globalOpts)
 	node.Type = expressionType(expression)
 	node.Parent = parent
 	return node

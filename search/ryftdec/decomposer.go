@@ -33,6 +33,8 @@ package ryftdec
 import (
 	"fmt"
 	"strings"
+
+	"github.com/getryft/ryft-server/search"
 )
 
 var (
@@ -41,7 +43,14 @@ var (
 	maxDepth   int = 1
 )
 
-func Decompose(originalQuery string) (node *Node, err error) {
+type GlobalOptions struct {
+	Mode  string
+	Width uint
+	Dist  uint
+	Cs    bool
+}
+
+func Decompose(originalQuery string, config *search.Config) (node *Node, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
@@ -55,7 +64,14 @@ func Decompose(originalQuery string) (node *Node, err error) {
 	rootNode := Node{SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 
-	_, err = parse(&rootNode, originalQuery)
+	globalOptions := GlobalOptions{
+		Mode:  config.Mode,
+		Dist:  config.Fuzziness,
+		Width: config.Surrounding,
+		Cs:    config.CaseSensitive,
+	}
+
+	_, err = parse(&rootNode, originalQuery, globalOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +92,7 @@ func formatQuery(query string) string {
 }
 
 // Parse expression and build query tree
-func parse(currentNode *Node, query string) (*Node, error) {
+func parse(currentNode *Node, query string, opts GlobalOptions) (*Node, error) {
 	if !validateQuery(query) {
 		return nil, buildError("Invalid query: " + query)
 	}
@@ -88,7 +104,7 @@ func parse(currentNode *Node, query string) (*Node, error) {
 	}
 
 	tokens = translateToPrefixNotation(tokens)
-	currentNode = addToTree(currentNode, tokens)
+	currentNode = addToTree(currentNode, tokens, opts)
 
 	if !validateTree(currentNode) {
 		return nil, buildError("Invalid query: " + query)
@@ -153,24 +169,24 @@ func reorderOperators(tokens []string, result []string) []string {
 	return result
 }
 
-func addToTree(currentNode *Node, tokens []string) *Node {
+func addToTree(currentNode *Node, tokens []string, opts GlobalOptions) *Node {
 	for _, token := range tokens {
 		if notParsable(token) {
-			currentNode = addChildToNode(currentNode, token)
+			currentNode = addChildToNode(currentNode, token, opts)
 		} else {
-			_, _ = parse(currentNode, token)
+			_, _ = parse(currentNode, token, opts)
 		}
 	}
 	return currentNode
 }
 
-func addChildToNode(currentNode *Node, expression string) *Node {
+func addChildToNode(currentNode *Node, expression string, opts GlobalOptions) *Node {
 	var node *Node = &Node{}
 	if len(currentNode.SubNodes) == 2 {
-		node = node.New(expression, currentNode.Parent)
+		node = node.New(expression, currentNode.Parent, opts)
 		currentNode.Parent.SubNodes = append(currentNode.Parent.SubNodes, node)
 	} else {
-		node = node.New(expression, currentNode)
+		node = node.New(expression, currentNode, opts)
 		currentNode.SubNodes = append(currentNode.SubNodes, node)
 	}
 

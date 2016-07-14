@@ -3,6 +3,7 @@ package ryftdec
 import (
 	"testing"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,8 +24,9 @@ func TestInvalidQueries(t *testing.T) {
 		`(RAW_TEXT CONTAINS FHS("text",123, 100, 2000))`,
 	}
 
+	cfg := &search.Config{}
 	for _, q := range queries {
-		_, err := ryftdec.Decompose(q)
+		_, err := ryftdec.Decompose(q, cfg)
 		assert.Error(t, err, "Invalid query: `%s`", q)
 	}
 }
@@ -62,8 +64,9 @@ func TestValidQueries(t *testing.T) {
 		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
 	}
 
+	cfg := &search.Config{}
 	for _, q := range queries {
-		_, err := ryftdec.Decompose(q)
+		_, err := ryftdec.Decompose(q, cfg)
 		assert.NoError(t, err, "Valid query: `%s`", q)
 	}
 }
