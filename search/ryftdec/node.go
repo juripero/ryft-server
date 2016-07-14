@@ -169,7 +169,7 @@ func (node *Node) New(expression string, parent *Node, globalOpts GlobalOptions)
 }
 
 func (node *Node) sameTypeSubnodes() bool {
-	return node.SubNodes[0].Type == node.SubNodes[1].Type
+	return (node.SubNodes[0].Type == node.SubNodes[1].Type) && node.SubNodes[0].optionsEqual(node.SubNodes[1])
 }
 
 func (node *Node) subnodesAreQueries() bool {
@@ -190,6 +190,10 @@ func (node *Node) isSearch() bool {
 
 func (node *Node) isOperator() bool {
 	return !node.Type.IsSearch()
+}
+
+func (node *Node) optionsEqual(cmpNode *Node) bool {
+	return (node.Mode() == cmpNode.Mode()) && (node.Dist() == cmpNode.Dist()) && (node.Cs() == cmpNode.Cs()) && (node.Width() == cmpNode.Width())
 }
 
 // Map string operator value to constant
