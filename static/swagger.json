@@ -12,6 +12,7 @@
         "tags": [
           "search"
         ],
+        "summary": "Text or structured search",
         "operationId": "search",
         "parameters": [
           {
@@ -149,7 +150,7 @@
         "tags": [
           "count"
         ],
-        "summary": "Count",
+        "summary": "Count the search matches",
         "operationId": "count",
         "parameters": [
           {
@@ -263,7 +264,7 @@
         "tags": [
           "files"
         ],
-        "summary": "Files",
+        "summary": "List a directory content",
         "description": "Endpoint to query mode/cluster file system structure",
         "operationId": "files",
         "parameters": [
@@ -303,7 +304,7 @@
         "tags": [
           "version"
         ],
-        "summary": "Version",
+        "summary": "Get server's version",
         "description": "Endpoint to query current build version",
         "operationId": "version",
         "responses": {
@@ -312,6 +313,71 @@
             "schema": {
               "type": "object",
               "$ref": "#/definitions/VersionResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "type": "object",
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": [
+          "login"
+        ],
+        "summary": "Authentication",
+        "description": "Endpoint to authenticate an user",
+        "operationId": "login",
+        "consumes": ["application/json"],
+        "parameters": [
+          {
+             "in": "body",
+             "name": "body",
+             "description": "User's credentials",
+             "required": true,
+             "schema": {
+              "type": "object",
+              "$ref": "#/definitions/LoginRequest"
+             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JWT",
+            "schema": {
+              "type": "object",
+              "$ref": "#/definitions/LoginResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "type": "object",
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/token/refresh": {
+      "get": {
+        "tags": [
+          "token_refresh"
+        ],
+        "summary": "Refresh authentication",
+        "description": "Endpoint to refresh existing authentication token",
+        "operationId": "token_refresh",
+        "responses": {
+          "200": {
+            "description": "JWT",
+            "schema": {
+              "type": "object",
+              "$ref": "#/definitions/LoginResponse"
             }
           },
           "default": {
@@ -400,6 +466,28 @@
           "type": "string"
         },
         "version": {
+          "type": "string"
+        }
+      }
+    },
+    "LoginRequest": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "LoginResponse": {
+      "type": "object",
+      "properties": {
+        "expire": {
+          "type": "string"
+        },
+        "token": {
           "type": "string"
         }
       }
