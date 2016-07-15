@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/getryft/ryft-server/search"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,8 +53,7 @@ func dumpTree(root *Node, deep int) string {
 
 // decompose the query and check it
 func testQueryTree(t *testing.T, query string, expected string) {
-	cfg := &search.Config{}
-	tree, err := Decompose(query, cfg)
+	tree, err := Decompose(query, Options{})
 	assert.NoError(t, err, "Bad query")
 	if assert.NotNil(t, tree, "No tree") {
 		assert.Equal(t, expected, dumpTree(tree, 0))

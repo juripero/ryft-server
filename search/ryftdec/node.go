@@ -52,68 +52,9 @@ const (
 	QTYPE_XOR
 )
 
-type Options struct {
-	Expression    string
-	Values        map[string]interface{}
-	DefaultValues *GlobalOptions
-}
-
-func (o *Options) Cs() (value bool) {
-	val := o.Values["cs"]
-	cs, ok := val.(bool)
-
-	if ok {
-		return cs
-	} else {
-		return o.DefaultValues.Cs
-	}
-}
-
-func (o *Options) Dist() (value uint) {
-	val := o.Values["dist"]
-	dist, ok := val.(uint)
-
-	if ok {
-		return dist
-	} else {
-		return o.DefaultValues.Dist
-	}
-}
-
-func (o *Options) Width() (value uint) {
-	val := o.Values["width"]
-	width, ok := val.(uint)
-
-	if ok {
-		return width
-	} else {
-		return o.DefaultValues.Width
-	}
-}
-
-func (o *Options) Mode() (value string) {
-	val := o.Values["mode"]
-	mode, ok := val.(string)
-
-	if ok {
-		return mode
-	} else {
-		return o.DefaultValues.Mode
-	}
-}
-
-func NewOptions(expression string, globalOpts GlobalOptions) Options {
-	expr, optionValues := parseOptions(expression)
-
-	if expressionType(expr).IsSearch() {
-		expr = fmt.Sprint("(", expr, ")")
-	}
-
-	return Options{Expression: expr, Values: optionValues, DefaultValues: &globalOpts}
-}
-
-func parseOptions(expression string) (cleanExpression string, values map[string]interface{}) {
-	values = make(map[string]interface{})
+// parses options from search expression
+func parseOptions(expression string, baseOpts Options) (cleanExpression string, opts Options) {
+	opts = baseOpts // just a copy by default
 	cleanExpression = expression
 
 	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\((.+?),?\s?([\s\w]+)?,?\s?(\d*)?,?\s?(\d*)?\)`)
@@ -122,54 +63,73 @@ func parseOptions(expression string) (cleanExpression string, values map[string]
 	if len(matches) > 0 {
 		match := matches[0]
 
-		if match[4] != "" {
-			cs, err := strconv.ParseBool(strings.TrimSpace(match[4]))
+		op := strings.TrimSpace(match[1])
+		mode := strings.TrimSpace(match[2])
+		expr := strings.TrimSpace(match[3])
+		cs := strings.TrimSpace(match[4])
+		dist := strings.TrimSpace(match[5])
+		width := strings.TrimSpace(match[6])
+
+		opts.Mode = strings.ToLower(mode) // FHS or FEDS
+
+		// remove all embedded options from search expression
+		cleanExpression = fmt.Sprintf("%s %s", op, expr)
+
+		// case sensitive
+		if len(cs) > 0 {
+			v, err := strconv.ParseBool(cs)
 			if err != nil {
 				panic(err)
 			}
-			values["cs"] = cs
+			opts.Cs = v
 		}
 
-		if match[5] != "" {
-			dist64, err := strconv.ParseInt(strings.TrimSpace(match[5]), 10, 0)
+		// fuziness distance
+		if len(dist) > 0 {
+			v, err := strconv.ParseInt(dist, 10, 0)
 			if err != nil {
 				panic(err)
 			}
-			values["dist"] = int(dist64)
+			opts.Dist = uint(v)
 		}
 
-		if match[6] != "" {
-			width64, err := strconv.ParseInt(strings.TrimSpace(match[6]), 10, 0)
+		// surrounding width
+		if len(width) > 0 {
+			v, err := strconv.ParseInt(strings.TrimSpace(match[6]), 10, 0)
 			if err != nil {
 				panic(err)
 			}
-			values["width"] = int(width64)
+			opts.Width = uint(v)
 		}
-
-		values["mode"] = match[2]
-		cleanExpression = fmt.Sprint(match[1], " ", match[3])
 	}
 
 	return
 }
 
+// Search tree node
 type Node struct {
-	//Expression string
-	Type     QueryType
-	Parent   *Node
-	SubNodes []*Node
-	Options
+	Expression string
+	Type       QueryType
+	Parent     *Node
+	SubNodes   []*Node
+	Options    Options
 }
 
-func (node *Node) New(expression string, parent *Node, globalOpts GlobalOptions) *Node {
-	node.Options = NewOptions(expression, globalOpts)
-	node.Type = expressionType(expression)
+// create new tree node
+func NewNode(expression string, parent *Node, baseOpts Options) *Node {
+	node := new(Node)
+	node.Expression, node.Options = parseOptions(expression, baseOpts)
+	node.Type = expressionType(node.Expression)
+	if node.Type.IsSearch() {
+		node.Expression = fmt.Sprintf("(%s)", node.Expression)
+	}
 	node.Parent = parent
 	return node
 }
 
 func (node *Node) sameTypeSubnodes() bool {
-	return (node.SubNodes[0].Type == node.SubNodes[1].Type) && node.SubNodes[0].optionsEqual(node.SubNodes[1])
+	return (node.SubNodes[0].Type == node.SubNodes[1].Type) &&
+		node.SubNodes[0].optionsEqual(node.SubNodes[1])
 }
 
 func (node *Node) subnodesAreQueries() bool {
@@ -193,7 +153,12 @@ func (node *Node) isOperator() bool {
 }
 
 func (node *Node) optionsEqual(cmpNode *Node) bool {
-	return (node.Mode() == cmpNode.Mode()) && (node.Dist() == cmpNode.Dist()) && (node.Cs() == cmpNode.Cs()) && (node.Width() == cmpNode.Width())
+	a := node.Options
+	b := cmpNode.Options
+	return (a.Mode == b.Mode) &&
+		(a.Dist == b.Dist) &&
+		(a.Width == b.Width) &&
+		(a.Cs == b.Cs)
 }
 
 // Map string operator value to constant

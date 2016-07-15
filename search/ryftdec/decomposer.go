@@ -43,14 +43,26 @@ var (
 	maxDepth   int = 1
 )
 
-type GlobalOptions struct {
-	Mode  string
-	Width uint
-	Dist  uint
-	Cs    bool
+// Options contains search options
+type Options struct {
+	Mode  string // Search mode: fhs, feds, date, time, etc.
+	Width uint   // Surrounding width
+	Dist  uint   // Fuzziness distance
+	Cs    bool   // Case sensitivity flag
 }
 
-func Decompose(originalQuery string, config *search.Config) (node *Node, err error) {
+// convert search config to Options
+func configToOpts(config *search.Config) Options {
+	return Options{
+		Mode:  config.Mode,
+		Dist:  config.Fuzziness,
+		Width: config.Surrounding,
+		Cs:    config.CaseSensitive,
+	}
+}
+
+// Decompose search expression into expression tree
+func Decompose(originalQuery string, baseOpts Options) (node *Node, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
@@ -64,14 +76,7 @@ func Decompose(originalQuery string, config *search.Config) (node *Node, err err
 	rootNode := Node{SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 
-	globalOptions := GlobalOptions{
-		Mode:  config.Mode,
-		Dist:  config.Fuzziness,
-		Width: config.Surrounding,
-		Cs:    config.CaseSensitive,
-	}
-
-	_, err = parse(&rootNode, originalQuery, globalOptions)
+	_, err = parse(&rootNode, originalQuery, baseOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +97,7 @@ func formatQuery(query string) string {
 }
 
 // Parse expression and build query tree
-func parse(currentNode *Node, query string, opts GlobalOptions) (*Node, error) {
+func parse(currentNode *Node, query string, opts Options) (*Node, error) {
 	if !validateQuery(query) {
 		return nil, buildError("Invalid query: " + query)
 	}
@@ -169,7 +174,7 @@ func reorderOperators(tokens []string, result []string) []string {
 	return result
 }
 
-func addToTree(currentNode *Node, tokens []string, opts GlobalOptions) *Node {
+func addToTree(currentNode *Node, tokens []string, opts Options) *Node {
 	for _, token := range tokens {
 		if notParsable(token) {
 			currentNode = addChildToNode(currentNode, token, opts)
@@ -180,13 +185,13 @@ func addToTree(currentNode *Node, tokens []string, opts GlobalOptions) *Node {
 	return currentNode
 }
 
-func addChildToNode(currentNode *Node, expression string, opts GlobalOptions) *Node {
-	var node *Node = &Node{}
+func addChildToNode(currentNode *Node, expression string, opts Options) *Node {
+	var node *Node
 	if len(currentNode.SubNodes) == 2 {
-		node = node.New(expression, currentNode.Parent, opts)
+		node = NewNode(expression, currentNode.Parent, opts)
 		currentNode.Parent.SubNodes = append(currentNode.Parent.SubNodes, node)
 	} else {
-		node = node.New(expression, currentNode, opts)
+		node = NewNode(expression, currentNode, opts)
 		currentNode.SubNodes = append(currentNode.SubNodes, node)
 	}
 
