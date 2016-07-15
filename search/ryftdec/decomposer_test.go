@@ -6,30 +6,29 @@ import (
 	"testing"
 
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/stretchr/testify/assert"
 )
 
 // gets query type string representation.
-func dumpType(q ryftdec.QueryType) string {
+func dumpType(q QueryType) string {
 	switch q {
-	case ryftdec.QTYPE_SEARCH:
+	case QTYPE_SEARCH:
 		return "    " // general search (es, fhs, feds)
-	case ryftdec.QTYPE_DATE:
+	case QTYPE_DATE:
 		return "DATE"
-	case ryftdec.QTYPE_REGEX:
+	case QTYPE_REGEX:
 		return "  RE"
-	case ryftdec.QTYPE_TIME:
+	case QTYPE_TIME:
 		return "TIME"
-	case ryftdec.QTYPE_NUMERIC:
+	case QTYPE_NUMERIC:
 		return " NUM"
-	case ryftdec.QTYPE_CURRENCY:
+	case QTYPE_CURRENCY:
 		return "CURR"
-	case ryftdec.QTYPE_AND:
+	case QTYPE_AND:
 		return " AND"
-	case ryftdec.QTYPE_OR:
+	case QTYPE_OR:
 		return "  OR"
-	case ryftdec.QTYPE_XOR:
+	case QTYPE_XOR:
 		return " XOR"
 	}
 
@@ -37,7 +36,7 @@ func dumpType(q ryftdec.QueryType) string {
 }
 
 // dump query tree as a string
-func dumpTree(root *ryftdec.Node, deep int) string {
+func dumpTree(root *Node, deep int) string {
 	s := fmt.Sprintf("%s[%s]:",
 		strings.Repeat("  ", deep),
 		dumpType(root.Type))
@@ -56,7 +55,7 @@ func dumpTree(root *ryftdec.Node, deep int) string {
 // decompose the query and check it
 func testQueryTree(t *testing.T, query string, expected string) {
 	cfg := &search.Config{}
-	tree, err := ryftdec.Decompose(query, cfg)
+	tree, err := Decompose(query, cfg)
 	assert.NoError(t, err, "Bad query")
 	if assert.NotNil(t, tree, "No tree") {
 		assert.Equal(t, expected, dumpTree(tree, 0))

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +25,7 @@ func TestInvalidQueries(t *testing.T) {
 
 	cfg := &search.Config{}
 	for _, q := range queries {
-		_, err := ryftdec.Decompose(q, cfg)
+		_, err := Decompose(q, cfg)
 		assert.Error(t, err, "Invalid query: `%s`", q)
 	}
 }
@@ -66,7 +65,7 @@ func TestValidQueries(t *testing.T) {
 
 	cfg := &search.Config{}
 	for _, q := range queries {
-		_, err := ryftdec.Decompose(q, cfg)
+		_, err := Decompose(q, cfg)
 		assert.NoError(t, err, "Valid query: `%s`", q)
 	}
 }
