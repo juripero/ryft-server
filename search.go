@@ -61,6 +61,7 @@ type SearchParams struct {
 	ErrorPrefix   bool     `form:"ep" json:"ep"`
 	KeepDataAs    string   `form:"data" json:"data"`
 	KeepIndexAs   string   `form:"index" json:"index"`
+	Limit         int      `form:"limit" json:"limit"`
 }
 
 // Handle /search endpoint.
@@ -134,6 +135,7 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.Limit = uint(params.Limit)
 
 	log.WithField("config", cfg).WithField("user", userName).
 		WithField("home", homeDir).WithField("cluster", userTag).
@@ -185,6 +187,7 @@ func (s *Server) search(ctx *gin.Context) {
 	}
 
 	// process results!
+	var recordsReceived uint
 	for {
 		select {
 		case <-gone:
@@ -193,6 +196,12 @@ func (s *Server) search(ctx *gin.Context) {
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
+				if recordsReceived > cfg.Limit && cfg.Limit != 0 {
+					log.WithField("result", res).Infof("/search done")
+					return // stop
+				}
+
+				recordsReceived++
 				putRec(rec)
 			}
 
