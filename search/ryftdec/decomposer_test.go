@@ -9,9 +9,12 @@ import (
 )
 
 // gets query type string representation.
-func dumpType(q QueryType) string {
+func dumpType(q QueryType, opts Options) string {
 	switch q {
 	case QTYPE_SEARCH:
+		if len(opts.Mode) > 0 || opts.Dist > 0 || opts.Width > 0 || opts.Cs {
+			return fmt.Sprintf("%s-%d/%d-%t", opts.Mode, opts.Dist, opts.Width, opts.Cs)
+		}
 		return "    " // general search (es, fhs, feds)
 	case QTYPE_DATE:
 		return "DATE"
@@ -38,7 +41,7 @@ func dumpType(q QueryType) string {
 func dumpTree(root *Node, deep int) string {
 	s := fmt.Sprintf("%s[%s]:",
 		strings.Repeat("  ", deep),
-		dumpType(root.Type))
+		dumpType(root.Type, root.Options))
 
 	if root.Type.IsSearch() {
 		s += " " + root.Expression
@@ -176,23 +179,23 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `((RECORD.id CONTAINS NUMBER(NUM < 7))   AND   (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
 		`[ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8))`)
 
-	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 0, 0)))`,
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 1, 2)))`,
 		`[ AND]:
-  [    ]: (RECORD.id CONTAINS "test")
-  [    ]: (RECORD.id CONTAINS "123")`)
+  [fhs-0/0-false]: (RECORD.id CONTAINS "test")
+  [feds-1/2-true]: (RECORD.id CONTAINS "123")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 0, 0)) OR (RECORD.id CONTAINS DATE("200301")))`,
 		`[  OR]:
   [ AND]:
-    [    ]: (RECORD.id CONTAINS "test")
-    [    ]: (RECORD.id CONTAINS "123")
+    [fhs-0/0-false]: (RECORD.id CONTAINS "test")
+    [feds-0/0-true]: (RECORD.id CONTAINS "123")
   [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
 	testQueryTree(t, `(RECORD.body CONTAINS FEDS('test',false,10,100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
 		`[ AND]:
-  [    ]: (RECORD.body CONTAINS 'test')
+  [feds-10/100-false]: (RECORD.body CONTAINS 'test')
   [  OR]:
-    [    ]: (RAW_TEXT CONTAINS "text")
+    [fhs-0/0-false]: (RAW_TEXT CONTAINS "text")
     [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
 	testQueryTree(t, `((RAW_TEXT CONTAINS REGEX("\w+", CASELESS)) OR (RECORD.id CONTAINS DATE("200301")))`,
@@ -211,8 +214,8 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   ((RECORD.id CONTAINS FEDS("123")) AND (RECORD.id CONTAINS DATE("200301"))))`,
 		`[ AND]:
-  [    ]: (RECORD.id CONTAINS "test")
+  [fhs-0/0-false]: (RECORD.id CONTAINS "test")
   [ AND]:
-    [    ]: (RECORD.id CONTAINS "123")
+    [feds-0/0-false]: (RECORD.id CONTAINS "123")
     [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 }
