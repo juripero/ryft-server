@@ -63,6 +63,12 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-p", "ds")
 	case "time_search", "time", "ts":
 		args = append(args, "-p", "ts")
+	case "number_search", "num", "ns":
+		args = append(args, "-p", "ns")
+	case "currency_search", "currency", "cs":
+		args = append(args, "-p", "ns") // currency is a kind of numeric search
+	case "regexp_search", "regex_search", "regexp", "regex", "rs":
+		args = append(args, "-p", "rs")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}

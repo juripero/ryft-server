@@ -3,7 +3,6 @@ package ryftdec
 import (
 	"testing"
 
-	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,10 +19,11 @@ func TestInvalidQueries(t *testing.T) {
 		`() AND OR" "() MOR ()`,
 		`(((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`,
 		`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301")))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`,
+		`(RAW_TEXT CONTAINS FHS("text",123, 100, 2000))`,
 	}
 
 	for _, q := range queries {
-		_, err := ryftdec.Decompose(q)
+		_, err := Decompose(q, Options{})
 		assert.Error(t, err, "Invalid query: `%s`", q)
 	}
 }
@@ -51,10 +51,18 @@ func TestValidQueries(t *testing.T) {
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
+		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
+		`(RECORD.body CONTAINS FHS("test", true, 10, 100))`,
+		`(RECORD.body CONTAINS FEDS("test", false, 10, 100))`,
+		`(RECORD.body CONTAINS FEDS("test",false,10,100))`,
+		`(RECORD.body CONTAINS FEDS('test',false,10,100))`,
+		`(RECORD.body CONTAINS FEDS('test',false,10,100)) AND (RECORD.body CONTAINS FHS("test", true, 10, 100))`,
+		`(RECORD.body CONTAINS "FEDS")`,
+		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
 	}
 
 	for _, q := range queries {
-		_, err := ryftdec.Decompose(q)
+		_, err := Decompose(q, Options{})
 		assert.NoError(t, err, "Valid query: `%s`", q)
 	}
 }

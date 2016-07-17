@@ -5,26 +5,32 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/stretchr/testify/assert"
 )
 
 // gets query type string representation.
-func dumpType(q ryftdec.QueryType) string {
+func dumpType(q QueryType, opts Options) string {
 	switch q {
-	case ryftdec.QTYPE_SEARCH:
+	case QTYPE_SEARCH:
+		if len(opts.Mode) > 0 || opts.Dist > 0 || opts.Width > 0 || opts.Cs {
+			return fmt.Sprintf("%s-%d/%d-%t", opts.Mode, opts.Dist, opts.Width, opts.Cs)
+		}
 		return "    " // general search (es, fhs, feds)
-	case ryftdec.QTYPE_DATE:
+	case QTYPE_DATE:
 		return "DATE"
-	case ryftdec.QTYPE_TIME:
+	case QTYPE_REGEX:
+		return "  RE"
+	case QTYPE_TIME:
 		return "TIME"
-	case ryftdec.QTYPE_NUMERIC:
+	case QTYPE_NUMERIC:
 		return " NUM"
-	case ryftdec.QTYPE_AND:
+	case QTYPE_CURRENCY:
+		return "CURR"
+	case QTYPE_AND:
 		return " AND"
-	case ryftdec.QTYPE_OR:
+	case QTYPE_OR:
 		return "  OR"
-	case ryftdec.QTYPE_XOR:
+	case QTYPE_XOR:
 		return " XOR"
 	}
 
@@ -32,10 +38,10 @@ func dumpType(q ryftdec.QueryType) string {
 }
 
 // dump query tree as a string
-func dumpTree(root *ryftdec.Node, deep int) string {
+func dumpTree(root *Node, deep int) string {
 	s := fmt.Sprintf("%s[%s]:",
 		strings.Repeat("  ", deep),
-		dumpType(root.Type))
+		dumpType(root.Type, root.Options))
 
 	if root.Type.IsSearch() {
 		s += " " + root.Expression
@@ -50,7 +56,7 @@ func dumpTree(root *ryftdec.Node, deep int) string {
 
 // decompose the query and check it
 func testQueryTree(t *testing.T, query string, expected string) {
-	tree, err := ryftdec.Decompose(query)
+	tree, err := Decompose(query, Options{})
 	assert.NoError(t, err, "Bad query")
 	if assert.NotNil(t, tree, "No tree") {
 		assert.Equal(t, expected, dumpTree(tree, 0))
@@ -67,6 +73,17 @@ func TestQueries(t *testing.T) {
 		`[    ]: (RAW_TEXT CONTAINS "100")`)
 	testQueryTree(t, `((RAW_TEXT CONTAINS "100"))`,
 		`[    ]: (RAW_TEXT CONTAINS "100")`)
+
+	testQueryTree(t, `(RAW_TEXT CONTAINS "DATE()")`,
+		`[    ]: (RAW_TEXT CONTAINS "DATE()")`)
+	testQueryTree(t, `(RAW_TEXT CONTAINS "TIME()")`,
+		`[    ]: (RAW_TEXT CONTAINS "TIME()")`)
+	testQueryTree(t, `(RAW_TEXT CONTAINS "NUMBER()")`,
+		`[    ]: (RAW_TEXT CONTAINS "NUMBER()")`)
+	testQueryTree(t, `(RAW_TEXT CONTAINS "CURRENCY()")`,
+		`[    ]: (RAW_TEXT CONTAINS "CURRENCY()")`)
+	testQueryTree(t, `(RAW_TEXT CONTAINS "REGEX()")`,
+		`[    ]: (RAW_TEXT CONTAINS "REGEX()")`)
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`,
 		`[    ]: (RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
@@ -173,4 +190,43 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `((RECORD.id CONTAINS NUMBER(NUM < 7))   AND   (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
 		`[ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8))`)
 
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 1, 2)))`,
+		`[ AND]:
+  [fhs-0/0-false]: (RECORD.id CONTAINS "test")
+  [feds-1/2-true]: (RECORD.id CONTAINS "123")`)
+
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 0, 0)) OR (RECORD.id CONTAINS DATE("200301")))`,
+		`[  OR]:
+  [ AND]:
+    [fhs-0/0-false]: (RECORD.id CONTAINS "test")
+    [feds-0/0-true]: (RECORD.id CONTAINS "123")
+  [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+
+	testQueryTree(t, `(RECORD.body CONTAINS FEDS('test',false,10,100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
+		`[ AND]:
+  [feds-10/100-false]: (RECORD.body CONTAINS 'test')
+  [  OR]:
+    [fhs-0/0-false]: (RAW_TEXT CONTAINS "text")
+    [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+
+	testQueryTree(t, `((RAW_TEXT CONTAINS REGEX("\w+", CASELESS)) OR (RECORD.id CONTAINS DATE("200301")))`,
+		`[  OR]:
+  [  RE]: (RAW_TEXT CONTAINS REGEX("\w+", CASELESS))
+  [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+
+	testQueryTree(t, `(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
+		`[CURR]: (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`)
+
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test", true, 0, 0))   AND   (RECORD.id CONTAINS FHS("123", true, 0, 0)))`,
+		`[    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
+
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FHS("123")))`,
+		`[    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
+
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   ((RECORD.id CONTAINS FEDS("123")) AND (RECORD.id CONTAINS DATE("200301"))))`,
+		`[ AND]:
+  [fhs-0/0-false]: (RECORD.id CONTAINS "test")
+  [ AND]:
+    [feds-0/0-false]: (RECORD.id CONTAINS "123")
+    [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 }

@@ -31,9 +31,9 @@
 package ryftdec
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 func containsString(slice []string, item string) bool {
@@ -43,6 +43,15 @@ func containsString(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func containsAnySubString(s string, subs []string) string {
+	for _, v := range subs {
+		if strings.Contains(s, v) {
+			return v
+		}
+	}
+	return ""
 }
 
 // Detect extension using input file set.
@@ -65,10 +74,6 @@ func detectExtension(fileNames []string) (string, error) {
 	}
 
 	return "", fmt.Errorf("unable to detect extension from %v", extensions)
-}
-
-func buildError(message string) error {
-	return errors.New(message)
 }
 
 func indexOfToken(tokens []string, token string) int {

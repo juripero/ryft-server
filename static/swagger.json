@@ -39,8 +39,8 @@
             "type": "string",
             "name": "mode",
             "x-go-name": "Mode",
-            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts) or numeric search (ns)",
-            "enum": ["es", "fhs", "feds", "ds", "ts", "ns"]
+            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs)",
+            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs"]
           },
           {
             "in": "query",

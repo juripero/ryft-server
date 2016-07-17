@@ -79,7 +79,7 @@ func differentLevelNormalization(node *Node) {
 
 func queriesWithSameType(node1 *Node, node2 *Node) bool {
 	for _, node := range node2.SubNodes {
-		return node1.Type == node.Type
+		return (node1.Type == node.Type) && node1.optionsEqual(node)
 	}
 	return false
 }

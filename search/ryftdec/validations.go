@@ -91,7 +91,7 @@ func validateTokens(tokens []string) bool {
 }
 
 func validateToken(token string) bool {
-	result, _ := regexp.MatchString(`^$|^[([\].a-zA-Z0-9_]+ [a-zA-Z-]+ [a-zA-Z0-9-"():=!<>/\\ ]+?$`, token)
+	result, _ := regexp.MatchString(`(?i)^(RAW_TEXT|(RECORD\..+?)) (CONTAINS|EQUALS) (DATE|TIME|CURRENCY|NUMBER|FHS|FEDS|REGEX|)((\(.+?\))|(["']{1}.+?["']{1})|([\w\d]+))$`, token)
 	return result
 }
 

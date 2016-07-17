@@ -32,6 +32,8 @@ package ryftdec
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -42,31 +44,93 @@ const (
 	QTYPE_DATE
 	QTYPE_TIME
 	QTYPE_NUMERIC
+	QTYPE_CURRENCY
+	QTYPE_REGEX
+
 	QTYPE_AND
 	QTYPE_OR
 	QTYPE_XOR
 )
 
+// parses options from search expression
+func parseOptions(expression string, baseOpts Options) (cleanExpression string, opts Options) {
+	opts = baseOpts // just a copy by default
+	cleanExpression = expression
+
+	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\((.+?),?\s?([\s\w]+)?,?\s?(\d*)?,?\s?(\d*)?\)`)
+	matches := regex.FindAllStringSubmatch(expression, -1)
+
+	if len(matches) > 0 {
+		match := matches[0]
+
+		op := strings.TrimSpace(match[1])
+		mode := strings.TrimSpace(match[2])
+		expr := strings.TrimSpace(match[3])
+		cs := strings.TrimSpace(match[4])
+		dist := strings.TrimSpace(match[5])
+		width := strings.TrimSpace(match[6])
+
+		opts.Mode = strings.ToLower(mode) // FHS or FEDS
+
+		// remove all embedded options from search expression
+		cleanExpression = fmt.Sprintf("%s %s", op, expr)
+
+		// case sensitive
+		if len(cs) > 0 {
+			v, err := strconv.ParseBool(cs)
+			if err != nil {
+				panic(err)
+			}
+			opts.Cs = v
+		}
+
+		// fuziness distance
+		if len(dist) > 0 {
+			v, err := strconv.ParseInt(dist, 10, 0)
+			if err != nil {
+				panic(err)
+			}
+			opts.Dist = uint(v)
+		}
+
+		// surrounding width
+		if len(width) > 0 {
+			v, err := strconv.ParseInt(strings.TrimSpace(match[6]), 10, 0)
+			if err != nil {
+				panic(err)
+			}
+			opts.Width = uint(v)
+		}
+	}
+
+	return
+}
+
+// Search tree node
 type Node struct {
 	Expression string
 	Type       QueryType
 	Parent     *Node
 	SubNodes   []*Node
+	Options    Options
 }
 
-func (node *Node) New(expression string, parent *Node) *Node {
-	if isOperator(expression) {
-		node.Expression = strings.Trim(expression, " ")
-	} else {
-		node.Expression = "(" + expression + ")"
+// create new tree node
+func NewNode(expression string, parent *Node, baseOpts Options) *Node {
+	node := new(Node)
+	node.Expression, node.Options = parseOptions(expression, baseOpts)
+	node.Type = expressionType(node.Expression)
+	if node.Type.IsSearch() {
+		node.Expression = fmt.Sprintf("(%s)", node.Expression)
 	}
-	node.Type = expressionType(expression)
 	node.Parent = parent
 	return node
 }
 
 func (node *Node) sameTypeSubnodes() bool {
-	return node.SubNodes[0].Type == node.SubNodes[1].Type
+	return node.hasSubnodes() &&
+		(node.SubNodes[0].Type == node.SubNodes[1].Type) &&
+		node.SubNodes[0].optionsEqual(node.SubNodes[1])
 }
 
 func (node *Node) subnodesAreQueries() bool {
@@ -78,7 +142,7 @@ func (node *Node) hasSubnodes() bool {
 }
 
 func (node Node) String() string {
-	return fmt.Sprintf("Expression: '%s'", node.Expression)
+	return fmt.Sprintf("Expression: %q", node.Expression)
 }
 
 func (node *Node) isSearch() bool {
@@ -87,6 +151,15 @@ func (node *Node) isSearch() bool {
 
 func (node *Node) isOperator() bool {
 	return !node.Type.IsSearch()
+}
+
+func (node *Node) optionsEqual(cmpNode *Node) bool {
+	a := node.Options
+	b := cmpNode.Options
+	return (a.Mode == b.Mode) &&
+		(a.Dist == b.Dist) &&
+		(a.Width == b.Width) &&
+		(a.Cs == b.Cs)
 }
 
 // Map string operator value to constant
@@ -105,6 +178,10 @@ func expressionType(expression string) QueryType {
 		return QTYPE_TIME
 	case strings.Contains(expression, "NUMBER("):
 		return QTYPE_NUMERIC
+	case strings.Contains(expression, "CURRENCY("):
+		return QTYPE_CURRENCY
+	case strings.Contains(expression, "REGEX("):
+		return QTYPE_REGEX
 	default:
 		return QTYPE_SEARCH
 	}
@@ -114,7 +191,8 @@ func expressionType(expression string) QueryType {
 func (q QueryType) IsSearch() bool {
 	switch q {
 	case QTYPE_SEARCH, QTYPE_DATE,
-		QTYPE_TIME, QTYPE_NUMERIC:
+		QTYPE_TIME, QTYPE_NUMERIC,
+		QTYPE_CURRENCY, QTYPE_REGEX:
 		return true
 	}
 
