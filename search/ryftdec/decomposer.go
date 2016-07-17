@@ -99,20 +99,20 @@ func formatQuery(query string) string {
 // Parse expression and build query tree
 func parse(currentNode *Node, query string, opts Options) (*Node, error) {
 	if !validateQuery(query) {
-		return nil, buildError("Invalid query: " + query)
+		return nil, fmt.Errorf("Invalid query: %q", query)
 	}
 
 	tokens := tokenize(query)
 
 	if !validateTokens(tokens) {
-		return nil, buildError("Invalid query: " + query)
+		return nil, fmt.Errorf("Invalid query: %q (bad tokens)", query)
 	}
 
 	tokens = translateToPrefixNotation(tokens)
 	currentNode = addToTree(currentNode, tokens, opts)
 
 	if !validateTree(currentNode) {
-		return nil, buildError("Invalid query: " + query)
+		return nil, fmt.Errorf("Invalid query: %d (bad tree)", query)
 	}
 
 	return currentNode, nil

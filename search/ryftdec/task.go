@@ -73,8 +73,10 @@ func getSearchMode(query QueryType, defaultMode string) string {
 		return "ds" // date_search
 	case QTYPE_TIME:
 		return "ts" // time_search
-	case QTYPE_NUMERIC:
+	case QTYPE_NUMERIC, QTYPE_CURRENCY:
 		return "ns" // numeric_search
+	case QTYPE_REGEX:
+		return "rs" // regex_search
 	}
 
 	return defaultMode

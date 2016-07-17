@@ -128,7 +128,8 @@ func NewNode(expression string, parent *Node, baseOpts Options) *Node {
 }
 
 func (node *Node) sameTypeSubnodes() bool {
-	return (node.SubNodes[0].Type == node.SubNodes[1].Type) &&
+	return node.hasSubnodes() &&
+		(node.SubNodes[0].Type == node.SubNodes[1].Type) &&
 		node.SubNodes[0].optionsEqual(node.SubNodes[1])
 }
 
@@ -141,7 +142,7 @@ func (node *Node) hasSubnodes() bool {
 }
 
 func (node Node) String() string {
-	return fmt.Sprintf("Expression: '%s'", node.Expression)
+	return fmt.Sprintf("Expression: %q", node.Expression)
 }
 
 func (node *Node) isSearch() bool {
@@ -190,7 +191,8 @@ func expressionType(expression string) QueryType {
 func (q QueryType) IsSearch() bool {
 	switch q {
 	case QTYPE_SEARCH, QTYPE_DATE,
-		QTYPE_TIME, QTYPE_NUMERIC, QTYPE_CURRENCY, QTYPE_REGEX:
+		QTYPE_TIME, QTYPE_NUMERIC,
+		QTYPE_CURRENCY, QTYPE_REGEX:
 		return true
 	}
 

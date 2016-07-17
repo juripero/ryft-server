@@ -56,7 +56,8 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		if len(cfg.Mode) == 0 {
 			// use "ds", "ts", "ns" search mode
 			// if query contains corresponding keywords
-			cfg.Mode = getSearchMode(task.queries.Type, "")
+			cfg.Mode = getSearchMode(task.queries.Type,
+				task.queries.Options.Mode)
 		}
 		return engine.Backend.Count(cfg)
 	}
@@ -83,5 +84,6 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 
 		// TODO: handle task cancellation!!!
 	}()
+
 	return mux, nil // OK for now
 }
