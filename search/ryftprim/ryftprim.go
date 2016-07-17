@@ -109,13 +109,13 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 	// files
 	for _, file := range cfg.Files {
-		args = append(args, "-f", file)
+		args = append(args, "-f", filepath.Join(engine.HomeDir, file))
 	}
 
 	// INDEX results file
 	if len(task.IndexFileName) != 0 {
 		if len(cfg.KeepIndexAs) != 0 {
-			task.IndexFileName = cfg.KeepIndexAs
+			task.IndexFileName = filepath.Join(engine.HomeDir, cfg.KeepIndexAs)
 			task.KeepIndexFile = true
 			if !strings.HasSuffix(task.IndexFileName, ".txt") {
 				// ryft adds .txt anyway, so if this extension is missed
@@ -126,7 +126,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 			}
 		} else {
 			// file path relative to `ryftone` mountpoint (including just instance)
-			task.IndexFileName = filepath.Join(engine.Instance, task.IndexFileName)
+			task.IndexFileName = filepath.Join(engine.HomeDir, engine.Instance, task.IndexFileName)
 		}
 		args = append(args, "-oi", task.IndexFileName)
 	}
@@ -134,11 +134,11 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// DATA results file
 	if len(task.DataFileName) != 0 {
 		if len(cfg.KeepDataAs) != 0 {
-			task.DataFileName = cfg.KeepDataAs
+			task.DataFileName = filepath.Join(engine.HomeDir, cfg.KeepDataAs)
 			task.KeepDataFile = true
 		} else {
 			// file path relative to `ryftone` mountpoint (including just instance)
-			task.DataFileName = filepath.Join(engine.Instance, task.DataFileName)
+			task.DataFileName = filepath.Join(engine.HomeDir, engine.Instance, task.DataFileName)
 		}
 		args = append(args, "-od", task.DataFileName)
 	}
@@ -422,7 +422,8 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	r := bufio.NewReader(file)
 	for index := range task.indexChan {
 		// trim mount point from file name! TODO: special option for this?
-		index.File = strings.TrimPrefix(index.File, engine.MountPoint)
+		index.File = strings.TrimPrefix(index.File,
+			filepath.Join(engine.MountPoint, engine.HomeDir))
 
 		rec := new(search.Record)
 		rec.Index = index

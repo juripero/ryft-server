@@ -27,7 +27,8 @@ func (s *Server) files(c *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local, nil /*no files*/)
+	authToken, homeDir, userTag := s.parseAuthAndHome(c)
+	engine, err := s.getSearchEngine(params.Local, nil /*no files*/, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))

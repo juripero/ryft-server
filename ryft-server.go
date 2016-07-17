@@ -39,6 +39,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
@@ -73,6 +74,10 @@ var (
 
 	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
 	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
+
+	authJwtSecret   = kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").String()
+	authJwtAlg      = kingpin.Flag("jwt-alg", "JWT signing algorithm.").String()
+	authJwtLifetime = kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").Duration()
 
 	authLdapServer = kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").TCP()
 	authLdapUser   = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
@@ -132,120 +137,128 @@ func ensureDefault(flag *string, message string) {
 }
 
 // get search backend with options
-func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine, error) {
+func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, homeDir, userTag string) (search.Engine, error) {
 	if !localOnly {
-		// cluster search
+		return s.getClusterSearchEngine(files, authToken, homeDir, userTag)
+	}
 
-		// for each service create corresponding search engine
-		backends := []search.Engine{}
-		nodes, tags, err := GetConsulInfo(files)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get consul services: %s", err)
+	return s.getLocalSearchEngine(homeDir)
+}
+
+// get cluster's search engine
+func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, userTag string) (search.Engine, error) {
+	// for each service create corresponding search engine
+	backends := []search.Engine{}
+	nodes, tags, err := GetConsulInfo(userTag, files)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get consul services: %s", err)
+	}
+	local_node, remote_nodes := SplitToLocalAndRemote(nodes)
+	log.WithField("tags", tags).Debug("cluster search tags")
+
+	// if no tags required - use all nodes
+	all_nodes := (len(tags) == 0)
+
+	// list of tags required
+	tags_required := make(map[string]bool)
+	for _, t := range tags {
+		tags_required[t] = true
+	}
+
+	// go through service tags and update `tags_required` map
+	// return match count, matched tags are removed
+	update_tags := func(serviceTags []string) int {
+		count := 0
+		for _, s := range serviceTags {
+			if _, ok := tags_required[s]; ok {
+				delete(tags_required, s)
+				count += 1
+			}
 		}
-		local_node, remote_nodes := SplitToLocalAndRemote(nodes)
-		log.WithField("tags", tags).Debug("cluster search tags")
+		return count
+	}
 
-		// if no tags required - use all nodes
-		all_nodes := (len(tags) == 0)
-
-		// list of tags required
-		tags_required := make(map[string]bool)
-		for _, t := range tags {
-			tags_required[t] = true
-		}
-
-		// go through service tags and update `tags_required` map
-		// return match count, matched tags are removed
-		update_tags := func(serviceTags []string) int {
-			count := 0
-			for _, s := range serviceTags {
-				if _, ok := tags_required[s]; ok {
-					delete(tags_required, s)
-					count += 1
-				}
-			}
-			return count
-		}
-
-		// prefer local service first...
-		if local_node != nil {
-			log.WithField("tags", local_node.ServiceTags).Debug("local node tags")
-			if all_nodes || update_tags(local_node.ServiceTags) > 0 {
-				// local node: just use normal backend
-				engine, err := s.getSearchEngine(true, files)
-				if err != nil {
-					return nil, err
-				}
-				backends = append(backends, engine)
-			}
-			log.WithField("tags", tags_required).Debug("remain (local) tags required")
-		}
-
-		// ... then remote services (shuffled)
-		for _, k := range rand.Perm(len(remote_nodes)) {
-			service := remote_nodes[k]
-
-			// stop if no more tags required
-			if !all_nodes && len(tags_required) == 0 {
-				break
-			}
-
-			// skip if no required tags found
-			log.WithField("tags", service.ServiceTags).Debug("remote node tags")
-			if !all_nodes && update_tags(service.ServiceTags) == 0 {
-				continue // no tags found, skip this node
-			}
-			log.WithField("tags", tags_required).Debug("remain (remote) tags required")
-
-			// remote node: use RyftHTTP backend
-			port := service.ServicePort
-			scheme := "http"
-			var url string
-			if port == 0 { // TODO: review the URL building!
-				url = fmt.Sprintf("%s://%s:%s", scheme, service.Address, DefaultPort)
-			} else {
-				url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-			}
-
-			opts := map[string]interface{}{
-				"server-url": url,
-				"local-only": true,
-				"skip-stat":  false,
-				"index-host": url,
-			}
-			// log level
-			if _, ok := opts["log-level"]; !ok && *debug {
-				opts["log-level"] = "debug"
-			}
-
-			engine, err := search.NewEngine("ryfthttp", opts)
+	// prefer local service first...
+	if local_node != nil {
+		log.WithField("tags", local_node.ServiceTags).Debug("local node tags")
+		if all_nodes || update_tags(local_node.ServiceTags) > 0 {
+			// local node: just use normal backend
+			engine, err := s.getLocalSearchEngine(homeDir)
 			if err != nil {
 				return nil, err
 			}
 			backends = append(backends, engine)
 		}
-
-		// fail if there is remaining required tags
-		if !all_nodes && len(tags_required) > 0 {
-			rem := []string{} // remaining tags
-			for k, _ := range tags_required {
-				rem = append(rem, k)
-			}
-			return nil, fmt.Errorf("no services found for tags: %q", rem)
-		}
-
-		if len(backends) > 0 {
-			engine, err := ryftmux.NewEngine(backends...)
-			log.WithField("engine", engine).Debug("cluster search")
-			return engine, err
-		}
-
-		// no services from consule, just use local search as a fallback
-		log.Printf("no cluster built, use local search as fallback")
-		return s.getSearchEngine(true, files)
+		log.WithField("tags", tags_required).Debug("remain (local) tags required")
 	}
 
-	// local node search
+	// ... then remote services (shuffled)
+	for _, k := range rand.Perm(len(remote_nodes)) {
+		service := remote_nodes[k]
+
+		// stop if no more tags required
+		if !all_nodes && len(tags_required) == 0 {
+			break
+		}
+
+		// skip if no required tags found
+		log.WithField("tags", service.ServiceTags).Debug("remote node tags")
+		if !all_nodes && update_tags(service.ServiceTags) == 0 {
+			continue // no tags found, skip this node
+		}
+		log.WithField("tags", tags_required).Debug("remain (remote) tags required")
+
+		// remote node: use RyftHTTP backend
+		port := service.ServicePort
+		scheme := "http"
+		var url string
+		if port == 0 { // TODO: review the URL building!
+			url = fmt.Sprintf("%s://%s:%s", scheme, service.Address, DefaultPort)
+		} else {
+			url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+		}
+
+		opts := map[string]interface{}{
+			"server-url": url,
+			"auth-token": authToken,
+			"local-only": true,
+			"skip-stat":  false,
+			"index-host": url,
+		}
+		// log level
+		if _, ok := opts["log-level"]; !ok && *debug {
+			opts["log-level"] = "debug"
+		}
+
+		engine, err := search.NewEngine("ryfthttp", opts)
+		if err != nil {
+			return nil, err
+		}
+		backends = append(backends, engine)
+	}
+
+	// fail if there is remaining required tags
+	if !all_nodes && len(tags_required) > 0 {
+		rem := []string{} // remaining tags
+		for k, _ := range tags_required {
+			rem = append(rem, k)
+		}
+		return nil, fmt.Errorf("no services found for tags: %q", rem)
+	}
+
+	if len(backends) > 0 {
+		engine, err := ryftmux.NewEngine(backends...)
+		log.WithField("engine", engine).Debug("cluster search")
+		return engine, err
+	}
+
+	// no services from consule, just use local search as a fallback
+	log.Printf("no cluster built, use local search as fallback")
+	return s.getLocalSearchEngine(homeDir)
+}
+
+// get local search engine
+func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	opts := s.BackendOptions
 
 	// some auto-options
@@ -253,7 +266,12 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 	case "ryftprim":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
-			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+			opts["instance-name"] = fmt.Sprintf(".rest-%d", (*listenAddress).Port)
+		}
+
+		// home-dir (override settings)
+		if _, ok := opts["home-dir"]; !ok || len(homeDir) > 0 {
+			opts["home-dir"] = homeDir
 		}
 
 		// keep-files
@@ -284,6 +302,21 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 	return ryftdec.NewEngine(backend)
 }
 
+// parse authentication token and home directory from context
+func (s *Server) parseAuthAndHome(ctx *gin.Context) (authToken string, homeDir string, userTag string) {
+	authToken = ctx.Request.Header.Get("Authorization") // may be empty
+
+	// get home directory
+	if v, exists := ctx.Get(gin.AuthUserKey); exists && v != nil {
+		if user, ok := v.(*auth.UserInfo); ok {
+			homeDir = user.Home
+			userTag = user.ClusterTag
+		}
+	}
+
+	return
+}
+
 // get local host name
 func getHostName() string {
 	hostName, _ := os.Hostname()
@@ -296,6 +329,7 @@ func parseParams() {
 	switch *authType {
 	case "file":
 		ensureDefault(authUsersFile, "users-file is required for file authentication.")
+		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
 		break
 	case "ldap":
 		if (*authLdapServer) == nil {
@@ -308,7 +342,7 @@ func parseParams() {
 		ensureDefault(authLdapUser, "ldap-user is required for ldap authentication.")
 		ensureDefault(authLdapPass, "ldap-pass is required for ldap authentication.")
 		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
-
+		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
 		break
 	}
 	if *tlsEnabled {
@@ -339,7 +373,7 @@ func main() {
 	var server Server
 	err := server.parseConfig(*serverConfig)
 	if err != nil {
-		log.Fatalf("Failed to read server configuration: %s", err)
+		log.WithError(err).Fatalf("Failed to read server configuration")
 	}
 	log.WithField("config", server).Infof("server configuration")
 
@@ -362,22 +396,43 @@ func main() {
 	// Enable GZip compression support
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
+	// private endpoints
+	private := router.Group("")
+
 	// Enable authentication if configured
-	switch *authType {
+	var auth_provider auth.Provider
+	switch strings.ToLower(*authType) {
 	case "file":
-		auth, err := auth.AuthBasicFile(*authUsersFile)
+		file, err := auth.NewFile(*authUsersFile)
 		if err != nil {
-			log.WithError(err).Fatal("Error reading users file")
+			log.WithError(err).Fatal("Failed to read users file")
 		}
-		router.Use(auth)
-		break
+		auth_provider = file
 	case "ldap":
-		router.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
-			*authLdapPass, *authLdapQuery, *authLdapBase))
+		ldap, err := auth.NewLDAP((*authLdapServer).String(), *authLdapUser,
+			*authLdapPass, *authLdapQuery, *authLdapBase)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to init LDAP authentication")
+		}
+		auth_provider = ldap
+	case "none", "":
 		break
+	default:
+		log.WithField("auth", *authType).Fatalf("unknown authentication type")
 	}
 
-	// Configure routes
+	// authentication enabled
+	if auth_provider != nil {
+		mw := auth.NewMiddleware(auth_provider, "")
+		secret, err := auth.ParseSecret(*authJwtSecret)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to parse JWT secret")
+		}
+		mw.EnableJwt(secret, *authJwtAlg, *authJwtLifetime)
+		private.Use(mw.Authentication())
+		private.GET("/token/refresh", mw.RefreshHandler())
+		router.POST("/login", mw.LoginHandler())
+	}
 
 	router.GET("/version", func(ctx *gin.Context) {
 		info := map[string]interface{}{
@@ -392,10 +447,10 @@ func main() {
 		c.JSON(http.StatusOK, serverStats.Data())
 	})
 
-	router.GET("/search", server.search)
-	router.GET("/count", server.count)
-	router.GET("/cluster/members", server.members)
-	router.GET("/files", server.files)
+	private.GET("/search", server.search)
+	private.GET("/count", server.count)
+	private.GET("/cluster/members", server.members)
+	private.GET("/files", server.files)
 
 	// static asset
 	for _, asset := range AssetNames() {
@@ -411,8 +466,6 @@ func main() {
 	router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
-
-	// Startup preparatory
 
 	// start listening on HTTP or HTTPS ports
 	if *tlsEnabled {

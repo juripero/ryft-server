@@ -56,6 +56,11 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	// we expect JSON format
 	req.Header.Set("Accept", "application/json")
 
+	// authorization
+	if len(engine.AuthToken) != 0 {
+		req.Header.Set("Authorization", engine.AuthToken)
+	}
+
 	// do HTTP request
 	resp, err := engine.httpClient.Do(req)
 	if err != nil {
