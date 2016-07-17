@@ -367,6 +367,12 @@
             }
           }
         },
+        "errors": {
+          "type": "array",
+           "items": {
+           "type": "string"
+          }
+        },
         "stats": {
           "type": "object",
           "$ref": "#/definitions/CountResponse"
