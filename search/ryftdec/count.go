@@ -53,12 +53,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
 	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		if len(cfg.Mode) == 0 {
-			// use "ds", "ts", "ns" search mode
-			// if query contains corresponding keywords
-			cfg.Mode = getSearchMode(task.queries.Type,
-				task.queries.Options)
-		}
+		updateConfig(cfg, task.queries)
 		return engine.Backend.Count(cfg)
 	}
 

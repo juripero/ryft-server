@@ -57,12 +57,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
 	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		if len(cfg.Mode) == 0 {
-			// use "ds", "ts", "ns" search mode
-			// if query contains corresponding keywords
-			cfg.Mode = getSearchMode(task.queries.Type,
-				task.queries.Options)
-		}
+		updateConfig(cfg, task.queries)
 		return engine.Backend.Search(cfg)
 	}
 
@@ -232,12 +227,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		return 0, fmt.Errorf("%d is unknown query type", query.Type)
 	}
 
-	cfg.Mode = getSearchMode(query.Type, query.Options)
-	cfg.Query = query.Expression
-	cfg.Fuzziness = query.Options.Dist
-	cfg.Surrounding = query.Options.Width
-	cfg.CaseSensitive = query.Options.Cs
-
+	updateConfig(cfg, query)
 	task.log().WithField("mode", cfg.Mode).
 		WithField("query", cfg.Query).
 		WithField("input", cfg.Files).
@@ -254,4 +244,13 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		return res.Stat.Matches, nil // OK
 	}
 	return 0, nil // OK
+}
+
+// update search configuration
+func updateConfig(cfg *search.Config, node *Node) {
+	cfg.Mode = getSearchMode(node.Type, node.Options)
+	cfg.Query = node.Expression
+	cfg.Fuzziness = node.Options.Dist
+	cfg.Surrounding = node.Options.Width
+	cfg.CaseSensitive = node.Options.Cs
 }
