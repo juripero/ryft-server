@@ -57,7 +57,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 			// use "ds", "ts", "ns" search mode
 			// if query contains corresponding keywords
 			cfg.Mode = getSearchMode(task.queries.Type,
-				task.queries.Options.Mode)
+				task.queries.Options)
 		}
 		return engine.Backend.Count(cfg)
 	}

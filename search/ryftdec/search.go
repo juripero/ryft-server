@@ -61,7 +61,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			// use "ds", "ts", "ns" search mode
 			// if query contains corresponding keywords
 			cfg.Mode = getSearchMode(task.queries.Type,
-				task.queries.Options.Mode)
+				task.queries.Options)
 		}
 		return engine.Backend.Search(cfg)
 	}
@@ -232,7 +232,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		return 0, fmt.Errorf("%d is unknown query type", query.Type)
 	}
 
-	cfg.Mode = getSearchMode(query.Type, query.Options.Mode)
+	cfg.Mode = getSearchMode(query.Type, query.Options)
 	cfg.Query = query.Expression
 	cfg.Fuzziness = query.Options.Dist
 	cfg.Surrounding = query.Options.Width

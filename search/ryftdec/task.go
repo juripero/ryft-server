@@ -65,10 +65,13 @@ func NewTask(config *search.Config) *Task {
 }
 
 // get search mode based on query type
-func getSearchMode(query QueryType, defaultMode string) string {
+func getSearchMode(query QueryType, opts Options) string {
 	switch query {
 	case QTYPE_SEARCH:
-		return defaultMode
+		if opts.Dist == 0 {
+			return "es" // exact_search if fuzziness is zero
+		}
+		return opts.Mode
 	case QTYPE_DATE:
 		return "ds" // date_search
 	case QTYPE_TIME:
@@ -79,7 +82,7 @@ func getSearchMode(query QueryType, defaultMode string) string {
 		return "rs" // regex_search
 	}
 
-	return defaultMode
+	return opts.Mode
 }
 
 // Drain all records/errors from 'res' to 'mux'
