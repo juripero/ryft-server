@@ -74,6 +74,17 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `((RAW_TEXT CONTAINS "100"))`,
 		`[    ]: (RAW_TEXT CONTAINS "100")`)
 
+	testQueryTree(t, `(RAW_TEXT CONTAINS "DATE()")`,
+		`[    ]: (RAW_TEXT CONTAINS "DATE()")`)
+	testQueryTree(t, `(RAW_TEXT CONTAINS "TIME()")`,
+		`[    ]: (RAW_TEXT CONTAINS "TIME()")`)
+	testQueryTree(t, `(RAW_TEXT CONTAINS "NUMBER()")`,
+		`[    ]: (RAW_TEXT CONTAINS "NUMBER()")`)
+	testQueryTree(t, `(RAW_TEXT CONTAINS "CURRENCY()")`,
+		`[    ]: (RAW_TEXT CONTAINS "CURRENCY()")`)
+	testQueryTree(t, `(RAW_TEXT CONTAINS "REGEX()")`,
+		`[    ]: (RAW_TEXT CONTAINS "REGEX()")`)
+
 	testQueryTree(t, `(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`,
 		`[    ]: (RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
 	testQueryTree(t, `((RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200"))`,
