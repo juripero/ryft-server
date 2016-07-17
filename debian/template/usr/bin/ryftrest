@@ -15,7 +15,8 @@ Search specific:
                     - fuzzy_edit_distance_search (or feds)
                     - date_search (or ds)
                     - time_search (or ts)
-                    - numeric_search (or ns)
+                    - numeric_search (or ns) also used for currency
+                    - regex_search (or rs)
 -f|--file        Specifies an input filename.
 -i               Specifies case-insensitive analysis for supported primitives.
 -n|--nodes       Specifies 1-4 RCAB processing nodes to use.
@@ -28,6 +29,7 @@ Search specific:
 REST specific:
 -a|--address     Specifies the ryft-server address.
                    "http://localhost:8765" by default.
+-u|--user|--auth Use user credentials, "username:password".
 --search         Use /search endpoint (used by default) to print all found items.
 --count          Use /count endpoint instead of /search to print just statistics.
 --local          Specifies the local search. Opposite to --cluster.
@@ -79,6 +81,7 @@ DATA=
 INDEX=
 
 ADDRESS=http://localhost:8765
+AUTH_USER=
 ENDPOINT=/search
 LOCAL=false
 FORMAT=
@@ -170,6 +173,14 @@ while [[ $# > 0 ]]; do
 		ADDRESS="$2"
 		shift 2
 		;;
+	-u=*|--user=*|--auth=*)
+		AUTH_USER="${1#*=}"
+		shift
+		;;
+	-u|--user|--auth)
+		AUTH_USER="$2"
+		shift 2
+		;;
 	--search)
 		ENDPOINT="/search"
 		shift
@@ -239,6 +250,7 @@ done
 
 # build the URL
 URL_DATA=(--data-urlencode "local=$LOCAL")
+[[ ! -z "$AUTH_USER" ]] && URL_DATA=("${URL_DATA[@]}" -u "$AUTH_USER")
 [[ ! -z "$QUERY" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "query=$QUERY")
 IFS=':' read -r -a files <<< "$FILES"
 for file in "${files[@]}"; do
