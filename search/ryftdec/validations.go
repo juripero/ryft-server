@@ -77,9 +77,14 @@ func validateQueryLength(chars []rune) bool {
 	return len(chars) > 2
 }
 
+// Check if empty brackets are surrounded by quotes
 func validateEmptyBrackets(query string) bool {
-	query = removeQuotedText(query)
-	return !strings.Contains(query, "()")
+	bracketsPresent := strings.Contains(query, "()")
+	quotedBrackets, err := regexp.MatchString(`[^".]+?\(\)[^".]*?`, query)
+	if err != nil {
+		return false
+	}
+	return (bracketsPresent && quotedBrackets) || !bracketsPresent
 }
 
 func validateTokens(tokens []string) bool {
@@ -92,7 +97,7 @@ func validateTokens(tokens []string) bool {
 }
 
 func validateToken(token string) bool {
-	result, _ := regexp.MatchString(`(?i)^(RAW_TEXT|(RECORD\..+?)) (CONTAINS|EQUALS) (DATE|TIME|CURRENCY|NUMBER|FHS|FEDS|REGEX|)((\(.+?\))|(["']{1}.+?["']{1})|([\w\d]+))$`, token)
+	result, _ := regexp.MatchString(`(?i)^(RAW_TEXT|(RECORD\..+?)) (CONTAINS|EQUALS) (DATE|TIME|CURRENCY|NUMBER|FHS|FEDS|REGEX|)((\(.+?\))|(["']{1}.+?["']{1})|([\?\w\d]+))$`, token)
 	return result
 }
 

@@ -51,6 +51,7 @@ func TestValidQueries(t *testing.T) {
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
+		`(RAW_TEXT CONTAINS "?")`,
 		`(RAW_TEXT CONTAINS ?)`,
 		`(RAW_TEXT CONTAINS "he"??"o")`,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
@@ -61,6 +62,7 @@ func TestValidQueries(t *testing.T) {
 		`(RECORD.body CONTAINS FEDS('test',false,10,100)) AND (RECORD.body CONTAINS FHS("test", true, 10, 100))`,
 		`(RECORD.body CONTAINS "FEDS")`,
 		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
+		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
 	}
 
 	for _, q := range queries {
