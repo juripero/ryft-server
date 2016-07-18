@@ -121,7 +121,7 @@ So it's possible to run multiple server instances on the same machine.
 Use `ryft-server --help` to get list of all supported arguments.
 
 
-## Debug mode
+## Debug and local modes
 
 To get detailed log messages debug mode can be used:
 
@@ -132,6 +132,13 @@ To get detailed log messages debug mode can be used:
 In this mode `ryft-server` prints a lot of log messages.
 This feature is useful for troubleshooting.
 
+If consul service is not running it's possible to run ryft server in local mode.
+In this mode all requestes will be performed locally even `local=false` is set.
+Just pass `--local-only` command line argument:
+
+```{.sh}
+./ryft-server --local-only
+```
 
 ## Keeping search results
 
@@ -191,7 +198,7 @@ More information about search engines can be found [here](./search.md)
 
 ## Authentication and security
 
-**TBD** need to add security **TBD**
+See [authentication](./auth.md) document for more details.
 
 The following flags are supported:
 

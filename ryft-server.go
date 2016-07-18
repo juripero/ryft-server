@@ -71,6 +71,7 @@ var (
 	// KeepResults console flag for keeping results files
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
 	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
+	localMode   = kingpin.Flag("local-only", "Run server is local mode (no cluster).").Bool()
 
 	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
 	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
@@ -138,7 +139,7 @@ func ensureDefault(flag *string, message string) {
 
 // get search backend with options
 func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, homeDir, userTag string) (search.Engine, error) {
-	if !localOnly {
+	if !*localMode && !localOnly {
 		return s.getClusterSearchEngine(files, authToken, homeDir, userTag)
 	}
 
