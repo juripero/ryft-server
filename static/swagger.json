@@ -1,7 +1,7 @@
 {
   "swagger": "2.0",
   "info": {
-    "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples. For more details visit project page https://github.com/getryft/ryft-server",
+    "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "RyftOne REST API",
     "version": "1.2"
   },
@@ -129,15 +129,12 @@
           "200": {
             "description": "SearchResponseOK is a search result in an array with an elements of various structure",
             "schema": {
-              "description": "CountResponse returns matches for query",
-              "type": "object",
               "$ref": "#/definitions/SearchResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -245,14 +242,12 @@
           "200": {
             "description": "SearchResponseOK is a search result in an array with an elements of various structure",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/CountResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -285,14 +280,12 @@
           "200": {
             "description": "List of files and directories for node/cluster",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/FilesResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -311,14 +304,12 @@
           "200": {
             "description": "Hash and version",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/VersionResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -336,28 +327,25 @@
         "consumes": ["application/json"],
         "parameters": [
           {
-             "in": "body",
-             "name": "body",
-             "description": "User's credentials",
-             "required": true,
-             "schema": {
-              "type": "object",
+            "in": "body",
+            "name": "body",
+            "description": "User's credentials",
+            "required": true,
+            "schema": {
               "$ref": "#/definitions/LoginRequest"
-             }
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "JWT",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/LoginResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -376,14 +364,12 @@
           "200": {
             "description": "JWT",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/LoginResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -435,12 +421,11 @@
         },
         "errors": {
           "type": "array",
-           "items": {
-           "type": "string"
+          "items": {
+            "type": "string"
           }
         },
         "stats": {
-          "type": "object",
           "$ref": "#/definitions/CountResponse"
         }
       }
