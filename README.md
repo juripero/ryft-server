@@ -90,6 +90,8 @@ This information is extremelly useful for bug reporting.
 
 See [REST API](./docs/restapi.md) document for more details.
 
+Some endpoints are protected. See corresponding [authentication](./docs/auth.md) document.
+
 
 # Command line tools
 

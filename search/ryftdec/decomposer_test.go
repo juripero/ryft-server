@@ -190,6 +190,11 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `((RECORD.id CONTAINS NUMBER(NUM < 7))   AND   (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
 		`[ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8))`)
 
+	testQueryTree(t, `(RECORD.id CONTAINS FHS("test",true,1,2))`,
+		`[fhs-1/2-true]: (RECORD.id CONTAINS "test")`)
+	testQueryTree(t, `(RECORD.id CONTAINS FEDS("test",true,3,4))`,
+		`[feds-3/4-true]: (RECORD.id CONTAINS "test")`)
+
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 1, 2)))`,
 		`[ AND]:
   [fhs-0/0-false]: (RECORD.id CONTAINS "test")

@@ -1,4 +1,4 @@
-This document contains detailed authentication description.
+This document contains detailed description of authentication methods used by the ryft server.
 
 The following types of authentication are supported:
 
@@ -19,7 +19,8 @@ The following endpoints are protected:
 If authentication is enabled the ryft server checks for `Authorization` HTTP header.
 
 If `Authorization` header contains `Basic` keyword the basic authentication is used.
-The ryft server extracts username and password from the header and checks them.
+The ryft server extracts username and password from the header and checks the user
+is authorized to access requested resources.
 
 Otherwise if `Authorization` header contains `Bearer` keyword the JWT is used.
 The ryft server extracts JWT token from the header and checks it.
@@ -72,7 +73,7 @@ TBD
 
 ## Simple text file
 
-simple text file may be used as a list of user credentials.
+Simple text file may be used as a list of user credentials.
 
 YAML format:
 
@@ -83,9 +84,11 @@ YAML format:
 - username: "test"
   password: "test"
   home: "/test"
+  clusterTag: "test"
 - username: "foo"
   password: "foo"
   home: "/foo"
+  clusterTag: "foo"
 ```
 
 JSON format:
@@ -93,10 +96,17 @@ JSON format:
 ```{.json}
 [
   {"username":"admin", "password":"admin", "home":"/"},
-  {"username":"test", "password":"test", "home":"/test"},
-  {"username":"foo", "password":"foo", "home":"/foo"}
+  {"username":"test", "password":"test", "home":"/test", "clusterTag":"test"},
+  {"username":"foo", "password":"foo", "home":"/foo", "clusterTag":"foo"}
 ]
 ```
+
+The `home` is a directory inside `/ryftone` mount point.
+It is used to separate data of various users.
+An user is authorized to have access to its home only.
+
+The `clusterTag` is used for partitioning (see corresponding `ryft-cluster/consul.md#partitioning-setup` document).
+If an user has custom paritioning rules they are located under `{clusterTag}/partitions` KV prefix.
 
 To run server use the following command line:
 
