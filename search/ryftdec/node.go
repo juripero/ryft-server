@@ -164,7 +164,7 @@ func (node *Node) optionsEqual(cmpNode *Node) bool {
 
 // Map string operator value to constant
 func expressionType(expression string) QueryType {
-	expression = strings.Trim(expression, " ")
+	expression = removeQuotedText(strings.Trim(expression, " "))
 	switch {
 	case expression == "AND":
 		return QTYPE_AND

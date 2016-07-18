@@ -33,6 +33,7 @@ package ryftdec
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -83,4 +84,11 @@ func indexOfToken(tokens []string, token string) int {
 		}
 	}
 	return -1
+}
+
+func removeQuotedText(expr string) string {
+	s := []byte(expr)
+	repl := []byte("")
+	reg := regexp.MustCompile(`\"(.*?)\"`)
+	return string(reg.ReplaceAll(s, repl))
 }

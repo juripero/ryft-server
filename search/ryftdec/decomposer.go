@@ -76,7 +76,8 @@ func Decompose(originalQuery string, baseOpts Options) (node *Node, err error) {
 	rootNode := Node{SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 
-	_, err = parse(&rootNode, originalQuery, baseOpts)
+	parse(&rootNode, originalQuery, baseOpts)
+
 	if err != nil {
 		return nil, err
 	}
@@ -97,40 +98,44 @@ func formatQuery(query string) string {
 }
 
 // Parse expression and build query tree
-func parse(currentNode *Node, query string, opts Options) (*Node, error) {
+func parse(currentNode *Node, query string, opts Options) {
 	if !validateQuery(query) {
-		return nil, fmt.Errorf("Invalid query: %q", query)
+		panic(fmt.Errorf("Invalid query: %q", query))
 	}
 
 	tokens := tokenize(query)
 
 	if !validateTokens(tokens) {
-		return nil, fmt.Errorf("Invalid query: %q (bad tokens)", query)
+		panic(fmt.Errorf("Invalid query: %q (bad tokens)", query))
 	}
 
 	tokens = translateToPrefixNotation(tokens)
 	currentNode = addToTree(currentNode, tokens, opts)
 
 	if !validateTree(currentNode) {
-		return nil, fmt.Errorf("Invalid query: %d (bad tree)", query)
+		panic(fmt.Errorf("Invalid query: %d (bad tree)", query))
 	}
-
-	return currentNode, nil
 }
 
 func tokenize(query string) []string {
 	count := 0
+	quotesCount := 0
+
 	isBracket := func(r rune) bool {
 		switch {
 		case r == '(':
-			count++
+			if quotesCount == 0 {
+				count++
+			}
 			if count == maxDepth {
 				return true
 			} else {
 				return false
 			}
 		case r == ')':
-			count--
+			if quotesCount == 0 {
+				count--
+			}
 			if count == maxDepth-1 {
 				return true
 			} else {
@@ -179,7 +184,7 @@ func addToTree(currentNode *Node, tokens []string, opts Options) *Node {
 		if notParsable(token) {
 			currentNode = addChildToNode(currentNode, token, opts)
 		} else {
-			_, _ = parse(currentNode, token, opts)
+			parse(currentNode, token, opts)
 		}
 	}
 	return currentNode
@@ -203,8 +208,10 @@ func addChildToNode(currentNode *Node, expression string, opts Options) *Node {
 }
 
 func notParsable(expression string) bool {
+	expression = removeQuotedText(expression)
 	twoBrackets := (strings.Count(expression, "(") == 1) && (strings.Count(expression, ")") == 1)
 	noBrackets := (strings.Count(expression, "(") == 0) && (strings.Count(expression, ")") == 0)
+
 	return noBrackets || (twoBrackets && isSearchQuery(expression))
 }
 

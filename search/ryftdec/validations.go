@@ -78,6 +78,7 @@ func validateQueryLength(chars []rune) bool {
 }
 
 func validateEmptyBrackets(query string) bool {
+	query = removeQuotedText(query)
 	return !strings.Contains(query, "()")
 }
 
