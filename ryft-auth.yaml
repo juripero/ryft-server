@@ -4,6 +4,8 @@
 - username: "test"
   password: "test"
   home: "/test"
+  clusterTag: "test-cluster"
 - username: "foo"
   password: "foo"
   home: "/foo"
+  clusterTag: "foo-cluster"

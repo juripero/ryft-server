@@ -53,6 +53,7 @@ type UserInfo struct {
 type Provider interface {
 	Reload() error
 	Verify(username string, password string) *UserInfo
+	ExtraData(username string) map[string]interface{}
 }
 
 type Middleware struct {
@@ -152,7 +153,7 @@ func (mw *Middleware) unauthorized(c *gin.Context, code int, message string) {
 
 // get additional payload
 func (mw *Middleware) payload(userId string) map[string]interface{} {
-	return nil // no payload yet
+	return mw.provider.ExtraData(userId)
 }
 
 // Try to decode Authorization header (basic) to get username and password

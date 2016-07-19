@@ -95,6 +95,18 @@ func (f *FileAuth) Verify(username, password string) *UserInfo {
 	return nil // not found or invalid password
 }
 
+// get user's extra data
+func (f *FileAuth) ExtraData(username string) map[string]interface{} {
+	if u, ok := f.Users[username]; ok {
+		return map[string]interface{}{
+			"home-dir":    u.Home,
+			"cluster-tag": u.ClusterTag,
+		}
+	}
+
+	return nil // not found
+}
+
 // read user credentials from a text file (JSON or YAML)
 // no duplicates are allowed
 func readUsersFile(fileName string) ([]*UserInfo, error) {

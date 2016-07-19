@@ -77,6 +77,11 @@ func (a *LdapAuth) Verify(username, password string) *UserInfo {
 	return user
 }
 
+// get user's extra data
+func (a *LdapAuth) ExtraData(username string) map[string]interface{} {
+	return nil // no any data yet
+}
+
 // check LDAP server
 func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 	// Connect to LDAP server
