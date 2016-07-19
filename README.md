@@ -90,7 +90,8 @@ This information is extremelly useful for bug reporting.
 
 See [REST API](./docs/restapi.md) document for more details.
 
-Some endpoints are protected. See corresponding [authentication](./docs/auth.md) document.
+Some endpoints are protected. See corresponding [authentication](./docs/auth.md) document
+and [corresponding demo](./docs/demo-2016-07-21.md)
 
 
 # Command line tools
@@ -113,4 +114,4 @@ ryftrest -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --local --format=xml -
 This command will print extracted list of date strings.
 
 For more detailed examples see:
-[ryftrest sample 1](./docs/demo-2015-04-28.md) and [ryftrest sample 2](./docs/demo-2015-05-12.md)
+[ryftrest sample 1](./docs/demo-2016-04-28.md) and [ryftrest sample 2](./docs/demo-2016-05-12.md)
