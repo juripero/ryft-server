@@ -77,6 +77,8 @@ func (s *Server) search(ctx *gin.Context) {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
+
+	// TODO: can cause problems when query is kind of: `(RAW_TEXT CONTAINS "RECORD")`
 	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
 		panic(NewServerError(http.StatusBadRequest,
 			"format=xml could not be used without RECORD query"))
@@ -185,6 +187,30 @@ func (s *Server) search(ctx *gin.Context) {
 			writer.Flush()
 		}
 	}
+	closeResponse := func() {
+		// special case: if no records and no stats were received
+		// but just an error, we panic to return 500 status code
+		if num_records == 0 && res.Stat == nil &&
+			num_errors == 1 && last_error != nil {
+			panic(last_error)
+		}
+
+		if params.Stats && res.Stat != nil {
+			xstat := tcode.FromStat(res.Stat)
+			err := enc.EncodeStat(xstat)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		// close encoder
+		err := enc.Close()
+		if err != nil {
+			panic(err)
+		}
+
+		log.WithField("result", res).Infof("/search done")
+	}
 
 	// process results!
 	var recordsReceived uint
@@ -197,7 +223,7 @@ func (s *Server) search(ctx *gin.Context) {
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
 				if recordsReceived > cfg.Limit && cfg.Limit != 0 {
-					log.WithField("result", res).Infof("/search done")
+					closeResponse()
 					return // stop
 				}
 
@@ -219,28 +245,7 @@ func (s *Server) search(ctx *gin.Context) {
 				putErr(err)
 			}
 
-			// special case: if no records and no stats were received
-			// but just an error, we panic to return 500 status code
-			if num_records == 0 && res.Stat == nil &&
-				num_errors == 1 && last_error != nil {
-				panic(last_error)
-			}
-
-			if params.Stats && res.Stat != nil {
-				xstat := tcode.FromStat(res.Stat)
-				err := enc.EncodeStat(xstat)
-				if err != nil {
-					panic(err)
-				}
-			}
-
-			// close encoder
-			err := enc.Close()
-			if err != nil {
-				panic(err)
-			}
-
-			log.WithField("result", res).Infof("/search done")
+			closeResponse()
 			return // stop
 		}
 	}
