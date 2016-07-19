@@ -128,6 +128,9 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	if len(cfg.KeepIndexAs) != 0 {
 		q.Set("index", cfg.KeepIndexAs)
 	}
+	if cfg.Limit > 0 {
+		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
+	}
 
 	u.RawQuery = q.Encode()
 	return u
