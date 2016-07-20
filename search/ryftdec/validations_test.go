@@ -19,7 +19,7 @@ func TestInvalidQueries(t *testing.T) {
 		`() AND OR" "() MOR ()`,
 		`(((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`,
 		`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301")))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`,
-		`(RAW_TEXT CONTAINS FHS("text",123, 100, 2000))`,
+		`(RAW_TEXT CONTAINS FHS("text",CS=123, DIST=100, WIDTH=2000))`,
 	}
 
 	for _, q := range queries {
@@ -55,11 +55,11 @@ func TestValidQueries(t *testing.T) {
 		`(RAW_TEXT CONTAINS ?)`,
 		`(RAW_TEXT CONTAINS "he"??"o")`,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`(RECORD.body CONTAINS FHS("test", true, 10, 100))`,
-		`(RECORD.body CONTAINS FEDS("test", false, 10, 100))`,
-		`(RECORD.body CONTAINS FEDS("test",false,10,100))`,
-		`(RECORD.body CONTAINS FEDS('test',false,10,100))`,
-		`(RECORD.body CONTAINS FEDS('test',false,10,100)) AND (RECORD.body CONTAINS FHS("test", true, 10, 100))`,
+		`(RECORD.body CONTAINS FHS("test", CS=true, DIST=10, WIDTH=100))`,
+		`(RECORD.body CONTAINS FEDS("test", CS=false, DIST=10, WIDTH=100))`,
+		`(RECORD.body CONTAINS FEDS("test",CS=false,DIST=10,WIDTH-100))`,
+		`(RECORD.body CONTAINS FEDS('test',CS=false,DIST=10,WIDTH=100))`,
+		`(RECORD.body CONTAINS FEDS('test',CS=false,DIST=10,WIDTH=100)) AND (RECORD.body CONTAINS FHS("test", CS=true, DIST=10, WIDTH=100))`,
 		`(RECORD.body CONTAINS "FEDS")`,
 		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
 		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,

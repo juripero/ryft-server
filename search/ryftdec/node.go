@@ -57,7 +57,7 @@ func parseOptions(expression string, baseOpts Options) (cleanExpression string, 
 	opts = baseOpts // just a copy by default
 	cleanExpression = expression
 
-	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\((.+?),?\s?([\s\w]+)?,?\s?(\d*)?,?\s?(\d*)?\)`)
+	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS|REGEX)\((.+?),?\s?([\s\w=]+)?,?\s?([\w\d=]*)?,?\s?([\w\d=]*)?\)`)
 	matches := regex.FindAllStringSubmatch(expression, -1)
 
 	if len(matches) > 0 {
@@ -66,44 +66,53 @@ func parseOptions(expression string, baseOpts Options) (cleanExpression string, 
 		op := strings.TrimSpace(match[1])
 		mode := strings.TrimSpace(match[2])
 		expr := strings.TrimSpace(match[3])
-		cs := strings.TrimSpace(match[4])
-		dist := strings.TrimSpace(match[5])
-		width := strings.TrimSpace(match[6])
+		arg1 := strings.TrimSpace(match[4])
+		arg2 := strings.TrimSpace(match[5])
+		arg3 := strings.TrimSpace(match[6])
+		args := []string{arg1, arg2, arg3}
 
 		opts.Mode = strings.ToLower(mode) // FHS or FEDS
 
 		// remove all embedded options from search expression
 		cleanExpression = fmt.Sprintf("%s %s", op, expr)
 
-		// case sensitive
-		if len(cs) > 0 {
-			v, err := strconv.ParseBool(cs)
-			if err != nil {
-				panic(err)
-			}
-			opts.Cs = v
-		}
+		for _, arg := range args {
+			tokens := strings.Split(arg, "=")
 
-		// fuziness distance
-		if len(dist) > 0 {
-			v, err := strconv.ParseInt(dist, 10, 0)
-			if err != nil {
-				panic(err)
+			if len(tokens) > 1 {
+				name := tokens[0]
+				value := tokens[1]
+				opts = SetOption(opts, name, value)
 			}
-			opts.Dist = uint(v)
-		}
-
-		// surrounding width
-		if len(width) > 0 {
-			v, err := strconv.ParseInt(strings.TrimSpace(match[6]), 10, 0)
-			if err != nil {
-				panic(err)
-			}
-			opts.Width = uint(v)
 		}
 	}
 
 	return
+}
+
+func SetOption(o Options, name, value string) Options {
+	switch name {
+	case "CS":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			panic(err)
+		}
+		o.Cs = v
+	case "DIST":
+		v, err := strconv.ParseInt(value, 10, 0)
+		if err != nil {
+			panic(err)
+		}
+		o.Dist = uint(v)
+	case "WIDTH":
+		v, err := strconv.ParseInt(strings.TrimSpace(value), 10, 0)
+		if err != nil {
+			panic(err)
+		}
+		o.Width = uint(v)
+	}
+
+	return o
 }
 
 // Search tree node

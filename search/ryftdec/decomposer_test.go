@@ -190,24 +190,24 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `((RECORD.id CONTAINS NUMBER(NUM < 7))   AND   (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
 		`[ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8))`)
 
-	testQueryTree(t, `(RECORD.id CONTAINS FHS("test",true,1,2))`,
+	testQueryTree(t, `(RECORD.id CONTAINS FHS("test",CS=true,DIST=1,WIDTH=2))`,
 		`[fhs-1/2-true]: (RECORD.id CONTAINS "test")`)
-	testQueryTree(t, `(RECORD.id CONTAINS FEDS("test",true,3,4))`,
+	testQueryTree(t, `(RECORD.id CONTAINS FEDS("test",CS=true,DIST=3,WIDTH=4))`,
 		`[feds-3/4-true]: (RECORD.id CONTAINS "test")`)
 
-	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 1, 2)))`,
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", CS=true, DIST=1, WIDTH=2)))`,
 		`[ AND]:
   [fhs-0/0-false]: (RECORD.id CONTAINS "test")
   [feds-1/2-true]: (RECORD.id CONTAINS "123")`)
 
-	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", true, 0, 0)) OR (RECORD.id CONTAINS DATE("200301")))`,
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FEDS("123", CS=true, DIST=0, WIDTH=0)) OR (RECORD.id CONTAINS DATE("200301")))`,
 		`[  OR]:
   [ AND]:
     [fhs-0/0-false]: (RECORD.id CONTAINS "test")
     [feds-0/0-true]: (RECORD.id CONTAINS "123")
   [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
-	testQueryTree(t, `(RECORD.body CONTAINS FEDS('test',false,10,100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
+	testQueryTree(t, `(RECORD.body CONTAINS FEDS('test',CS=false,DIST=10,WIDTH=100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
 		`[ AND]:
   [feds-10/100-false]: (RECORD.body CONTAINS 'test')
   [  OR]:
@@ -222,7 +222,7 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
 		`[CURR]: (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`)
 
-	testQueryTree(t, `((RECORD.id CONTAINS FHS("test", true, 0, 0))   AND   (RECORD.id CONTAINS FHS("123", true, 0, 0)))`,
+	testQueryTree(t, `((RECORD.id CONTAINS FHS("test", CS=true, DIST=0, WIDTH=0))   AND   (RECORD.id CONTAINS FHS("123", CS=true, DIST=0, WIDTH=0)))`,
 		`[    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FHS("123")))`,
