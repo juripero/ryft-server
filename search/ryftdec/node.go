@@ -95,7 +95,7 @@ func cleanExpression(opts Options, op, expr, mode string) string {
 
 	switch mode {
 	case "REGEX":
-		cleanedExpression = fmt.Sprintf("%s REGEX(%s, %s, PCRE_OPTION_DEFAULT)", op, expr, regexCsValue(opts.Cs))
+		cleanedExpression = fmt.Sprintf("%s REGEX(%s, PCRE_OPTION_DEFAULT)", op, expr)
 	default:
 		cleanedExpression = fmt.Sprintf("%s %s", op, expr)
 	}
