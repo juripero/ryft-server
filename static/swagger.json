@@ -357,7 +357,8 @@
               "$ref": "#/definitions/ErrorResponse"
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/token/refresh": {
@@ -414,6 +415,9 @@
     },
     "SearchResponse": {
       "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      },
       "required": [
         "results"
       ],
@@ -505,5 +509,20 @@
         }
       }
     }
-  }
+  },
+  "securityDefinitions": {
+    "jwt": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    },
+    "basic": {
+      "type": "basic"
+    }
+  },
+  "security": [
+    {
+      "jwt": []
+    }
+  ]
 }
