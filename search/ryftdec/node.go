@@ -53,9 +53,9 @@ const (
 )
 
 // parses options from search expression
-func parseOptions(expression string, baseOpts Options) (cleanExpression string, opts Options) {
+func parseOptions(expression string, baseOpts Options) (cleanedExpression string, opts Options) {
 	opts = baseOpts // just a copy by default
-	cleanExpression = expression
+	cleanedExpression = expression
 
 	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS|REGEX)\((.+?),?\s?([\s\w=]+)?,?\s?([\w\d=]*)?,?\s?([\w\d=]*)?\)`)
 	matches := regex.FindAllStringSubmatch(expression, -1)
@@ -73,9 +73,6 @@ func parseOptions(expression string, baseOpts Options) (cleanExpression string, 
 
 		opts.Mode = strings.ToLower(mode) // FHS or FEDS
 
-		// remove all embedded options from search expression
-		cleanExpression = fmt.Sprintf("%s %s", op, expr)
-
 		for _, arg := range args {
 			tokens := strings.Split(arg, "=")
 
@@ -85,9 +82,34 @@ func parseOptions(expression string, baseOpts Options) (cleanExpression string, 
 				opts = SetOption(opts, name, value)
 			}
 		}
+
+		// remove all embedded options from search expression
+		cleanedExpression = cleanExpression(opts, op, expr, mode)
 	}
 
 	return
+}
+
+func cleanExpression(opts Options, op, expr, mode string) string {
+	var cleanedExpression string
+
+	switch mode {
+	case "REGEX":
+		cleanedExpression = fmt.Sprintf("%s REGEX(%s, %s, PCRE_OPTION_DEFAULT)", op, expr, regexCsValue(opts.Cs))
+	default:
+		cleanedExpression = fmt.Sprintf("%s %s", op, expr)
+	}
+	return cleanedExpression
+}
+
+func regexCsValue(cs bool) string {
+	var regexCs string
+	if cs {
+		regexCs = "CASELESS"
+	} else {
+		regexCs = "NO_CASELESS"
+	}
+	return regexCs
 }
 
 func SetOption(o Options, name, value string) Options {

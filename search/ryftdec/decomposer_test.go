@@ -214,9 +214,9 @@ func TestQueries(t *testing.T) {
     [fhs-0/0-false]: (RAW_TEXT CONTAINS "text")
     [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
-	testQueryTree(t, `((RAW_TEXT CONTAINS REGEX("\w+", CASELESS)) OR (RECORD.id CONTAINS DATE("200301")))`,
+	testQueryTree(t, `((RAW_TEXT CONTAINS REGEX("\w+", CS=true)) OR (RECORD.id CONTAINS DATE("200301")))`,
 		`[  OR]:
-  [  RE]: (RAW_TEXT CONTAINS REGEX("\w+", CASELESS))
+  [  RE]: (RAW_TEXT CONTAINS REGEX("\w+", CASELESS, PCRE_OPTION_DEFAULT))
   [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
 	testQueryTree(t, `(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
@@ -234,4 +234,8 @@ func TestQueries(t *testing.T) {
   [ AND]:
     [feds-0/0-false]: (RECORD.id CONTAINS "123")
     [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+
+	testQueryTree(t, `((RAW_TEXT CONTAINS REGEX("\w+")))`,
+		`[  RE]: (RAW_TEXT CONTAINS REGEX("\w+", NO_CASELESS, PCRE_OPTION_DEFAULT))`)
+
 }
