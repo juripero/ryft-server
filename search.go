@@ -213,7 +213,6 @@ func (s *Server) search(ctx *gin.Context) {
 	}
 
 	// process results!
-	var recordsReceived uint
 	for {
 		select {
 		case <-gone:
@@ -222,12 +221,6 @@ func (s *Server) search(ctx *gin.Context) {
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				if recordsReceived > cfg.Limit && cfg.Limit != 0 {
-					closeResponse()
-					return // stop
-				}
-
-				recordsReceived++
 				putRec(rec)
 			}
 
