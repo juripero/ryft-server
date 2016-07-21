@@ -424,7 +424,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	defer file.Close()
 
 	// try to process all INDEX records
-	var recordsNumber uint
+	var recordsCount uint
 	r := bufio.NewReader(file)
 	for index := range task.indexChan {
 		// trim mount point from file name! TODO: special option for this?
@@ -453,11 +453,11 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-		if recordsNumber >= task.Limit && task.Limit != 0 {
+		if recordsCount >= task.Limit && task.Limit != 0 {
 			return
 		} else {
 			res.ReportRecord(rec)
-			recordsNumber++
+			recordsCount++
 		}
 	}
 }

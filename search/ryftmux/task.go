@@ -47,6 +47,7 @@ var (
 // RyftMUX task related data.
 type Task struct {
 	Identifier string // unique
+	Limit      uint   // limit of returned records
 
 	subtasks sync.WaitGroup
 	results  []*search.Result
@@ -79,6 +80,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 		len(task.results))
 
 	// start multiplexing results and errors
+	var recordsCount uint
 	for _, res := range task.results {
 		task.log().Debugf("[%s]: subtask in progress", TAG)
 		go func(res *search.Result) {
@@ -101,7 +103,13 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					if ok && rec != nil {
 						task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
 						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-						mux.ReportRecord(rec)
+
+						if recordsCount >= task.Limit && task.Limit != 0 {
+							return
+						} else {
+							mux.ReportRecord(rec)
+							recordsCount++
+						}
 					}
 
 				case <-res.DoneChan:

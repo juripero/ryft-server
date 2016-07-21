@@ -53,7 +53,7 @@ type Task struct {
 	DataFileName  string
 	KeepIndexFile bool
 	KeepDataFile  bool
-	Limit         uint
+	Limit         uint // limit of returned records
 
 	// `ryftprim` process & output
 	tool_args []string      // command line arguments
