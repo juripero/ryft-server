@@ -238,4 +238,6 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `((RAW_TEXT CONTAINS REGEX("\w+", PCRE_OPTION_DEFAULT)))`,
 		`[  RE]: (RAW_TEXT CONTAINS REGEX("\w+", PCRE_OPTION_DEFAULT))`)
 
+	testQueryTree(t, `(RAW_TEXT CONTAINS REGEX("[JS]on[(ny)|(es)]", CASELESS, PCRE_OPTION_DEFAULT))`,
+		`[  RE]: (RAW_TEXT CONTAINS REGEX("[JS]on[(ny)|(es)]", CASELESS, PCRE_OPTION_DEFAULT))`)
 }
