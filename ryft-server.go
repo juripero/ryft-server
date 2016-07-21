@@ -304,12 +304,13 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 }
 
 // parse authentication token and home directory from context
-func (s *Server) parseAuthAndHome(ctx *gin.Context) (authToken string, homeDir string, userTag string) {
+func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken string, homeDir string, userTag string) {
 	authToken = ctx.Request.Header.Get("Authorization") // may be empty
 
 	// get home directory
 	if v, exists := ctx.Get(gin.AuthUserKey); exists && v != nil {
 		if user, ok := v.(*auth.UserInfo); ok {
+			userName = user.Name
 			homeDir = user.Home
 			userTag = user.ClusterTag
 		}

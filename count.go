@@ -55,7 +55,7 @@ func (s *Server) count(ctx *gin.Context) {
 	}
 
 	// get search engine
-	authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
+	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -79,7 +79,9 @@ func (s *Server) count(ctx *gin.Context) {
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 
-	log.WithField("config", cfg).Infof("start /count")
+	log.WithField("config", cfg).WithField("user", userName).
+		WithField("home", homeDir).WithField("cluster", userTag).
+		Infof("start /count")
 	res, err := engine.Count(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,

@@ -52,6 +52,7 @@ type UserInfo struct {
 
 type Provider interface {
 	Reload() error
+	FindUser(username string) *UserInfo
 	Verify(username string, password string) *UserInfo
 	ExtraData(username string) map[string]interface{}
 }
@@ -140,6 +141,10 @@ func (mw *Middleware) authenticator(userId string, password string, c *gin.Conte
 
 // authorizator: all logged in users have access
 func (mw *Middleware) authorizator(userId string, c *gin.Context) bool {
+	user := mw.provider.FindUser(userId)
+	if user != nil {
+		c.Set(gin.AuthUserKey, user)
+	}
 	return true
 }
 

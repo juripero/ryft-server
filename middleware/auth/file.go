@@ -84,6 +84,15 @@ func (f *FileAuth) Reload() error {
 	return nil // OK
 }
 
+// find user credentials
+func (f *FileAuth) FindUser(username string) *UserInfo {
+	if u, ok := f.Users[username]; ok {
+		return u // found
+	}
+
+	return nil // not found
+}
+
 // verify user credentials
 func (f *FileAuth) Verify(username, password string) *UserInfo {
 	if u, ok := f.Users[username]; ok {

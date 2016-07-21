@@ -66,6 +66,15 @@ func (a *LdapAuth) Reload() error {
 	return nil // OK
 }
 
+// find user credentials
+func (a *LdapAuth) FindUser(username string) *UserInfo {
+	//	if u, ok := f.Users[username]; ok {
+	//		return u // found
+	//	}
+
+	return nil // not found
+}
+
 // verify user credentials
 func (a *LdapAuth) Verify(username, password string) *UserInfo {
 	user, err := a.verify(username, password)
