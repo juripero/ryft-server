@@ -32,9 +32,11 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/demon-xxi/wildmatch"
@@ -70,6 +72,7 @@ func (s *Server) members(c *gin.Context) {
 
 // GetConsulInfo gets the list of ryft services and
 // the service tags related to requested set of files.
+// the services are arranged based on "busyness" metric!
 func GetConsulInfo(userTag string, files []string) (services []*consul.CatalogService, tags []string, err error) {
 	config := consul.DefaultConfig()
 	// TODO: get some data from server's configuration
@@ -93,7 +96,36 @@ func GetConsulInfo(userTag string, files []string) (services []*consul.CatalogSe
 		}
 	}
 
+	// arrange services based on node metrics
+	metrics, err := getNodeMetrics(client)
+	if err != nil {
+		return services, tags, fmt.Errorf("failed to get node metrics: %s", err)
+	}
+	services = rearrangeServices(services, metrics)
+
 	return services, tags, err
+}
+
+// re-arrange services from less busy to most used
+func rearrangeServices(services []*consul.CatalogService, metrics map[string]int) []*consul.CatalogService {
+	arranged := map[int][]*consul.CatalogService{}
+	for _, service := range services {
+		// get node's metric
+		m := metrics[service.Node]
+
+		// add service to corresponding metric
+		arranged[m] = append(arranged[m], service)
+	}
+
+	// for the same metric just use random shuffle
+	services = make([]*consul.CatalogService, 0, len(services))
+	for _, ss := range arranged {
+		for _, k := range rand.Perm(len(ss)) {
+			services = append(services, ss[k])
+		}
+	}
+
+	return services
 }
 
 // UpdateConsulMetric updates the node metric in the cluster
@@ -120,6 +152,26 @@ func UpdateConsulMetric(metric int) error {
 	}
 
 	return nil // OK
+}
+
+// get metric for all nodes
+func getNodeMetrics(client *consul.Client) (map[string]int, error) {
+	// get all wildcards (keys) and tags
+	prefix := filepath.Join("busyness/")
+	pairs, _, err := client.KV().List(prefix, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metrics from KV: %s", err)
+	}
+
+	metrics := map[string]int{}
+	for _, kvp := range pairs {
+		key, _ := url.QueryUnescape(kvp.Key)
+		node := strings.TrimPrefix(key, prefix)
+		metric, _ := strconv.ParseInt(string(kvp.Value), 10, 32)
+		metrics[node] = int(metric)
+	}
+
+	return metrics, nil
 }
 
 // SplitToLocalAndRemote splits services to local and remote set

@@ -33,7 +33,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"mime"
 	"net/http"
 	"os"
@@ -199,10 +198,8 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		log.WithField("tags", tags_required).Debug("remain (local) tags required")
 	}
 
-	// ... then remote services (shuffled)
-	for _, k := range rand.Perm(len(remote_nodes)) {
-		service := remote_nodes[k]
-
+	// ... then remote services (should be already arranged)
+	for _, service := range remote_nodes {
 		// stop if no more tags required
 		if !all_nodes && len(tags_required) == 0 {
 			break
