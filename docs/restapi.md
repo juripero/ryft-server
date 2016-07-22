@@ -77,6 +77,20 @@ Expression tree is built and each node is passed to the Ryft hardware. Then resu
 NOTE: If search query contains two or more expressions of the same type (text, date, time, numeric) that query
 will not be split into subqueries because the Ryft hardware supports those type of queries directly.
 
+There is also possible to use advanced text search queries to customize some parameters within search expression.
+For example: `(RAW_TEXT CONTAINS FHS("555",CS=true,DIST=1,WIDTH=2)) AND (RAW_TEXT CONTAINS FEDS("777",CS=true,DIST=1,WIDTH=4))`.
+The ryft server splits this expressions into two Ryft calls:
+- `(RAW_TEXT CONTAINS "555")` with `FHS` search type, `fuzziness=1` and `surrounding=2`
+- `(RAW_TEXT CONTAINS "777")` with `FEDS` search type, `fuzziness=1` and `surrounding=4`
+
+This advanced search query syntax overrides the following global parameters:
+- search type: `FHS` or `FEDS` (exact search is used if fuzziness is zero)
+- case sensitivity
+- fuzziness distance
+- surrounding width
+
+If nothing provided the global options are used by default. Any option can be omitted: `(RAW_TEXT CONTAINS FHS("555")) AND (RAW_TEXT CONTAINS FEDS("777",CS=false))`.
+
 
 ### Search `files` parameter
 
