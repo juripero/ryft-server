@@ -50,7 +50,7 @@ func (s *Server) members(c *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(c)
 
-	info, _, err := GetConsulInfo("", nil) // no user tag, no files
+	info, _, err := GetConsulInfo("", nil, 0) // no user tag, no files
 
 	if err != nil {
 		panic(NewServerError(http.StatusInternalServerError, err.Error()))
@@ -73,7 +73,7 @@ func (s *Server) members(c *gin.Context) {
 // GetConsulInfo gets the list of ryft services and
 // the service tags related to requested set of files.
 // the services are arranged based on "busyness" metric!
-func GetConsulInfo(userTag string, files []string) (services []*consul.CatalogService, tags []string, err error) {
+func GetConsulInfo(userTag string, files []string, tolerance int) (services []*consul.CatalogService, tags []string, err error) {
 	config := consul.DefaultConfig()
 	// TODO: get some data from server's configuration
 	config.Datacenter = "dc1"
@@ -101,27 +101,31 @@ func GetConsulInfo(userTag string, files []string) (services []*consul.CatalogSe
 	if err != nil {
 		return services, tags, fmt.Errorf("failed to get node metrics: %s", err)
 	}
-	services = rearrangeServices(services, metrics)
+	services = rearrangeServices(services, metrics, tolerance)
 
 	return services, tags, err
 }
 
 // re-arrange services from less busy to most used
-func rearrangeServices(services []*consul.CatalogService, metrics map[string]int) []*consul.CatalogService {
+func rearrangeServices(services []*consul.CatalogService, metrics map[string]int, tolerance int) []*consul.CatalogService {
+	if tolerance < 0 {
+		tolerance = 0
+	}
+
 	arranged := map[int][]*consul.CatalogService{}
 	for _, service := range services {
 		// get node's metric
-		m := metrics[service.Node]
+		m := metrics[service.Node] / (tolerance + 1)
 
-		// add service to corresponding metric
+		// add service to corresponding level
 		arranged[m] = append(arranged[m], service)
 	}
 
 	// for the same metric just use random shuffle
 	services = make([]*consul.CatalogService, 0, len(services))
-	for _, ss := range arranged {
-		for _, k := range rand.Perm(len(ss)) {
-			services = append(services, ss[k])
+	for _, level := range arranged {
+		for _, k := range rand.Perm(len(level)) {
+			services = append(services, level[k])
 		}
 	}
 

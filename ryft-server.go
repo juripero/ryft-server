@@ -155,7 +155,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, home
 func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, userTag string) (search.Engine, error) {
 	// for each service create corresponding search engine
 	backends := []search.Engine{}
-	nodes, tags, err := GetConsulInfo(userTag, files)
+	nodes, tags, err := GetConsulInfo(userTag, files, 0) // TODO: tolerance configuration
 	if err != nil {
 		return nil, fmt.Errorf("failed to get consul services: %s", err)
 	}
