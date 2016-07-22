@@ -98,12 +98,13 @@ Multiple files can be provided as:
 - `feds` for fuzzy edit distance search
 - `ds` for date search
 - `ts` for time search
-- `ns` for numeric search
+- `ns` for numeric or currency search
+- `rs` for regex search
 
 If no search mode is specified, fuzzy hamming search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
 keyword then date search will be used. It's the same when `TIME` keyword is used for time search,
-and `NUMERIC` for numeric search.
+and `NUMERIC` or `CURRENCY` for numeric search.
 
 In case of complex search queries, the mode specified is used for text or structured search only.
 Date, time and numeric search modes will be detected automatically by corresponding keywords.
