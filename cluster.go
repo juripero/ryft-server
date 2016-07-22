@@ -96,6 +96,32 @@ func GetConsulInfo(userTag string, files []string) (services []*consul.CatalogSe
 	return services, tags, err
 }
 
+// UpdateConsulMetric updates the node metric in the cluster
+func UpdateConsulMetric(metric int) error {
+	config := consul.DefaultConfig()
+	// TODO: get some data from server's configuration
+	config.Datacenter = "dc1"
+	client, err := consul.NewClient(config)
+	if err != nil {
+		return fmt.Errorf("failed to get consul client: %s", err)
+	}
+
+	name, err := client.Agent().NodeName()
+	if err != nil {
+		return fmt.Errorf("failed to get node name: %s", err)
+	}
+
+	pair := new(consul.KVPair)
+	pair.Key = filepath.Join("busyness", name)
+	pair.Value = []byte(fmt.Sprintf("%d", metric))
+	_, err = client.KV().Put(pair, nil)
+	if err != nil {
+		return fmt.Errorf("failed to update node metric: %s", err)
+	}
+
+	return nil // OK
+}
+
 // SplitToLocalAndRemote splits services to local and remote set
 // NOTE the input `services` slice might be modified!
 func SplitToLocalAndRemote(services []*consul.CatalogService) (local *consul.CatalogService, remotes []*consul.CatalogService) {

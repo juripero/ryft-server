@@ -144,6 +144,9 @@ func (s *Server) search(ctx *gin.Context) {
 			err.Error(), "failed to start search"))
 	}
 
+	s.onSearchStarted(cfg)
+	defer s.onSearchStopped(cfg)
+
 	// ctx.Stream() logic
 	writer := ctx.Writer
 	gone := writer.CloseNotify()

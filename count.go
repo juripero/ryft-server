@@ -88,6 +88,9 @@ func (s *Server) count(ctx *gin.Context) {
 			err.Error(), "failed to start search"))
 	}
 
+	s.onSearchStarted(cfg)
+	defer s.onSearchStopped(cfg)
+
 	for {
 		select {
 		case rec, ok := <-res.RecordChan:

@@ -33,13 +33,13 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-
 	"math/rand"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
@@ -104,6 +104,12 @@ var (
 type Server struct {
 	SearchBackend  string                 `yaml:"searchBackend,omitempty"`
 	BackendOptions map[string]interface{} `yaml:"backendOptions,omitempty"`
+
+	// the number of active search requests on this node
+	// is used as a metric for "busyness"
+	// worker thread is started if "local mode" is disabled
+	activeSearchCount int32
+	busynessChanged   chan int32
 }
 
 // parse server configuration from YML file
@@ -319,6 +325,49 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 	return
 }
 
+// update busyness thread
+func (s *Server) startUpdatingBusyness() {
+	s.busynessChanged = make(chan int32, 256)
+	go func(metric int32) {
+		var reported int32 = -1 // to force update metric ASAP
+		for {
+			select {
+			case metric = <-s.busynessChanged:
+				log.WithField("metric", metric).Debug("metric changed")
+				continue
+			case <-time.After(time.Second): // update latency
+				if metric != reported {
+					reported = metric
+					log.WithField("metric", metric).Debug("metric reporting...")
+					err := UpdateConsulMetric(int(metric))
+					if err != nil {
+						log.WithError(err).Warnf("failed to update consul metric")
+					}
+				}
+				// TODO: graceful shutdown
+			}
+		}
+	}(s.activeSearchCount)
+}
+
+// notify server a search is started
+func (s *Server) onSearchStarted(config *search.Config) {
+	metric := atomic.AddInt32(&s.activeSearchCount, +1)
+	if s.busynessChanged != nil {
+		// notify to update metric
+		s.busynessChanged <- metric
+	}
+}
+
+// notify server a search is started
+func (s *Server) onSearchStopped(config *search.Config) {
+	metric := atomic.AddInt32(&s.activeSearchCount, -1)
+	if s.busynessChanged != nil {
+		// notify to update metric
+		s.busynessChanged <- metric
+	}
+}
+
 // get local host name
 func getHostName() string {
 	hostName, _ := os.Hostname()
@@ -468,6 +517,10 @@ func main() {
 	router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
+
+	if !*localMode {
+		server.startUpdatingBusyness()
+	}
 
 	// start listening on HTTP or HTTPS ports
 	if *tlsEnabled {
