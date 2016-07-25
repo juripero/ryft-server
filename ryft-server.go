@@ -162,6 +162,10 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 	local_node, remote_nodes := SplitToLocalAndRemote(nodes)
 	log.WithField("tags", tags).Debug("cluster search tags")
 
+	// since now we use 'busyness' metric there is no sense
+	// to use local node first, all nodes should be equal!
+	local_node, remote_nodes = nil, nodes
+
 	// if no tags required - use all nodes
 	all_nodes := (len(tags) == 0)
 
