@@ -123,7 +123,15 @@
             "name": "stats",
             "x-go-name": "Stats",
             "description": "Include search statistics in response. Default 'false'."
-          }
+          },
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint",
+            "name": "limit",
+            "x-go-name": "Limit",
+            "description": "Limit the total number of records reported."
+          },
         ],
         "responses": {
           "200": {

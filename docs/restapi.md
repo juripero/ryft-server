@@ -33,6 +33,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
+| `limit`       | int     | [Limit the total number of records reported](#search-limit-parameter). |
 | `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-and-spark-parameters). |
 | `spark`       | boolean | **Internal** [The spark output format flag](#search-stream-and-spark--parameters). |
 | `ep`          | boolean | **Internal** [The error prefix flag](#search-ep-parameter). |
@@ -228,6 +229,12 @@ To execute a search on single node just pass `local=true`.
 
 The statistics is not reported **by default**.
 To check total number of matches and performance number just pass `stats=true`.
+
+
+### Search `limit` parameter
+
+This parameter is used to limit the total number of records reported.
+There is no any limit **by default** or when `limit=0`.
 
 
 ### Search `stream` and `spark` parameters
