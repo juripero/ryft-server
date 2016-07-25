@@ -32,6 +32,7 @@ package search
 
 import (
 	"fmt"
+	"sync/atomic"
 )
 
 // Search result.
@@ -89,24 +90,24 @@ func (res Result) String() string {
 
 // ReportError sends error to Error channel.
 func (res *Result) ReportError(err error) {
-	res.errorsReported += 1 // FIXME: use atomic?
+	atomic.AddUint64(&res.errorsReported, 1)
 	res.ErrorChan <- err
 }
 
 // ErrorsReported gets the number of total errors reported
 func (res *Result) ErrorsReported() uint64 {
-	return res.errorsReported
+	return atomic.LoadUint64(&res.errorsReported)
 }
 
 // ReportRecord sends data record to records channel.
 func (res *Result) ReportRecord(rec *Record) {
-	res.recordsReported += 1 // FIXME: use atomic?
+	atomic.AddUint64(&res.recordsReported, 1)
 	res.RecordChan <- rec
 }
 
 // RecordsReported gets the number of total records reported
 func (res *Result) RecordsReported() uint64 {
-	return res.recordsReported
+	return atomic.LoadUint64(&res.recordsReported)
 }
 
 // Cancel stops the search processing.
