@@ -146,6 +146,9 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// assign command line
 	task.tool_args = args
 
+	// limit number of records
+	task.Limit = uint64(cfg.Limit)
+
 	return nil // OK
 }
 
@@ -447,6 +450,15 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+		if task.Limit > 0 && res.RecordsReported() >= task.Limit {
+			task.log().WithField("limit", task.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)
+
+			// just in case, also stop INDEX processing
+			task.cancelIndex()
+
+			return // stop processing
+		}
+
 		res.ReportRecord(rec)
 	}
 }
