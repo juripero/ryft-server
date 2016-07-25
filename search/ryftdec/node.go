@@ -53,11 +53,11 @@ const (
 )
 
 // parses options from search expression
-func parseOptions(expression string, baseOpts Options) (cleanedExpression string, opts Options) {
+func parseExpression(expression string, baseOpts Options) (cleanedExpression string, opts Options) {
 	opts = baseOpts // just a copy by default
 	cleanedExpression = expression
 
-	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\((.+?),?\s?([\s\w=]+)?,?\s?([\w\d=]*)?,?\s?([\w\d=]*)?\)`)
+	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\(([\"\'].+?[\"\']),?(.+?)?\)\)?`)
 	matches := regex.FindAllStringSubmatch(expression, -1)
 
 	if len(matches) > 0 {
@@ -66,21 +66,13 @@ func parseOptions(expression string, baseOpts Options) (cleanedExpression string
 		op := strings.TrimSpace(match[1])
 		mode := strings.TrimSpace(match[2])
 		expr := strings.TrimSpace(match[3])
-		arg1 := strings.TrimSpace(match[4])
-		arg2 := strings.TrimSpace(match[5])
-		arg3 := strings.TrimSpace(match[6])
-		args := []string{arg1, arg2, arg3}
+		argsString := strings.TrimSpace(match[4])
+		args := parseArgs(argsString)
 
 		opts.Mode = strings.ToLower(mode) // FHS or FEDS
 
-		for _, arg := range args {
-			tokens := strings.Split(arg, "=")
-
-			if len(tokens) > 1 {
-				name := tokens[0]
-				value := tokens[1]
-				opts = SetOption(opts, name, value)
-			}
+		for name, value := range args {
+			opts = SetOption(opts, name, value)
 		}
 
 		// remove all embedded options from search expression
@@ -88,6 +80,19 @@ func parseOptions(expression string, baseOpts Options) (cleanedExpression string
 	}
 
 	return
+}
+
+func parseArgs(argsString string) map[string]string {
+	args := make(map[string]string)
+	regex := regexp.MustCompile(`(:?(\w+)=([\w\d]+))`)
+	matches := regex.FindAllStringSubmatch(argsString, -1)
+
+	for _, match := range matches {
+		key := match[2]
+		value := match[3]
+		args[key] = value
+	}
+	return args
 }
 
 func SetOption(o Options, name, value string) Options {
@@ -127,7 +132,7 @@ type Node struct {
 // create new tree node
 func NewNode(expression string, parent *Node, baseOpts Options) *Node {
 	node := new(Node)
-	node.Expression, node.Options = parseOptions(expression, baseOpts)
+	node.Expression, node.Options = parseExpression(expression, baseOpts)
 	node.Type = expressionType(node.Expression)
 	if node.Type.IsSearch() {
 		node.Expression = fmt.Sprintf("(%s)", node.Expression)
