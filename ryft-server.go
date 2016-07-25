@@ -72,6 +72,8 @@ var (
 	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
 	localMode   = kingpin.Flag("local-only", "Run server is local mode (no cluster).").Bool()
 
+	busynessTolerance = kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Int()
+
 	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
 	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
 
@@ -155,7 +157,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, home
 func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, userTag string) (search.Engine, error) {
 	// for each service create corresponding search engine
 	backends := []search.Engine{}
-	nodes, tags, err := GetConsulInfo(userTag, files, 0) // TODO: tolerance configuration
+	nodes, tags, err := GetConsulInfo(userTag, files, *busynessTolerance)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get consul services: %s", err)
 	}
