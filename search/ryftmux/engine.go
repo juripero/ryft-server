@@ -59,10 +59,9 @@ func NewEngine(backends ...search.Engine) (*Engine, error) {
 	return engine, nil
 }
 
+// prepare task configuration
 func (engine *Engine) prepare(task *Task, cfg *search.Config) {
-	if cfg.Limit != 0 {
-		task.Limit = cfg.Limit
-	}
+	task.Limit = uint64(cfg.Limit)
 }
 
 // String gets string representation of the engine.

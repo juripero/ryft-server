@@ -187,30 +187,6 @@ func (s *Server) search(ctx *gin.Context) {
 			writer.Flush()
 		}
 	}
-	closeResponse := func() {
-		// special case: if no records and no stats were received
-		// but just an error, we panic to return 500 status code
-		if num_records == 0 && res.Stat == nil &&
-			num_errors == 1 && last_error != nil {
-			panic(last_error)
-		}
-
-		if params.Stats && res.Stat != nil {
-			xstat := tcode.FromStat(res.Stat)
-			err := enc.EncodeStat(xstat)
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		// close encoder
-		err := enc.Close()
-		if err != nil {
-			panic(err)
-		}
-
-		log.WithField("result", res).Infof("/search done")
-	}
 
 	// process results!
 	for {
@@ -238,7 +214,28 @@ func (s *Server) search(ctx *gin.Context) {
 				putErr(err)
 			}
 
-			closeResponse()
+			// special case: if no records and no stats were received
+			// but just an error, we panic to return 500 status code
+			if num_records == 0 && res.Stat == nil &&
+				num_errors == 1 && last_error != nil {
+				panic(last_error)
+			}
+
+			if params.Stats && res.Stat != nil {
+				xstat := tcode.FromStat(res.Stat)
+				err := enc.EncodeStat(xstat)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			// close encoder
+			err := enc.Close()
+			if err != nil {
+				panic(err)
+			}
+
+			log.WithField("result", res).Infof("/search done")
 			return // stop
 		}
 	}

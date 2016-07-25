@@ -104,11 +104,6 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-d", fmt.Sprintf("%d", cfg.Fuzziness))
 	}
 
-	// number of returned records
-	if cfg.Limit > 0 {
-		task.Limit = cfg.Limit
-	}
-
 	// search query
 	args = append(args, "-q", ryftone.PrepareQuery(cfg.Query))
 
@@ -150,6 +145,9 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 	// assign command line
 	task.tool_args = args
+
+	// limit number of records
+	task.Limit = uint64(cfg.Limit)
 
 	return nil // OK
 }
@@ -424,7 +422,6 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	defer file.Close()
 
 	// try to process all INDEX records
-	var recordsCount uint
 	r := bufio.NewReader(file)
 	for index := range task.indexChan {
 		// trim mount point from file name! TODO: special option for this?
@@ -453,12 +450,16 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-		if recordsCount >= task.Limit && task.Limit != 0 {
-			return
-		} else {
-			res.ReportRecord(rec)
-			recordsCount++
+		if task.Limit > 0 && res.RecordsReported() >= task.Limit {
+			task.log().WithField("limit", task.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)
+
+			// just in case, also stop INDEX processing
+			task.cancelIndex()
+
+			return // stop processing
 		}
+
+		res.ReportRecord(rec)
 	}
 }
 

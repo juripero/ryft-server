@@ -44,11 +44,11 @@ import (
 type Result struct {
 	// Channel of processing errors (Engine -> client)
 	ErrorChan      chan error
-	errorsReceived uint64 // statistics
+	errorsReported uint64 // statistics
 
 	// Channel of processed records (Engine -> client)
 	RecordChan      chan *Record
-	recordsReceived uint64 // statistics
+	recordsReported uint64 // statistics
 
 	// Cancel channel is used to notify search engine
 	// to stop processing immideatelly (client -> Engine)
@@ -80,23 +80,33 @@ func NewResult() *Result {
 func (res Result) String() string {
 	if res.Stat != nil {
 		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, stat:%s}",
-			res.recordsReceived, res.errorsReceived, res.isDone, res.Stat)
+			res.recordsReported, res.errorsReported, res.isDone, res.Stat)
 	} else {
 		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, no stat}",
-			res.recordsReceived, res.errorsReceived, res.isDone)
+			res.recordsReported, res.errorsReported, res.isDone)
 	}
 }
 
 // ReportError sends error to Error channel.
 func (res *Result) ReportError(err error) {
-	res.errorsReceived += 1 // FIXME: use atomic?
+	res.errorsReported += 1 // FIXME: use atomic?
 	res.ErrorChan <- err
+}
+
+// ErrorsReported gets the number of total errors reported
+func (res *Result) ErrorsReported() uint64 {
+	return res.errorsReported
 }
 
 // ReportRecord sends data record to records channel.
 func (res *Result) ReportRecord(rec *Record) {
-	res.recordsReceived += 1 // FIXME: use atomic?
+	res.recordsReported += 1 // FIXME: use atomic?
 	res.RecordChan <- rec
+}
+
+// RecordsReported gets the number of total records reported
+func (res *Result) RecordsReported() uint64 {
+	return res.recordsReported
 }
 
 // Cancel stops the search processing.
