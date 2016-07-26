@@ -33,13 +33,13 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"mime"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
@@ -108,6 +108,14 @@ type Server struct {
 		Secret    string `yaml:"secret,omitempty"`
 		Lifetime  string `yaml:"lifetime,omitempty"`
 	} `yaml:"auth-jwt,omitempty"`
+
+	BusynessTolerance int `yaml:"busyness-tolerance,omitempty"`
+
+	// the number of active search requests on this node
+	// is used as a metric for "busyness"
+	// worker thread is started if "local mode" is disabled
+	activeSearchCount int32
+	busynessChanged   chan int32
 }
 
 // config file name kingpin.Value
@@ -140,6 +148,7 @@ func NewServer() (*Server, error) {
 	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&s.LocalOnly)
 	kingpin.Flag("keep", "Keep search results temporary files.").Short('k').BoolVar(&s.KeepResults)
 	kingpin.Flag("debug", "Run http server in debug mode.").Short('d').BoolVar(&s.DebugMode)
+	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").IntVar(&s.BusynessTolerance)
 
 	kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").StringVar(&s.ListenAddress)
 	kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').BoolVar(&s.TLS.Enabled)
@@ -246,12 +255,16 @@ func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, home
 func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, userTag string) (search.Engine, error) {
 	// for each service create corresponding search engine
 	backends := []search.Engine{}
-	nodes, tags, err := GetConsulInfo(userTag, files)
+	nodes, tags, err := GetConsulInfo(userTag, files, s.BusynessTolerance)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get consul services: %s", err)
 	}
 	local_node, remote_nodes := SplitToLocalAndRemote(nodes, s.listenAddress.Port)
 	log.WithField("tags", tags).Debug("cluster search tags")
+
+	// since now we use 'busyness' metric there is no sense
+	// to use local node first, all nodes should be equal!
+	local_node, remote_nodes = nil, nodes
 
 	// if no tags required - use all nodes
 	all_nodes := (len(tags) == 0)
@@ -289,10 +302,8 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		log.WithField("tags", tags_required).Debug("remain (local) tags required")
 	}
 
-	// ... then remote services (shuffled)
-	for _, k := range rand.Perm(len(remote_nodes)) {
-		service := remote_nodes[k]
-
+	// ... then remote services (should be already arranged)
+	for _, service := range remote_nodes {
 		// stop if no more tags required
 		if !all_nodes && len(tags_required) == 0 {
 			break
@@ -415,6 +426,49 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 	return
 }
 
+// update busyness thread
+func (s *Server) startUpdatingBusyness() {
+	s.busynessChanged = make(chan int32, 256)
+	go func(metric int32) {
+		var reported int32 = -1 // to force update metric ASAP
+		for {
+			select {
+			case metric = <-s.busynessChanged:
+				log.WithField("metric", metric).Debug("metric changed")
+				continue
+			case <-time.After(time.Second): // update latency
+				if metric != reported {
+					reported = metric
+					log.WithField("metric", metric).Debug("metric reporting...")
+					err := UpdateConsulMetric(int(metric))
+					if err != nil {
+						log.WithError(err).Warnf("failed to update consul metric")
+					}
+				}
+				// TODO: graceful shutdown
+			}
+		}
+	}(s.activeSearchCount)
+}
+
+// notify server a search is started
+func (s *Server) onSearchStarted(config *search.Config) {
+	metric := atomic.AddInt32(&s.activeSearchCount, +1)
+	if s.busynessChanged != nil {
+		// notify to update metric
+		s.busynessChanged <- metric
+	}
+}
+
+// notify server a search is started
+func (s *Server) onSearchStopped(config *search.Config) {
+	metric := atomic.AddInt32(&s.activeSearchCount, -1)
+	if s.busynessChanged != nil {
+		// notify to update metric
+		s.busynessChanged <- metric
+	}
+}
+
 // get local host name
 func getHostName() string {
 	hostName, _ := os.Hostname()
@@ -535,6 +589,10 @@ func main() {
 	router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
+
+	if !server.LocalOnly {
+		server.startUpdatingBusyness()
+	}
 
 	// start listening on HTTP or HTTPS ports
 	if server.TLS.Enabled {
