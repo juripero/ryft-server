@@ -50,13 +50,18 @@ func (s *Server) members(c *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(c)
 
-	info, _, err := GetConsulInfo("", nil, 0) // no user tag, no files
+	info, _, metrics, err := GetConsulInfo("", nil, 0) // no user tag, no files
 
 	if err != nil {
 		panic(NewServerError(http.StatusInternalServerError, err.Error()))
 	} else {
 		log.WithField("info", info).Debug("consul information")
-		c.JSON(http.StatusOK, info)
+
+		data := map[string]interface{}{
+			"nodes":   info,
+			"metrics": metrics,
+		}
+		c.JSON(http.StatusOK, data)
 	}
 }
 
@@ -73,37 +78,37 @@ func (s *Server) members(c *gin.Context) {
 // GetConsulInfo gets the list of ryft services and
 // the service tags related to requested set of files.
 // the services are arranged based on "busyness" metric!
-func GetConsulInfo(userTag string, files []string, tolerance int) (services []*consul.CatalogService, tags []string, err error) {
+func GetConsulInfo(userTag string, files []string, tolerance int) (services []*consul.CatalogService, tags []string, metrics map[string]int, err error) {
 	config := consul.DefaultConfig()
 	// TODO: get some data from server's configuration
 	config.Datacenter = "dc1"
 	client, err := consul.NewClient(config)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get consul client: %s", err)
+		return nil, nil, nil, fmt.Errorf("failed to get consul client: %s", err)
 	}
 
 	catalog := client.Catalog()
 	services, _, err = catalog.Service("ryft-rest-api", "", nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get consul services: %s", err)
+		return nil, nil, nil, fmt.Errorf("failed to get consul services: %s", err)
 	}
 
 	if len(files) != 0 {
 		tags, err = findBestMatch(client, userTag, files)
 		if err != nil {
-			return services, nil, fmt.Errorf("failed to get match tags: %s", err)
+			return services, nil, nil, fmt.Errorf("failed to get match tags: %s", err)
 		}
 	}
 
 	// arrange services based on node metrics
-	metrics, err := getNodeMetrics(client)
+	metrics, err = getNodeMetrics(client)
 	if err != nil {
-		return services, tags, fmt.Errorf("failed to get node metrics: %s", err)
+		return services, tags, nil, fmt.Errorf("failed to get node metrics: %s", err)
 	}
 	services = rearrangeServices(services, metrics, tolerance)
 
-	return services, tags, err
+	return services, tags, metrics, err
 }
 
 // re-arrange services from less busy to most used
