@@ -33,9 +33,9 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-
 	"math/rand"
 	"mime"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -65,32 +65,6 @@ var (
 	log = logrus.New()
 )
 
-var (
-	// KeepResults console flag for keeping results files
-	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
-	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
-
-	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
-	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
-
-	authJwtSecret   = kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").String()
-	authJwtAlg      = kingpin.Flag("jwt-alg", "JWT signing algorithm.").String()
-	authJwtLifetime = kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").Duration()
-
-	authLdapServer = kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").TCP()
-	authLdapUser   = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
-	authLdapPass   = kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").String()
-	authLdapQuery  = kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").Default("(&(uid=%s))").String()
-	authLdapBase   = kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups.'. Required for --auth=ldap.").String()
-
-	listenAddress = kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").TCP()
-
-	tlsEnabled       = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
-	tlsCrtFile       = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
-	tlsKeyFile       = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
-	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
-)
-
 // customized via Makefile
 var (
 	Version string
@@ -101,42 +75,132 @@ var (
 type Server struct {
 	SearchBackend  string                 `yaml:"searchBackend,omitempty"`
 	BackendOptions map[string]interface{} `yaml:"backendOptions,omitempty"`
+	LocalOnly      bool                   `yaml:"localOnly,omitempty"`
+	DebugMode      bool                   `yaml:"debugMode,omitempty"`
+	KeepResults    bool                   `yaml:"keepResults,omitempty"`
 
-	LocalMode bool `yaml:"localOnly,omitempty"`
+	ListenAddress string `yaml:"address,omitempty"`
+	listenAddress *net.TCPAddr
+
+	TLS struct {
+		Enabled       bool   `yaml:"enabled,omitempty"`
+		ListenAddress string `yaml:"address,omitempty"`
+		CertFile      string `yaml:"cert-file,omitempty"`
+		KeyFile       string `yaml:"key-file,omitempty"`
+	} `yaml:"tls,omitempty"`
+
+	AuthType string `yaml:"auth-type,omitempty"`
+
+	AuthFile struct {
+		UsersFile string `yaml:"users-file,omitempty"`
+	} `yaml:"auth-file,omitempty"`
+
+	AuthLdap struct {
+		Server   string `yaml:"server,omitempty"`
+		Username string `yaml:"username,omitempty"`
+		Password string `yaml:"password,omitempty"`
+		Query    string `yaml:"query,omitempty"`
+		BaseDN   string `yaml:"basedn,omitempty"`
+	} `yaml:"auth-ldap,omitempty"`
+
+	AuthJwt struct {
+		Algorithm string `yaml:"algorithm,omitempty"`
+		Secret    string `yaml:"secret,omitempty"`
+		Lifetime  string `yaml:"lifetime,omitempty"`
+	} `yaml:"auth-jwt,omitempty"`
+}
+
+// config file name kingpin.Value
+type serverConfigValue struct {
+	s *Server
+	v string
+}
+
+// set server's configuration file
+func (f *serverConfigValue) Set(s string) error {
+	f.v = s
+	return f.s.parseConfig(f.v)
+}
+
+// get server's configuration file
+func (f *serverConfigValue) String() string {
+	return f.v
 }
 
 // create new server instance
 func NewServer() (*Server, error) {
 	s := new(Server)
 
-	kingpin.Flag("config", "Server configuration in YML format.").Action(s.parseConfig)
-	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&s.LocalMode)
+	// default configuration
+	s.SearchBackend = "ryftprim"
+	s.BackendOptions = map[string]interface{}{}
+
+	config := &serverConfigValue{s: s}
+	kingpin.Flag("config", "Server configuration in YML format.").SetValue(config)
+	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&s.LocalOnly)
+	kingpin.Flag("keep", "Keep search results temporary files.").Short('k').BoolVar(&s.KeepResults)
+	kingpin.Flag("debug", "Run http server in debug mode.").Short('d').BoolVar(&s.DebugMode)
+
+	kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").StringVar(&s.ListenAddress)
+	kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').BoolVar(&s.TLS.Enabled)
+	kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").StringVar(&s.TLS.CertFile)
+	kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").StringVar(&s.TLS.KeyFile)
+	kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").StringVar(&s.TLS.ListenAddress)
+
+	kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Default("none").EnumVar(&s.AuthType, "none", "file", "ldap")
+	kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFileVar(&s.AuthFile.UsersFile)
+	kingpin.Flag("jwt-alg", "JWT signing algorithm.").StringVar(&s.AuthJwt.Algorithm)
+	kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").StringVar(&s.AuthJwt.Secret)
+	kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").StringVar(&s.AuthJwt.Lifetime)
+
+	kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").StringVar(&s.AuthLdap.Server)
+	kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.Username)
+	kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.Password)
+	kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").Default("(&(uid=%s))").StringVar(&s.AuthLdap.Query)
+	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups.'. Required for --auth=ldap.").StringVar(&s.AuthLdap.BaseDN)
 
 	kingpin.Parse()
 
 	// check extra dependencies logic not handled by kingpin
-	switch *authType {
+	var err error
+
+	switch strings.ToLower(s.AuthType) {
 	case "file":
-		ensureDefault(authUsersFile, "users-file is required for file authentication.")
-		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
-		break
-	case "ldap":
-		if (*authLdapServer) == nil {
-			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
-		}
-		if (*authLdapServer).IP == nil {
-			kingpin.FatalUsage("ldap-server requires addresse name part, not only port.")
+		switch {
+		case len(s.AuthFile.UsersFile) == 0:
+			kingpin.FatalUsage("users-file is required for file authentication.")
+		case len(s.AuthJwt.Secret) == 0:
+			kingpin.FatalUsage("jwt-secret is required for any authentication.")
 		}
 
-		ensureDefault(authLdapUser, "ldap-user is required for ldap authentication.")
-		ensureDefault(authLdapPass, "ldap-pass is required for ldap authentication.")
-		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
-		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
-		break
+	case "ldap":
+		switch {
+		case len(s.AuthLdap.Server) == 0:
+			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
+		case len(s.AuthLdap.Username) == 0:
+			kingpin.FatalUsage("ldap-user is required for ldap authentication.")
+		case len(s.AuthLdap.Password) == 0:
+			kingpin.FatalUsage("ldap-pass is required for ldap authentication.")
+		case len(s.AuthLdap.BaseDN) == 0:
+			kingpin.FatalUsage("ldap-basedn is required for ldap authentication.")
+		case len(s.AuthJwt.Secret) == 0:
+			kingpin.FatalUsage("jwt-secret is required for any authentication.")
+		}
 	}
-	if *tlsEnabled {
-		ensureDefault(tlsCrtFile, "tls-crt is required for enabled tls property")
-		ensureDefault(tlsKeyFile, "tls-key is required for enabled tls property")
+
+	if s.TLS.Enabled {
+		switch {
+		case len(s.TLS.ListenAddress) == 0:
+			kingpin.FatalUsage("tls-address is required for enabled tls property")
+		case len(s.TLS.CertFile) == 0:
+			kingpin.FatalUsage("tls-crt is required for enabled tls property")
+		case len(s.TLS.KeyFile) == 0:
+			kingpin.FatalUsage("tls-key is required for enabled tls property")
+		}
+	}
+
+	if s.listenAddress, err = net.ResolveTCPAddr("tcp", s.ListenAddress); err != nil {
+		kingpin.FatalUsage("%q is not a valid TCP address: %s", s.ListenAddress, err)
 	}
 
 	return s, nil // OK
@@ -144,10 +208,6 @@ func NewServer() (*Server, error) {
 
 // parse server configuration from YML file
 func (s *Server) parseConfig(fileName string) error {
-	// default configuration if no file provided
-	s.SearchBackend = "ryftprim"
-	s.BackendOptions = map[string]interface{}{}
-
 	if len(fileName) == 0 {
 		return nil // OK
 	}
@@ -175,7 +235,7 @@ func ensureDefault(flag *string, message string) {
 
 // get search backend with options
 func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, homeDir, userTag string) (search.Engine, error) {
-	if !*localMode && !localOnly {
+	if !s.LocalOnly && !localOnly {
 		return s.getClusterSearchEngine(files, authToken, homeDir, userTag)
 	}
 
@@ -190,7 +250,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 	if err != nil {
 		return nil, fmt.Errorf("failed to get consul services: %s", err)
 	}
-	local_node, remote_nodes := SplitToLocalAndRemote(nodes)
+	local_node, remote_nodes := SplitToLocalAndRemote(nodes, s.listenAddress.Port)
 	log.WithField("tags", tags).Debug("cluster search tags")
 
 	// if no tags required - use all nodes
@@ -263,7 +323,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 			"index-host": url,
 		}
 		// log level
-		if _, ok := opts["log-level"]; !ok && *debug {
+		if _, ok := opts["log-level"]; !ok && s.DebugMode {
 			opts["log-level"] = "debug"
 		}
 
@@ -303,7 +363,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	case "ryftprim":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
-			opts["instance-name"] = fmt.Sprintf(".rest-%d", (*listenAddress).Port)
+			opts["instance-name"] = fmt.Sprintf(".rest-%d", s.listenAddress.Port)
 		}
 
 		// home-dir (override settings)
@@ -313,7 +373,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 
 		// keep-files
 		if _, ok := opts["keep-files"]; !ok {
-			opts["keep-files"] = *KeepResults
+			opts["keep-files"] = s.KeepResults
 		}
 
 		// index-host
@@ -322,7 +382,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 		}
 
 		// log level
-		if _, ok := opts["log-level"]; !ok && *debug {
+		if _, ok := opts["log-level"]; !ok && s.DebugMode {
 			opts["log-level"] = "debug"
 		}
 	}
@@ -333,7 +393,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	}
 
 	// special query decomposer
-	if *debug {
+	if s.DebugMode {
 		ryftdec.SetLogLevel("debug")
 	}
 	return ryftdec.NewEngine(backend)
@@ -370,10 +430,10 @@ func main() {
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to read server configuration")
 	}
-	log.WithField("config", server).Infof("server configuration")
+	log.WithField("config", server).Infof("server configuration local:%t", server.LocalOnly)
 
 	// be quiet and efficient in production
-	if !*debug {
+	if !server.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
 		log.Level = logrus.DebugLevel
@@ -406,16 +466,16 @@ func main() {
 
 	// Enable authentication if configured
 	var auth_provider auth.Provider
-	switch strings.ToLower(*authType) {
+	switch strings.ToLower(server.AuthType) {
 	case "file":
-		file, err := auth.NewFile(*authUsersFile)
+		file, err := auth.NewFile(server.AuthFile.UsersFile)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to read users file")
 		}
 		auth_provider = file
 	case "ldap":
-		ldap, err := auth.NewLDAP((*authLdapServer).String(), *authLdapUser,
-			*authLdapPass, *authLdapQuery, *authLdapBase)
+		ldap, err := auth.NewLDAP(server.AuthLdap.Server, server.AuthLdap.Username,
+			server.AuthLdap.Password, server.AuthLdap.Query, server.AuthLdap.BaseDN)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to init LDAP authentication")
 		}
@@ -423,17 +483,21 @@ func main() {
 	case "none", "":
 		break
 	default:
-		log.WithField("auth", *authType).Fatalf("unknown authentication type")
+		log.WithField("auth", server.AuthType).Fatalf("unknown authentication type")
 	}
 
 	// authentication enabled
 	if auth_provider != nil {
 		mw := auth.NewMiddleware(auth_provider, "")
-		secret, err := auth.ParseSecret(*authJwtSecret)
+		secret, err := auth.ParseSecret(server.AuthJwt.Secret)
 		if err != nil {
 			log.WithError(err).Fatalf("Failed to parse JWT secret")
 		}
-		mw.EnableJwt(secret, *authJwtAlg, *authJwtLifetime)
+		lifetime, err := time.ParseDuration(server.AuthJwt.Lifetime)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to parse JWT lifetime")
+		}
+		mw.EnableJwt(secret, server.AuthJwt.Algorithm, lifetime)
 		private.Use(mw.Authentication())
 		private.GET("/token/refresh", mw.RefreshHandler())
 		router.POST("/login", mw.LoginHandler())
@@ -473,8 +537,8 @@ func main() {
 	})
 
 	// start listening on HTTP or HTTPS ports
-	if *tlsEnabled {
-		go router.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
+	if server.TLS.Enabled {
+		go router.RunTLS(server.TLS.ListenAddress, server.TLS.CertFile, server.TLS.KeyFile)
 	}
-	router.Run((*listenAddress).String())
+	router.Run(server.ListenAddress)
 }

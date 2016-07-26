@@ -98,9 +98,9 @@ func GetConsulInfo(userTag string, files []string) (services []*consul.CatalogSe
 
 // SplitToLocalAndRemote splits services to local and remote set
 // NOTE the input `services` slice might be modified!
-func SplitToLocalAndRemote(services []*consul.CatalogService) (local *consul.CatalogService, remotes []*consul.CatalogService) {
+func SplitToLocalAndRemote(services []*consul.CatalogService, listenPort int) (local *consul.CatalogService, remotes []*consul.CatalogService) {
 	for i, service := range services {
-		if compareIP(service.Address) && service.ServicePort == (*listenAddress).Port {
+		if compareIP(service.Address) && service.ServicePort == listenPort {
 			local = service
 			remotes = append(services[:i],
 				services[i+1:]...)
