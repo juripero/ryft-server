@@ -36,6 +36,9 @@ import (
 	"net/url"
 	"strings"
 
+	"math/rand"
+	"time"
+
 	"github.com/getryft/ryft-server/codec"
 	"github.com/getryft/ryft-server/format"
 	"github.com/getryft/ryft-server/search"
@@ -62,6 +65,8 @@ type SearchParams struct {
 	KeepDataAs    string   `form:"data" json:"data"`
 	KeepIndexAs   string   `form:"index" json:"index"`
 	Limit         int      `form:"limit" json:"limit"`
+
+	Fake string `form:"fake" json:"fake"` // TODO: remove this test code!
 }
 
 // Handle /search endpoint.
@@ -142,7 +147,45 @@ func (s *Server) search(ctx *gin.Context) {
 	log.WithField("config", cfg).WithField("user", userName).
 		WithField("home", homeDir).WithField("cluster", userTag).
 		Infof("start /search")
-	res, err := engine.Search(cfg)
+
+	var res *search.Result
+	if len(params.Fake) > 0 {
+		res, err = search.NewResult(), nil
+		go func() {
+			defer res.Close()
+			defer res.ReportDone()
+
+			files := []string{
+				"/myfile.txt",
+				"/test.dat",
+				"/xxx.avi",
+			}
+			nodes := []string{
+				"node=a",
+				"node-b",
+				"node-c",
+			}
+			T, _ := time.ParseDuration(params.Fake)
+			stop := time.Now().Add(T)
+			log.Infof("start fake reporting")
+			for time.Now().Before(stop) && !res.IsCancelled() {
+				rec := new(search.Record)
+				rec.Data = []byte(time.Now().String())
+				rec.Index.File = files[rand.Int()%len(files)]
+				rec.Index.Offset = uint64(rand.Int()%1000 + 0)
+				rec.Index.Length = uint64(rand.Int()%100 + 10)
+				rec.Index.Fuzziness = uint8(rand.Int() % 10)
+				rec.Index.Host = nodes[rand.Int()%len(nodes)]
+				res.ReportRecord(rec)
+
+				time.Sleep(time.Millisecond * 100) // 10 records per second
+			}
+
+			log.Infof("stop fake reporting")
+		}()
+	} else {
+		res, err = engine.Search(cfg)
+	}
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))
