@@ -166,7 +166,7 @@ func UpdateConsulMetric(metric int) error {
 // get metric for all nodes
 func getNodeMetrics(client *consul.Client) (map[string]int, error) {
 	// get all wildcards (keys) and tags
-	prefix := filepath.Join("busyness/")
+	prefix := "busyness/"
 	pairs, _, err := client.KV().List(prefix, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metrics from KV: %s", err)
@@ -206,7 +206,7 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 	}
 
 	// get all wildcards (keys) and tags
-	prefix := filepath.Join(userTag, "partitions/")
+	prefix := filepath.Join(userTag, "partitions") + "/"
 	pairs, _, err := client.KV().List(prefix, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tags from KV: %s", err)
