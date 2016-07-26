@@ -195,6 +195,10 @@ backendOptions:
 
 More information about search engines can be found [here](./search.md)
 
+This search configuration file also contains most of the command line options
+that also can be customized. Note these options have lower priority and may be
+overriden by command line.
+
 
 ## Authentication and security
 
