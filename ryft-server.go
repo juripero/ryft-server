@@ -66,12 +66,9 @@ var (
 )
 
 var (
-	serverConfig = kingpin.Flag("config", "Server configuration in YML format.").String()
-
 	// KeepResults console flag for keeping results files
 	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
 	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
-	localMode   = kingpin.Flag("local-only", "Run server is local mode (no cluster).").Bool()
 
 	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
 	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
@@ -104,6 +101,45 @@ var (
 type Server struct {
 	SearchBackend  string                 `yaml:"searchBackend,omitempty"`
 	BackendOptions map[string]interface{} `yaml:"backendOptions,omitempty"`
+
+	LocalMode bool `yaml:"localOnly,omitempty"`
+}
+
+// create new server instance
+func NewServer() (*Server, error) {
+	s := new(Server)
+
+	kingpin.Flag("config", "Server configuration in YML format.").Action(s.parseConfig)
+	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&s.LocalMode)
+
+	kingpin.Parse()
+
+	// check extra dependencies logic not handled by kingpin
+	switch *authType {
+	case "file":
+		ensureDefault(authUsersFile, "users-file is required for file authentication.")
+		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
+		break
+	case "ldap":
+		if (*authLdapServer) == nil {
+			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
+		}
+		if (*authLdapServer).IP == nil {
+			kingpin.FatalUsage("ldap-server requires addresse name part, not only port.")
+		}
+
+		ensureDefault(authLdapUser, "ldap-user is required for ldap authentication.")
+		ensureDefault(authLdapPass, "ldap-pass is required for ldap authentication.")
+		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
+		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
+		break
+	}
+	if *tlsEnabled {
+		ensureDefault(tlsCrtFile, "tls-crt is required for enabled tls property")
+		ensureDefault(tlsKeyFile, "tls-key is required for enabled tls property")
+	}
+
+	return s, nil // OK
 }
 
 // parse server configuration from YML file
@@ -325,41 +361,16 @@ func getHostName() string {
 	return hostName
 }
 
-func parseParams() {
-	kingpin.Parse()
-	// check extra dependencies logic not handled by kingpin
-	switch *authType {
-	case "file":
-		ensureDefault(authUsersFile, "users-file is required for file authentication.")
-		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
-		break
-	case "ldap":
-		if (*authLdapServer) == nil {
-			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
-		}
-		if (*authLdapServer).IP == nil {
-			kingpin.FatalUsage("ldap-server requires addresse name part, not only port.")
-		}
-
-		ensureDefault(authLdapUser, "ldap-user is required for ldap authentication.")
-		ensureDefault(authLdapPass, "ldap-pass is required for ldap authentication.")
-		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
-		ensureDefault(authJwtSecret, "jwt-secret is required for any authentication.")
-		break
-	}
-	if *tlsEnabled {
-		ensureDefault(tlsCrtFile, "tls-crt is required for enabled tls property")
-		ensureDefault(tlsKeyFile, "tls-key is required for enabled tls property")
-	}
-}
-
 var serverStats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
 
-	// parse command line arguments
-	parseParams()
+	server, err := NewServer()
+	if err != nil {
+		log.WithError(err).Fatalf("Failed to read server configuration")
+	}
+	log.WithField("config", server).Infof("server configuration")
 
 	// be quiet and efficient in production
 	if !*debug {
@@ -370,14 +381,6 @@ func main() {
 
 	// Create a rounter with default middleware: logger, recover
 	router := gin.Default()
-
-	// Configure required middlewares
-	var server Server
-	err := server.parseConfig(*serverConfig)
-	if err != nil {
-		log.WithError(err).Fatalf("Failed to read server configuration")
-	}
-	log.WithField("config", server).Infof("server configuration")
 
 	// Logging & error recovery
 	//	router.Use(gin.Logger())
