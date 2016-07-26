@@ -113,3 +113,13 @@ To run server use the following command line:
 ```{.sh}
 ryft-server --auth=file --users-file ryft-auth.yaml
 ```
+
+
+# Cluster Mode
+
+All cluster nodes should have the same list of user (or the same LDAP configured)
+and the same secret key. It's important to be able to pass authentication tokens
+between cluster nodes. Ryft server uses `Authorization` HTTP header "as is" to
+redirect search requests.
+
+Moreover, each user should have the same home directory on each cluster node.
