@@ -484,7 +484,7 @@ func main() {
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to read server configuration")
 	}
-	log.WithField("config", server).Infof("server configuration local:%t", server.LocalOnly)
+	log.WithField("config", server).Infof("server configuration")
 
 	// be quiet and efficient in production
 	if !server.DebugMode {
