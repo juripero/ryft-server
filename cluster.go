@@ -102,6 +102,7 @@ func (s *Server) getConsulInfo(userTag string, files []string) (services []*cons
 		return services, tags, fmt.Errorf("failed to get node metrics: %s", err)
 	}
 	services = s.rearrangeServices(services, metrics, s.BusynessTolerance)
+	log.WithField("metrics", metrics).Debugf("cluster node metrics")
 
 	return services, tags, err
 }
@@ -232,6 +233,7 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 		for k := range tags[i] {
 			tags[i][k] = strings.TrimSpace(tags[i][k])
 		}
+		log.WithField("key", keys[i]).WithField("tags", tags[i]).Debugf("partition info")
 	}
 
 	// match files and wildcards

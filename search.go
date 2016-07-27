@@ -167,7 +167,9 @@ func (s *Server) search(ctx *gin.Context) {
 			}
 			T, _ := time.ParseDuration(params.Fake)
 			stop := time.Now().Add(T)
-			log.Infof("start fake reporting")
+			log.WithField("interval", params.Fake).Infof("start fake reporting")
+			defer log.Infof("stop fake reporting")
+
 			for time.Now().Before(stop) && !res.IsCancelled() {
 				rec := new(search.Record)
 				rec.Data = []byte(time.Now().String())
@@ -180,8 +182,6 @@ func (s *Server) search(ctx *gin.Context) {
 
 				time.Sleep(time.Millisecond * 100) // 10 records per second
 			}
-
-			log.Infof("stop fake reporting")
 		}()
 	} else {
 		res, err = engine.Search(cfg)
