@@ -22,10 +22,7 @@ DESTDIR=.build
 package: control
 	cp "${RYFT_SERVER_BIN}" "${DESTDIR}/usr/bin/"
 	cp "../ryft-server.conf" "${DESTDIR}/etc/ryft-server.conf"
-	echo "0.0.0.0:8765" > "${DESTDIR}/etc/ryft-rest.conf"
-	echo "--config=/etc/ryft-server.conf" >> "${DESTDIR}/etc/ryft-rest.conf"
-	echo "/etc/ryft-rest.conf" > "${DESTDIR}/DEBIAN/conffiles"
-	echo "/etc/ryft-server.conf" >> "${DESTDIR}/DEBIAN/conffiles"
+	echo "/etc/ryft-server.conf" > "${DESTDIR}/DEBIAN/conffiles"
 	dpkg --build "${DESTDIR}"
 	mv -f "${DESTDIR}.deb" "${DEBNAME}"
 	rm -rf "${DESTDIR}"

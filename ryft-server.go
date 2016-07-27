@@ -73,11 +73,11 @@ var (
 
 // Server instance
 type Server struct {
-	SearchBackend  string                 `yaml:"searchBackend,omitempty"`
-	BackendOptions map[string]interface{} `yaml:"backendOptions,omitempty"`
-	LocalOnly      bool                   `yaml:"localOnly,omitempty"`
-	DebugMode      bool                   `yaml:"debugMode,omitempty"`
-	KeepResults    bool                   `yaml:"keepResults,omitempty"`
+	SearchBackend  string                 `yaml:"search-backend,omitempty"`
+	BackendOptions map[string]interface{} `yaml:"backend-options,omitempty"`
+	LocalOnly      bool                   `yaml:"local-only,omitempty"`
+	DebugMode      bool                   `yaml:"debug-mode,omitempty"`
+	KeepResults    bool                   `yaml:"keep-results,omitempty"`
 
 	ListenAddress string `yaml:"address,omitempty"`
 	listenAddress *net.TCPAddr
@@ -146,27 +146,27 @@ func NewServer() (*Server, error) {
 	config := &serverConfigValue{s: s}
 	kingpin.Flag("config", "Server configuration in YML format.").SetValue(config)
 	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&s.LocalOnly)
-	kingpin.Flag("keep", "Keep search results temporary files.").Short('k').BoolVar(&s.KeepResults)
-	kingpin.Flag("debug", "Run http server in debug mode.").Short('d').BoolVar(&s.DebugMode)
-	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").IntVar(&s.BusynessTolerance)
+	kingpin.Flag("keep", "Keep temporary search result files.").Short('k').BoolVar(&s.KeepResults)
+	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&s.DebugMode)
+	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&s.BusynessTolerance)
 
-	kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").StringVar(&s.ListenAddress)
-	kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').BoolVar(&s.TLS.Enabled)
-	kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").StringVar(&s.TLS.CertFile)
-	kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").StringVar(&s.TLS.KeyFile)
-	kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").StringVar(&s.TLS.ListenAddress)
+	kingpin.Flag("address", "Address:port to listen on.").Short('l').Default(":8765").StringVar(&s.ListenAddress)
+	kingpin.Flag("tls", "Enable TLS/SSL.").Short('t').BoolVar(&s.TLS.Enabled)
+	kingpin.Flag("tls-cert", "Certificate file. Required for --tls enabled.").StringVar(&s.TLS.CertFile)
+	kingpin.Flag("tls-key", "Key-file. Required for --tls enabled.").StringVar(&s.TLS.KeyFile)
+	kingpin.Flag("tls-address", "HTTPS address:port to listen on.").Default(":8766").StringVar(&s.TLS.ListenAddress)
 
 	kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Default("none").EnumVar(&s.AuthType, "none", "file", "ldap")
-	kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFileVar(&s.AuthFile.UsersFile)
-	kingpin.Flag("jwt-alg", "JWT signing algorithm.").StringVar(&s.AuthJwt.Algorithm)
+	kingpin.Flag("users-file", "User credentials filename. Required for --auth=file.").ExistingFileVar(&s.AuthFile.UsersFile)
+	kingpin.Flag("jwt-alg", "JWT signing algorithm.").Default("HS256").StringVar(&s.AuthJwt.Algorithm)
 	kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").StringVar(&s.AuthJwt.Secret)
 	kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").StringVar(&s.AuthJwt.Lifetime)
 
 	kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").StringVar(&s.AuthLdap.Server)
 	kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.Username)
 	kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.Password)
-	kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").Default("(&(uid=%s))").StringVar(&s.AuthLdap.Query)
-	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups.'. Required for --auth=ldap.").StringVar(&s.AuthLdap.BaseDN)
+	kingpin.Flag("ldap-query", "LDAP user lookup query. Required for --auth=ldap.").Default("(&(uid=%s))").StringVar(&s.AuthLdap.Query)
+	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups. Required for --auth=ldap.").StringVar(&s.AuthLdap.BaseDN)
 
 	kingpin.Parse()
 
@@ -200,11 +200,11 @@ func NewServer() (*Server, error) {
 	if s.TLS.Enabled {
 		switch {
 		case len(s.TLS.ListenAddress) == 0:
-			kingpin.FatalUsage("tls-address is required for enabled tls property")
+			kingpin.FatalUsage("tls-address option is required for TLS enabled")
 		case len(s.TLS.CertFile) == 0:
-			kingpin.FatalUsage("tls-crt is required for enabled tls property")
+			kingpin.FatalUsage("tls-cert option is required for TLS enabled")
 		case len(s.TLS.KeyFile) == 0:
-			kingpin.FatalUsage("tls-key is required for enabled tls property")
+			kingpin.FatalUsage("tls-key option is required for TLS enabled")
 		}
 	}
 
