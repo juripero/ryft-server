@@ -356,7 +356,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 
 // get local search engine
 func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
-	opts := s.BackendOptions
+	opts := s.getBackendOptions()
 
 	// some auto-options
 	switch s.SearchBackend {
@@ -397,6 +397,15 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 		ryftdec.SetLogLevel("debug")
 	}
 	return ryftdec.NewEngine(backend)
+}
+
+// deep copy of backend options
+func (s *Server) getBackendOptions() map[string]interface{} {
+	opts := make(map[string]interface{})
+	for k, v := range s.BackendOptions {
+		opts[k] = v
+	}
+	return opts
 }
 
 // parse authentication token and home directory from context
