@@ -254,20 +254,15 @@ func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, home
 // get cluster's search engine
 func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, userTag string) (search.Engine, error) {
 	// for each service create corresponding search engine
-	backends := []search.Engine{}
-	nodes, tags, _, err := GetConsulInfo(userTag, files, s.BusynessTolerance)
+	services, tags, err := s.getConsulInfo(userTag, files)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get consul services: %s", err)
 	}
-	local_node, remote_nodes := SplitToLocalAndRemote(nodes, s.listenAddress.Port)
-	log.WithField("tags", tags).Debug("cluster search tags")
-
-	// since now we use 'busyness' metric there is no sense
-	// to use local node first, all nodes should be equal!
-	local_node, remote_nodes = nil, nodes
+	log.WithField("tags", tags).WithField("services", services).Debug("cluster search")
 
 	// if no tags required - use all nodes
 	all_nodes := (len(tags) == 0)
+	is_local := true // assume local service is used
 
 	// list of tags required
 	tags_required := make(map[string]bool)
@@ -288,22 +283,10 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		return count
 	}
 
-	// prefer local service first...
-	if local_node != nil {
-		log.WithField("tags", local_node.ServiceTags).Debug("local node tags")
-		if all_nodes || update_tags(local_node.ServiceTags) > 0 {
-			// local node: just use normal backend
-			engine, err := s.getLocalSearchEngine(homeDir)
-			if err != nil {
-				return nil, err
-			}
-			backends = append(backends, engine)
-		}
-		log.WithField("tags", tags_required).Debug("remain (local) tags required")
-	}
-
-	// ... then remote services (should be already arranged)
-	for _, service := range remote_nodes {
+	// all services should be already arranged based on metrics
+	backends := []search.Engine{}
+	nodes := []string{}
+	for _, service := range services {
 		// stop if no more tags required
 		if !all_nodes && len(tags_required) == 0 {
 			break
@@ -321,7 +304,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		scheme := "http"
 		var url string
 		if port == 0 { // TODO: review the URL building!
-			url = fmt.Sprintf("%s://%s:%s", scheme, service.Address, DefaultPort)
+			url = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
 		} else {
 			url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
 		}
@@ -343,6 +326,10 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 			return nil, err
 		}
 		backends = append(backends, engine)
+		nodes = append(nodes, service.Node)
+		if !s.isLocalService(service) {
+			is_local = false
+		}
 	}
 
 	// fail if there is remaining required tags
@@ -354,14 +341,16 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		return nil, fmt.Errorf("no services found for tags: %q", rem)
 	}
 
-	if len(backends) > 0 {
+	log.WithField("tags", tags).WithField("nodes", nodes).Infof("cluster search")
+
+	if len(backends) > 0 && !is_local {
 		engine, err := ryftmux.NewEngine(backends...)
 		log.WithField("engine", engine).Debug("cluster search")
 		return engine, err
 	}
 
 	// no services from consule, just use local search as a fallback
-	log.Printf("no cluster built, use local search as fallback")
+	log.Debugf("use local search as fallback")
 	return s.getLocalSearchEngine(homeDir)
 }
 
