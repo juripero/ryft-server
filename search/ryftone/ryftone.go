@@ -114,7 +114,7 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 	err = task.dataSet.SearchFuzzyHamming(PrepareQuery(cfg.Query),
 		dataFile, indexFile, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive)
 	if err == nil {
-		res.Stat = search.NewStat()
+		res.Stat = search.NewStat(engine.IndexHost)
 		res.Stat.Matches = task.dataSet.GetTotalMatches()
 		res.Stat.Duration = task.dataSet.GetExecutionDuration()
 		res.Stat.TotalBytes = task.dataSet.GetTotalBytesProcessed()

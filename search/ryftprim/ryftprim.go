@@ -269,7 +269,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// parse statistics from output
 	if err == nil {
-		res.Stat, err = ParseStat(out_buf)
+		res.Stat, err = ParseStat(out_buf, engine.IndexHost)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
 			err = fmt.Errorf("failed to parse statistics: %s", err)
@@ -291,8 +291,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		// if no files found it's better to report 0 matches (TODO: report 0 files also, TODO: engine configuration for this)
 		case strings.Contains(string(out_buf), "ERROR:  Input data set cannot be empty"):
 			task.log().WithError(err).Warnf("[%s]: error suppressed! empty results will be reported", TAG)
-			error_suppressed, err = true, nil // suppress error
-			res.Stat = search.NewStat()       // empty stats
+			error_suppressed, err = true, nil           // suppress error
+			res.Stat = search.NewStat(engine.IndexHost) // empty stats
 		}
 	}
 
