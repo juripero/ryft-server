@@ -20,7 +20,7 @@ percentage completed). Having a new search request we can select `Node-A`
 or `Node-B` based on this metric - the node with lowest metric will be used.
 
 All nodes keep and update their metrics in the `consul`'s KV storage
-under `busyness/` perfix. Once a new search request arrives, metrics for all
+under `busyness/` prefix. Once a new search request arrives, metrics for all
 nodes are obtained from KV and all nodes are arranged - from the
 lowest metric to the highest.
 
