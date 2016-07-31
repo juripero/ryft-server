@@ -20,7 +20,7 @@ Running server is even simpler:
 Sometimes it's useful to run multiple instances on different ports:
 
 ```{.sh}
-./ryft-server 0.0.0.0:9000 --debug
+./ryft-server -l=:9000 --debug
 ```
 
 This command runs another server instance on port `9000` in debug mode.

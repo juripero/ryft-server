@@ -113,7 +113,7 @@ This command runs server with default arguments. Port `8765` will be used for li
 To run another server instance on `9000` port just pass "address" argument:
 
 ```{.sh}
-./ryft-server 0.0.0.0:9000
+./ryft-server --address=0.0.0.0:9000
 ```
 
 So it's possible to run multiple server instances on the same machine.
@@ -170,23 +170,23 @@ Using search configuration file it's possible to change the main search engine
 and its options. The file format is the following:
 
 ```{.yaml}
-searchBackend: <search engine>
-backendOptions:
+search-backend: <search engine>
+backend-options:
   <search engine options>
 ```
 
-`searchBackend` is the search engine name and can be one of the following:
+`search-backend` is the search engine name and can be one of the following:
 
 - `ryftprim` uses *ryftprim* command line tool to access Ryft hardware (is used by default)
 - `ryftone` uses *libryftone* library to access Ryft hardware
 - `ryfthttp` uses another `ryft-server` instance to access Ryft hardware
 
-`backendOptions` is search engine specific options. For example `ryftprim` engine
+`backend-options` is search engine specific options. For example `ryftprim` engine
 supports the following options:
 
 ```{.yaml}
-searchBackend: ryftprim
-backendOptions:
+search-backend: ryftprim
+backend-options:
   instance-name: .ryft/8765   # server instance name (RyftServer-$PORT by default)
   ryftprim-exec: ryftprim     # ryftprim tool path (/usr/bin/ryftprim by default)
   ryftone-mount: /ryftone     # ryftone volume (/ryftone by default)
@@ -257,24 +257,6 @@ To uninstall debian package use:
 
 ```{.sh}
 sudo dpkg -r ryft-server
-```
-
-
-## Setting arguments
-
-You can pass arguments to `ryft-server` daemon by creating `/etc/ryft-rest.conf` file and restarting `ryft-server-d` service.
-Write flags and arguments (see above) each on a separate line. For example:
-
-```
-0.0.0.0:9000
---debug
---keep
-```
-
-Daemon will start as follows:
-
-```{.sh}
-ryft-server @/etc/ryft-rest.conf
 ```
 
 

@@ -47,7 +47,7 @@ type UserInfo struct {
 	Name       string `json:"username" yaml:"username"`
 	Password   string `json:"password" yaml:"password"`
 	Home       string `json:"home" yaml:"home"`
-	ClusterTag string `json:"clusterTag,omitempty" yaml:"clusterTag,omitempty"`
+	ClusterTag string `json:"cluster-tag,omitempty" yaml:"cluster-tag,omitempty"`
 }
 
 type Provider interface {

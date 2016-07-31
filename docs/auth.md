@@ -111,7 +111,7 @@ If an user has custom paritioning rules they are located under `{clusterTag}/par
 To run server use the following command line:
 
 ```{.sh}
-ryft-server --auth=file --users-file ryft-auth.yaml
+ryft-server --auth=file --users-file "ryft-users.yaml"
 ```
 
 

@@ -50,7 +50,7 @@ func (s *Server) members(c *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(c)
 
-	info, _, err := GetConsulInfo("", nil, 0) // no user tag, no files
+	info, _, err := s.getConsulInfo("", nil) // no user tag, no files
 
 	if err != nil {
 		panic(NewServerError(http.StatusInternalServerError, err.Error()))
@@ -73,7 +73,7 @@ func (s *Server) members(c *gin.Context) {
 // GetConsulInfo gets the list of ryft services and
 // the service tags related to requested set of files.
 // the services are arranged based on "busyness" metric!
-func GetConsulInfo(userTag string, files []string, tolerance int) (services []*consul.CatalogService, tags []string, err error) {
+func (s *Server) getConsulInfo(userTag string, files []string) (services []*consul.CatalogService, tags []string, err error) {
 	config := consul.DefaultConfig()
 	// TODO: get some data from server's configuration
 	config.Datacenter = "dc1"
@@ -101,31 +101,37 @@ func GetConsulInfo(userTag string, files []string, tolerance int) (services []*c
 	if err != nil {
 		return services, tags, fmt.Errorf("failed to get node metrics: %s", err)
 	}
-	services = rearrangeServices(services, metrics, tolerance)
+	services = s.rearrangeServices(services, metrics, s.BusynessTolerance)
+	log.WithField("metrics", metrics).Debugf("cluster node metrics")
 
 	return services, tags, err
 }
 
-// re-arrange services from less busy to most used
-func rearrangeServices(services []*consul.CatalogService, metrics map[string]int, tolerance int) []*consul.CatalogService {
+// re-arrange services from less busy to most
+func (s *Server) rearrangeServices(services []*consul.CatalogService, metrics map[string]int, tolerance int) []*consul.CatalogService {
 	if tolerance < 0 {
 		tolerance = 0
 	}
 
-	arranged := map[int][]*consul.CatalogService{}
+	// split services into groups based on metrics and tolerance
+	groups := map[int][]*consul.CatalogService{}
 	for _, service := range services {
-		// get node's metric
-		m := metrics[service.Node] / (tolerance + 1)
-
-		// add service to corresponding level
-		arranged[m] = append(arranged[m], service)
+		groupId := metrics[service.Node] / (tolerance + 1)
+		groups[groupId] = append(groups[groupId], service)
 	}
 
-	// for the same metric just use random shuffle
+	// for the same group just use random shuffle
 	services = make([]*consul.CatalogService, 0, len(services))
-	for _, level := range arranged {
-		for _, k := range rand.Perm(len(level)) {
-			services = append(services, level[k])
+	for _, group := range groups {
+		// local node goes first!
+		local, remote := s.splitToLocalAndRemote(group)
+		if local != nil {
+			services = append(services, local)
+		}
+
+		// remote nodes are randomly shuffled!
+		for _, k := range rand.Perm(len(remote)) {
+			services = append(services, remote[k])
 		}
 	}
 
@@ -161,7 +167,7 @@ func UpdateConsulMetric(metric int) error {
 // get metric for all nodes
 func getNodeMetrics(client *consul.Client) (map[string]int, error) {
 	// get all wildcards (keys) and tags
-	prefix := filepath.Join("busyness/")
+	prefix := "busyness/"
 	pairs, _, err := client.KV().List(prefix, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metrics from KV: %s", err)
@@ -178,11 +184,11 @@ func getNodeMetrics(client *consul.Client) (map[string]int, error) {
 	return metrics, nil
 }
 
-// SplitToLocalAndRemote splits services to local and remote set
+// splits services to local and remote set
 // NOTE the input `services` slice might be modified!
-func SplitToLocalAndRemote(services []*consul.CatalogService, listenPort int) (local *consul.CatalogService, remotes []*consul.CatalogService) {
+func (s *Server) splitToLocalAndRemote(services []*consul.CatalogService) (local *consul.CatalogService, remotes []*consul.CatalogService) {
 	for i, service := range services {
-		if compareIP(service.Address) && service.ServicePort == listenPort {
+		if s.isLocalService(service) {
 			local = service
 			remotes = append(services[:i],
 				services[i+1:]...)
@@ -193,6 +199,15 @@ func SplitToLocalAndRemote(services []*consul.CatalogService, listenPort int) (l
 	return nil, services // no local found
 }
 
+// check if service is local
+func (s *Server) isLocalService(service *consul.CatalogService) bool {
+	if compareIP(service.Address) && service.ServicePort == s.listenAddress.Port {
+		return true
+	}
+
+	return false
+}
+
 // find best matched service tags for the file list
 // userTag is used for multitenancy support
 func findBestMatch(client *consul.Client, userTag string, files []string) ([]string, error) {
@@ -201,7 +216,7 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 	}
 
 	// get all wildcards (keys) and tags
-	prefix := filepath.Join(userTag, "partitions/")
+	prefix := filepath.Join(userTag, "partitions") + "/"
 	pairs, _, err := client.KV().List(prefix, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tags from KV: %s", err)
@@ -218,6 +233,7 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 		for k := range tags[i] {
 			tags[i][k] = strings.TrimSpace(tags[i][k])
 		}
+		// log.WithField("key", keys[i]).WithField("tags", tags[i]).Debugf("partition info")
 	}
 
 	// match files and wildcards
