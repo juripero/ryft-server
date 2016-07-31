@@ -210,6 +210,7 @@ func (s *Server) isLocalService(service *consul.CatalogService) bool {
 
 // find best matched service tags for the file list
 // userTag is used for multitenancy support
+// no tags means "use all nodes"
 func findBestMatch(client *consul.Client, userTag string, files []string) ([]string, error) {
 	if len(files) == 0 {
 		return nil, nil // no files - no tags
@@ -243,6 +244,11 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 			for _, tag := range tags[found] {
 				tags_map[tag] += 1
 			}
+		} else {
+			// if no any tag found we have to search all nodes.
+			// already found tags are ignored.
+			log.WithField("file", f).Debugf("no any tag found for file, will search all nodes")
+			return []string{}, nil // search all nodes!
 		}
 	}
 
