@@ -118,19 +118,23 @@ func (s *Server) rearrangeServices(services []*consul.CatalogService, metrics ma
 	for _, service := range services {
 		groupId := metrics[service.Node] / (tolerance + 1)
 		groups[groupId] = append(groups[groupId], service)
+		log.WithField("node", service.Node).WithField("metric", metrics[service.Node]).
+			WithField("group", groupId).Debugf("service metric details")
 	}
 
 	// for the same group just use random shuffle
 	services = make([]*consul.CatalogService, 0, len(services))
-	for _, group := range groups {
+	for groupId, group := range groups {
 		// local node goes first!
 		local, remote := s.splitToLocalAndRemote(group)
 		if local != nil {
 			services = append(services, local)
+			log.WithField("node", local.Node).WithField("group", groupId).Debugf("use as local service")
 		}
 
 		// remote nodes are randomly shuffled!
 		for _, k := range rand.Perm(len(remote)) {
+			log.WithField("node", remote[k].Node).WithField("group", groupId).Debugf("use as remote service [%d]", k)
 			services = append(services, remote[k])
 		}
 	}
