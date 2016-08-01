@@ -112,6 +112,7 @@ func (s *Server) search(ctx *gin.Context) {
 	if err != nil {
 		panic(NewServerError(http.StatusBadRequest, err.Error()))
 	}
+	ctx.Set("encoder", enc) // to recover from panic in appropriate format
 
 	// get search engine
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
