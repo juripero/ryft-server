@@ -258,7 +258,6 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 	if err != nil {
 		return nil, fmt.Errorf("failed to get consul services: %s", err)
 	}
-	log.WithField("tags", tags).WithField("services", services).Debug("cluster search")
 
 	// if no tags required - use all nodes
 	all_nodes := (len(tags) == 0)
@@ -293,11 +292,24 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		}
 
 		// skip if no required tags found
-		log.WithField("tags", service.ServiceTags).Debug("remote node tags")
+		log.WithField("service", service.Node).WithField("tags", service.ServiceTags).Debug("remote node tags")
 		if !all_nodes && update_tags(service.ServiceTags) == 0 {
 			continue // no tags found, skip this node
 		}
 		log.WithField("tags", tags_required).Debug("remain (remote) tags required")
+
+		// use native search engine for local services!
+		// (no sense to do extra HTTP call)
+		if s.isLocalService(service) {
+			engine, err := s.getLocalSearchEngine(homeDir)
+			if err != nil {
+				return nil, err
+			}
+			backends = append(backends, engine)
+			nodes = append(nodes, service.Node)
+
+			continue
+		}
 
 		// remote node: use RyftHTTP backend
 		port := service.ServicePort
@@ -327,9 +339,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		}
 		backends = append(backends, engine)
 		nodes = append(nodes, service.Node)
-		if !s.isLocalService(service) {
-			is_local = false
-		}
+		is_local = false
 	}
 
 	// fail if there is remaining required tags
