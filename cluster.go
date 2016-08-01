@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -122,9 +123,19 @@ func (s *Server) rearrangeServices(services []*consul.CatalogService, metrics ma
 			WithField("group", groupId).Debugf("service metric details")
 	}
 
+	// Go map keys are not ordered!
+	// we need to sort keys by hand :(
+	groupIds := make([]int, 0, len(groups))
+	for groupId, _ := range groups {
+		groupIds = append(groupIds, groupId)
+	}
+	sort.Ints(groupIds)
+
 	// for the same group just use random shuffle
 	services = make([]*consul.CatalogService, 0, len(services))
-	for groupId, group := range groups {
+	for _, groupId := range groupIds {
+		group := groups[groupId]
+
 		// local node goes first!
 		local, remote := s.splitToLocalAndRemote(group)
 		if local != nil {
