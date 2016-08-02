@@ -70,3 +70,41 @@ func TestValidQueries(t *testing.T) {
 		assert.NoError(t, err, "Valid query: `%s`", q)
 	}
 }
+
+// test extension detection
+func TestDetectExtension(t *testing.T) {
+
+	type ExtFileSet struct {
+		fileNames   []string
+		dataOut     string
+		expectedExt string
+		expectedErr bool
+	}
+
+	data := []ExtFileSet{
+		{[]string{}, "out.txt", ".txt", false},
+		{[]string{"a.txt"}, "", ".txt", false},
+		{[]string{"a.txt", "b.txt"}, "", ".txt", false},
+		{[]string{"a.dat", "b.dat"}, "", ".dat", false},
+		{[]string{"a.txt", "b.dat"}, "", "", true},
+		{[]string{"a.txt", "b.dat"}, "c.jpeg", "", true},
+		{[]string{}, "", "", true},
+		{[]string{"foo/a.txt", "my.test/b.txt"}, "", ".txt", false},
+		{[]string{"foo/a.txt", "my.test/b.txt"}, "data.txt", ".txt", false},
+		{[]string{"foo/*.txt", "my.test/*txt"}, "", ".txt", false},
+		{[]string{"foo/*.txt", "my.test/*"}, "data.txt", ".txt", false},
+		{[]string{"my.test/*"}, "data.txt", ".txt", false},
+		{[]string{"nyctaxi/xml/2015/yellow/*"}, "ryftnyctest.nxml", ".nxml", false},
+	}
+
+	for _, d := range data {
+		ext, err := detectExtension(d.fileNames, d.dataOut)
+		if d.expectedErr {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, d.expectedExt, ext)
+		}
+	}
+
+}

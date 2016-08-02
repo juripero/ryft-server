@@ -61,7 +61,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return engine.Backend.Search(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files)
+	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)

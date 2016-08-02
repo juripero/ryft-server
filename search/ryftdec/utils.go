@@ -55,15 +55,20 @@ func containsAnySubString(s string, subs []string) string {
 	return ""
 }
 
-// Detect extension using input file set.
-func detectExtension(fileNames []string) (string, error) {
+// Detect extension using input file set and optional data file.
+func detectExtension(fileNames []string, dataOut string) (string, error) {
 	extensions := map[string]int{}
+
+	// output data file
+	if ext := filepath.Ext(dataOut); len(ext) != 0 {
+		extensions[ext] += 1
+	}
 
 	// collect unique extensions
 	for _, file := range fileNames {
 		ext := filepath.Ext(file)
 		if len(ext) != 0 {
-			extensions[ext] = 1
+			extensions[ext] += 1
 		}
 	}
 
