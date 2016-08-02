@@ -32,6 +32,7 @@ package ryftdec
 
 import (
 	_ "fmt"
+	"strings"
 )
 
 func normalizeTree(node *Node) {
@@ -42,7 +43,7 @@ func normalizeTree(node *Node) {
 }
 
 func sameLevelNormalization(node *Node) {
-	if node.hasSubnodes() && node.sameTypeSubnodes() && node.subnodesAreQueries() {
+	if node.isNormalizable() {
 		subnodesType := node.SubNodes[0].Type
 		node.Expression = node.SubNodes[0].Expression + " " + node.Expression + " " + node.SubNodes[1].Expression
 		node.Type = subnodesType
@@ -70,8 +71,6 @@ func differentLevelNormalization(node *Node) {
 
 	if node.hasSubnodes() && searchAndOperatorSubnodes && subnodeIsNormalizable {
 		if leftSubnode.isSearch() {
-			appendNode(rightSubnode, leftSubnode)
-		} else {
 			appendNode(rightSubnode, leftSubnode)
 		}
 	}
@@ -103,4 +102,8 @@ func splitNodes(dstNode, parentNode *Node) (*Node, *Node) {
 		}
 	}
 	return srcNode, otherNode
+}
+
+func countBoolOperators(node *Node) int {
+	return strings.Count(node.Expression, " OR ") + strings.Count(node.Expression, " AND ")
 }

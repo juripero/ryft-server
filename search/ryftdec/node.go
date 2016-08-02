@@ -141,6 +141,21 @@ func NewNode(expression string, parent *Node, baseOpts Options) *Node {
 	return node
 }
 
+func (node *Node) isNormalizable() bool {
+	return node.hasSubnodes() &&
+		node.sameTypeSubnodes() &&
+		node.subnodesAreQueries() &&
+		node.boolLimitIsNotReached()
+}
+
+func (node *Node) boolLimitIsNotReached() bool {
+	boolCount := 0
+	for _, subNode := range node.SubNodes {
+		boolCount += countBoolOperators(subNode)
+	}
+	return boolCount == 0
+}
+
 func (node *Node) sameTypeSubnodes() bool {
 	return node.hasSubnodes() &&
 		(node.SubNodes[0].Type == node.SubNodes[1].Type) &&
