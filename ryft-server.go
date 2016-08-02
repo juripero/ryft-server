@@ -95,13 +95,7 @@ type Server struct {
 		UsersFile string `yaml:"users-file,omitempty"`
 	} `yaml:"auth-file,omitempty"`
 
-	AuthLdap struct {
-		Server   string `yaml:"server,omitempty"`
-		Username string `yaml:"username,omitempty"`
-		Password string `yaml:"password,omitempty"`
-		Query    string `yaml:"query,omitempty"`
-		BaseDN   string `yaml:"basedn,omitempty"`
-	} `yaml:"auth-ldap,omitempty"`
+	AuthLdap auth.LdapConfig `yaml:"auth-ldap,omitempty"`
 
 	AuthJwt struct {
 		Algorithm string `yaml:"algorithm,omitempty"`
@@ -162,10 +156,10 @@ func NewServer() (*Server, error) {
 	kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").StringVar(&s.AuthJwt.Secret)
 	kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").StringVar(&s.AuthJwt.Lifetime)
 
-	kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").StringVar(&s.AuthLdap.Server)
-	kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.Username)
-	kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.Password)
-	kingpin.Flag("ldap-query", "LDAP user lookup query. Required for --auth=ldap.").Default("(&(uid=%s))").StringVar(&s.AuthLdap.Query)
+	kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").StringVar(&s.AuthLdap.ServerAddress)
+	kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.BindUsername)
+	kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.BindPassword)
+	kingpin.Flag("ldap-query", "LDAP user lookup query. Required for --auth=ldap.").Default("(&(uid=%s))").StringVar(&s.AuthLdap.QueryFormat)
 	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups. Required for --auth=ldap.").StringVar(&s.AuthLdap.BaseDN)
 
 	kingpin.Parse()
@@ -184,11 +178,11 @@ func NewServer() (*Server, error) {
 
 	case "ldap":
 		switch {
-		case len(s.AuthLdap.Server) == 0:
+		case len(s.AuthLdap.ServerAddress) == 0:
 			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
-		case len(s.AuthLdap.Username) == 0:
+		case len(s.AuthLdap.BindUsername) == 0:
 			kingpin.FatalUsage("ldap-user is required for ldap authentication.")
-		case len(s.AuthLdap.Password) == 0:
+		case len(s.AuthLdap.BindPassword) == 0:
 			kingpin.FatalUsage("ldap-pass is required for ldap authentication.")
 		case len(s.AuthLdap.BaseDN) == 0:
 			kingpin.FatalUsage("ldap-basedn is required for ldap authentication.")
@@ -536,8 +530,7 @@ func main() {
 		}
 		auth_provider = file
 	case "ldap":
-		ldap, err := auth.NewLDAP(server.AuthLdap.Server, server.AuthLdap.Username,
-			server.AuthLdap.Password, server.AuthLdap.Query, server.AuthLdap.BaseDN)
+		ldap, err := auth.NewLDAP(server.AuthLdap)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to init LDAP authentication")
 		}
