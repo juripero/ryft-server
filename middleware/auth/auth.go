@@ -42,6 +42,11 @@ import (
 	"gopkg.in/appleboy/gin-jwt.v1"
 )
 
+const (
+	tokenAttrHomeDir = "home-dir"
+	tokenAttrCluster = "cluster-tag"
+)
+
 // UserInfo is a user credentials and related information such a home directory.
 type UserInfo struct {
 	Name       string `json:"username" yaml:"username"`
@@ -52,15 +57,15 @@ type UserInfo struct {
 
 type Provider interface {
 	Reload() error
-	FindUser(username string) *UserInfo
 	Verify(username string, password string) *UserInfo
-	ExtraData(username string) map[string]interface{}
 }
 
 type Middleware struct {
 	provider Provider
 	realm    string
 	jwt      *jwt.GinJWTMiddleware
+
+	userCache map[string]*UserInfo
 }
 
 func NewMiddleware(provider Provider, realm string) *Middleware {
@@ -71,6 +76,7 @@ func NewMiddleware(provider Provider, realm string) *Middleware {
 	mw := new(Middleware)
 	mw.provider = provider
 	mw.realm = realm
+	mw.userCache = make(map[string]*UserInfo)
 
 	return mw
 }
@@ -118,6 +124,7 @@ func (mw *Middleware) Authentication() gin.HandlerFunc {
 				// The user credentials was found!
 				// pass user info as key "user" in this context
 				// the user can be read later using c.MustGet(gin.AuthUserKey)
+				mw.userCache[username] = user // put to cache
 				c.Set(gin.AuthUserKey, user)
 			}
 		} else if mw.jwt != nil && len(h) != 0 {
@@ -134,18 +141,33 @@ func (mw *Middleware) Authentication() gin.HandlerFunc {
 func (mw *Middleware) authenticator(userId string, password string, c *gin.Context) (string, bool) {
 	user := mw.provider.Verify(userId, password)
 	if user != nil {
+		mw.userCache[userId] = user // put to cache
 		c.Set(gin.AuthUserKey, user)
 	}
 	return userId, user != nil
 }
 
 // authorizator: all logged in users have access
-func (mw *Middleware) authorizator(userId string, c *gin.Context) bool {
-	user := mw.provider.FindUser(userId)
-	if user != nil {
-		c.Set(gin.AuthUserKey, user)
+func (mw *Middleware) authorizator(userId string, ctx *gin.Context) bool {
+	if user := getUserFromJwt(userId, ctx); user != nil {
+		ctx.Set(gin.AuthUserKey, user)
 	}
 	return true
+}
+
+// creates user info based on token attributes
+func getUserFromJwt(userId string, ctx *gin.Context) *UserInfo {
+	if ival, ok := ctx.Get("JWT_PAYLOAD"); ok && ival != nil {
+		if val, ok := ival.(map[string]interface{}); ok {
+			user := new(UserInfo)
+			user.Name, _ = val["id"].(string) // userId
+			user.Home, _ = val[tokenAttrHomeDir].(string)
+			user.ClusterTag, _ = val[tokenAttrCluster].(string)
+			return user
+		}
+	}
+
+	return nil
 }
 
 // report unauthorized access
@@ -158,7 +180,14 @@ func (mw *Middleware) unauthorized(c *gin.Context, code int, message string) {
 
 // get additional payload
 func (mw *Middleware) payload(userId string) map[string]interface{} {
-	return mw.provider.ExtraData(userId)
+	if user, ok := mw.userCache[userId]; ok {
+		return map[string]interface{}{
+			tokenAttrHomeDir: user.Home,
+			tokenAttrCluster: user.ClusterTag,
+		}
+	}
+
+	return nil // no any data yet
 }
 
 // Try to decode Authorization header (basic) to get username and password

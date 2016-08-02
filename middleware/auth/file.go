@@ -84,15 +84,6 @@ func (f *FileAuth) Reload() error {
 	return nil // OK
 }
 
-// find user credentials
-func (f *FileAuth) FindUser(username string) *UserInfo {
-	if u, ok := f.Users[username]; ok {
-		return u // found
-	}
-
-	return nil // not found
-}
-
 // verify user credentials
 func (f *FileAuth) Verify(username, password string) *UserInfo {
 	if u, ok := f.Users[username]; ok {
@@ -102,18 +93,6 @@ func (f *FileAuth) Verify(username, password string) *UserInfo {
 	}
 
 	return nil // not found or invalid password
-}
-
-// get user's extra data
-func (f *FileAuth) ExtraData(username string) map[string]interface{} {
-	if u, ok := f.Users[username]; ok {
-		return map[string]interface{}{
-			"home-dir":    u.Home,
-			"cluster-tag": u.ClusterTag,
-		}
-	}
-
-	return nil // not found
 }
 
 // read user credentials from a text file (JSON or YAML)

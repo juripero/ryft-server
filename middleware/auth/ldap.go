@@ -56,6 +56,11 @@ type LdapAuth struct {
 	// TODO: conn *ldap.Conn for caching
 }
 
+const (
+	attrHomeDir    = "postalAddress"
+	attrClusterTag = "postalCode"
+)
+
 // NewLDAP returns new LDAP based credentials
 func NewLDAP(config LdapConfig) (*LdapAuth, error) {
 	a := &LdapAuth{config}
@@ -68,15 +73,6 @@ func (a *LdapAuth) Reload() error {
 	return nil // OK
 }
 
-// find user credentials
-func (a *LdapAuth) FindUser(username string) *UserInfo {
-	//	if u, ok := f.Users[username]; ok {
-	//		return u // found
-	//	}
-
-	return nil // not found
-}
-
 // verify user credentials
 func (a *LdapAuth) Verify(username, password string) *UserInfo {
 	user, err := a.verify(username, password)
@@ -86,11 +82,6 @@ func (a *LdapAuth) Verify(username, password string) *UserInfo {
 	}
 
 	return user
-}
-
-// get user's extra data
-func (a *LdapAuth) ExtraData(username string) map[string]interface{} {
-	return nil // no any data yet
 }
 
 // check LDAP server
@@ -120,7 +111,7 @@ func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 	req := ldap.NewSearchRequest(a.BaseDN, ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf(a.QueryFormat, username),
-		[]string{"dn"},
+		[]string{"dn", attrHomeDir, attrClusterTag},
 		nil,
 	)
 
@@ -134,6 +125,8 @@ func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 	}
 
 	userdn := resp.Entries[0].DN
+	homeDir := resp.Entries[0].GetAttributeValue(attrHomeDir)
+	clusterTag := resp.Entries[0].GetAttributeValue(attrClusterTag)
 
 	// Bind as the user to verify their password
 	err = conn.Bind(userdn, password)
@@ -143,8 +136,9 @@ func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 
 	user := new(UserInfo)
 	user.Name = userdn
-	user.Password = password
-	user.Home = "/" // TODO: get from LDAP!!!s
+	// user.Password = password
+	user.Home = homeDir
+	user.ClusterTag = clusterTag
 
 	return user, nil // OK
 }
