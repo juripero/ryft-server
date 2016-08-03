@@ -18,34 +18,66 @@ const (
 	EOF
 	WS
 
-	NUMBER
-	INTEGER
-	STRING
+	literal_beg
 	IDENT
+	INT
+	FLOAT
+	STRING
+	literal_end
 
+	operator_beg
+	EQ  // =
+	NEQ // !=
+	LS  // <
+	LEQ // <=
+	GT  // >
+	GEQ // >=
+
+	PLUS  // +
+	MINUS // -
+	WCARD // ?
+	SLASH // /
+
+	COLON  // :
 	LPAREN // (
 	RPAREN // )
 	COMMA  // ,
-	DOT    // .
-	WCARD  // ?
+	PERIOD // .
+	operator_end
 )
 
 // operators
-func (t Token) isAnd(lit string) bool { return t == IDENT && strings.EqualFold(lit, "AND") }
-func (t Token) isXor(lit string) bool { return t == IDENT && strings.EqualFold(lit, "XOR") }
-func (t Token) isOr(lit string) bool  { return t == IDENT && strings.EqualFold(lit, "OR") }
+func (t Token) isAnd(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "AND")
+}
+func (t Token) isXor(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "XOR")
+}
+func (t Token) isOr(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "OR")
+}
 
 // input
-func (t Token) isRawText(lit string) bool { return t == IDENT && strings.EqualFold(lit, "RAW_TEXT") }
-func (t Token) isRecord(lit string) bool  { return t == IDENT && strings.EqualFold(lit, "RECORD") }
+func (t Token) isRawText(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "RAW_TEXT")
+}
+func (t Token) isRecord(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "RECORD")
+}
 
 // operation
-func (t Token) isContains(lit string) bool { return t == IDENT && strings.EqualFold(lit, "CONTAINS") }
+func (t Token) isContains(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "CONTAINS")
+}
 func (t Token) isNotContains(lit string) bool {
 	return t == IDENT && strings.EqualFold(lit, "NOT_CONTAINS")
 }
-func (t Token) isEquals(lit string) bool    { return t == IDENT && strings.EqualFold(lit, "EQUALS") }
-func (t Token) isNotEquals(lit string) bool { return t == IDENT && strings.EqualFold(lit, "NOT_EQUALS") }
+func (t Token) isEquals(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "EQUALS")
+}
+func (t Token) isNotEquals(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "NOT_EQUALS")
+}
 
 // search types
 func (t Token) isFhs(lit string) bool {
@@ -54,17 +86,23 @@ func (t Token) isFhs(lit string) bool {
 func (t Token) isFeds(lit string) bool {
 	return t == IDENT && (strings.EqualFold(lit, "FEDS") || strings.EqualFold(lit, "EDIT"))
 }
-func (t Token) isDate(lit string) bool { return t == IDENT && strings.EqualFold(lit, "DATE") }
-func (t Token) isTime(lit string) bool { return t == IDENT && strings.EqualFold(lit, "TIME") }
+func (t Token) isDate(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "DATE")
+}
+func (t Token) isTime(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "TIME")
+}
 func (t Token) isNumber(lit string) bool {
 	return t == IDENT && (strings.EqualFold(lit, "NUMBER") || strings.EqualFold(lit, "NUMERIC"))
 }
-func (t Token) isCurrency(lit string) bool { return t == IDENT && strings.EqualFold(lit, "CURRENCY") }
+func (t Token) isCurrency(lit string) bool {
+	return t == IDENT && strings.EqualFold(lit, "CURRENCY")
+}
 func (t Token) isRegex(lit string) bool {
 	return t == IDENT && (strings.EqualFold(lit, "REGEX") || strings.EqualFold(lit, "REGEXP"))
 }
 
-const eof = rune(0)
+const eof rune = -1
 
 // Scanner represents a lexical scanner.
 type Scanner struct {
@@ -136,12 +174,28 @@ func (s *Scanner) Scan() (Token, string) {
 	case ',':
 		return COMMA, string(r)
 	case '.':
-		return DOT, string(r)
+		return PERIOD, string(r)
+	case ':':
+		return COLON, string(r)
+	case '/':
+		return SLASH, string(r)
+	case '=':
+		return EQ, string(r)
+		// TODO: return NEQ // !=
+	case '<':
+		return LS, string(r)
+		// TODO: LEQ // <=
+	case '>':
+		return GT, string(r)
+	// TODO: GEQ // >=
+	case '+':
+		return PLUS, string(r)
+	case '-':
+		return MINUS, string(r)
+
 	case '"':
 		s.unread()
 		return s.scanString()
-	case '+', '-':
-		return s.scanNumber()
 	}
 
 	return ILLEGAL, string(r)
@@ -190,130 +244,82 @@ func (s *Scanner) scanIdent() (Token, string) {
 // scanString consumes a contiguous string of non-quote characters.
 // Quote characters can be consumed if they're first escaped with a backslash.
 func (s *Scanner) scanString() (Token, string) {
-	var err error
-	//lit, err = ScanString(s.r)
-	
-
-// ScanString reads a quoted string from a rune reader.
-func ScanString(r io.RuneScanner) (string, error) {
-	ending, _, err := r.ReadRune()
-	if err != nil {
-		return "", errBadString
-	}
-
 	var buf bytes.Buffer
+	ending := s.read()
+	buf.WriteRune(ending)
+
 	for {
-		ch0, _, err := r.ReadRune()
-		if ch0 == ending {
-			return buf.String(), nil
-		} else if err != nil || ch0 == '\n' {
-			return buf.String(), errBadString
-		} else if ch0 == '\\' {
+		switch r0 := s.read(); r0 {
+		case ending:
+			buf.WriteRune(ending)
+			return STRING, buf.String() // OK
+		case eof:
+			panic(fmt.Errorf("no string ending found"))
+			// return EOF, ""
+		case '\\':
 			// If the next character is an escape then write the escaped char.
 			// If it's not a valid escape then return an error.
-			ch1, _, _ := r.ReadRune()
-			if ch1 == 'n' {
-				_, _ = buf.WriteRune('\n')
-			} else if ch1 == '\\' {
-				_, _ = buf.WriteRune('\\')
-			} else if ch1 == '"' {
-				_, _ = buf.WriteRune('"')
-			} else if ch1 == '\'' {
-				_, _ = buf.WriteRune('\'')
-			} else {
-				return string(ch0) + string(ch1), errBadEscape
+			switch r1 := s.read(); r1 {
+			case eof:
+				panic(fmt.Errorf("bad string escaping found"))
+				// return EOF, ""
+			default: // case ending:
+				// leave escaped runes "as is"
+				buf.WriteRune(r0)
+				buf.WriteRune(r1)
 			}
-		} else {
-			_, _ = buf.WriteRune(ch0)
+		default:
+			buf.WriteRune(r0)
 		}
 	}
-}
-	
-	
-	if err == errBadString {
-		return BADSTRING, pos, lit
-	} else if err == errBadEscape {
-		_, pos = s.r.curr()
-		return BADESCAPE, pos, lit
-	}
-	return STRING, pos, lit
 }
 
 // scanNumber consumes anything that looks like the start of a number.
 // Numbers start with a digit, full stop, plus sign or minus sign.
 // This function can return non-number tokens if a scan is a false positive.
 // For example, a minus sign followed by a letter will just return a minus sign.
-func (s *Scanner) scanNumber() (tok Token, pos Pos, lit string) {
+func (s *Scanner) scanNumber() (Token, string) {
 	var buf bytes.Buffer
 
-	// Check if the initial rune is a "+" or "-".
-	ch, pos := s.r.curr()
-	if ch == '+' || ch == '-' {
-		// Peek at the next two runes.
-		ch1, _ := s.r.read()
-		ch2, _ := s.r.read()
-		s.r.unread()
-		s.r.unread()
-
-		// This rune must be followed by a digit or a full stop and a digit.
-		if isDigit(ch1) || (ch1 == '.' && isDigit(ch2)) {
-			_, _ = buf.WriteRune(ch)
-		} else if ch == '+' {
-			return ADD, pos, ""
-		} else if ch == '-' {
-			return SUB, pos, ""
-		}
-	} else if ch == '.' {
-		// Peek and see if the next rune is a digit.
-		ch1, _ := s.r.read()
-		s.r.unread()
-		if !isDigit(ch1) {
-			return ILLEGAL, pos, "."
-		}
-
-		// Unread the full stop so we can read it later.
-		s.r.unread()
-	} else {
-		s.r.unread()
-	}
-
-	// Read as many digits as possible.
-	_, _ = buf.WriteString(s.scanDigits())
+	// read as many digits as possible.
+	buf.WriteString(s.scanDigits())
 
 	// If next code points are a full stop and digit then consume them.
 	isDecimal := false
-	if ch0, _ := s.r.read(); ch0 == '.' {
+	if r1 := s.read(); r1 == '.' {
 		isDecimal = true
-		if ch1, _ := s.r.read(); isDigit(ch1) {
-			_, _ = buf.WriteRune(ch0)
-			_, _ = buf.WriteRune(ch1)
-			_, _ = buf.WriteString(s.scanDigits())
+		if r2 := s.read(); s.isDigit(r2) {
+			buf.WriteRune(r1)
+			buf.WriteRune(r2)
+			buf.WriteString(s.scanDigits())
 		} else {
-			s.r.unread()
+			s.unread()
 		}
 	} else {
-		s.r.unread()
+		s.unread()
 	}
 
-	// Read as a duration or integer if it doesn't have a fractional part.
+	// Read as integer if it doesn't have a fractional part.
 	if !isDecimal {
-		// If the next rune is a duration unit (u,µ,ms,s) then return a duration token
-		if ch0, _ := s.r.read(); ch0 == 'u' || ch0 == 'µ' || ch0 == 's' || ch0 == 'h' || ch0 == 'd' || ch0 == 'w' {
-			_, _ = buf.WriteRune(ch0)
-			return DURATIONVAL, pos, buf.String()
-		} else if ch0 == 'm' {
-			_, _ = buf.WriteRune(ch0)
-			if ch1, _ := s.r.read(); ch1 == 's' {
-				_, _ = buf.WriteRune(ch1)
-			} else {
-				s.r.unread()
-			}
-			return DURATIONVAL, pos, buf.String()
-		}
-		s.r.unread()
-		return INTEGER, pos, buf.String()
+		return FLOAT, buf.String()
 	}
-	return NUMBER, pos, buf.String()
+	return INT, buf.String()
+}
+
+// scanDigits consume a contiguous series of digits.
+func (s *Scanner) scanDigits() string {
+	var buf bytes.Buffer
+
+	for {
+		r := s.read()
+		if !s.isDigit(r) {
+			s.unread()
+			break
+		}
+		buf.WriteRune(r)
+	}
+
+	return buf.String()
 }
 
 // Parser represents a parser.
@@ -374,8 +380,15 @@ func (s SearchStatement) String() string {
 	return fmt.Sprintf("(%s %s %s)", s.Input, s.Operator, s.Expression)
 }
 
-func (p *Parser) parseSimpleQuery() (*SearchStatement, error) {
-	res := new(SearchStatement)
+func (p *Parser) parseSimpleQuery() (res *SearchStatement, err error) {
+	// recover from panic
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
+
+	res = new(SearchStatement)
 
 	// input
 	switch tok, lit := p.scanIgnoreSpace(); {
@@ -384,7 +397,7 @@ func (p *Parser) parseSimpleQuery() (*SearchStatement, error) {
 	case tok.isRecord(lit):
 		res.Input = lit
 		for {
-			if tok, _ := p.scan(); tok == DOT {
+			if tok, _ := p.scan(); tok == PERIOD {
 				if tok, lit := p.scan(); tok == IDENT {
 					res.Input += "."
 					res.Input += lit
@@ -410,42 +423,92 @@ func (p *Parser) parseSimpleQuery() (*SearchStatement, error) {
 	}
 
 	// expression
-	expr, err := p.parseExpression()
-	if err != nil {
-		return nil, err
-	}
-	res.Expression = expr
+	res.Expression = p.parseExpression()
 
 	return res, nil // OK
 }
 
-func (p *Parser) parseExpression() (string, error) {
-	tok, lit := p.scanIgnoreSpace()
-	//	if tok != STRING {
-	//		return nil, fmt.Errorf("found %q, expected table name", lit)
-	//	}
-	_ = tok
-	return lit, nil
+// parse search expression
+func (p *Parser) parseExpression() string {
+	switch tok, lit := p.scanIgnoreSpace(); {
+	case tok.isFhs(lit),
+		tok.isFeds(lit),
+		tok.isDate(lit),
+		tok.isTime(lit),
+		tok.isNumber(lit),
+		tok.isCurrency(lit),
+		tok.isRegex(lit):
+		return lit + p.parseExprInParen()
+	case tok == STRING,
+		tok == WCARD:
+		return lit
+	default:
+		panic(fmt.Errorf("%q is unexpected expression", lit))
+	}
+}
+
+// parse search expression in parens
+func (p *Parser) parseExprInParen() string {
+	var buf bytes.Buffer
+
+	// left paren first
+	switch tok, lit := p.scanIgnoreSpace(); tok {
+	case LPAREN:
+		buf.WriteString(lit)
+	default:
+		panic(fmt.Errorf("%q found instead of (", lit))
+	}
+
+	// read all inside ()
+	for deep := 1; deep > 0; {
+		tok, lit := p.scanIgnoreSpace()
+		switch tok {
+		case RPAREN:
+			deep -= 1
+		case LPAREN:
+			deep += 1
+		case EOF, ILLEGAL:
+			panic(fmt.Errorf("no expression ending found"))
+		}
+		buf.WriteString(lit)
+	}
+
+	return buf.String() // OK
 }
 
 func main() {
 	queries := []string{
-		"RAW_TEXT CONTAINS ?",
-		"RECORD EQUALS no",
-		"RECORD.id NOT_EQUALS to",
+		`RAW_TEXT CONTAINS ?`,
+		`RECORD EQUALS "no"`,
+		`RECORD.id NOT_EQUALS "to"`,
+		`RAW_TEXT CONTAINS FHS("f")`,
+		`RAW_TEXT CONTAINS FHS("f",CS = true)`,
+		`RAW_TEXT CONTAINS FEDS( "f" , CS = true, DIST= 5, 	WIDTH =    100.50 )`,
 
-		"ROW_TEXT CONTAINS ?",
-		"RECORD EQUALZ no",
-		"RECORD. NOT_EQUALS to",
+		`RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12)`,
+		`RECORD.date CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15)`,
+		`RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00)`,
+		`RECORD.time CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00)`,
+		`RECORD.id CONTAINS NUMBER("1025" < NUM < "1050", ",", ".")`,
+		`RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", ".")`,
+
+		// `( record.city EQUALS "Rockville" ) AND ( record.state EQUALS "MD" )`
+
+		`ROW_TEXT CONTAINS ?`,
+		`RECORD EQUALZ "no"`,
+		`RECORD. NOT_EQUALS "to"`,
+		`RAW_TEXT CONTAINS (`,
+		`RAW_TEXT CONTAINS FHS(`,
+		`RAW_TEXT CONTAINS FHS(()`,
 	}
 
 	for _, q := range queries {
 		p := NewParser(bytes.NewBufferString(q))
 		expr, err := p.parseSimpleQuery()
 		if err != nil {
-			fmt.Printf("%q: FAILED with %s\n", q, err)
+			fmt.Printf("%s: FAILED with %s\n", q, err)
 		} else {
-			fmt.Printf("%q => %s\n", q, expr)
+			fmt.Printf("%s => %s\n", q, expr)
 		}
 	}
 }
