@@ -154,14 +154,16 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 // Run the `ryftprim` tool in background and parse results.
 func (engine *Engine) run(task *Task, res *search.Result) error {
-	// clear old INDEX&DATA files before start
-	if err := engine.removeFile(task.IndexFileName); err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to remove old INDEX file", TAG)
-		return fmt.Errorf("failed to remove old INDEX file: %s", err)
-	}
-	if err := engine.removeFile(task.DataFileName); err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to remove old DATA file", TAG)
-		return fmt.Errorf("failed to remove old DATA file: %s", err)
+	if false { // this feature is disabled for now
+		// clear old INDEX&DATA files before start
+		if err := engine.removeFile(task.IndexFileName); err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to remove old INDEX file", TAG)
+			return fmt.Errorf("failed to remove old INDEX file: %s", err)
+		}
+		if err := engine.removeFile(task.DataFileName); err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to remove old DATA file", TAG)
+			return fmt.Errorf("failed to remove old DATA file: %s", err)
+		}
 	}
 
 	task.log().WithField("args", task.tool_args).Infof("[%s]: executing tool", TAG)

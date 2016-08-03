@@ -50,7 +50,8 @@ return the following:
 
 ## JWT options
 
-To pass JWT secret to the server the `--jwt-secret` command line option is used:
+To pass JWT secret to the server the configuration file
+or `--jwt-secret` command line option is used:
 
 ```{.sh}
 ryft-server --jwt-secret=my-secret-key
@@ -67,9 +68,29 @@ Default token lifetime is 1 hour.
 To change it use `--jwt-lifetime` command line option.
 Note, the overall token refresh timeout is set to 10 lifetimes!
 
+See corresponding section in configuration file to check all available options.
+
+
 ## LDAP
 
-TBD
+Most of LDAP customization can be done via configuration file.
+But there is also some command line options are available.
+Check `ryft-server --help` output.
+
+First of all the LDAP server address should be provided.
+See `--ldap-server` command line option.
+
+Second, we need a special read-only account to do search requests.
+This account credentials can be customized via `--ldap-user` and `--ldap-pass`
+command line options.
+
+The `--ldap-query` and `--ldap-basedn` are used to finish the LDAP search request.
+Query format is used to select appropriate RDN, for example `(&(cn=%s))`.
+
+There are a few security related options (currently in configuration file only)
+that could be used to disable TLS or to disable TLS certificate verification.
+Please check corresponding `auth-ldap` section of the configuration file.
+
 
 ## Simple text file
 
@@ -84,11 +105,11 @@ YAML format:
 - username: "test"
   password: "test"
   home: "/test"
-  clusterTag: "test"
+  cluster-tag: "test"
 - username: "foo"
   password: "foo"
   home: "/foo"
-  clusterTag: "foo"
+  cluster-tag: "foo"
 ```
 
 JSON format:
@@ -96,8 +117,8 @@ JSON format:
 ```{.json}
 [
   {"username":"admin", "password":"admin", "home":"/"},
-  {"username":"test", "password":"test", "home":"/test", "clusterTag":"test"},
-  {"username":"foo", "password":"foo", "home":"/foo", "clusterTag":"foo"}
+  {"username":"test", "password":"test", "home":"/test", "cluster-tag":"test"},
+  {"username":"foo", "password":"foo", "home":"/foo", "cluster-tag":"foo"}
 ]
 ```
 
@@ -105,8 +126,8 @@ The `home` is a directory inside `/ryftone` mount point.
 It is used to separate data of various users.
 An user is authorized to have access to its home only.
 
-The `clusterTag` is used for partitioning (see corresponding `ryft-cluster/consul.md#partitioning-setup` document).
-If an user has custom paritioning rules they are located under `{clusterTag}/partitions` KV prefix.
+The `cluster-tag` is used for partitioning (see corresponding `ryft-cluster/consul.md#partitioning-setup` document).
+If an user has custom paritioning rules they are located under `{cluster-tag}/partitions` KV prefix.
 
 To run server use the following command line:
 

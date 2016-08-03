@@ -37,26 +37,33 @@ import (
 	"gopkg.in/ldap.v2"
 )
 
+// LDAP configuration
+type LdapConfig struct {
+	ServerAddress string `yaml:"server,omitempty"`
+	BindUsername  string `yaml:"username,omitempty"`
+	BindPassword  string `yaml:"password,omitempty"`
+	QueryFormat   string `yaml:"query,omitempty"`
+	BaseDN        string `yaml:"basedn,omitempty"`
+
+	InsecureSkipTLS    bool `yaml:"insecure-skip-tls,omitempty"`
+	InsecureSkipVerify bool `yaml:"insecure-skip-verify,omitempty"`
+}
+
 // LdapAuth contains LDAP related information
 type LdapAuth struct {
-	Address      string
-	QueryFormat  string
-	BindUsername string
-	BindPassword string
-	BaseDN       string
+	LdapConfig
 
 	// TODO: conn *ldap.Conn for caching
 }
 
-// NewLDAP returns new LDAP based credentials
-func NewLDAP(address, username, password, query, baseDN string) (*LdapAuth, error) {
-	a := new(LdapAuth)
-	a.Address = address
-	a.QueryFormat = query
-	a.BindUsername = username
-	a.BindPassword = password
-	a.BaseDN = baseDN
+const (
+	attrHomeDir    = "postalAddress"
+	attrClusterTag = "postalCode"
+)
 
+// NewLDAP returns new LDAP based credentials
+func NewLDAP(config LdapConfig) (*LdapAuth, error) {
+	a := &LdapAuth{config}
 	return a, nil // OK
 }
 
@@ -64,15 +71,6 @@ func NewLDAP(address, username, password, query, baseDN string) (*LdapAuth, erro
 func (a *LdapAuth) Reload() error {
 	// TODO: update LDAP options?
 	return nil // OK
-}
-
-// find user credentials
-func (a *LdapAuth) FindUser(username string) *UserInfo {
-	//	if u, ok := f.Users[username]; ok {
-	//		return u // found
-	//	}
-
-	return nil // not found
 }
 
 // verify user credentials
@@ -86,24 +84,21 @@ func (a *LdapAuth) Verify(username, password string) *UserInfo {
 	return user
 }
 
-// get user's extra data
-func (a *LdapAuth) ExtraData(username string) map[string]interface{} {
-	return nil // no any data yet
-}
-
 // check LDAP server
 func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 	// Connect to LDAP server
-	conn, err := ldap.Dial("tcp", a.Address)
+	conn, err := ldap.Dial("tcp", a.ServerAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial LDAP: %s", err)
 	}
 	defer conn.Close()
 
 	// Reconnect with TLS
-	err = conn.StartTLS(&tls.Config{InsecureSkipVerify: true}) // TODO: remove this flag! UNSECURE!!
-	if err != nil {
-		return nil, fmt.Errorf("failed to use TLS: %s", err)
+	if !a.InsecureSkipTLS {
+		err = conn.StartTLS(&tls.Config{InsecureSkipVerify: a.InsecureSkipVerify})
+		if err != nil {
+			return nil, fmt.Errorf("failed to use TLS: %s", err)
+		}
 	}
 
 	// First bind with a read only user
@@ -116,7 +111,7 @@ func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 	req := ldap.NewSearchRequest(a.BaseDN, ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf(a.QueryFormat, username),
-		[]string{"dn"},
+		[]string{"dn", attrHomeDir, attrClusterTag},
 		nil,
 	)
 
@@ -130,6 +125,8 @@ func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 	}
 
 	userdn := resp.Entries[0].DN
+	homeDir := resp.Entries[0].GetAttributeValue(attrHomeDir)
+	clusterTag := resp.Entries[0].GetAttributeValue(attrClusterTag)
 
 	// Bind as the user to verify their password
 	err = conn.Bind(userdn, password)
@@ -139,8 +136,9 @@ func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 
 	user := new(UserInfo)
 	user.Name = userdn
-	user.Password = password
-	user.Home = "/" // TODO: get from LDAP!!!s
+	// user.Password = password
+	user.Home = homeDir
+	user.ClusterTag = clusterTag
 
 	return user, nil // OK
 }
