@@ -89,6 +89,7 @@ func Decompose(originalQuery string, baseOpts Options) (node *Node, err error) {
 }
 
 func formatQuery(query string) string {
+	query = strings.TrimSpace(query)
 	for _, delimiter := range delimiters {
 		delimiter = strings.Trim(delimiter, " ")
 		query = strings.Replace(query, ")"+delimiter+"(", ") "+delimiter+" (", -1)

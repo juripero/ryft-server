@@ -63,6 +63,7 @@ func TestValidQueries(t *testing.T) {
 		`(RECORD.body CONTAINS "FEDS")`,
 		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
 		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
+		` (RAW_TEXT CONTAINS "Some text0")`,
 	}
 
 	for _, q := range queries {
