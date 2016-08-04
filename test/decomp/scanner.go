@@ -288,7 +288,7 @@ func (s *Scanner) scanNumber(prefix ...rune) Lexeme {
 		s.unread()
 	}
 
-	if !isDecimal {
+	if isDecimal {
 		return NewLexeme(FLOAT, buf.String())
 	}
 	return NewLexeme(INT, buf.String())
