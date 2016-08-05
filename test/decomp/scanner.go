@@ -73,7 +73,7 @@ func (s *Scanner) Scan() Lexeme {
 		return s.scanIdent()
 	} else if s.isDigit(r) {
 		s.unread()
-		return s.scanNumber()
+		return s.scanNumber(false)
 	} else if r == '"' {
 		s.unread()
 		return s.scanString()
@@ -118,7 +118,7 @@ func (s *Scanner) Scan() Lexeme {
 		r1 := s.read()
 		s.unread()
 		if r1 == '.' || s.isDigit(r1) {
-			return s.scanNumber(r) // pass '+'
+			return s.scanNumber(false, r) // pass '+'
 		} else {
 			return NewLexeme1(PLUS, r)
 		}
@@ -126,7 +126,7 @@ func (s *Scanner) Scan() Lexeme {
 		r1 := s.read()
 		s.unread()
 		if r1 == '.' || s.isDigit(r1) {
-			return s.scanNumber(r) // pass '-'
+			return s.scanNumber(false, r) // pass '-'
 		} else {
 			return NewLexeme1(MINUS, r)
 		}
@@ -138,7 +138,13 @@ func (s *Scanner) Scan() Lexeme {
 	case ',':
 		return NewLexeme1(COMMA, r)
 	case '.':
-		return NewLexeme1(PERIOD, r)
+		r1 := s.read()
+		s.unread()
+		if s.isDigit(r1) {
+			return s.scanNumber(true, r) // pass '.'
+		} else {
+			return NewLexeme1(PERIOD, r)
+		}
 	case ':':
 		return NewLexeme1(COLON, r)
 	case ';':
@@ -202,26 +208,6 @@ func (s *Scanner) scanIdent() Lexeme {
 	return NewLexeme(IDENT, buf.String())
 }
 
-// scanDigits consume a contiguous series of digits.
-func (s *Scanner) scanDigits() string {
-	var buf bytes.Buffer
-
-	// read every subsequent digit character into the buffer.
-	// non-digit characters and EOF will cause the loop to exit.
-	for {
-		if r := s.read(); r == eof {
-			break
-		} else if !s.isDigit(r) {
-			s.unread()
-			break
-		} else {
-			buf.WriteRune(r)
-		}
-	}
-
-	return buf.String()
-}
-
 // scanString consumes a contiguous string of non-quote characters.
 // Quote characters can be consumed if they're first escaped with a backslash.
 // panics if string is not properly terminated
@@ -258,11 +244,31 @@ func (s *Scanner) scanString() Lexeme {
 	}
 }
 
+// scanDigits consume a contiguous series of digits.
+func (s *Scanner) scanDigits() string {
+	var buf bytes.Buffer
+
+	// read every subsequent digit character into the buffer.
+	// non-digit characters and EOF will cause the loop to exit.
+	for {
+		if r := s.read(); r == eof {
+			break
+		} else if !s.isDigit(r) {
+			s.unread()
+			break
+		} else {
+			buf.WriteRune(r)
+		}
+	}
+
+	return buf.String()
+}
+
 // scanNumber consumes anything that looks like the start of a number.
 // Numbers start with a digit, full stop, plus sign or minus sign.
 // This function can return non-number tokens if a scan is a false positive.
 // For example, a minus sign followed by a letter will just return a minus sign.
-func (s *Scanner) scanNumber(prefix ...rune) Lexeme {
+func (s *Scanner) scanNumber(isDecimal bool, prefix ...rune) Lexeme {
 	var buf bytes.Buffer
 
 	// put prefix first
@@ -273,14 +279,37 @@ func (s *Scanner) scanNumber(prefix ...rune) Lexeme {
 	// read as many digits as possible.
 	buf.WriteString(s.scanDigits())
 
-	// If next code points are a full stop and digit then consume them.
-	isDecimal := false
-	if r := s.read(); r == '.' {
+	if !isDecimal {
+		// If next code points are a full stop and digit then consume them.
+		if r := s.read(); r == '.' {
+			buf.WriteRune(r) // dot
+			isDecimal = true
+			if r1 := s.read(); s.isDigit(r1) {
+				buf.WriteRune(r1)
+				buf.WriteString(s.scanDigits())
+			} else {
+				s.unread()
+			}
+		} else {
+			s.unread()
+		}
+	}
+
+	// If next code points is 'e'.
+	if r := s.read(); r == 'e' || r == 'E' {
+		buf.WriteRune(r) // [eE]
 		isDecimal = true
 		if r1 := s.read(); s.isDigit(r1) {
-			buf.WriteRune(r)
 			buf.WriteRune(r1)
 			buf.WriteString(s.scanDigits())
+		} else if r1 == '+' || r1 == '-' {
+			buf.WriteRune(r1) // [+-]
+			if r2 := s.read(); s.isDigit(r2) {
+				buf.WriteRune(r2)
+				buf.WriteString(s.scanDigits())
+			} else {
+				panic(fmt.Errorf("bad float format, expected digital"))
+			}
 		} else {
 			s.unread()
 		}

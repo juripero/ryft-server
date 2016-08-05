@@ -28,7 +28,6 @@ func (q Query) String() string {
 	var buf bytes.Buffer
 	if q.Operator != "" {
 		buf.WriteString(q.Operator)
-		buf.WriteString(" ")
 	}
 	if q.Simple != nil {
 		buf.WriteString(q.Simple.String())

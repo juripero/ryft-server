@@ -31,14 +31,20 @@ func TestScannerScan(t *testing.T) {
 		{"0123", INT},
 		{"+123", INT},
 		{"-123", INT},
-		//		{"123.", FLOAT},
+		{"123.", FLOAT},
 		{"123.1", FLOAT},
 		{"+123.1", FLOAT},
 		{"-123.1", FLOAT},
-		//		{".1", FLOAT},
-		//		{"0.1e5", FLOAT},
-		//		{"0.1e+5", FLOAT},
-		//		{"0.1e-5", FLOAT},
+		{".1", FLOAT},
+		{".1e5", FLOAT},
+		{".1e+5", FLOAT},
+		{".1e-5", FLOAT},
+		{"1e5", FLOAT},
+		{"1e+5", FLOAT},
+		{"1e-5", FLOAT},
+		{"0.1e5", FLOAT},
+		{"0.1e+5", FLOAT},
+		{"0.1e-5", FLOAT},
 		// TODO: more tests for numbers
 
 		{`""`, STRING},
@@ -79,9 +85,9 @@ func TestScannerScan(t *testing.T) {
 		s := testNewScanner(d.data)
 		if assert.NotNil(t, s, "no scanner created (data:%s)", d.data) {
 			lex := s.Scan()
-			assert.Equal(t, lex.token, d.tok, "unexpected token (data:%s)", d.data)
-			assert.Equal(t, lex.literal, d.data, "unexpected literal (data:%s)", d.data)
-			assert.Equal(t, s.Scan().token, EOF, "nothing more expected (data:%s)", d.data)
+			assert.Equal(t, d.tok, lex.token, "unexpected token (data:%s)", d.data)
+			assert.Equal(t, d.data, lex.literal, "unexpected literal (data:%s)", d.data)
+			assert.Equal(t, EOF, s.Scan().token, "nothing more expected (data:%s)", d.data)
 		}
 	}
 }
@@ -111,9 +117,9 @@ func TestScannerScan2(t *testing.T) {
 		if assert.NotNil(t, s, "no scanner created") {
 			for _, tok := range d.tok {
 				lex := s.Scan()
-				assert.Equal(t, lex.token, tok, "unexpected token")
+				assert.Equal(t, tok, lex.token, "unexpected token")
 			}
-			assert.Equal(t, s.Scan().token, EOF, "nothing more expected")
+			assert.Equal(t, EOF, s.Scan().token, "nothing more expected")
 		}
 	}
 }

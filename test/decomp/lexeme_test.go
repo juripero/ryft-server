@@ -8,10 +8,10 @@ import (
 
 // simple tests for lexem
 func TestLexemeNew(t *testing.T) {
-	assert.Equal(t, NewLexeme(WS, " ").literal, " ")
-	assert.Equal(t, NewLexeme1(WS, 'a').literal, "a")
-	assert.Equal(t, NewLexeme1(WS, 'a', 'b').String(), "ab")
-	assert.Equal(t, NewLexeme1(WS, 'a', 'b', 'c').String(), "abc")
+	assert.Equal(t, " ", NewLexeme(WS, " ").literal)
+	assert.Equal(t, "a", NewLexeme1(WS, 'a').literal)
+	assert.Equal(t, "ab", NewLexeme1(WS, 'a', 'b').String())
+	assert.Equal(t, "abc", NewLexeme1(WS, 'a', 'b', 'c').String())
 }
 
 // test lexem words
