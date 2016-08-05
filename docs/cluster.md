@@ -24,12 +24,16 @@ under `busyness/` prefix. Once a new search request arrives, metrics for all
 nodes are obtained from KV and all nodes are arranged - from the
 lowest metric to the highest.
 
-It's possible to use a `tolerance` parameter. Actual level will be calculated
-as `level = metric / (tolerance + 1)`. This option is used to put
-nodes with almost the same `busyness` metric at the same level. For example,
+## Busyness tolerance
+
+It's possible to use a `tolerance` parameter. This option is used to group
+nodes with almost the same `busyness` metric. Actual group will be calculated
+as `group = metric / (tolerance + 1)`.  For example,
 if `busyness/node-a=10` and `busyness/node-b=13`:
-- having `tolerance=4` all nodes will be places at the same level `2`,
-- having `tolerance=0` or `tolerance=1` all nodes will be at their own levels.
+- having `tolerance=4` all nodes will be places in the same group `2`,
+- having `tolerance=0` or `tolerance=1` all nodes will be in their own groups.
 
 To customize this parameter the `--busyness-tolerance` command line option
 can be used. By default it is zero.
+
+See [corresponding demo](./demo-2016-07-28.md) for more details.

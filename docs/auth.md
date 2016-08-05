@@ -1,11 +1,11 @@
-This document contains detailed description of authentication methods used by the ryft server.
+This document contains detailed description of authentication methods used by the `ryft-server`.
 
 The following types of authentication are supported:
 
 - [basic](https://en.wikipedia.org/wiki/Basic_access_authentication)
 - [JWT](https://jwt.io/introduction/)
 
-To verify provided user credentials the LDAP service or simple file may be used.
+To verify user credentials the LDAP service or simple file may be used.
 
 The following endpoints are protected:
 
@@ -16,14 +16,14 @@ The following endpoints are protected:
 
 # Authentication
 
-If authentication is enabled the ryft server checks for `Authorization` HTTP header.
+If authentication is enabled the `ryft-server` checks for `Authorization` HTTP header.
 
 If `Authorization` header contains `Basic` keyword the basic authentication is used.
-The ryft server extracts username and password from the header and checks the user
+The `ryft-server` extracts username and password from the header and checks the user
 is authorized to access requested resources.
 
 Otherwise if `Authorization` header contains `Bearer` keyword the JWT is used.
-The ryft server extracts JWT token from the header and checks it.
+The `ryft-server` extracts JWT token from the header and uses it.
 
 There are two special endpoints for JWT authentication:
 
@@ -43,15 +43,22 @@ curl -d '{"username":"admin","password":"admin"}' "localhost:8765/login"
 
 return the following:
 
-```{.sh}
+```{.json}
 {"expire":"2016-07-11T08:13:09-04:00",
 "token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE0NjgyMzkxODksImlkIjoiYWRtaW4iLCJvcmlnX2lhdCI6MTQ2ODIzNTU4OX0.X_sO1pimiDQ9XGg37PzTYIB9ohu4DJM8VG9lgqd4sqg"}
 ```
 
+Having this token it's possible to send authorized requests:
+
+```{.sh}
+TOKEN=`curl -d '{"username":"test","password":"test"}' "localhost:8765/login" | jq -r .token`
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:8765/search?query=Joe&files=*.txt"
+```
+
 ## JWT options
 
-To pass JWT secret to the server the configuration file
-or `--jwt-secret` command line option is used:
+To pass JWT secret to the server the [configuration file](./buildandrun.md#authentication-server-configuration)
+or `--jwt-secret` command line option can be used:
 
 ```{.sh}
 ryft-server --jwt-secret=my-secret-key
@@ -68,12 +75,12 @@ Default token lifetime is 1 hour.
 To change it use `--jwt-lifetime` command line option.
 Note, the overall token refresh timeout is set to 10 lifetimes!
 
-See corresponding section in configuration file to check all available options.
+See corresponding section in [configuration file](./buildandrun.md#authentication-server-configuration) to check all available options.
 
 
 ## LDAP
 
-Most of LDAP customization can be done via configuration file.
+Most of LDAP customization can be done via [configuration file](./buildandrun.md#authentication-server-configuration).
 But there is also some command line options are available.
 Check `ryft-server --help` output.
 

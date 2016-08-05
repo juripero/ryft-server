@@ -9,10 +9,15 @@ This document contains information about REST API.
 
 The main API endpoints are `/search` and `/count`.
 
+If authentication is enabled, there are also a few endpoints related to
+[JWT](./auth.md#JWT-login).
 
 # Search
 
 The GET `/search` endpoint is used to search data on Ryft boxes.
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
 
 ## Search query parameters
 
@@ -37,7 +42,6 @@ The list of supported query parameters are the following (check detailed descrip
 | `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-and-spark-parameters). |
 | `spark`       | boolean | **Internal** [The spark output format flag](#search-stream-and-spark--parameters). |
 | `ep`          | boolean | **Internal** [The error prefix flag](#search-ep-parameter). |
-
 
 ### Search `query` parameter
 
@@ -418,6 +422,9 @@ The GET `/count` endpoint is also used to search data on Ryft boxes.
 However, it does not transfer all found data, it will just print
 the number of matches and associated performance numbers.
 
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
+
 ## Count query parameters
 
 The list of supported query parameters are the following:
@@ -464,6 +471,9 @@ will report the following output:
 
 The GET `/files` endpoint is used to get Ryft box directory content.
 The name of all subdirectories and files are reported.
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
 
 
 ## Files query parameters
