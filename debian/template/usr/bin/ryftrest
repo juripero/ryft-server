@@ -8,39 +8,42 @@ ryftrest is a ryftprim equivalent, it uses ryft-server as a backend.
 Usage: $0 [options]
 
 Search specific:
--h|--help        Prints this short help message.
--p|--mode        Specifies the search mode to run, which can be one of:
-                    - exact_search (or es)
-                    - fuzzy_hamming_search (or fhs) (used by default)
-                    - fuzzy_edit_distance_search (or feds)
-                    - date_search (or ds)
-                    - time_search (or ts)
-                    - numeric_search (or ns) also used for currency
-                    - regex_search (or rs)
--f|--file        Specifies an input filename.
--i               Specifies case-insensitive analysis for supported primitives.
--n|--nodes       Specifies 1-4 RCAB processing nodes to use.
--d|--fuzziness   Specifies the fuzzy search distance.
--w|--width       Specifies the surrounding width.
--s|-q|--query    Specifies the search/query expression to use with *_search primitives.
--od|--data       Used to keep a data results file.
--oi|--index      Used to keep an index results file.
+-h|--help          Prints this short help message.
+-p|--mode=<mode>   Specifies the search mode to run, which can be one of:
+                     - exact_search (or es)
+                     - fuzzy_hamming_search (or fhs) (used by default)
+                     - fuzzy_edit_distance_search (or feds)
+                     - date_search (or ds)
+                     - time_search (or ts)
+                     - numeric_search (or ns) also used for currency
+                     - regex_search (or rs)
+-f|--file=<file>   Specifies an input filename.
+-i                 Specifies case-insensitive analysis for supported primitives.
+-n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use.
+-d|--fuzziness=<D> Specifies the fuzzy search distance.
+-w|--width=<W>     Specifies the surrounding width.
+-s|-q=<query>      Specifies the search/query expression to use.
+  |--query=<query>
+-od|--data=<file>  Used to keep a data results file.
+-oi|--index=<file> Used to keep an index results file.
 
 REST specific:
--a|--address     Specifies the ryft-server address.
-                   "http://localhost:8765" by default.
--u|--user|--auth Use user credentials, "username:password".
+-a|--address=<addr> Specifies the ryft-server address.
+                      "http://localhost:8765" by default.
+-u|--user=<cred> Use user credentials, "username:password".
+  |--auth
 --search         Use /search endpoint (used by default) to print all found items.
 --count          Use /count endpoint instead of /search to print just statistics.
+--limit=N        Specifies the limit on total number of records printed (used with /search).
 --local          Specifies the local search. Opposite to --cluster.
 --cluster        Specifies the cluster search. Opposite to --local. Used by default.
---format         Specifies format of the result records, can be:
+--format=<fmt>   Specifies format of the result records, can be:
                      - raw - base-64 encoded data, by default.
                      - xml - decode XML records
                      - json - decode JSON objects
                      - utf8 - for text search get utf-8 string
                               instead of base-64 encoded raw bytes
---fields         Specifies comma-separated list of fields to return.
+--fields=<list>  Specifies comma-separated list of fields to return.
                  This parameter is useful with XML and JSON formats.
 --no-stats       Disable statistics output.
 --stream         Use stream output format. Provides a sequence of JSON
@@ -48,7 +51,7 @@ REST specific:
                  (is used for node communication within cluster).
 
 -v|--verbose     Tells curl to be verbose.
--vv|--pretty     Get pretty (properly indented) formatting with jq.
+-vv|--pretty     Get pretty (properly indented) formatting with jq tool.
 
 Examples:
 
@@ -83,6 +86,7 @@ INDEX=
 ADDRESS=http://localhost:8765
 AUTH_USER=
 ENDPOINT=/search
+LIMIT=
 LOCAL=false
 FORMAT=
 FIELDS=
@@ -189,6 +193,14 @@ while [[ $# > 0 ]]; do
 		ENDPOINT="/count"
 		shift
 		;;
+	--limit=*)
+		LIMIT="${1#*=}"
+		shift
+		;;
+	--limit)
+		LIMIT="$2"
+		shift 2
+		;;
 	--local)
 		LOCAL="true"
 		shift
@@ -261,6 +273,7 @@ done
 [[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
 [[ ! -z "$MODE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "mode=$MODE")
+[[ ! -z "$LIMIT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "limit=$LIMIT")
 [[ ! -z "$DATA" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "data=$DATA")
 [[ ! -z "$INDEX" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "index=$INDEX")
 [[ ! -z "$FORMAT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "format=$FORMAT")
