@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 )
 
 // Parser represents a parser.
 type Parser struct {
-	scanner *Scanner
-	buf     struct {
+	scanner  *Scanner
+	baseOpts Options
+	buf      struct {
 		lex Lexeme // last read lexeme
 		n   int    // buffer size (max=1)
 	}
@@ -106,7 +109,7 @@ func (p *Parser) parseQuery2() Query {
 	}
 }
 
-// parse ()
+// parse () and simple queries
 func (p *Parser) parseQuery3() Query {
 	if lex := p.scanIgnoreSpace(); lex.token == LPAREN {
 		res := p.parseQuery0()
@@ -124,9 +127,17 @@ func (p *Parser) parseQuery3() Query {
 // parse simple query (relational expression)
 func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	res := new(SimpleQuery)
+	// res.Mode = "" // mode is global
 
 	// input specifier (RAW_TEXT or RECORD)
 	switch lex := p.scanIgnoreSpace(); {
+	case lex.token == STRING:
+		// plain simple query
+		res.Input = "RAW_TEXT"
+		res.Operator = "CONTAINS"
+		res.Expression = p.parseStringExpr(lex)
+		return res
+
 	case lex.IsRawText():
 		res.Input = lex.literal
 
@@ -174,15 +185,40 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 
 	// search expression
 	switch lex := p.scanIgnoreSpace(); {
+	case lex.IsFHS(): // +options
+		res.Expression, res.Options = p.parseSearchExpr(p.baseOpts)
+		if res.Options.Dist == 0 {
+			res.Options.Mode = "es"
+		} else {
+			res.Options.Mode = "fhs"
+		}
 
-	// expression in parentheses
-	case lex.IsFHS(), lex.IsFEDS(),
-		lex.IsDate(), lex.IsTime(),
-		lex.IsNumber(), lex.IsCurrency(),
-		lex.isRegex():
+	case lex.IsFEDS(): // +options
+		res.Expression, res.Options = p.parseSearchExpr(p.baseOpts)
+		if res.Options.Dist == 0 {
+			res.Options.Mode = "es"
+		} else {
+			res.Options.Mode = "feds"
+		}
+
+	case lex.IsDate(): // "as is"
 		res.Expression = p.parseParenExpr(lex)
+		res.Options.Mode = "ds"
 
-	// consume all conitous strings and wildcards
+	case lex.IsTime(): // "as is"
+		res.Expression = p.parseParenExpr(lex)
+		res.Options.Mode = "ts"
+
+	case lex.IsNumber(), // "as is"
+		lex.IsCurrency():
+		res.Expression = p.parseParenExpr(lex)
+		res.Options.Mode = "ns"
+
+	case lex.isRegex(): // "as is"
+		res.Expression = p.parseParenExpr(lex)
+		res.Options.Mode = "rs"
+
+	// consume all continous strings and wildcards
 	case lex.token == STRING,
 		lex.token == WCARD:
 		res.Expression = p.parseStringExpr(lex)
@@ -224,12 +260,129 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 	return buf.String()
 }
 
+// parse FHS or FEDS expression in parentheses and options
+func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
+	var res string
+
+	// left paren first
+	switch beg := p.scanIgnoreSpace(); beg.token {
+	case LPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of (", beg))
+	}
+
+	// read expression first
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case STRING, WCARD:
+		res = p.parseStringExpr(lex)
+
+	default:
+		panic(fmt.Errorf("no expression found"))
+	}
+
+	// read options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		opts = p.parseOptions(opts)
+	default:
+		p.unscan()
+	}
+
+	// right paren last
+	switch end := p.scanIgnoreSpace(); end.token {
+	case RPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of )", end))
+	}
+
+	return res, opts
+}
+
+// parse options
+func (p *Parser) parseOptions(opts Options) Options {
+	// read all options
+	for {
+		if lex := p.scanIgnoreSpace(); lex.token == IDENT {
+			switch {
+
+			// fuzziness distance
+			case strings.EqualFold(lex.literal, "DIST"),
+				strings.EqualFold(lex.literal, "D"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					if val := p.scanIgnoreSpace(); val.token == INT {
+						d, err := strconv.ParseInt(val.literal, 10, 32)
+						if err != nil {
+							panic(fmt.Errorf("failed to parse integer from %q: %s", val, err))
+						}
+						if d < 0 || 64*1024 < d {
+							panic(fmt.Errorf("distance %d is out of range", d))
+						}
+						opts.Dist = uint(d) // OK
+					} else {
+						panic(fmt.Errorf("%q found instead of integer value", val))
+					}
+				} else {
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
+			// surrounding width
+			case strings.EqualFold(lex.literal, "WIDTH"),
+				strings.EqualFold(lex.literal, "W"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					if val := p.scanIgnoreSpace(); val.token == INT {
+						w, err := strconv.ParseInt(val.literal, 10, 32)
+						if err != nil {
+							panic(fmt.Errorf("failed to parse integer from %q: %s", val, err))
+						}
+						if w < 0 || 64*1024 < w {
+							panic(fmt.Errorf("width %d is out of range", w))
+						}
+						opts.Width = uint(w) // OK
+					} else {
+						panic(fmt.Errorf("%q found instead of integer value", val))
+					}
+				} else {
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
+			// case sensitivity flag
+			case strings.EqualFold(lex.literal, "CS"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					if val := p.scanIgnoreSpace(); val.token == INT || val.token == IDENT {
+						cs, err := strconv.ParseBool(val.literal)
+						if err != nil {
+							panic(fmt.Errorf("failed to parse boolean from %q: %s", val, err))
+						}
+						opts.Cs = cs // OK
+					} else {
+						panic(fmt.Errorf("%q found instead of boolean value", val))
+					}
+				} else {
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
+			default:
+				panic(fmt.Errorf("unknown argument %q found", lex))
+			}
+		} else if lex.token == COMMA {
+			continue
+		} else { // done
+			p.unscan()
+			break
+		}
+	}
+
+	return opts
+}
+
 // parse string expression
 func (p *Parser) parseStringExpr(start Lexeme) string {
 	var buf bytes.Buffer
 	buf.WriteString(start.literal)
 
-	// consule all STRINGs and WCARDs
+	// consume all STRINGs and WCARDs
 	for {
 		if lex := p.scanIgnoreSpace(); lex.token == STRING || lex.token == WCARD {
 			buf.WriteString(lex.literal)

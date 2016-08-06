@@ -3,18 +3,61 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
+
+// Options contains search options
+type Options struct {
+	Mode  string // Search mode: fhs, feds, date, time, etc.
+	Dist  uint   // Fuzziness distance
+	Width uint   // Surrounding width
+	Cs    bool   // Case sensitivity flag
+}
+
+// options as string
+func (o Options) String() string {
+	var args []string
+
+	// search mode
+	if o.Mode != "" {
+		args = append(args, fmt.Sprintf("mode=%s", o.Mode))
+	}
+
+	// fuzziness distance
+	if o.Dist != 0 {
+		args = append(args, fmt.Sprintf("dist=%d", o.Dist))
+	}
+
+	// surrounding width
+	if o.Width != 0 {
+		args = append(args, fmt.Sprintf("width=%d", o.Width))
+	}
+
+	// case sensitivity
+	if o.Cs {
+		args = append(args, fmt.Sprintf("cs=%t", o.Cs))
+	}
+
+	if len(args) != 0 {
+		return fmt.Sprintf("[%s]", strings.Join(args, ","))
+	}
+
+	return "" // no options
+}
 
 // simple query (relational expression)
 type SimpleQuery struct {
-	Input      string // RAW_TEXT or RECORD
-	Operator   string // CONTAINS, EQUALS, ...
-	Expression string // search expression
+	Input      string  // RAW_TEXT or RECORD
+	Operator   string  // CONTAINS, EQUALS, ...
+	Expression string  // search expression
+	Options    Options // search options
 }
 
 // simple query as string
 func (s SimpleQuery) String() string {
-	return fmt.Sprintf("(%s %s %s)", s.Input, s.Operator, s.Expression)
+	return fmt.Sprintf("(%s %s %s)%s",
+		s.Input, s.Operator,
+		s.Expression, s.Options)
 }
 
 // complex query
