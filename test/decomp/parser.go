@@ -69,43 +69,58 @@ func (p *Parser) ParseQuery() (res Query, err error) {
 
 // parse OR
 func (p *Parser) parseQuery0() Query {
-	a := p.parseQuery1()
-	if lex := p.scanIgnoreSpace(); lex.IsOr() {
-		b := p.parseQuery1()
-		res := Query{Operator: lex.literal}
-		res.Arguments = append(res.Arguments, a, b)
-		return res
-	} else {
-		p.unscan()
-		return a
+	res := p.parseQuery1() // first argument
+	for {
+		if lex := p.scanIgnoreSpace(); lex.IsOr() {
+			arg := p.parseQuery1() // second arguments...
+			if !strings.EqualFold(res.Operator, lex.literal) {
+				tmp := Query{Operator: lex.literal}
+				tmp.Arguments = append(tmp.Arguments, res)
+				res = tmp
+			}
+			res.Arguments = append(res.Arguments, arg)
+		} else {
+			p.unscan()
+			return res
+		}
 	}
 }
 
 // parse XOR
 func (p *Parser) parseQuery1() Query {
-	a := p.parseQuery2()
-	if lex := p.scanIgnoreSpace(); lex.IsXor() {
-		b := p.parseQuery2()
-		res := Query{Operator: lex.literal}
-		res.Arguments = append(res.Arguments, a, b)
-		return res
-	} else {
-		p.unscan()
-		return a
+	res := p.parseQuery2() // first argument
+	for {
+		if lex := p.scanIgnoreSpace(); lex.IsXor() {
+			arg := p.parseQuery2() // second arguments
+			if !strings.EqualFold(res.Operator, lex.literal) {
+				tmp := Query{Operator: lex.literal}
+				tmp.Arguments = append(tmp.Arguments, res)
+				res = tmp
+			}
+			res.Arguments = append(res.Arguments, arg)
+		} else {
+			p.unscan()
+			return res
+		}
 	}
 }
 
 // parse AND
 func (p *Parser) parseQuery2() Query {
-	a := p.parseQuery3()
-	if lex := p.scanIgnoreSpace(); lex.IsAnd() {
-		b := p.parseQuery3()
-		res := Query{Operator: lex.literal}
-		res.Arguments = append(res.Arguments, a, b)
-		return res
-	} else {
-		p.unscan()
-		return a
+	res := p.parseQuery3() // first argument
+	for {
+		if lex := p.scanIgnoreSpace(); lex.IsAnd() {
+			arg := p.parseQuery3() // second arguments
+			if !strings.EqualFold(res.Operator, lex.literal) {
+				tmp := Query{Operator: lex.literal}
+				tmp.Arguments = append(tmp.Arguments, res)
+				res = tmp
+			}
+			res.Arguments = append(res.Arguments, arg)
+		} else {
+			p.unscan()
+			return res
+		}
 	}
 }
 

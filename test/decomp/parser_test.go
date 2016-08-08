@@ -13,7 +13,7 @@ func testNewParser(data string) *Parser {
 }
 
 // test for invalid queries
-func TestInvalidQueries(t *testing.T) {
+func TestParserInvalidQueries(t *testing.T) {
 	queries := []string{
 		"", " ", "   ",
 		"(", ")", "((", "))", ")(",
@@ -79,41 +79,43 @@ func TestParserSimple(t *testing.T) {
 }
 
 // test for valid queries
-func TestValidQueries2(t *testing.T) {
+func TestParserValidQueries(t *testing.T) {
 	queries := []string{
 		`(RAW_TEXT CONTAINS "Some text0")`,
-		//		`(RAW_TEXT CONTAINS aabbccddeeff)`,
-		//		`((RAW_TEXT CONTAINS "Some text0"))`,
-		//		`(RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2")`,
-		//		`((RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2"))`,
-		//		`(( record.city EQUALS "Rockville" ) AND ( record.state EQUALS "MD" ))`,
-		//		`(( ( record.city EQUALS "Rockville" ) OR ( record.city EQUALS "Gaithersburg" ) ) AND ( record.state EQUALS "MD" ))`,
-		//		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
-		//		`(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))`,
-		//		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
-		//		`(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
-		//		`((RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))  AND (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00)))`,
-		//		`(RECORD.Name.Actors.[].Name CONTAINS "Christian")`,
-		//		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS = 11:59:00)))`,
-		//		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS = 11:59:00)))`,
-		//		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS <= 11:59:00)))`,
-		//		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00)))`,
-		//		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00)))`,
-		//		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
-		//		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
-		//		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
-		//		`(RAW_TEXT CONTAINS "?")`,
-		//		`(RAW_TEXT CONTAINS ?)`,
-		//		`(RAW_TEXT CONTAINS "he"??"o")`,
-		//		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		//		`(RECORD.body CONTAINS FHS("test", true, 10, 100))`,
-		//		`(RECORD.body CONTAINS FEDS("test", false, 10, 100))`,
-		//		`(RECORD.body CONTAINS FEDS("test",false,10,100))`,
-		//		`(RECORD.body CONTAINS FEDS('test',false,10,100))`,
-		//		`(RECORD.body CONTAINS FEDS('test',false,10,100)) AND (RECORD.body CONTAINS FHS("test", true, 10, 100))`,
-		//		`(RECORD.body CONTAINS "FEDS")`,
-		//		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
-		//		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
+		`((RAW_TEXT CONTAINS "Some text0"))`,
+		`(RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2")`,
+		`((RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2"))`,
+		`(RAW_TEXT CONTAINS "0") OR (RAW_TEXT CONTAINS "1") OR (RAW_TEXT CONTAINS "2")`,
+		`(RAW_TEXT CONTAINS "0") XOR (RAW_TEXT CONTAINS "1") XOR (RAW_TEXT CONTAINS "2")`,
+		`(RAW_TEXT CONTAINS "0") AND (RAW_TEXT CONTAINS "1") AnD (RAW_TEXT CONTAINS "2")`,
+		`(( record.city EQUALS "Rockville" ) AND ( record.state EQUALS "MD" ))`,
+		`(( ( record.city EQUALS "Rockville" ) OR ( record.city EQUALS "Gaithersburg" ) ) AND ( record.state EQUALS "MD" ))`,
+		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
+		`(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))`,
+		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
+		`(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
+		`((RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))  AND (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00)))`,
+		`(RECORD.Name.Actors.[].Name CONTAINS "Christian")`,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS = 11:59:00)))`,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS = 11:59:00)))`,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS <= 11:59:00)))`,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00)))`,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00)))`,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
+		`(RAW_TEXT CONTAINS "?")`,
+		`(RAW_TEXT CONTAINS ?)`,
+		`(RAW_TEXT CONTAINS "he"??"o")`,
+		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
+		`(RECORD.body CONTAINS FHS("test", cs=true, dist=10, width=100))`,
+		`(RECORD.body CONTAINS FEDS("test", CS=false, Width = 10, DIST = 	 100))`,
+		`(RECORD.body CONTAINS FEDS("test",CS=false))`,
+		`(RECORD.body CONTAINS FEDS("test",dIst=10))`,
+		`(RECORD.body CONTAINS FEDS("test",widtH=100)) AND (RECORD.body CONTAINS FHS("test", CS=true))`,
+		`(RECORD.body CONTAINS "FEDS")`,
+		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
+		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
 	}
 
 	for _, q := range queries {
