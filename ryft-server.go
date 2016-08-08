@@ -110,6 +110,8 @@ type Server struct {
 	// worker thread is started if "local mode" is disabled
 	activeSearchCount int32
 	busynessChanged   chan int32
+
+	BooleansPerExpression map[string]int `yaml:"booleans-per-expression"`
 }
 
 // config file name kingpin.Value

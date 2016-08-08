@@ -49,6 +49,8 @@ type Config struct {
 	// if not empty keep the index and/or data file
 	KeepDataAs  string
 	KeepIndexAs string
+
+	BooleansPerExpression map[string]int
 }
 
 // NewEmptyConfig creates new empty search configuration.

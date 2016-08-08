@@ -35,15 +35,15 @@ import (
 	"strings"
 )
 
-func normalizeTree(node *Node) {
-	sameLevelNormalization(node)
+func normalizeTree(node *Node, booleansLimit map[string]int) {
+	sameLevelNormalization(node, booleansLimit)
 	if node.hasSubnodes() {
-		differentLevelNormalization(node)
+		differentLevelNormalization(node, booleansLimit)
 	}
 }
 
-func sameLevelNormalization(node *Node) {
-	if node.isNormalizable() {
+func sameLevelNormalization(node *Node, booleansLimit map[string]int) {
+	if node.isNormalizable(booleansLimit) {
 		subnodesType := node.SubNodes[0].Type
 		node.Expression = node.SubNodes[0].Expression + " " + node.Expression + " " + node.SubNodes[1].Expression
 		node.Type = subnodesType
@@ -51,23 +51,23 @@ func sameLevelNormalization(node *Node) {
 
 		// Parent node changed, try to normalize it too
 		if (node.Parent != nil) && node.Parent.hasSubnodes() {
-			normalizeTree(node.Parent)
+			normalizeTree(node.Parent, booleansLimit)
 		}
 	} else {
 		for _, subNode := range node.SubNodes {
-			normalizeTree(subNode)
+			normalizeTree(subNode, booleansLimit)
 		}
 	}
 }
 
-func differentLevelNormalization(node *Node) {
+func differentLevelNormalization(node *Node, booleansLimit map[string]int) {
 	leftSubnode := node.SubNodes[0]
 	rightSubnode := node.SubNodes[1]
 
 	searchAndOperatorSubnodes := (leftSubnode.isSearch() && rightSubnode.isOperator()) || (leftSubnode.isOperator() && rightSubnode.isSearch())
 	sameTypeOperators := (node.Type == leftSubnode.Type) || (node.Type == rightSubnode.Type)
 	sameTypeQueries := queriesWithSameType(leftSubnode, rightSubnode) || queriesWithSameType(rightSubnode, leftSubnode)
-	subnodeIsNormalizable := sameTypeOperators && sameTypeQueries
+	subnodeIsNormalizable := sameTypeOperators && sameTypeQueries && node.boolLimitIsNotReached(booleansLimit)
 
 	if node.hasSubnodes() && searchAndOperatorSubnodes && subnodeIsNormalizable {
 		if leftSubnode.isSearch() {

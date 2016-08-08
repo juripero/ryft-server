@@ -8,6 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func decomposerOptions() Options {
+	return Options{BooleansPerExpression: map[string]int{
+		"es":   5,
+		"fhs":  5,
+		"feds": 5,
+		"ns":   0,
+		"ds":   5,
+		"ts":   5,
+		"rs":   0,
+		"cs":   0,
+	}}
+}
+
 // gets query type string representation.
 func dumpType(q QueryType, opts Options) string {
 	switch q {
@@ -56,7 +69,7 @@ func dumpTree(root *Node, deep int) string {
 
 // decompose the query and check it
 func testQueryTree(t *testing.T, query string, expected string) {
-	tree, err := Decompose(query, Options{})
+	tree, err := Decompose(query, decomposerOptions())
 	assert.NoError(t, err, "Bad query")
 	if assert.NotNil(t, tree, "No tree") {
 		assert.Equal(t, expected, dumpTree(tree, 0))
@@ -70,30 +83,30 @@ func _testQueryTree(t *testing.T, query string, expected string) {
 
 func TestQueries(t *testing.T) {
 	testQueryTree(t, `(RAW_TEXT CONTAINS "100")`,
-		`[    ]: (RAW_TEXT CONTAINS "100")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "100")`)
 	testQueryTree(t, `((RAW_TEXT CONTAINS "100"))`,
-		`[    ]: (RAW_TEXT CONTAINS "100")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "100")`)
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS "DATE()")`,
-		`[    ]: (RAW_TEXT CONTAINS "DATE()")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "DATE()")`)
 	testQueryTree(t, `(RAW_TEXT CONTAINS "TIME()")`,
-		`[    ]: (RAW_TEXT CONTAINS "TIME()")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "TIME()")`)
 	testQueryTree(t, `(RAW_TEXT CONTAINS "NUMBER()")`,
-		`[    ]: (RAW_TEXT CONTAINS "NUMBER()")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "NUMBER()")`)
 	testQueryTree(t, `(RAW_TEXT CONTAINS "CURRENCY()")`,
-		`[    ]: (RAW_TEXT CONTAINS "CURRENCY()")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "CURRENCY()")`)
 	testQueryTree(t, `(RAW_TEXT CONTAINS "REGEX()")`,
-		`[    ]: (RAW_TEXT CONTAINS "REGEX()")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "REGEX()")`)
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`,
-		`[    ]: (RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
 	testQueryTree(t, `((RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200"))`,
-		`[    ]: (RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`,
-		`[    ]: (RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
 	testQueryTree(t, `((RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200"))`,
-		`[    ]: (RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
 
 	testQueryTree(t, `(RECORD.date CONTAINS DATE("00/00/0000")) OR (RECORD.date CONTAINS DATE("11/11/1111"))`,
 		`[DATE]: (RECORD.date CONTAINS DATE("00/00/0000")) OR (RECORD.date CONTAINS DATE("11/11/1111"))`)
@@ -107,27 +120,27 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE("00/00/0000"))`,
 		`[ AND]:
-  [    ]: (RECORD.id CONTAINS "1003")
+  [es-0/0-false]: (RECORD.id CONTAINS "1003")
   [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))`)
 
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")   AND   (RECORD.date CONTAINS DATE("00/00/0000"))`,
 		`[ AND]:
-  [    ]: (RECORD.id CONTAINS "1003")
+  [es-0/0-false]: (RECORD.id CONTAINS "1003")
   [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))`)
 
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")OR(RECORD.date CONTAINS TIME("00:00:00"))`,
 		`[  OR]:
-  [    ]: (RECORD.id CONTAINS "1003")
+  [es-0/0-false]: (RECORD.id CONTAINS "1003")
   [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
 
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")    OR   (RECORD.date CONTAINS TIME("00:00:00"))`,
 		`[  OR]:
-  [    ]: (RECORD.id CONTAINS "1003")
+  [es-0/0-false]: (RECORD.id CONTAINS "1003")
   [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
 
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND (RECORD.date CONTAINS DATE("00/00/0000")) AND(RECORD.date CONTAINS TIME("00:00:00"))`,
 		`[ AND]:
-  [    ]: (RECORD.id CONTAINS "1003")
+  [es-0/0-false]: (RECORD.id CONTAINS "1003")
   [ AND]:
     [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))
     [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
@@ -135,21 +148,21 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND (RECORD.date CONTAINS DATE("00/00/0000"))   OR   (RECORD.date CONTAINS TIME("00:00:00"))`,
 		`[  OR]:
   [ AND]:
-    [    ]: (RECORD.id CONTAINS "1003")
+    [es-0/0-false]: (RECORD.id CONTAINS "1003")
     [DATE]: (RECORD.date CONTAINS DATE("00/00/0000"))
   [TIME]: (RECORD.date CONTAINS TIME("00:00:00"))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE("100301")))`,
 		`[ AND]:
-  [    ]: (RECORD.id CONTAINS "1003")
+  [es-0/0-false]: (RECORD.id CONTAINS "1003")
   [DATE]: (RECORD.date CONTAINS DATE("100301"))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE("100301")) OR (RECORD.id CONTAINS "2003"))`,
 		`[  OR]:
   [ AND]:
-    [    ]: (RECORD.id CONTAINS "1003")
+    [es-0/0-false]: (RECORD.id CONTAINS "1003")
     [DATE]: (RECORD.date CONTAINS DATE("100301"))
-  [    ]: (RECORD.id CONTAINS "2003")`)
+  [es-0/0-false]: (RECORD.id CONTAINS "2003")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301")))`,
 		`[DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))`)
@@ -166,20 +179,20 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `((RECORD.id CONTAINS "1003")   AND   (RECORD.id CONTAINS DATE("100301"))  AND   (RECORD.id CONTAINS DATE("200301")))`,
 		`[ AND]:
-  [    ]: (RECORD.id CONTAINS "1003")
+  [es-0/0-false]: (RECORD.id CONTAINS "1003")
   [DATE]: (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301"))`)
 
 	testQueryTree(t, `(((RECORD.id CONTAINS "1003")   AND   (RECORD.id CONTAINS DATE("100301")))  AND   (RECORD.id CONTAINS DATE("200301")))`,
 		`[ AND]:
   [ AND]:
-    [    ]: (RECORD.id CONTAINS "1003")
+    [es-0/0-false]: (RECORD.id CONTAINS "1003")
     [DATE]: (RECORD.id CONTAINS DATE("100301"))
   [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301"))  OR   (RECORD.id CONTAINS "200301"))`,
 		`[  OR]:
   [DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))
-  [    ]: (RECORD.id CONTAINS "200301")`)
+  [es-0/0-false]: (RECORD.id CONTAINS "200301")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301")) AND (RECORD.id CONTAINS DATE("200301")) AND (RECORD.id CONTAINS DATE("20030102")))`,
 		`[ AND]:
@@ -188,11 +201,13 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS NUMBER(NUM < 7))`,
 		`[ AND]:
-  [    ]: (RECORD.id CONTAINS "1003")
+  [es-0/0-false]: (RECORD.id CONTAINS "1003")
   [ NUM]: (RECORD.date CONTAINS NUMBER(NUM < 7))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS NUMBER(NUM < 7))   AND   (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
-		`[ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8))`)
+		`[ AND]:
+  [ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 7))
+  [ NUM]: (RECORD.id CONTAINS NUMBER(NUM < 8))`)
 
 	testQueryTree(t, `(RECORD.id CONTAINS FHS("test",CS=true,DIST=1,WIDTH=2))`,
 		`[fhs-1/2-true]: (RECORD.id CONTAINS "test")`)
@@ -227,10 +242,10 @@ func TestQueries(t *testing.T) {
 		`[CURR]: (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test", CS=true, DIST=0, WIDTH=0))   AND   (RECORD.id CONTAINS FHS("123", CS=true, DIST=0, WIDTH=0)))`,
-		`[    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
+		`[es-0/0-false]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FHS("123")))`,
-		`[    ]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
+		`[es-0/0-false]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   ((RECORD.id CONTAINS FEDS("123")) AND (RECORD.id CONTAINS DATE("200301"))))`,
 		`[ AND]:
@@ -248,11 +263,30 @@ func TestQueries(t *testing.T) {
 	testQueryTree(t, `(RECORD.total CONTAINS NUMBER( NUM >= "200", ",", ".")) AND ((RECORD.plat CONTAINS NUMBER( "40.74865639878676" < NUM < "40.75143187852503", ",", "." )) AND (RECORD.plon CONTAINS NUMBER( "-73.99046244906013" < NUM < "-73.98519014882514", ",", "." )))`,
 		`[ AND]:
   [ NUM]: (RECORD.total CONTAINS NUMBER( NUM >= "200", ",", "."))
-  [ NUM]: (RECORD.plat CONTAINS NUMBER( "40.74865639878676" < NUM < "40.75143187852503", ",", "." )) AND (RECORD.plon CONTAINS NUMBER( "-73.99046244906013" < NUM < "-73.98519014882514", ",", "." ))`)
+  [ AND]:
+    [ NUM]: (RECORD.plat CONTAINS NUMBER( "40.74865639878676" < NUM < "40.75143187852503", ",", "." ))
+    [ NUM]: (RECORD.plon CONTAINS NUMBER( "-73.99046244906013" < NUM < "-73.98519014882514", ",", "." ))`)
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS DATE("200301")) AND ((RAW_TEXT CONTAINS DATE("78676")) AND (RAW_TEXT CONTAINS DATE("213")))`,
 		`[ AND]:
   [DATE]: (RAW_TEXT CONTAINS DATE("200301"))
   [DATE]: (RAW_TEXT CONTAINS DATE("78676")) AND (RAW_TEXT CONTAINS DATE("213"))`)
 
+	testQueryTree(t, `(RAW_TEXT CONTAINS NUMBER(1)) AND (RAW_TEXT CONTAINS NUMBER(2))`,
+		`[ AND]:
+  [ NUM]: (RAW_TEXT CONTAINS NUMBER(1))
+  [ NUM]: (RAW_TEXT CONTAINS NUMBER(2))`)
+
+	testQueryTree(t, `(RAW_TEXT CONTAINS CURRENCY(1)) AND (RAW_TEXT CONTAINS CURRENCY(2))`,
+		`[ AND]:
+  [CURR]: (RAW_TEXT CONTAINS CURRENCY(1))
+  [CURR]: (RAW_TEXT CONTAINS CURRENCY(2))`)
+
+	testQueryTree(t, `(RAW_TEXT CONTAINS REGEX(1)) AND (RAW_TEXT CONTAINS REGEX(2))`,
+		`[ AND]:
+  [  RE]: (RAW_TEXT CONTAINS REGEX(1))
+  [  RE]: (RAW_TEXT CONTAINS REGEX(2))`)
+
+	testQueryTree(t, `(RAW_TEXT CONTAINS FHS("1")) AND (RAW_TEXT CONTAINS FHS("2"))`,
+		`[es-0/0-false]: (RAW_TEXT CONTAINS "1") AND (RAW_TEXT CONTAINS "2")`)
 }

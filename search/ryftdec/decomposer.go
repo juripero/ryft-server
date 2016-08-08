@@ -45,10 +45,11 @@ var (
 
 // Options contains search options
 type Options struct {
-	Mode  string // Search mode: fhs, feds, date, time, etc.
-	Width uint   // Surrounding width
-	Dist  uint   // Fuzziness distance
-	Cs    bool   // Case sensitivity flag
+	Mode                  string         // Search mode: fhs, feds, date, time, etc.
+	Width                 uint           // Surrounding width
+	Dist                  uint           // Fuzziness distance
+	Cs                    bool           // Case sensitivity flag
+	BooleansPerExpression map[string]int // Number of permitted booleans per expression type
 }
 
 // convert search config to Options
@@ -58,6 +59,7 @@ func configToOpts(config *search.Config) Options {
 		Dist:  config.Fuzziness,
 		Width: config.Surrounding,
 		Cs:    config.CaseSensitive,
+		BooleansPerExpression: config.BooleansPerExpression,
 	}
 }
 
@@ -83,7 +85,7 @@ func Decompose(originalQuery string, baseOpts Options) (node *Node, err error) {
 	}
 
 	node = rootNode.SubNodes[0]
-	normalizeTree(node)
+	normalizeTree(node, baseOpts.BooleansPerExpression)
 
 	return
 }

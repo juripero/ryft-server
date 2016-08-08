@@ -79,6 +79,11 @@ func parseExpression(expression string, baseOpts Options) (cleanedExpression str
 		cleanedExpression = fmt.Sprintf("%s %s", op, expr)
 	}
 
+	// TODO: hack, to be removed, see 228 line
+	if opts.Mode == "" {
+		opts.Mode = expressionMode(expression)
+	}
+
 	return
 }
 
@@ -141,19 +146,20 @@ func NewNode(expression string, parent *Node, baseOpts Options) *Node {
 	return node
 }
 
-func (node *Node) isNormalizable() bool {
+func (node *Node) isNormalizable(booleansLimit map[string]int) bool {
 	return node.hasSubnodes() &&
 		node.sameTypeSubnodes() &&
 		node.subnodesAreQueries() &&
-		node.boolLimitIsNotReached()
+		node.boolLimitIsNotReached(booleansLimit)
 }
 
-func (node *Node) boolLimitIsNotReached() bool {
+func (node *Node) boolLimitIsNotReached(booleansLimit map[string]int) bool {
+	limit := booleansLimit[node.SubNodes[0].Options.Mode]
 	boolCount := 0
 	for _, subNode := range node.SubNodes {
 		boolCount += countBoolOperators(subNode)
 	}
-	return boolCount == 0
+	return (boolCount + 1) <= limit
 }
 
 func (node *Node) sameTypeSubnodes() bool {
@@ -213,6 +219,25 @@ func expressionType(expression string) QueryType {
 		return QTYPE_REGEX
 	default:
 		return QTYPE_SEARCH
+	}
+}
+
+// TODO: hack, remove this method and duplication between Node.Type and Options.Mode
+func expressionMode(expression string) string {
+	expression = removeQuotedText(strings.Trim(expression, " "))
+	switch {
+	case strings.Contains(expression, "DATE("):
+		return "ds"
+	case strings.Contains(expression, "TIME("):
+		return "ts"
+	case strings.Contains(expression, "NUMBER("):
+		return "ns"
+	case strings.Contains(expression, "CURRENCY("):
+		return "cs"
+	case strings.Contains(expression, "REGEX("):
+		return "rs"
+	default:
+		return "es"
 	}
 }
 
