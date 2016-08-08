@@ -127,10 +127,13 @@ func (p *Parser) parseQuery2() Query {
 // parse () and simple queries
 func (p *Parser) parseQuery3() Query {
 	if lex := p.scanIgnoreSpace(); lex.token == LPAREN {
-		res := p.parseQuery0()
+		arg := p.parseQuery0()
 		if end := p.scanIgnoreSpace(); end.token != RPAREN {
 			panic(fmt.Errorf("%q found instead of closing )", end))
 		}
+
+		res := Query{Operator: "P"}
+		res.Arguments = append(res.Arguments, arg)
 		return res
 	} else {
 		p.unscan()
