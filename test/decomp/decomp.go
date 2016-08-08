@@ -45,17 +45,17 @@ func (o Options) String() string {
 
 	// search mode
 	if o.Mode != "" {
-		args = append(args, fmt.Sprintf("mode=%s", o.Mode))
+		args = append(args, fmt.Sprintf("%s", o.Mode))
 	}
 
 	// fuzziness distance
 	if o.Dist != 0 {
-		args = append(args, fmt.Sprintf("dist=%d", o.Dist))
+		args = append(args, fmt.Sprintf("d=%d", o.Dist))
 	}
 
 	// surrounding width
 	if o.Width != 0 {
-		args = append(args, fmt.Sprintf("width=%d", o.Width))
+		args = append(args, fmt.Sprintf("w=%d", o.Width))
 	}
 
 	// case sensitivity
