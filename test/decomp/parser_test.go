@@ -66,6 +66,13 @@ func TestParserSimple(t *testing.T) {
 		{`(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`, `(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[mode=ts]`},
 		{`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`, `(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[mode=ns]`},
 		{`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`, `(RECORD.body CONTAINS REGEX("\w+",CASELESS))[mode=rs]`},
+		{`(RAW_TEXT CONTAINS "100")`, `(RAW_TEXT CONTAINS "100")`},
+		{`((RAW_TEXT CONTAINS "100"))`, `(RAW_TEXT CONTAINS "100")`},
+		{`(RAW_TEXT CONTAINS "DATE()")`, `(RAW_TEXT CONTAINS "DATE()")`},
+		{`(RAW_TEXT CONTAINS "TIME()")`, `(RAW_TEXT CONTAINS "TIME()")`},
+		{`(RAW_TEXT CONTAINS "NUMBER()")`, `(RAW_TEXT CONTAINS "NUMBER()")`},
+		{`(RAW_TEXT CONTAINS "CURRENCY()")`, `(RAW_TEXT CONTAINS "CURRENCY()")`},
+		{`(RAW_TEXT CONTAINS "REGEX()")`, `(RAW_TEXT CONTAINS "REGEX()")`},
 	}
 
 	for _, d := range data {

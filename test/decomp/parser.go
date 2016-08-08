@@ -143,18 +143,19 @@ func (p *Parser) parseQuery3() Query {
 func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	res := new(SimpleQuery)
 	// res.Mode = "" // mode is global
+	var input string
+	var operator string
+	var expression string
 
 	// input specifier (RAW_TEXT or RECORD)
 	switch lex := p.scanIgnoreSpace(); {
 	case lex.token == STRING:
-		// plain simple query
-		res.Input = "RAW_TEXT"
-		res.Operator = "CONTAINS"
-		res.Expression = p.parseStringExpr(lex)
-		return res
+		input = "RAW_TEXT"
+		operator = "CONTAINS"
+		expression = p.parseStringExpr(lex) // plain simple query
 
 	case lex.IsRawText():
-		res.Input = lex.literal
+		input = lex.literal
 
 	case lex.IsRecord():
 		var buf bytes.Buffer
@@ -182,66 +183,71 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 				break
 			}
 		}
-		res.Input = buf.String()
+		input = buf.String()
 
 	default:
 		panic(fmt.Errorf("found %q, expected RAW_TEXT or RECORD", lex))
 	}
 
 	// operator (CONTAINS, EQUALS, ...)
-	switch lex := p.scanIgnoreSpace(); {
-	case lex.IsContains(), lex.IsNotContains(),
-		lex.IsEquals(), lex.IsNotEquals():
-		res.Operator = lex.literal
+	if len(operator) == 0 {
+		switch lex := p.scanIgnoreSpace(); {
+		case lex.IsContains(), lex.IsNotContains(),
+			lex.IsEquals(), lex.IsNotEquals():
+			operator = lex.literal
 
-	default:
-		panic(fmt.Errorf("found %q, expected CONTAINS or EQUALS", lex))
+		default:
+			panic(fmt.Errorf("found %q, expected CONTAINS or EQUALS", lex))
+		}
 	}
 
 	// search expression
-	switch lex := p.scanIgnoreSpace(); {
-	case lex.IsFHS(): // +options
-		res.Expression, res.Options = p.parseSearchExpr(p.baseOpts)
-		if res.Options.Dist == 0 {
-			res.Options.Mode = "es"
-		} else {
-			res.Options.Mode = "fhs"
+	if len(expression) == 0 {
+		switch lex := p.scanIgnoreSpace(); {
+		case lex.IsFHS(): // +options
+			expression, res.Options = p.parseSearchExpr(p.baseOpts)
+			if res.Options.Dist == 0 {
+				res.Options.Mode = "es"
+			} else {
+				res.Options.Mode = "fhs"
+			}
+
+		case lex.IsFEDS(): // +options
+			expression, res.Options = p.parseSearchExpr(p.baseOpts)
+			if res.Options.Dist == 0 {
+				res.Options.Mode = "es"
+			} else {
+				res.Options.Mode = "feds"
+			}
+
+		case lex.IsDate(): // "as is"
+			expression = p.parseParenExpr(lex)
+			res.Options.Mode = "ds"
+
+		case lex.IsTime(): // "as is"
+			expression = p.parseParenExpr(lex)
+			res.Options.Mode = "ts"
+
+		case lex.IsNumber(), // "as is"
+			lex.IsCurrency():
+			expression = p.parseParenExpr(lex)
+			res.Options.Mode = "ns"
+
+		case lex.isRegex(): // "as is"
+			expression = p.parseParenExpr(lex)
+			res.Options.Mode = "rs"
+
+		// consume all continous strings and wildcards
+		case lex.token == STRING,
+			lex.token == WCARD:
+			expression = p.parseStringExpr(lex)
+
+		default:
+			panic(fmt.Errorf("%q is unexpected expression", lex))
 		}
-
-	case lex.IsFEDS(): // +options
-		res.Expression, res.Options = p.parseSearchExpr(p.baseOpts)
-		if res.Options.Dist == 0 {
-			res.Options.Mode = "es"
-		} else {
-			res.Options.Mode = "feds"
-		}
-
-	case lex.IsDate(): // "as is"
-		res.Expression = p.parseParenExpr(lex)
-		res.Options.Mode = "ds"
-
-	case lex.IsTime(): // "as is"
-		res.Expression = p.parseParenExpr(lex)
-		res.Options.Mode = "ts"
-
-	case lex.IsNumber(), // "as is"
-		lex.IsCurrency():
-		res.Expression = p.parseParenExpr(lex)
-		res.Options.Mode = "ns"
-
-	case lex.isRegex(): // "as is"
-		res.Expression = p.parseParenExpr(lex)
-		res.Options.Mode = "rs"
-
-	// consume all continous strings and wildcards
-	case lex.token == STRING,
-		lex.token == WCARD:
-		res.Expression = p.parseStringExpr(lex)
-
-	default:
-		panic(fmt.Errorf("%q is unexpected expression", lex))
 	}
 
+	res.Expression = fmt.Sprintf("(%s %s %s)", input, operator, expression)
 	return res // done
 }
 
@@ -299,7 +305,7 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	// read options
 	switch lex := p.scanIgnoreSpace(); lex.token {
 	case COMMA:
-		opts = p.parseOptions(opts)
+		opts = p.parseSearchOptions(opts)
 	default:
 		p.unscan()
 	}
@@ -316,7 +322,7 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 }
 
 // parse options
-func (p *Parser) parseOptions(opts Options) Options {
+func (p *Parser) parseSearchOptions(opts Options) Options {
 	// read all options
 	for {
 		if lex := p.scanIgnoreSpace(); lex.token == IDENT {
