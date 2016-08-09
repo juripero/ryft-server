@@ -139,7 +139,6 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 	cfg.Limit = uint(params.Limit)
-	cfg.BooleansPerExpression = s.BooleansPerExpression
 
 	log.WithField("config", cfg).WithField("user", userName).
 		WithField("home", homeDir).WithField("cluster", userTag).
