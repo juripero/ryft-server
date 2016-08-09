@@ -233,7 +233,7 @@ func expressionMode(expression string) string {
 	case strings.Contains(expression, "NUMBER("):
 		return "ns"
 	case strings.Contains(expression, "CURRENCY("):
-		return "cs"
+		return "ns"
 	case strings.Contains(expression, "REGEX("):
 		return "rs"
 	default:

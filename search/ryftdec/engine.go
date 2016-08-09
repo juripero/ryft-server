@@ -47,13 +47,15 @@ var (
 
 // RyftDEC engine uses abstract engine as backend.
 type Engine struct {
-	Backend search.Engine
+	Backend               search.Engine
+	BooleansPerExpression map[string]int
 }
 
 // NewEngine creates new RyftDEC search engine.
-func NewEngine(backend search.Engine) (*Engine, error) {
+func NewEngine(backend search.Engine, booleansLimit map[string]int) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backend = backend
+	engine.BooleansPerExpression = booleansLimit
 	return engine, nil
 }
 

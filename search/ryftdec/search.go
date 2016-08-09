@@ -48,7 +48,10 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// split cfg.Query into several expressions
 	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query, configToOpts(cfg))
+	opts := configToOpts(cfg)
+	opts.BooleansPerExpression = engine.BooleansPerExpression
+
+	task.queries, err = Decompose(cfg.Query, opts)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)

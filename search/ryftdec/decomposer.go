@@ -59,7 +59,6 @@ func configToOpts(config *search.Config) Options {
 		Dist:  config.Fuzziness,
 		Width: config.Surrounding,
 		Cs:    config.CaseSensitive,
-		BooleansPerExpression: config.BooleansPerExpression,
 	}
 }
 

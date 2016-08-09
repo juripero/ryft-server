@@ -402,7 +402,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	if s.DebugMode {
 		ryftdec.SetLogLevel("debug")
 	}
-	return ryftdec.NewEngine(backend)
+	return ryftdec.NewEngine(backend, s.BooleansPerExpression)
 }
 
 // deep copy of backend options
