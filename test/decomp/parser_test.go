@@ -95,11 +95,20 @@ func TestParserSimple(t *testing.T) {
 			`  (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
 			`P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}`},
 		{
+			`  (RECORD.price CONTAINS NUMBER("450" < NUM < "600", ",", "."))`,
+			`P{(RECORD.price CONTAINS NUMBER("450"<NUM<"600",",","."))[ns]}`},
+		{
+			`  (RECORD.price CONTAINS NUMERIC("450" < NUM < "600", ",", "."))`,
+			`P{(RECORD.price CONTAINS NUMBER("450"<NUM<"600",",","."))[ns]}`},
+		{
 			`  (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
 			`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[ns]}`},
 		{
 			`  (RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
 			`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS))[rs]}`},
+		{
+			`  (RECORD.body CONTAINS REGEXP("\w+", CASELESS, D=5))`,
+			`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS,D=5))[rs]}`},
 		{
 			`  (RAW_TEXT CONTAINS "100")`,
 			`P{(RAW_TEXT CONTAINS "100")}`},

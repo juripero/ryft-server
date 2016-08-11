@@ -231,12 +231,23 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ts"
 
-		case lex.IsNumber(), // "as is"
-			lex.IsCurrency():
+		case lex.IsNumber(): // "as is"
+			// handle aliases NUMERIC -> NUMBER
+			if !strings.EqualFold(lex.literal, "NUMBER") {
+				lex.literal = "NUMBER"
+			}
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ns"
 
+		case lex.IsCurrency(): // "as is"
+			expression = p.parseParenExpr(lex)
+			res.Options.Mode = "ns" // (!) as numeric search!
+
 		case lex.isRegex(): // "as is"
+			// handle aliases REGEXP -> REGEX
+			if !strings.EqualFold(lex.literal, "REGEX") {
+				lex.literal = "REGEX"
+			}
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "rs"
 
