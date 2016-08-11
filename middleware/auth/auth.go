@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -65,7 +66,8 @@ type Middleware struct {
 	realm    string
 	jwt      *jwt.GinJWTMiddleware
 
-	userCache map[string]*UserInfo
+	userCache     map[string]*UserInfo
+	userCacheLock sync.Mutex
 }
 
 func NewMiddleware(provider Provider, realm string) *Middleware {
@@ -124,7 +126,7 @@ func (mw *Middleware) Authentication() gin.HandlerFunc {
 				// The user credentials was found!
 				// pass user info as key "user" in this context
 				// the user can be read later using c.MustGet(gin.AuthUserKey)
-				mw.userCache[username] = user // put to cache
+				mw.putUserToCache(username, user)
 				c.Set(gin.AuthUserKey, user)
 			}
 		} else if mw.jwt != nil && len(h) != 0 {
@@ -141,7 +143,7 @@ func (mw *Middleware) Authentication() gin.HandlerFunc {
 func (mw *Middleware) authenticator(userId string, password string, c *gin.Context) (string, bool) {
 	user := mw.provider.Verify(userId, password)
 	if user != nil {
-		mw.userCache[userId] = user // put to cache
+		mw.putUserToCache(userId, user)
 		c.Set(gin.AuthUserKey, user)
 	}
 	return userId, user != nil
@@ -170,6 +172,15 @@ func getUserFromJwt(userId string, ctx *gin.Context) *UserInfo {
 	return nil
 }
 
+// put user to cache
+func (mw *Middleware) putUserToCache(username string, user *UserInfo) {
+	mw.userCacheLock.Lock()
+	defer mw.userCacheLock.Unlock()
+
+	// put to cache under lock
+	mw.userCache[username] = user
+}
+
 // report unauthorized access
 func (mw *Middleware) unauthorized(c *gin.Context, code int, message string) {
 	c.JSON(code, gin.H{
@@ -180,6 +191,9 @@ func (mw *Middleware) unauthorized(c *gin.Context, code int, message string) {
 
 // get additional payload
 func (mw *Middleware) payload(userId string) map[string]interface{} {
+	mw.userCacheLock.Lock()
+	defer mw.userCacheLock.Unlock()
+
 	if user, ok := mw.userCache[userId]; ok {
 		return map[string]interface{}{
 			tokenAttrHomeDir: user.Home,
