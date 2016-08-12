@@ -1,8 +1,12 @@
 #!/bin/bash
 
-echo ryft-server-d uninstalling from autostart...
-update-rc.d -f ryft-server-d remove
+NAME=ryft-server-d
 
-echo ryft-server-d stopping...
-service ryft-server-d stop
+echo $NAME uninstalling from autostart...
+update-rc.d -f $NAME remove
 
+echo $NAME stopping...
+service $NAME stop
+
+# have to return success
+exit 0
