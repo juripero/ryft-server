@@ -44,6 +44,7 @@ type Config struct {
 	Fuzziness     uint
 	CaseSensitive bool
 	Nodes         uint
+	Limit         uint
 
 	// if not empty keep the index and/or data file
 	KeepDataAs  string

@@ -44,7 +44,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 
 	// split cfg.Query into several expressions
 	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query)
+	task.queries, err = Decompose(cfg.Query, configToOpts(cfg))
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
@@ -53,15 +53,11 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
 	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		if len(cfg.Mode) == 0 {
-			// use "ds", "ts", "ns" search mode
-			// if query contains corresponding keywords
-			cfg.Mode = getSearchMode(task.queries.Type, "")
-		}
+		updateConfig(cfg, task.queries)
 		return engine.Backend.Count(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files)
+	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)
@@ -83,5 +79,6 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 
 		// TODO: handle task cancellation!!!
 	}()
+
 	return mux, nil // OK for now
 }

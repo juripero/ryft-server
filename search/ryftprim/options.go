@@ -46,6 +46,7 @@ func (engine *Engine) Options() map[string]interface{} {
 		"ryftprim-exec":   engine.ExecPath,
 		"ryftprim-legacy": engine.LegacyMode,
 		"ryftone-mount":   engine.MountPoint,
+		"home-dir":        engine.HomeDir,
 		"open-poll":       engine.OpenFilePollTimeout.String(),
 		"read-poll":       engine.ReadFilePollTimeout.String(),
 		"read-limit":      engine.ReadFilePollLimit,
@@ -104,8 +105,18 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 			engine.MountPoint, err)
 	}
 
+	// user's home directory
+	if v, ok := opts["home-dir"]; ok {
+		engine.HomeDir, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "home-dir" option: %s`, err)
+		}
+	} else {
+		engine.HomeDir = "/"
+	}
+
 	// create working directory
-	work_dir := filepath.Join(engine.MountPoint, engine.Instance)
+	work_dir := filepath.Join(engine.MountPoint, engine.HomeDir, engine.Instance)
 	// TODO: option to clear working dir before start?
 	err = os.MkdirAll(work_dir, os.ModeDir)
 	if err != nil {

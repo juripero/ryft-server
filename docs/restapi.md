@@ -9,10 +9,15 @@ This document contains information about REST API.
 
 The main API endpoints are `/search` and `/count`.
 
+If authentication is enabled, there are also a few endpoints related to
+[JWT](./auth.md#JWT-login).
 
 # Search
 
 The GET `/search` endpoint is used to search data on Ryft boxes.
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
 
 ## Search query parameters
 
@@ -33,10 +38,10 @@ The list of supported query parameters are the following (check detailed descrip
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
+| `limit`       | int     | [Limit the total number of records reported](#search-limit-parameter). |
 | `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-and-spark-parameters). |
 | `spark`       | boolean | **Internal** [The spark output format flag](#search-stream-and-spark--parameters). |
 | `ep`          | boolean | **Internal** [The error prefix flag](#search-ep-parameter). |
-
 
 ### Search `query` parameter
 
@@ -77,6 +82,20 @@ Expression tree is built and each node is passed to the Ryft hardware. Then resu
 NOTE: If search query contains two or more expressions of the same type (text, date, time, numeric) that query
 will not be split into subqueries because the Ryft hardware supports those type of queries directly.
 
+There is also possible to use advanced text search queries to customize some parameters within search expression.
+For example: `(RAW_TEXT CONTAINS FHS("555",CS=true,DIST=1,WIDTH=2)) AND (RAW_TEXT CONTAINS FEDS("777",CS=true,DIST=1,WIDTH=4))`.
+The ryft server splits this expressions into two Ryft calls:
+- `(RAW_TEXT CONTAINS "555")` with `FHS` search type, `fuzziness=1` and `surrounding=2`
+- `(RAW_TEXT CONTAINS "777")` with `FEDS` search type, `fuzziness=1` and `surrounding=4`
+
+This advanced search query syntax overrides the following global parameters:
+- search type: `FHS` or `FEDS` (exact search is used if fuzziness is zero)
+- case sensitivity
+- fuzziness distance
+- surrounding width
+
+If nothing provided the global options are used by default. Any option can be omitted: `(RAW_TEXT CONTAINS FHS("555")) AND (RAW_TEXT CONTAINS FEDS("777",CS=false))`.
+
 
 ### Search `files` parameter
 
@@ -98,12 +117,13 @@ Multiple files can be provided as:
 - `feds` for fuzzy edit distance search
 - `ds` for date search
 - `ts` for time search
-- `ns` for numeric search
+- `ns` for numeric or currency search
+- `rs` for regex search
 
 If no search mode is specified, fuzzy hamming search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
 keyword then date search will be used. It's the same when `TIME` keyword is used for time search,
-and `NUMERIC` for numeric search.
+and `NUMBER` or `CURRENCY` for numeric search.
 
 In case of complex search queries, the mode specified is used for text or structured search only.
 Date, time and numeric search modes will be detected automatically by corresponding keywords.
@@ -228,6 +248,12 @@ To execute a search on single node just pass `local=true`.
 
 The statistics is not reported **by default**.
 To check total number of matches and performance number just pass `stats=true`.
+
+
+### Search `limit` parameter
+
+This parameter is used to limit the total number of records reported.
+There is no any limit **by default** or when `limit=0`.
 
 
 ### Search `stream` and `spark` parameters
@@ -396,6 +422,9 @@ The GET `/count` endpoint is also used to search data on Ryft boxes.
 However, it does not transfer all found data, it will just print
 the number of matches and associated performance numbers.
 
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
+
 ## Count query parameters
 
 The list of supported query parameters are the following:
@@ -442,6 +471,9 @@ will report the following output:
 
 The GET `/files` endpoint is used to get Ryft box directory content.
 The name of all subdirectories and files are reported.
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
 
 
 ## Files query parameters

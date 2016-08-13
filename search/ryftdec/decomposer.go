@@ -31,31 +31,66 @@
 package ryftdec
 
 import (
+	"fmt"
 	"strings"
+
+	"github.com/getryft/ryft-server/search"
 )
 
 var (
 	delimiters     = []string{" AND ", " OR "}
-	markers        = []string{" DATE(", " TIME(", "NUMBER("}
+	markers        = []string{" DATE(", " TIME(", " NUMBER(", " FHS(", " FEDS(", " CURRENCY(", "REGEX("}
 	maxDepth   int = 1
 )
 
-func Decompose(originalQuery string) (*Node, error) {
+// Options contains search options
+type Options struct {
+	Mode                  string         // Search mode: fhs, feds, date, time, etc.
+	Width                 uint           // Surrounding width
+	Dist                  uint           // Fuzziness distance
+	Cs                    bool           // Case sensitivity flag
+	BooleansPerExpression map[string]int // Number of permitted booleans per expression type
+}
+
+// convert search config to Options
+func configToOpts(config *search.Config) Options {
+	return Options{
+		Mode:  config.Mode,
+		Dist:  config.Fuzziness,
+		Width: config.Surrounding,
+		Cs:    config.CaseSensitive,
+	}
+}
+
+// Decompose search expression into expression tree
+func Decompose(originalQuery string, baseOpts Options) (node *Node, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("Decomposer: %v", r)
+			}
+		}
+	}()
+
 	rootNode := Node{SubNodes: make([]*Node, 0)}
 	originalQuery = formatQuery(originalQuery)
 
-	_, err := parse(&rootNode, originalQuery)
+	parse(&rootNode, originalQuery, baseOpts)
+
 	if err != nil {
 		return nil, err
 	}
 
-	node := rootNode.SubNodes[0]
-	normalizeTree(node)
+	node = rootNode.SubNodes[0]
+	normalizeTree(node, baseOpts.BooleansPerExpression)
 
-	return node, nil // Return first node with value
+	return
 }
 
 func formatQuery(query string) string {
+	query = strings.TrimSpace(query)
 	for _, delimiter := range delimiters {
 		delimiter = strings.Trim(delimiter, " ")
 		query = strings.Replace(query, ")"+delimiter+"(", ") "+delimiter+" (", -1)
@@ -65,40 +100,44 @@ func formatQuery(query string) string {
 }
 
 // Parse expression and build query tree
-func parse(currentNode *Node, query string) (*Node, error) {
+func parse(currentNode *Node, query string, opts Options) {
 	if !validateQuery(query) {
-		return nil, buildError("Invalid query: " + query)
+		panic(fmt.Errorf("Invalid query: %q", query))
 	}
 
 	tokens := tokenize(query)
 
 	if !validateTokens(tokens) {
-		return nil, buildError("Invalid query: " + query)
+		panic(fmt.Errorf("Invalid query: %q (bad tokens)", query))
 	}
 
 	tokens = translateToPrefixNotation(tokens)
-	currentNode = addToTree(currentNode, tokens)
+	currentNode = addToTree(currentNode, tokens, opts)
 
 	if !validateTree(currentNode) {
-		return nil, buildError("Invalid query: " + query)
+		panic(fmt.Errorf("Invalid query: %d (bad tree)", query))
 	}
-
-	return currentNode, nil
 }
 
 func tokenize(query string) []string {
 	count := 0
+	quotesCount := 0
+
 	isBracket := func(r rune) bool {
 		switch {
 		case r == '(':
-			count++
+			if quotesCount == 0 {
+				count++
+			}
 			if count == maxDepth {
 				return true
 			} else {
 				return false
 			}
 		case r == ')':
-			count--
+			if quotesCount == 0 {
+				count--
+			}
 			if count == maxDepth-1 {
 				return true
 			} else {
@@ -142,24 +181,24 @@ func reorderOperators(tokens []string, result []string) []string {
 	return result
 }
 
-func addToTree(currentNode *Node, tokens []string) *Node {
+func addToTree(currentNode *Node, tokens []string, opts Options) *Node {
 	for _, token := range tokens {
 		if notParsable(token) {
-			currentNode = addChildToNode(currentNode, token)
+			currentNode = addChildToNode(currentNode, token, opts)
 		} else {
-			_, _ = parse(currentNode, token)
+			parse(currentNode, token, opts)
 		}
 	}
 	return currentNode
 }
 
-func addChildToNode(currentNode *Node, expression string) *Node {
-	var node *Node = &Node{}
+func addChildToNode(currentNode *Node, expression string, opts Options) *Node {
+	var node *Node
 	if len(currentNode.SubNodes) == 2 {
-		node = node.New(expression, currentNode.Parent)
+		node = NewNode(expression, currentNode.Parent, opts)
 		currentNode.Parent.SubNodes = append(currentNode.Parent.SubNodes, node)
 	} else {
-		node = node.New(expression, currentNode)
+		node = NewNode(expression, currentNode, opts)
 		currentNode.SubNodes = append(currentNode.SubNodes, node)
 	}
 
@@ -171,12 +210,20 @@ func addChildToNode(currentNode *Node, expression string) *Node {
 }
 
 func notParsable(expression string) bool {
+	expression = removeQuotedText(expression)
 	twoBrackets := (strings.Count(expression, "(") == 1) && (strings.Count(expression, ")") == 1)
-	dateExpression := strings.Contains(expression, "DATE(")
-	timeExpression := strings.Contains(expression, "TIME(")
-	numberExpression := strings.Contains(expression, "NUMBER(")
 	noBrackets := (strings.Count(expression, "(") == 0) && (strings.Count(expression, ")") == 0)
-	return noBrackets || (twoBrackets && dateExpression) || (twoBrackets && timeExpression) || (twoBrackets && numberExpression)
+
+	return noBrackets || (twoBrackets && isSearchQuery(expression))
+}
+
+func isSearchQuery(expression string) bool {
+	for _, v := range markers {
+		if strings.Contains(expression, v) {
+			return true
+		}
+	}
+	return false
 }
 
 func isOperator(token string) bool {

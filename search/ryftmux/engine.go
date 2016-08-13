@@ -59,6 +59,11 @@ func NewEngine(backends ...search.Engine) (*Engine, error) {
 	return engine, nil
 }
 
+// prepare task configuration
+func (engine *Engine) prepare(task *Task, cfg *search.Config) {
+	task.Limit = uint64(cfg.Limit)
+}
+
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
 	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)

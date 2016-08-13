@@ -20,7 +20,7 @@ Running server is even simpler:
 Sometimes it's useful to run multiple instances on different ports:
 
 ```{.sh}
-./ryft-server 0.0.0.0:9000 --debug
+./ryft-server -l=:9000 --debug
 ```
 
 This command runs another server instance on port `9000` in debug mode.
@@ -32,9 +32,11 @@ It's also possible to create a Debian package:
 make debian
 ```
 
+Most of the options can be customized via configuration file.
 See [build and run](./docs/buildandrun.md) document for more details.
 
-There is also some information about [search engine](./docs/search.md) implementation.
+There is also some information about [search engine](./docs/search.md)
+implementation and [authnetication](./docs/auth.md).
 
 
 # REST API
@@ -49,8 +51,10 @@ There is also some information about [search engine](./docs/search.md) implement
 All examples assume the `ryft-server` host name is `ryftone-777`.
 
 The main API endpoints are `/search` and `/count`. Both have almost the same parameters.
-However, the /count endpoint does not transfer all found data. Instead, it prints the number of matches and associated performance numbers.
-The minimum required parameters are search query and the set of files to search. Here's an example of a simple request:
+However, the `/count` endpoint does not transfer all found data.
+Instead, it prints the number of matches and associated performance numbers.
+The minimum required parameters are search query and the set of files to search.
+Here's an example of a simple request:
 
 ```{.sh}
 curl "http://ryftone-777:8765/search?query=Joe&files=*.txt"
@@ -90,6 +94,9 @@ This information is extremelly useful for bug reporting.
 
 See [REST API](./docs/restapi.md) document for more details.
 
+Some endpoints are protected. See [authentication](./docs/auth.md) document
+and [corresponding demo](./docs/demo-2016-07-21.md).
+
 
 # Command line tools
 
@@ -110,5 +117,16 @@ ryftrest -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --local --format=xml -
 
 This command will print extracted list of date strings.
 
+The `ryftrest` tool can be used to do any requests that `ryftprim` does and even more:
+
+```{.sh}
+ryftrest -q '(RAW_TEXT CONTAINS NUMBER("35" < NUM <= "50", ",", "."))' -f '*.pcrime' -vv
+ryftrest -q '(RAW_TEXT CONTAINS CURRENCY("$300" < CUR <= "$500", "$", ",", "."))' -f '*.pcrime' -vv
+ryftrest -q '(RAW_TEXT CONTAINS REGEX("$[3-5]00", PCRE_OPTION_DEFAULT))' -f '*.pcrime' -vv
+ryftrest -q '((RECORD.Date CONTAINS TIME(11:50:00 < HH:MM:SS <= 11:55:00)) \
+    AND(RECORD.ID CONTAINS FEDS("10029", CS=false, DIST=3, WIDTH=0)) \
+    AND(RECORD.Description CONTAINS FHS("vehycle", CS=false, DIST=1, WIDTH=0))' -f '*.pcrime' -vv
+```
+
 For more detailed examples see:
-[ryftrest sample 1](./docs/demo-2015-04-28.md) and [ryftrest sample 2](./docs/demo-2015-05-12.md)
+[ryftrest sample 1](./docs/demo-2016-04-28.md) and [ryftrest sample 2](./docs/demo-2016-05-12.md)

@@ -61,6 +61,7 @@ type SearchParams struct {
 	ErrorPrefix   bool     `form:"ep" json:"ep"`
 	KeepDataAs    string   `form:"data" json:"data"`
 	KeepIndexAs   string   `form:"index" json:"index"`
+	Limit         int      `form:"limit" json:"limit"`
 }
 
 // Handle /search endpoint.
@@ -76,6 +77,8 @@ func (s *Server) search(ctx *gin.Context) {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
+
+	// TODO: can cause problems when query is kind of: `(RAW_TEXT CONTAINS "RECORD")`
 	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
 		panic(NewServerError(http.StatusBadRequest,
 			"format=xml could not be used without RECORD query"))
@@ -109,9 +112,11 @@ func (s *Server) search(ctx *gin.Context) {
 	if err != nil {
 		panic(NewServerError(http.StatusBadRequest, err.Error()))
 	}
+	ctx.Set("encoder", enc) // to recover from panic in appropriate format
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local, params.Files)
+	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
+	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
@@ -133,13 +138,19 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.Limit = uint(params.Limit)
 
-	log.WithField("config", cfg).Infof("start /search")
+	log.WithField("config", cfg).WithField("user", userName).
+		WithField("home", homeDir).WithField("cluster", userTag).
+		Infof("start /search")
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))
 	}
+
+	s.onSearchStarted(cfg)
+	defer s.onSearchStopped(cfg)
 
 	// ctx.Stream() logic
 	writer := ctx.Writer

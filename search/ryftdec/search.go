@@ -48,7 +48,10 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// split cfg.Query into several expressions
 	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query)
+	opts := configToOpts(cfg)
+	opts.BooleansPerExpression = engine.BooleansPerExpression
+
+	task.queries, err = Decompose(cfg.Query, opts)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
@@ -57,15 +60,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
 	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		if len(cfg.Mode) == 0 {
-			// use "ds", "ts", "ns" search mode
-			// if query contains corresponding keywords
-			cfg.Mode = getSearchMode(task.queries.Type, "")
-		}
+		updateConfig(cfg, task.queries)
 		return engine.Backend.Search(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files)
+	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)
@@ -101,6 +100,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 	case QTYPE_DATE:
 	case QTYPE_TIME:
 	case QTYPE_NUMERIC:
+	case QTYPE_CURRENCY:
 		// search later
 
 	case QTYPE_AND:
@@ -112,6 +112,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		task.subtaskId += 1
 		backendOptions := engine.Backend.Options()
 		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
+		backendHomeDir, _ := utils.AsString(backendOptions["home-dir"])
 		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
 		tempResult := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-and%s",
 			task.Identifier, task.subtaskId, task.extension))
@@ -140,7 +141,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		}
 
 		// remove temporary file TODO: defer!!!
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResult))
+		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResult))
 
 		return n2, nil // OK
 
@@ -153,6 +154,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		task.subtaskId += 1
 		backendOptions := engine.Backend.Options()
 		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
+		backendHomeDir, _ := utils.AsString(backendOptions["home-dir"])
 		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
 		tempResultA := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-a%s",
 			task.Identifier, task.subtaskId, task.extension))
@@ -182,21 +184,21 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		// combine two temporary files into one
 		if len(cfg.KeepDataAs) != 0 {
 			// output file
-			f, err := os.Create(filepath.Join(backendMountPoint, cfg.KeepDataAs))
+			f, err := os.Create(filepath.Join(backendMountPoint, backendHomeDir, cfg.KeepDataAs))
 			if err != nil {
 				return 0, fmt.Errorf("failed to create output file: %s", err)
 			}
 			defer f.Close()
 
 			// first input file
-			a, err := os.Open(filepath.Join(backendMountPoint, tempResultA))
+			a, err := os.Open(filepath.Join(backendMountPoint, backendHomeDir, tempResultA))
 			if err != nil {
 				return 0, fmt.Errorf("failed to open first input file: %s", err)
 			}
 			defer a.Close()
 
 			// second input file
-			b, err := os.Open(filepath.Join(backendMountPoint, tempResultB))
+			b, err := os.Open(filepath.Join(backendMountPoint, backendHomeDir, tempResultB))
 			if err != nil {
 				return 0, fmt.Errorf("failed to open second input file: %s", err)
 			}
@@ -216,8 +218,8 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		}
 
 		// remove temporary files TODO: defer!!!
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResultA))
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, tempResultB))
+		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultA))
+		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultB))
 
 		return n1 + n2, nil // OK
 
@@ -228,9 +230,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		return 0, fmt.Errorf("%d is unknown query type", query.Type)
 	}
 
-	cfg.Mode = getSearchMode(query.Type, task.config.Mode)
-	cfg.Query = query.Expression
-
+	updateConfig(cfg, query)
 	task.log().WithField("mode", cfg.Mode).
 		WithField("query", cfg.Query).
 		WithField("input", cfg.Files).
@@ -247,4 +247,13 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		return res.Stat.Matches, nil // OK
 	}
 	return 0, nil // OK
+}
+
+// update search configuration
+func updateConfig(cfg *search.Config, node *Node) {
+	cfg.Mode = getSearchMode(node.Type, node.Options)
+	cfg.Query = node.Expression
+	cfg.Fuzziness = node.Options.Dist
+	cfg.Surrounding = node.Options.Width
+	cfg.CaseSensitive = node.Options.Cs
 }

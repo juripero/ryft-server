@@ -21,7 +21,8 @@ DESTDIR=.build
 .PHONY: package
 package: control
 	cp "${RYFT_SERVER_BIN}" "${DESTDIR}/usr/bin/"
-# TODO: copy server configuration	?
+	cp "../ryft-server.conf" "${DESTDIR}/etc/ryft-server.conf"
+	echo "/etc/ryft-server.conf" > "${DESTDIR}/DEBIAN/conffiles"
 	dpkg --build "${DESTDIR}"
 	mv -f "${DESTDIR}.deb" "${DEBNAME}"
 	rm -rf "${DESTDIR}"

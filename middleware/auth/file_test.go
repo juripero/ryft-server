@@ -31,51 +31,69 @@
 package auth
 
 import (
-	"encoding/json"
-	"errors"
 	"io/ioutil"
-
-	"gopkg.in/yaml.v2"
-
+	"os"
 	"path/filepath"
+	"testing"
 
-	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 )
 
-const (
-	constJson = ".json"
-	constYml  = ".yml"
-	constYaml = ".yaml"
-)
+// test JSON file format
+func TestReadUsersFileJson(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "auth_test_")
+	if assert.NoError(t, err) {
+		defer os.RemoveAll(tmpdir)
 
-func AuthBasicFile(fileName string) (gin.HandlerFunc, error) {
-	users, err := readUsersFile(fileName)
-	if err != nil {
-		return nil, err
+		file := filepath.Join(tmpdir, "users.json")
+		data := `[
+{"username":"Joe", "password":"123", "home":"joe_dir"},
+{"username":"Foo", "password":"456", "home":"foo_dir"},
+{"username":"Boo", "password":"789", "home":"boo_dir"}
+]`
+		err := ioutil.WriteFile(file, []byte(data), 0644)
+		assert.NoError(t, err)
+
+		users, err := readUsersFile(file)
+		if assert.NoError(t, err) &&
+			assert.Equal(t, len(users), 3) {
+			assert.Equal(t, users[0].Name, "Joe")
+			assert.Equal(t, users[1].Password, "456")
+			assert.Equal(t, users[2].Home, "boo_dir")
+		}
 	}
-	return gin.BasicAuth(users), nil
-
 }
 
-func readUsersFile(fileName string) (map[string]string, error) {
-	var users map[string]string
+// test YAML file format
+func TestReadUsersFileYaml(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "auth_test_")
+	if assert.NoError(t, err) {
+		defer os.RemoveAll(tmpdir)
 
-	ext := filepath.Ext(fileName)
+		file := filepath.Join(tmpdir, "users.yaml")
+		data := `
+- username: "Joe"
+  password: "123"
+  home: "joe_dir"
+- username: "Foo"
+  password: "456"
+  home: "foo_dir"
+- username: "Boo"
+  password: "789"
+  home: "boo_dir"
+`
+		err := ioutil.WriteFile(file, []byte(data), 0644)
+		assert.NoError(t, err)
 
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, err
+		users, err := readUsersFile(file)
+		if assert.NoError(t, err) &&
+			assert.Equal(t, len(users), 3) {
+			assert.Equal(t, users[0].Name, "Joe")
+			assert.Equal(t, users[1].Password, "456")
+			assert.Equal(t, users[2].Home, "boo_dir")
+		}
 	}
-	if ext == constJson {
-		err = json.Unmarshal(data, &users)
-	} else if ext == constYaml || ext == constYml {
-		err = yaml.Unmarshal(data, &users)
-	} else {
-		err = errors.New("Unrecognized file extention " + ext)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	return users, nil
 }
+
+// TODO: check bad extension
+// TODO: check duplicate user info

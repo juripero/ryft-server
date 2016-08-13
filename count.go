@@ -55,7 +55,8 @@ func (s *Server) count(ctx *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local, params.Files)
+	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
+	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
@@ -78,12 +79,17 @@ func (s *Server) count(ctx *gin.Context) {
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 
-	log.WithField("config", cfg).Infof("start /count")
+	log.WithField("config", cfg).WithField("user", userName).
+		WithField("home", homeDir).WithField("cluster", userTag).
+		Infof("start /count")
 	res, err := engine.Count(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))
 	}
+
+	s.onSearchStarted(cfg)
+	defer s.onSearchStopped(cfg)
 
 	for {
 		select {

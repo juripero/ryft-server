@@ -36,6 +36,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/getryft/ryft-server/codec"
 )
 
 type ServerError struct {
@@ -57,9 +59,28 @@ func NewServerErrorWithDetails(status int, message string, details string) *Serv
 }
 
 func RecoverFromPanic(c *gin.Context) {
+	// check for specific encoder
+	reportEncoderError := func(err error) bool {
+		// check for specific encoder
+		if encI, ok := c.Get("encoder"); ok {
+			if enc, ok := encI.(codec.Encoder); ok {
+				_ = enc.EncodeError(err)
+				_ = enc.Close()
+				return true
+			}
+		}
+
+		return false
+	}
+
 	if r := recover(); r != nil {
 		if err, ok := r.(*ServerError); ok {
 			log.WithField("status", err.Status).WithError(err).Warnf("Panic recovered server error")
+
+			if reportEncoderError(err) {
+				return
+			}
+
 			if len(err.Details) > 0 {
 				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status, "details": err.Details})
 			} else {
@@ -71,7 +92,10 @@ func RecoverFromPanic(c *gin.Context) {
 
 		if err, ok := r.(error); ok {
 			log.WithError(err).Warnf("Panic recovered unknown error")
-			//			debug.PrintStack()
+
+			if reportEncoderError(err) {
+				return
+			}
 			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%v", err.Error()), "status": http.StatusInternalServerError})
 			return
 		}

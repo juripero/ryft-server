@@ -89,7 +89,7 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 
 	// files
 	for _, file := range cfg.Files {
-		err = task.dataSet.AddFile(file)
+		err = task.dataSet.AddFile(filepath.Join(engine.HomeDir, file))
 		if err != nil {
 			engine.finish(err, task, res)
 			return
@@ -100,14 +100,14 @@ func (engine *Engine) process(task *Task, cfg *search.Config, res *search.Result
 	var indexFile string
 	if len(task.IndexFileName) != 0 {
 		// file path relative to `ryftone` mountpoint (including just instance)
-		indexFile = filepath.Join(engine.Instance, task.IndexFileName)
+		indexFile = filepath.Join(engine.HomeDir, engine.Instance, task.IndexFileName)
 	}
 
 	// DATA results file
 	var dataFile string
 	if len(task.DataFileName) != 0 {
 		// file path relative to `ryftone` mountpoint (including just instance)
-		dataFile = filepath.Join(engine.Instance, task.DataFileName)
+		dataFile = filepath.Join(engine.HomeDir, engine.Instance, task.DataFileName)
 	}
 
 	// TODO: use cfg.Mode to run specific search!
@@ -201,7 +201,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 	task.log().Debugf("[%s]: start INDEX processing...", TAG)
 
 	// try to open INDEX file: if operation is cancelled `file` is nil
-	path := filepath.Join(engine.MountPoint, engine.Instance, task.IndexFileName)
+	path := filepath.Join(engine.MountPoint, engine.HomeDir, engine.Instance, task.IndexFileName)
 	file, err := task.openFile(path, engine.OpenFilePollTimeout, task.cancelIndexChan)
 	if err != nil {
 		task.log().WithError(err).WithField("path", path).
@@ -273,7 +273,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	task.log().Debugf("[%s]: start DATA processing...", TAG)
 
 	// try to open DATA file: if operation is cancelled `file` is nil
-	path := filepath.Join(engine.MountPoint, engine.Instance, task.DataFileName)
+	path := filepath.Join(engine.MountPoint, engine.HomeDir, engine.Instance, task.DataFileName)
 	file, err := task.openFile(path, engine.OpenFilePollTimeout, task.cancelDataChan)
 	if err != nil {
 		task.log().WithError(err).WithField("path", path).
@@ -292,7 +292,8 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	r := bufio.NewReader(file)
 	for index := range task.indexChan {
 		// trim mount point from file name! TODO: special option for this?
-		index.File = strings.TrimPrefix(index.File, engine.MountPoint)
+		index.File = strings.TrimPrefix(index.File,
+			filepath.Join(engine.MountPoint, engine.HomeDir))
 
 		rec := new(search.Record)
 		rec.Index = index
@@ -324,7 +325,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 func (engine *Engine) removeFile(name string) error {
 	if len(name) != 0 {
 		path := filepath.Join(engine.MountPoint,
-			engine.Instance, name) // full path
+			engine.HomeDir, engine.Instance, name) // full path
 		err := os.RemoveAll(path)
 		if err != nil {
 			return err

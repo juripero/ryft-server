@@ -63,6 +63,12 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-p", "ds")
 	case "time_search", "time", "ts":
 		args = append(args, "-p", "ts")
+	case "number_search", "num", "ns":
+		args = append(args, "-p", "ns")
+	case "currency_search", "currency", "cs":
+		args = append(args, "-p", "ns") // currency is a kind of numeric search
+	case "regexp_search", "regex_search", "regexp", "regex", "rs":
+		args = append(args, "-p", "rs")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
@@ -103,13 +109,13 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 	// files
 	for _, file := range cfg.Files {
-		args = append(args, "-f", file)
+		args = append(args, "-f", filepath.Join(engine.HomeDir, file))
 	}
 
 	// INDEX results file
 	if len(task.IndexFileName) != 0 {
 		if len(cfg.KeepIndexAs) != 0 {
-			task.IndexFileName = cfg.KeepIndexAs
+			task.IndexFileName = filepath.Join(engine.HomeDir, cfg.KeepIndexAs)
 			task.KeepIndexFile = true
 			if !strings.HasSuffix(task.IndexFileName, ".txt") {
 				// ryft adds .txt anyway, so if this extension is missed
@@ -120,7 +126,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 			}
 		} else {
 			// file path relative to `ryftone` mountpoint (including just instance)
-			task.IndexFileName = filepath.Join(engine.Instance, task.IndexFileName)
+			task.IndexFileName = filepath.Join(engine.HomeDir, engine.Instance, task.IndexFileName)
 		}
 		args = append(args, "-oi", task.IndexFileName)
 	}
@@ -128,11 +134,11 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// DATA results file
 	if len(task.DataFileName) != 0 {
 		if len(cfg.KeepDataAs) != 0 {
-			task.DataFileName = cfg.KeepDataAs
+			task.DataFileName = filepath.Join(engine.HomeDir, cfg.KeepDataAs)
 			task.KeepDataFile = true
 		} else {
 			// file path relative to `ryftone` mountpoint (including just instance)
-			task.DataFileName = filepath.Join(engine.Instance, task.DataFileName)
+			task.DataFileName = filepath.Join(engine.HomeDir, engine.Instance, task.DataFileName)
 		}
 		args = append(args, "-od", task.DataFileName)
 	}
@@ -140,19 +146,24 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// assign command line
 	task.tool_args = args
 
+	// limit number of records
+	task.Limit = uint64(cfg.Limit)
+
 	return nil // OK
 }
 
 // Run the `ryftprim` tool in background and parse results.
 func (engine *Engine) run(task *Task, res *search.Result) error {
-	// clear old INDEX&DATA files before start
-	if err := engine.removeFile(task.IndexFileName); err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to remove old INDEX file", TAG)
-		return fmt.Errorf("failed to remove old INDEX file: %s", err)
-	}
-	if err := engine.removeFile(task.DataFileName); err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to remove old DATA file", TAG)
-		return fmt.Errorf("failed to remove old DATA file: %s", err)
+	if false { // this feature is disabled for now
+		// clear old INDEX&DATA files before start
+		if err := engine.removeFile(task.IndexFileName); err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to remove old INDEX file", TAG)
+			return fmt.Errorf("failed to remove old INDEX file: %s", err)
+		}
+		if err := engine.removeFile(task.DataFileName); err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to remove old DATA file", TAG)
+			return fmt.Errorf("failed to remove old DATA file: %s", err)
+		}
 	}
 
 	task.log().WithField("args", task.tool_args).Infof("[%s]: executing tool", TAG)
@@ -416,7 +427,8 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	r := bufio.NewReader(file)
 	for index := range task.indexChan {
 		// trim mount point from file name! TODO: special option for this?
-		index.File = strings.TrimPrefix(index.File, engine.MountPoint)
+		index.File = strings.TrimPrefix(index.File,
+			filepath.Join(engine.MountPoint, engine.HomeDir))
 
 		rec := new(search.Record)
 		rec.Index = index
@@ -440,6 +452,15 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+		if task.Limit > 0 && res.RecordsReported() >= task.Limit {
+			task.log().WithField("limit", task.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)
+
+			// just in case, also stop INDEX processing
+			task.cancelIndex()
+
+			return // stop processing
+		}
+
 		res.ReportRecord(rec)
 	}
 }
