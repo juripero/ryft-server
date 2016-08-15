@@ -109,7 +109,9 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 	// files
 	for _, file := range cfg.Files {
-		args = append(args, "-f", filepath.Join(engine.HomeDir, file))
+		path := filepath.Join(engine.HomeDir, file)
+		path = engine.relativeToMountPoint(path)
+		args = append(args, "-f", path)
 	}
 
 	// INDEX results file
@@ -128,7 +130,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 			// file path relative to `ryftone` mountpoint (including just instance)
 			task.IndexFileName = filepath.Join(engine.HomeDir, engine.Instance, task.IndexFileName)
 		}
-		args = append(args, "-oi", task.IndexFileName)
+		args = append(args, "-oi", engine.relativeToMountPoint(task.IndexFileName))
 	}
 
 	// DATA results file
@@ -140,7 +142,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 			// file path relative to `ryftone` mountpoint (including just instance)
 			task.DataFileName = filepath.Join(engine.HomeDir, engine.Instance, task.DataFileName)
 		}
-		args = append(args, "-od", task.DataFileName)
+		args = append(args, "-od", engine.relativeToMountPoint(task.DataFileName))
 	}
 
 	// assign command line
@@ -463,6 +465,18 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 		res.ReportRecord(rec)
 	}
+}
+
+// make path relative to mountpoint
+func (engine *Engine) relativeToMountPoint(path string) string {
+	full := filepath.Join(engine.MountPoint, path) // full path
+	rel, err := filepath.Rel(engine.MountPoint, full)
+	if err != nil {
+		log.WithError(err).Warnf("[%s]: failed to get relative path", TAG)
+		return path // "as is"
+	}
+
+	return rel
 }
 
 // removeFile removes INDEX or DATA file.
