@@ -101,6 +101,13 @@
           },
           {
             "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "x-go-name": "Delimiter",
+            "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint8",
             "maximum": 4,
@@ -226,6 +233,13 @@
             "name": "index",
             "x-go-name": "Index",
             "description": "Name of index file to keep. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "x-go-name": "Delimiter",
+            "description": "The delimiter is used between found records in DATA file."
           },
           {
             "in": "query",

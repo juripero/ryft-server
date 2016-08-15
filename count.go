@@ -22,6 +22,7 @@ type CountParams struct {
 	Local         bool     `form:"local" json:"local"`
 	KeepDataAs    string   `form:"data" json:"data"`
 	KeepIndexAs   string   `form:"index" json:"index"`
+	Delimiter     string   `form:"delimiter" json:"delimiter"`
 }
 
 // CountResponse returnes matches for query
@@ -78,6 +79,12 @@ func (s *Server) count(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+	if d, err := url.QueryUnescape(params.Delimiter); err != nil {
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to unescape delimiter"))
+	} else {
+		cfg.Delimiter = d
+	}
 
 	log.WithField("config", cfg).WithField("user", userName).
 		WithField("home", homeDir).WithField("cluster", userTag).

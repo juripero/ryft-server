@@ -73,8 +73,9 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
 
-	// disable data separator
-	args = append(args, "-e", "")
+	// data separator
+	args = append(args, "-e", cfg.Delimiter)
+	task.Delimiter = cfg.Delimiter
 
 	// enable verbose mode to grab statistics
 	args = append(args, "-v")
@@ -464,6 +465,33 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		}
 
 		res.ReportRecord(rec)
+
+		// read and check delimiter
+		if len(task.Delimiter) > 0 {
+			tmp, err := task.readDataFile(r,
+				uint64(len(task.Delimiter)),
+				engine.ReadFilePollTimeout,
+				engine.ReadFilePollLimit)
+
+			if err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to read DATA delimiter", TAG)
+				res.ReportError(fmt.Errorf("failed to read DATA delimiter: %s", err))
+			}
+			if string(tmp) != task.Delimiter {
+				task.log().WithField("actual", tmp).WithField("expected", task.Delimiter).
+					Warnf("unexpected delimiter found")
+				tmp = nil // force to cancel futher processing
+			}
+
+			if err != nil || tmp == nil {
+				task.log().Debugf("[%s]: DATA processing cancelled", TAG)
+
+				// just in case, also stop INDEX processing
+				task.cancelIndex()
+
+				return // no sense to continue processing
+			}
+		}
 	}
 }
 

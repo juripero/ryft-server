@@ -35,6 +35,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
+| `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
@@ -225,6 +226,15 @@ Using the second parameter `index=index.txt` keeps the search index file under `
 NOTE: According to Ryft API documentation, an index file should always have `.txt` extension!
 
 **WARNING:** Provided data or index files will be overriden!
+
+
+### Search `delimiter` parameter
+
+To customize output format the `delimiter=` parameter may be used. This optional
+string will be used to separate found records in the output file.
+
+By default there is no any delimiter. To use Windows newline
+just pass url-encoded `delimiter=%0D%0A`.
 
 
 ### Search `nodes` parameter
@@ -439,6 +449,7 @@ The list of supported query parameters are the following:
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
+| `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 

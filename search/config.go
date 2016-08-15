@@ -46,9 +46,11 @@ type Config struct {
 	Nodes         uint
 	Limit         uint
 
-	// if not empty keep the index and/or data file
+	// if not empty keep the INDEX and/or DATA file
+	// delimiter is used between records in DATA file
 	KeepDataAs  string
 	KeepIndexAs string
+	Delimiter   string
 }
 
 // NewEmptyConfig creates new empty search configuration.
@@ -77,6 +79,6 @@ func (cfg *Config) AddFiles(files []string) {
 
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
-	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, surr:%d, fuzz:%d, case-sens:%t, nodes:%d}",
-		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes)
+	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, surr:%d, fuzz:%d, case-sens:%t, nodes:%d, limit:%d}",
+		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes, cfg.Limit)
 }
