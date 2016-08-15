@@ -89,6 +89,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return mux, nil // OK for now
 }
 
+// get backend options
+func (engine *Engine) getBackendOptions() (instanceName, homeDir, mountPoint string) {
+	opts := engine.Backend.Options()
+	instanceName, _ = utils.AsString(opts["instance-name"])
+	homeDir, _ = utils.AsString(opts["home-dir"])
+	mountPoint, _ = utils.AsString(opts["ryftone-mount"])
+	return
+}
+
 // Backend search function. Search() or Count()
 type SearchFunc func(cfg *search.Config) (*search.Result, error)
 
@@ -101,7 +110,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 	case QTYPE_TIME:
 	case QTYPE_NUMERIC:
 	case QTYPE_CURRENCY:
-		// search later
+		break // search later
 
 	case QTYPE_AND:
 		//if query.Left == nil || query.Right == nil {
@@ -110,12 +119,10 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		}
 
 		task.subtaskId += 1
-		backendOptions := engine.Backend.Options()
-		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
-		backendHomeDir, _ := utils.AsString(backendOptions["home-dir"])
-		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
-		tempResult := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-and%s",
+		instanceName, homeDir, mountPoint := engine.getBackendOptions()
+		tempResult := filepath.Join(instanceName, fmt.Sprintf(".temp-%s-%d-and%s",
 			task.Identifier, task.subtaskId, task.extension))
+		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, tempResult))
 
 		task.log().WithField("temp", tempResult).
 			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
@@ -140,9 +147,6 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			}
 		}
 
-		// remove temporary file TODO: defer!!!
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResult))
-
 		return n2, nil // OK
 
 	case QTYPE_OR:
@@ -152,14 +156,13 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		}
 
 		task.subtaskId += 1
-		backendOptions := engine.Backend.Options()
-		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
-		backendHomeDir, _ := utils.AsString(backendOptions["home-dir"])
-		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
-		tempResultA := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-a%s",
+		instanceName, homeDir, mountPoint := engine.getBackendOptions()
+		tempResultA := filepath.Join(instanceName, fmt.Sprintf(".temp-%s-%d-or-a%s",
 			task.Identifier, task.subtaskId, task.extension))
-		tempResultB := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-b%s",
+		tempResultB := filepath.Join(instanceName, fmt.Sprintf(".temp-%s-%d-or-b%s",
 			task.Identifier, task.subtaskId, task.extension))
+		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, tempResultA))
+		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, tempResultB))
 
 		task.log().WithField("temp", []string{tempResultA, tempResultB}).
 			Infof("[%s]/%d: running OR", TAG, task.subtaskId)
@@ -184,21 +187,21 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		// combine two temporary files into one
 		if len(cfg.KeepDataAs) != 0 {
 			// output file
-			f, err := os.Create(filepath.Join(backendMountPoint, backendHomeDir, cfg.KeepDataAs))
+			f, err := os.Create(filepath.Join(mountPoint, homeDir, cfg.KeepDataAs))
 			if err != nil {
 				return 0, fmt.Errorf("failed to create output file: %s", err)
 			}
 			defer f.Close()
 
 			// first input file
-			a, err := os.Open(filepath.Join(backendMountPoint, backendHomeDir, tempResultA))
+			a, err := os.Open(filepath.Join(mountPoint, homeDir, tempResultA))
 			if err != nil {
 				return 0, fmt.Errorf("failed to open first input file: %s", err)
 			}
 			defer a.Close()
 
 			// second input file
-			b, err := os.Open(filepath.Join(backendMountPoint, backendHomeDir, tempResultB))
+			b, err := os.Open(filepath.Join(mountPoint, homeDir, tempResultB))
 			if err != nil {
 				return 0, fmt.Errorf("failed to open second input file: %s", err)
 			}
@@ -216,10 +219,6 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 				return 0, fmt.Errorf("failed to copy second file: %s", err)
 			}
 		}
-
-		// remove temporary files TODO: defer!!!
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultA))
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultB))
 
 		return n1 + n2, nil // OK
 

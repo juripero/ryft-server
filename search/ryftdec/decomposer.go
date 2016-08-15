@@ -115,7 +115,7 @@ func parse(currentNode *Node, query string, opts Options) {
 	currentNode = addToTree(currentNode, tokens, opts)
 
 	if !validateTree(currentNode) {
-		panic(fmt.Errorf("Invalid query: %d (bad tree)", query))
+		panic(fmt.Errorf("Invalid query: %q (bad tree)", query))
 	}
 }
 
