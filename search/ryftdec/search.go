@@ -120,18 +120,25 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		task.subtaskId += 1
 		instanceName, homeDir, mountPoint := engine.getBackendOptions()
-		tempResult := filepath.Join(instanceName, fmt.Sprintf(".temp-%s-%d-and%s",
+		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-and-a%s",
 			task.Identifier, task.subtaskId, task.extension))
-		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, tempResult))
+		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
+			task.Identifier, task.subtaskId, ".txt"))
+		idx2 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-b%s",
+			task.Identifier, task.subtaskId, ".txt"))
+		//defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
+		//defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
 
-		task.log().WithField("temp", tempResult).
+		task.log().WithField("temp", dat1).
 			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
 		var err1, err2 error
 		var n1, n2 uint64
 
 		// left: save results to temporary file
 		tempCfg := *cfg
-		tempCfg.KeepDataAs = tempResult
+		tempCfg.KeepDataAs = dat1
+		tempCfg.KeepIndexAs = idx1
+		tempCfg.Delimiter = "\n\f\n"
 		n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
 		if err1 != nil {
 			return 0, err1
@@ -139,11 +146,28 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		if n1 > 0 { // no sense to run search on empty input
 			// right: read input from temporary file
-			tempCfg.Files = []string{tempResult}
+			tempCfg.Files = []string{dat1}
 			tempCfg.KeepDataAs = cfg.KeepDataAs
+			if len(cfg.KeepIndexAs) > 0 {
+				// defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx2))
+				tempCfg.KeepIndexAs = idx2
+			}
+			tempCfg.Delimiter = cfg.Delimiter
 			n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 			if err2 != nil {
 				return 0, err2
+			}
+
+			// merge indexes
+			if len(cfg.KeepIndexAs) > 0 {
+				err2 = ryftone.UnwindIndex(
+					filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
+					filepath.Join(mountPoint, homeDir, idx1),
+					filepath.Join(mountPoint, homeDir, idx2),
+					tempCfg.Delimiter)
+				if err2 != nil {
+					return 0, err2
+				}
 			}
 		}
 
