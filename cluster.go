@@ -61,25 +61,30 @@ func (s *Server) members(c *gin.Context) {
 	}
 }
 
-//type Service struct {
-//	Node           string   `json:"Node"`
-//	Address        string   `json:"Address"`
-//	ServiceID      string   `json:"ServiceID"`
-//	ServiceName    string   `json:"ServiceName"`
-//	ServiceAddress string   `json:"ServiceAddress"`
-//	ServiceTags    []string `json:"ServiceTags"`
-//	ServicePort    string   `json:"ServicePort"`
-//}
+// get consul client
+func (s *Server) getConsulClient() (*consul.Client, error) {
+	if s.consulClient != nil {
+		return s.consulClient.(*consul.Client), nil // cached
+	}
+
+	// create new client
+	config := consul.DefaultConfig()
+	// TODO: get some data from server's configuration?
+	config.Datacenter = "dc1"
+	client, err := consul.NewClient(config)
+	if err != nil {
+		return nil, err
+	}
+
+	s.consulClient = client // put to cache
+	return client, nil      // OK
+}
 
 // GetConsulInfo gets the list of ryft services and
 // the service tags related to requested set of files.
 // the services are arranged based on "busyness" metric!
 func (s *Server) getConsulInfo(userTag string, files []string) (services []*consul.CatalogService, tags []string, err error) {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
-
+	client, err := s.getConsulClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get consul client: %s", err)
 	}
@@ -153,12 +158,9 @@ func (s *Server) rearrangeServices(services []*consul.CatalogService, metrics ma
 	return services
 }
 
-// UpdateConsulMetric updates the node metric in the cluster
-func UpdateConsulMetric(metric int) error {
-	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration
-	config.Datacenter = "dc1"
-	client, err := consul.NewClient(config)
+// updateConsulMetric updates the node metric in the cluster
+func (s *Server) updateConsulMetric(metric int) error {
+	client, err := s.getConsulClient()
 	if err != nil {
 		return fmt.Errorf("failed to get consul client: %s", err)
 	}
