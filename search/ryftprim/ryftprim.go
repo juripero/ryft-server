@@ -355,13 +355,22 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 
 	// try to read all index records
 	r := bufio.NewReader(file)
+	var parts [][]byte
 	for {
 		// read line by line
-		line, err := r.ReadBytes('\n')
+		part, err := r.ReadBytes('\n')
+		if len(part) > 0 {
+			// save some data
+			parts = append(parts, part)
+		}
+
 		if err != nil {
 			// task.log().WithError(err).Debugf("[%s]: failed to read line from INDEX file", TAG) // FIXME: DEBUG
 			// will sleep a while and try again...
 		} else {
+			line := bytes.Join(parts, nil)
+			parts = parts[0:0] // clear
+
 			// task.log().WithField("line", string(bytes.TrimSpace(line))).
 			// 	Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
 
