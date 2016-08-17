@@ -270,7 +270,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// parse statistics from output
 	if err == nil {
-		res.Stat, err = ParseStat(out_buf)
+		res.Stat, err = ParseStat(out_buf, engine.IndexHost)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
 			err = fmt.Errorf("failed to parse statistics: %s", err)
@@ -292,8 +292,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		// if no files found it's better to report 0 matches (TODO: report 0 files also, TODO: engine configuration for this)
 		case strings.Contains(string(out_buf), "ERROR:  Input data set cannot be empty"):
 			task.log().WithError(err).Warnf("[%s]: error suppressed! empty results will be reported", TAG)
-			error_suppressed, err = true, nil // suppress error
-			res.Stat = search.NewStat()       // empty stats
+			error_suppressed, err = true, nil           // suppress error
+			res.Stat = search.NewStat(engine.IndexHost) // empty stats
 		}
 	}
 
@@ -356,13 +356,22 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 
 	// try to read all index records
 	r := bufio.NewReader(file)
+	var parts [][]byte
 	for {
 		// read line by line
-		line, err := r.ReadBytes('\n')
+		part, err := r.ReadBytes('\n')
+		if len(part) > 0 {
+			// save some data
+			parts = append(parts, part)
+		}
+
 		if err != nil {
 			// task.log().WithError(err).Debugf("[%s]: failed to read line from INDEX file", TAG) // FIXME: DEBUG
 			// will sleep a while and try again...
 		} else {
+			line := bytes.Join(parts, nil)
+			parts = parts[0:0] // clear
+
 			// task.log().WithField("line", string(bytes.TrimSpace(line))).
 			// 	Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
 

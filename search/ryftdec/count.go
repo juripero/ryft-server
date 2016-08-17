@@ -70,8 +70,9 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		defer mux.Close()
 		defer mux.ReportDone()
 
-		_, err := engine.search(task, task.queries, task.config,
+		_, stat, err := engine.search(task, task.queries, task.config,
 			engine.Backend.Count, mux, true)
+		mux.Stat = stat
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
 			mux.ReportError(err)

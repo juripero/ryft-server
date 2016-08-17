@@ -144,7 +144,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					Infof("[%s]: subtask is finished", TAG)
 				if res.Stat != nil {
 					if mux.Stat == nil {
-						mux.Stat = search.NewStat()
+						mux.Stat = search.NewStat(engine.IndexHost)
 					}
 					mux.Stat.Merge(res.Stat)
 				}

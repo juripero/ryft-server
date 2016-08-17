@@ -119,15 +119,6 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 				}
 			}
 
-			// statistics
-			if saveRecords && res.Stat != nil {
-				if mux.Stat == nil {
-					mux.Stat = res.Stat
-				} else {
-					mux.Stat.Merge(res.Stat)
-				}
-			}
-
 			return // done!
 		}
 	}

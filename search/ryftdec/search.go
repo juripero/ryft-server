@@ -77,8 +77,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		defer mux.Close()
 		defer mux.ReportDone()
 
-		_, err := engine.search(task, task.queries, task.config,
+		_, stat, err := engine.search(task, task.queries, task.config,
 			engine.Backend.Search, mux, true)
+		mux.Stat = stat
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
 			mux.ReportError(err)
@@ -102,8 +103,8 @@ func (engine *Engine) getBackendOptions() (instanceName, homeDir, mountPoint str
 type SearchFunc func(cfg *search.Config) (*search.Result, error)
 
 // process and wait all /search subtasks
-// returns number of matches
-func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, searchFunc SearchFunc, mux *search.Result, isLast bool) (uint64, error) {
+// returns number of matches and corresponding statistics
+func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, searchFunc SearchFunc, mux *search.Result, isLast bool) (uint64, *search.Statistics, error) {
 	switch query.Type {
 	case QTYPE_SEARCH:
 	case QTYPE_DATE:
@@ -115,7 +116,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 	case QTYPE_AND:
 		//if query.Left == nil || query.Right == nil {
 		if len(query.SubNodes) != 2 {
-			return 0, fmt.Errorf("invalid format for AND operator")
+			return 0, nil, fmt.Errorf("invalid format for AND operator")
 		}
 
 		task.subtaskId += 1
@@ -131,6 +132,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		task.log().WithField("temp", dat1).
 			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
+		var stat1, stat2 *search.Statistics
 		var err1, err2 error
 		var n1, n2 uint64
 
@@ -139,9 +141,9 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		tempCfg.KeepDataAs = dat1
 		tempCfg.KeepIndexAs = idx1
 		tempCfg.Delimiter = "\n\f\n"
-		n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
+		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
 		if err1 != nil {
-			return 0, err1
+			return 0, nil, err1
 		}
 
 		if n1 > 0 { // no sense to run search on empty input
@@ -153,9 +155,9 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 				tempCfg.KeepIndexAs = idx2
 			}
 			tempCfg.Delimiter = cfg.Delimiter
-			n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
+			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 			if err2 != nil {
-				return 0, err2
+				return 0, nil, err2
 			}
 
 			// merge indexes
@@ -171,12 +173,24 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			}
 		}
 
-		return n2, nil // OK
+		// combined statistics
+		var stat *search.Statistics
+		if stat1 != nil && stat2 != nil {
+			stat = search.NewStat(stat1.Host)
+			statCombine(stat, stat1)
+			statCombine(stat, stat2)
+			// keep the number of matches equal to the last stat
+			stat.Matches = stat2.Matches
+		} else {
+			stat = stat1 // just use first one
+		}
+
+		return n2, stat, nil // OK
 
 	case QTYPE_OR:
 		//if query.Left == nil || query.Right == nil {
 		if len(query.SubNodes) != 2 {
-			return 0, fmt.Errorf("invalid format for OR operator")
+			return 0, nil, fmt.Errorf("invalid format for OR operator")
 		}
 
 		task.subtaskId += 1
@@ -190,22 +204,23 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		task.log().WithField("temp", []string{tempResultA, tempResultB}).
 			Infof("[%s]/%d: running OR", TAG, task.subtaskId)
+		var stat1, stat2 *search.Statistics
 		var err1, err2 error
 		var n1, n2 uint64
 
 		// left: save results to temporary file "A"
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = tempResultA
-		n1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
+		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
 		if err1 != nil {
-			return 0, err1
+			return 0, nil, err1
 		}
 
 		// right: save results to temporary file "B"
 		tempCfg.KeepDataAs = tempResultB
-		n2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
+		n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 		if err2 != nil {
-			return 0, err2
+			return 0, nil, err2
 		}
 
 		// combine two temporary files into one
@@ -213,44 +228,52 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			// output file
 			f, err := os.Create(filepath.Join(mountPoint, homeDir, cfg.KeepDataAs))
 			if err != nil {
-				return 0, fmt.Errorf("failed to create output file: %s", err)
+				return 0, nil, fmt.Errorf("failed to create output file: %s", err)
 			}
 			defer f.Close()
 
 			// first input file
 			a, err := os.Open(filepath.Join(mountPoint, homeDir, tempResultA))
 			if err != nil {
-				return 0, fmt.Errorf("failed to open first input file: %s", err)
+				return 0, nil, fmt.Errorf("failed to open first input file: %s", err)
 			}
 			defer a.Close()
 
 			// second input file
 			b, err := os.Open(filepath.Join(mountPoint, homeDir, tempResultB))
 			if err != nil {
-				return 0, fmt.Errorf("failed to open second input file: %s", err)
+				return 0, nil, fmt.Errorf("failed to open second input file: %s", err)
 			}
 			defer b.Close()
 
 			// copy first file
 			_, err = io.Copy(f, a)
 			if err != nil {
-				return 0, fmt.Errorf("failed to copy first file: %s", err)
+				return 0, nil, fmt.Errorf("failed to copy first file: %s", err)
 			}
 
 			// copy second file
 			_, err = io.Copy(f, b)
 			if err != nil {
-				return 0, fmt.Errorf("failed to copy second file: %s", err)
+				return 0, nil, fmt.Errorf("failed to copy second file: %s", err)
 			}
 		}
 
-		return n1 + n2, nil // OK
+		// combined statistics
+		var stat *search.Statistics
+		if stat1 != nil && stat2 != nil {
+			stat = search.NewStat(stat1.Host)
+			statCombine(stat, stat1)
+			statCombine(stat, stat2)
+		}
+
+		return n1 + n2, stat, nil // OK
 
 	case QTYPE_XOR:
-		return 0, fmt.Errorf("XOR is not implemented yet")
+		return 0, nil, fmt.Errorf("XOR is not implemented yet")
 
 	default:
-		return 0, fmt.Errorf("%d is unknown query type", query.Type)
+		return 0, nil, fmt.Errorf("%d is unknown query type", query.Type)
 	}
 
 	updateConfig(cfg, query)
@@ -262,14 +285,30 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 	res, err := searchFunc(cfg)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	task.drainResults(mux, res, isLast)
 	if res.Stat != nil {
-		return res.Stat.Matches, nil // OK
+		return res.Stat.Matches, res.Stat, nil // OK
 	}
-	return 0, nil // OK
+	return 0, nil, nil // OK?
+}
+
+// combine statistics
+func statCombine(mux *search.Statistics, stat *search.Statistics) {
+	mux.Matches += stat.Matches
+	mux.TotalBytes += stat.TotalBytes
+
+	mux.Duration += stat.Duration
+	mux.FabricDuration += stat.FabricDuration
+
+	// update data rates
+	mux.FabricDataRate = (float64(mux.TotalBytes) / 1024 / 1024) / (float64(mux.FabricDuration) / 1000)
+	mux.DataRate = (float64(mux.TotalBytes) / 1024 / 1024) / (float64(mux.Duration) / 1000)
+
+	// save details
+	mux.Details = append(mux.Details, stat)
 }
 
 // update search configuration

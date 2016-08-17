@@ -112,6 +112,9 @@ type Server struct {
 	busynessChanged   chan int32
 
 	BooleansPerExpression map[string]int `yaml:"booleans-per-expression"`
+
+	// consul client is cached here
+	consulClient interface{}
 }
 
 // config file name kingpin.Value
@@ -444,7 +447,7 @@ func (s *Server) startUpdatingBusyness() {
 				if metric != reported {
 					reported = metric
 					log.WithField("metric", metric).Debug("metric reporting...")
-					err := UpdateConsulMetric(int(metric))
+					err := s.updateConsulMetric(int(metric))
 					if err != nil {
 						log.WithError(err).Warnf("failed to update consul metric")
 					}
