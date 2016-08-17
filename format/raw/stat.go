@@ -44,7 +44,7 @@ type Statistics struct {
 	Duration uint64  `json:"duration" msgpack:"duration"`
 	DataRate float64 `json:"dataRate" msgpack:"dataRate"`
 
-	FabricDuration uint64  `json:"-" msgpack:"-"`
+	FabricDuration uint64  `json:"fabricDuration" msgpack:"fabricDuration"`
 	FabricDataRate float64 `json:"fabricDataRate" msgpack:"fabricDataRate"`
 
 	Host    string        `json:"host,omitempty" msgpack:"host,omitempty"`
