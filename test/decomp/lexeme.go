@@ -104,3 +104,8 @@ func (lex Lexeme) IsCurrency() bool {
 func (lex Lexeme) isRegex() bool {
 	return lex.token == IDENT && (strings.EqualFold(lex.literal, "REGEX") || strings.EqualFold(lex.literal, "REGEXP"))
 }
+
+// is "IPv4" search type?
+func (lex Lexeme) isIPv4() bool {
+	return lex.token == IDENT && strings.EqualFold(lex.literal, "IPv4")
+}

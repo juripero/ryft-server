@@ -110,6 +110,9 @@ func TestParserSimple(t *testing.T) {
 			`  (RECORD.body CONTAINS REGEXP("\w+", CASELESS, D=5))`,
 			`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS,D=5))[rs]}`},
 		{
+			`  (RECORD.body CONTAINS IPV4(IP > "127.0.0.1"))`,
+			`P{(RECORD.body CONTAINS IPV4(IP>"127.0.0.1"))[ipv4]}`},
+		{
 			`  (RAW_TEXT CONTAINS "100")`,
 			`P{(RAW_TEXT CONTAINS "100")}`},
 		{
