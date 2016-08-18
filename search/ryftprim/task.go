@@ -65,8 +65,8 @@ type Task struct {
 	indexChan            chan search.Index // INDEX to DATA
 	cancelIndexChan      chan interface{}  // to cancel INDEX processing (hard stop)
 	cancelDataChan       chan interface{}  // to cancel DATA processing (hard stop)
-	indexStopped         bool              // soft stop
-	dataStopped          bool              // soft stop
+	indexStopped         int32             // soft stop
+	dataStopped          int32             // soft stop
 	subtasks             sync.WaitGroup
 
 	// some processing statistics
@@ -120,10 +120,10 @@ func (task *Task) cancelData() {
 
 // Stop INDEX processing subtask (soft stop).
 func (task *Task) stopIndex() {
-	task.indexStopped = true
+	atomic.AddInt32(&task.indexStopped, 1)
 }
 
 // Stop DATA processing subtask (soft stop).
 func (task *Task) stopData() {
-	task.dataStopped = true
+	atomic.AddInt32(&task.dataStopped, 1)
 }

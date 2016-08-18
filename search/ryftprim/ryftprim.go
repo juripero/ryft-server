@@ -38,6 +38,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
@@ -389,7 +390,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 		}
 
 		// check for soft stops
-		if task.indexStopped {
+		if atomic.LoadInt32(&task.indexStopped) != 0 {
 			task.log().Debugf("[%s]: INDEX processing stopped", TAG)
 			task.log().WithField("data_len", task.totalDataLength).
 				Infof("[%s]: total DATA length expected", TAG)
@@ -575,7 +576,7 @@ func (task *Task) readDataFile(file *bufio.Reader, length uint64, poll time.Dura
 		}
 
 		// check for soft stops
-		if task.dataStopped && pos >= length {
+		if atomic.LoadInt32(&task.dataStopped) != 0 && pos >= length {
 			task.log().Debugf("[%s]: DATA processing stopped", TAG)
 			return buf, nil // fmt.Errorf("stopped")
 		}
