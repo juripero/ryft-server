@@ -356,7 +356,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 	// try to read all index records
 	r := bufio.NewReader(file)
 	var parts [][]byte
-	for {
+	for attempt := 0; attempt < engine.ReadFilePollLimit; attempt++ {
 		// read line by line
 		part, err := r.ReadBytes('\n')
 		if len(part) > 0 {
@@ -370,6 +370,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 		} else {
 			line := bytes.Join(parts, nil)
 			parts = parts[0:0] // clear
+			attempt = 0
 
 			// task.log().WithField("line", string(bytes.TrimSpace(line))).
 			// 	Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
@@ -409,6 +410,11 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 			return
 		}
 	}
+
+	task.log().Warnf("index processing cancelled by attempt limit %s (%dx%s)",
+		engine.ReadFilePollTimeout*time.Duration(engine.ReadFilePollLimit),
+		engine.ReadFilePollLimit, engine.ReadFilePollTimeout)
+	res.ReportError(fmt.Errorf("index processing cancelled by attempt limit"))
 }
 
 // Process the `ryftprim` DATA results file.
