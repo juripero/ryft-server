@@ -149,6 +149,19 @@ func (s *Server) search(ctx *gin.Context) {
 			err.Error(), "failed to start search"))
 	}
 
+	// in case of unexpected panic
+	// we need to cancel search request
+	// otherwise resource leaks are possible
+	defer func() {
+		if !res.IsDone() {
+			errors, records := res.Cancel() // cancel processing
+			if errors > 0 || records > 0 {
+				log.WithField("errors", errors).WithField("records", records).
+					Debugf("***some errors/records are ignored")
+			}
+		}
+	}()
+
 	s.onSearchStarted(cfg)
 	defer s.onSearchStopped(cfg)
 
