@@ -168,7 +168,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 					filepath.Join(mountPoint, homeDir, idx2),
 					tempCfg.Delimiter)
 				if err2 != nil {
-					return 0, err2
+					return 0, nil, err2
 				}
 			}
 		}

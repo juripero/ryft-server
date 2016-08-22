@@ -31,11 +31,8 @@
 package ryftone
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"strconv"
 
 	"github.com/getryft/ryft-server/search"
@@ -47,7 +44,7 @@ func ParseIndex(buf []byte) (index search.Index, err error) {
 	fields := bytes.Split(bytes.TrimSpace(buf), sep)
 	n := len(fields)
 	if n < 4 {
-		return index, fmt.Errorf("invalid number of fields in %q", string(buf))
+		return index, fmt.Errorf("invalid number of fields in '%s'", string(buf))
 	}
 
 	// NOTE: filename (first field) may contains ','
@@ -82,89 +79,4 @@ func ParseIndex(buf []byte) (index search.Index, err error) {
 	index.Fuzziness = uint8(fuzz)
 
 	return // OK
-}
-
-// ReadIndex reads Index from custom line.
-func ReadIndex(r *bufio.Reader) (search.Index, error) {
-	// read line by line
-	line, err := r.ReadBytes('\n')
-	if err != nil {
-		return search.Index{}, err
-	}
-
-	return ParseIndex(line)
-}
-
-// unwind `input` index based on `base` and save to `output`
-// delimiter which was used to create base data file
-func UnwindIndex(outputFileName, baseFileName, inputFileName, delimiter string) error {
-	delimiterLen := uint64(len(delimiter))
-
-	// open base index file
-	baseFd, err := os.Open(baseFileName)
-	if err != nil {
-		return fmt.Errorf("failed to open base index file: %s", err)
-	}
-	defer baseFd.Close() // close at the end
-
-	// open input index file
-	inputFd, err := os.Open(inputFileName)
-	if err != nil {
-		return fmt.Errorf("failed to open input index file: %s", err)
-	}
-	defer inputFd.Close() // close at the end
-
-	// create output index file
-	outputFd, err := os.Create(outputFileName)
-	if err != nil {
-		return fmt.Errorf("failed to create output index file: %s", err)
-	}
-	defer outputFd.Close() // close at the end
-
-	// try to read all input indexes
-	outputWr := bufio.NewWriter(outputFd)
-	defer outputWr.Flush()
-
-	inputRd := bufio.NewReader(inputFd)
-	baseRd := bufio.NewReader(baseFd)
-	var baseOffset uint64 = 0
-	var base search.Index
-	for {
-		// read input index
-		in, err := ReadIndex(inputRd)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return fmt.Errorf("failed to read input index: %s", err)
-		}
-
-		if in.Offset < baseOffset {
-			return fmt.Errorf("bad index files: input offset %d < base offset %d", in.Offset, baseOffset)
-		}
-
-		// find corresponding base index
-		for baseOffset+base.Length < in.Offset {
-			if base.Length != 0 {
-				baseOffset += base.Length + delimiterLen
-			}
-			base, err = ReadIndex(baseRd)
-			if err != nil {
-				return fmt.Errorf("failed to read base index: %s", err)
-			}
-		}
-
-		in.File = base.File
-		in.Offset += base.Offset - baseOffset
-		// in.Length += 0
-		// in.Fuzziness += 0
-
-		_, err = outputWr.WriteString(fmt.Sprintf("%s,%d,%d,%d\n",
-			in.File, in.Offset, in.Length, in.Fuzziness))
-		if err != nil {
-			return fmt.Errorf("failed to write output index: %s", err)
-		}
-	}
-
-	return nil // OK
 }
