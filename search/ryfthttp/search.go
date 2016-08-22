@@ -73,6 +73,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		defer res.Close()
 		defer res.ReportDone()
 
+		done_ch := make(chan struct{}, 1)
+		defer close(done_ch)
+
+		cancel_ch := make(chan struct{}, 1)
+		req.Cancel = cancel_ch
+		//var cancelled int32
+
 		// do HTTP request
 		resp, err := engine.httpClient.Do(req)
 		if err != nil {
@@ -93,9 +100,21 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// read response and report records and/or statistics
 		dec, _ := codec.NewStreamDecoder(resp.Body)
 
-		// TODO: task cancellation!!
+		// handle task cancellation
+		go func() {
+			select {
+			case <-res.CancelChan:
+				task.log().Warnf("[%s]: cancelled by user...", TAG)
+				// atomic.StoreInt32(&cancelled, 1)
+				close(cancel_ch) // cancel the request
 
-		for {
+			case <-done_ch:
+				task.log().Debugf("[%s]: finished", TAG)
+				return
+			}
+		}()
+
+		for /*atomic.LoadInt32(&cancelled) != 0*/ {
 			tag, _ := dec.NextTag()
 			switch tag {
 			case codec.TAG_EOF:
@@ -142,6 +161,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 			default:
 				task.log().WithField("tag", tag).Errorf("unknown tag, ignored")
+				return // no sense to continue processing
 			}
 		}
 	}()

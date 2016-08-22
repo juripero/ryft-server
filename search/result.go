@@ -54,11 +54,11 @@ type Result struct {
 	// Cancel channel is used to notify search engine
 	// to stop processing immideatelly (client -> Engine)
 	CancelChan  chan interface{}
-	isCancelled bool
+	isCancelled int32
 
 	// Done channel is used to notify client search is done (Engine -> client)
 	DoneChan chan interface{}
-	isDone   bool
+	isDone   int32
 
 	// Search processing statistics
 	Stat *Statistics
@@ -81,10 +81,10 @@ func NewResult() *Result {
 func (res Result) String() string {
 	if res.Stat != nil {
 		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, stat:%s}",
-			res.recordsReported, res.errorsReported, res.isDone, res.Stat)
+			res.recordsReported, res.errorsReported, res.isDone != 0, res.Stat)
 	} else {
 		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, no stat}",
-			res.recordsReported, res.errorsReported, res.isDone)
+			res.recordsReported, res.errorsReported, res.isDone != 0)
 	}
 }
 
@@ -111,22 +111,55 @@ func (res *Result) RecordsReported() uint64 {
 }
 
 // Cancel stops the search processing.
-func (res *Result) Cancel() {
-	if !res.isDone {
-		res.isCancelled = true
+//  return number of ignored errors and records
+func (res *Result) Cancel() (errors uint64, records uint64) {
+	if !res.IsDone() {
+		atomic.AddInt32(&res.isCancelled, 1)
 		res.CancelChan <- nil
 	}
+
+	for !res.IsDone() {
+		select {
+		case err, ok := <-res.ErrorChan:
+			if ok && err != nil {
+				errors += 1
+			}
+
+		case rec, ok := <-res.RecordChan:
+			if ok && rec != nil {
+				records += 1
+			}
+
+		case <-res.DoneChan:
+			// drain the error channel
+			for _ = range res.ErrorChan {
+				errors += 1
+			}
+
+			// drain the record channel
+			for _ = range res.RecordChan {
+				records += 1
+			}
+		}
+	}
+
+	return // done!
 }
 
 // Is the result cancelled?
 func (res *Result) IsCancelled() bool {
-	return res.isCancelled
+	return atomic.LoadInt32(&res.isCancelled) != 0
 }
 
 // ReportDone sends 'done' notification.
 func (res *Result) ReportDone() {
-	res.isDone = true
+	atomic.AddInt32(&res.isDone, 1)
 	res.DoneChan <- nil
+}
+
+// Is the result done?
+func (res *Result) IsDone() bool {
+	return atomic.LoadInt32(&res.isDone) != 0
 }
 
 // Close closes all channels.

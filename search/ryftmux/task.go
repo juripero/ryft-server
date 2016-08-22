@@ -157,7 +157,11 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 			task.log().Infof("[%s]: cancel all unfinished subtasks", TAG)
 			for _, r := range task.results {
 				if !finished[r] {
-					r.Cancel()
+					errors, records := r.Cancel()
+					if errors > 0 || records > 0 {
+						task.log().WithField("errors", errors).WithField("records", records).
+							Debugf("[%s]: some errors/records are ignored", TAG)
+					}
 				}
 			}
 

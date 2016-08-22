@@ -65,8 +65,10 @@ type Task struct {
 	indexChan            chan search.Index // INDEX to DATA
 	cancelIndexChan      chan interface{}  // to cancel INDEX processing (hard stop)
 	cancelDataChan       chan interface{}  // to cancel DATA processing (hard stop)
-	indexStopped         int32             // soft stop
-	dataStopped          int32             // soft stop
+	indexCancelled       int32
+	indexStopped         int32 // soft stop
+	dataCancelled        int32
+	dataStopped          int32 // soft stop
 	subtasks             sync.WaitGroup
 
 	// some processing statistics
@@ -99,6 +101,7 @@ func (task *Task) prepareProcessing() {
 
 // Cancel INDEX processing subtask (hard stop).
 func (task *Task) cancelIndex() {
+	atomic.AddInt32(&task.indexCancelled, 1)
 	task.cancelIndexChan <- nil
 	task.stopIndex()
 
@@ -106,14 +109,18 @@ func (task *Task) cancelIndex() {
 	// a chance to finish it's work (it might be blocked sending
 	// index record to the task.indexChan which DATA processing
 	// is not going to read anymore)
-	for idx := range task.indexChan {
-		task.log().WithField("index", idx).
-			Debugf("[%s]: INDEX ignored", TAG)
+	ignored := 0
+	for _ = range task.indexChan {
+		// task.log().WithField("index", idx).
+		// 	Debugf("[%s]: INDEX ignored", TAG)
+		ignored += 1
 	}
+	task.log().Debugf("[%s]: %d INDEXes are ignored", TAG, ignored)
 }
 
 // Cancel DATA processing subtask (hard stop).
 func (task *Task) cancelData() {
+	atomic.AddInt32(&task.dataCancelled, 1)
 	task.cancelDataChan <- nil
 	task.stopData()
 }

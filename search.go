@@ -196,7 +196,12 @@ func (s *Server) search(ctx *gin.Context) {
 	for {
 		select {
 		case <-gone:
-			res.Cancel() // cancel processing
+			log.Warnf("cancelling by user...")
+			errors, records := res.Cancel() // cancel processing
+			if errors > 0 || records > 0 {
+				log.WithField("errors", errors).WithField("records", records).
+					Debugf("some errors/records are ignored")
+			}
 			return
 
 		case rec, ok := <-res.RecordChan:
