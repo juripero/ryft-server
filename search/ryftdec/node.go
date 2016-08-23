@@ -46,6 +46,7 @@ const (
 	QTYPE_NUMERIC
 	QTYPE_CURRENCY
 	QTYPE_REGEX
+	QTYPE_IPV4
 
 	QTYPE_AND
 	QTYPE_OR
@@ -217,6 +218,8 @@ func expressionType(expression string) QueryType {
 		return QTYPE_CURRENCY
 	case strings.Contains(expression, "REGEX("):
 		return QTYPE_REGEX
+	case strings.Contains(expression, "IPV4("):
+		return QTYPE_IPV4
 	default:
 		return QTYPE_SEARCH
 	}
@@ -236,6 +239,8 @@ func expressionMode(expression string) string {
 		return "ns"
 	case strings.Contains(expression, "REGEX("):
 		return "rs"
+	case strings.Contains(expression, "IPV4("):
+		return "ipv4"
 	default:
 		return "es"
 	}
@@ -246,7 +251,8 @@ func (q QueryType) IsSearch() bool {
 	switch q {
 	case QTYPE_SEARCH, QTYPE_DATE,
 		QTYPE_TIME, QTYPE_NUMERIC,
-		QTYPE_CURRENCY, QTYPE_REGEX:
+		QTYPE_CURRENCY, QTYPE_REGEX,
+		QTYPE_IPV4:
 		return true
 	}
 

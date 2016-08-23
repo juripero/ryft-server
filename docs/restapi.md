@@ -119,6 +119,7 @@ Multiple files can be provided as:
 - `ts` for time search
 - `ns` for numeric or currency search
 - `rs` for regex search
+- `ipv4` for IPv4 search
 
 If no search mode is specified, fuzzy hamming search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
