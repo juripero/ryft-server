@@ -12,10 +12,7 @@ import (
 type Parser struct {
 	scanner  *Scanner
 	baseOpts Options
-	buf      struct {
-		lex Lexeme // last read lexeme
-		n   int    // buffer size (max=1)
-	}
+	lexBuf   []Lexeme // last read lexem
 }
 
 // NewParser returns a new instance of Parser.
@@ -27,21 +24,19 @@ func NewParser(r io.Reader) *Parser {
 // If a token has been unscanned then read that instead.
 func (p *Parser) scan() Lexeme {
 	// If we have a lexeme on the buffer, then return it.
-	if p.buf.n != 0 {
-		p.buf.n = 0
-		return p.buf.lex
+	if n := len(p.lexBuf); n > 0 {
+		lex := p.lexBuf[n-1]
+		p.lexBuf = p.lexBuf[0 : n-1] // pop
+		return lex
 	}
 
 	// Otherwise read the next lexeme from the scanner.
-	// And save it to the buffer in case we unscan later.
-	p.buf.lex = p.scanner.Scan()
-
-	return p.buf.lex
+	return p.scanner.Scan()
 }
 
 // unscan pushes the previously read lexeme back onto the buffer.
-func (p *Parser) unscan() {
-	p.buf.n = 1
+func (p *Parser) unscan(lex Lexeme) {
+	p.lexBuf = append(p.lexBuf, lex) // push
 }
 
 // scanIgnoreSpace scans the next non-whitespace or EOF token.
@@ -80,7 +75,7 @@ func (p *Parser) parseQuery0() Query {
 			}
 			res.Arguments = append(res.Arguments, arg)
 		} else {
-			p.unscan()
+			p.unscan(lex)
 			return res
 		}
 	}
@@ -99,7 +94,7 @@ func (p *Parser) parseQuery1() Query {
 			}
 			res.Arguments = append(res.Arguments, arg)
 		} else {
-			p.unscan()
+			p.unscan(lex)
 			return res
 		}
 	}
@@ -118,7 +113,7 @@ func (p *Parser) parseQuery2() Query {
 			}
 			res.Arguments = append(res.Arguments, arg)
 		} else {
-			p.unscan()
+			p.unscan(lex)
 			return res
 		}
 	}
@@ -129,6 +124,7 @@ func (p *Parser) parseQuery3() Query {
 	if lex := p.scanIgnoreSpace(); lex.token == LPAREN {
 		arg := p.parseQuery0()
 		if end := p.scanIgnoreSpace(); end.token != RPAREN {
+			p.unscan(end)
 			panic(fmt.Errorf("%q found instead of closing )", end))
 		}
 
@@ -136,7 +132,7 @@ func (p *Parser) parseQuery3() Query {
 		res.Arguments = append(res.Arguments, arg)
 		return res
 	} else {
-		p.unscan()
+		p.unscan(lex)
 		q := p.parseSimpleQuery()
 		return Query{Simple: q}
 	}
@@ -176,19 +172,22 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 						buf.WriteString(lex.literal)
 						buf.WriteString(end.literal)
 					} else {
+						p.unscan(end)
 						panic(fmt.Errorf("no closing ] found"))
 					}
 				} else {
+					p.unscan(lex)
 					panic(fmt.Errorf("no field name found for RECORD"))
 				}
 			} else {
-				p.unscan()
+				p.unscan(dot)
 				break
 			}
 		}
 		input = buf.String()
 
 	default:
+		p.unscan(lex)
 		panic(fmt.Errorf("found %q, expected RAW_TEXT or RECORD", lex))
 	}
 
@@ -200,6 +199,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			operator = lex.literal
 
 		default:
+			p.unscan(lex)
 			panic(fmt.Errorf("found %q, expected CONTAINS or EQUALS", lex))
 		}
 	}
@@ -261,6 +261,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression = p.parseStringExpr(lex)
 
 		default:
+			p.unscan(lex)
 			panic(fmt.Errorf("%q is unexpected expression", lex))
 		}
 	}
@@ -279,6 +280,7 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 	case LPAREN:
 		buf.WriteString(beg.literal)
 	default:
+		p.unscan(beg)
 		panic(fmt.Errorf("%q found instead of (", beg))
 	}
 
@@ -291,6 +293,7 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 		case LPAREN:
 			deep += 1
 		case EOF, ILLEGAL:
+			p.unscan(lex)
 			panic(fmt.Errorf("no expression ending found"))
 		}
 		buf.WriteString(lex.literal)
@@ -308,6 +311,7 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	case LPAREN:
 		break // OK
 	default:
+		p.unscan(beg)
 		panic(fmt.Errorf("%q found instead of (", beg))
 	}
 
@@ -317,7 +321,8 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 		res = p.parseStringExpr(lex)
 
 	default:
-		panic(fmt.Errorf("no expression found"))
+		p.unscan(lex)
+		panic(fmt.Errorf("no string expression found"))
 	}
 
 	// read options
@@ -325,7 +330,7 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	case COMMA:
 		opts = p.parseSearchOptions(opts)
 	default:
-		p.unscan()
+		p.unscan(lex)
 	}
 
 	// right paren last
@@ -333,6 +338,7 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	case RPAREN:
 		break // OK
 	default:
+		p.unscan(end)
 		panic(fmt.Errorf("%q found instead of )", end))
 	}
 
@@ -347,68 +353,48 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 			switch {
 
 			// fuzziness distance
-			case strings.EqualFold(lex.literal, "DIST"),
+			case strings.EqualFold(lex.literal, "FUZZINESS_DISTANCE"),
+				strings.EqualFold(lex.literal, "FUZZINESS"),
+				strings.EqualFold(lex.literal, "DISTANCE"),
+				strings.EqualFold(lex.literal, "DIST"),
 				strings.EqualFold(lex.literal, "D"):
 				if eq := p.scanIgnoreSpace(); eq.token == EQ {
-					if val := p.scanIgnoreSpace(); val.token == INT {
-						d, err := strconv.ParseInt(val.literal, 10, 32)
-						if err != nil {
-							panic(fmt.Errorf("failed to parse integer from %q: %s", val, err))
-						}
-						if d < 0 || 64*1024 < d {
-							panic(fmt.Errorf("distance %d is out of range", d))
-						}
-						opts.Dist = uint(d) // OK
-					} else {
-						panic(fmt.Errorf("%q found instead of integer value", val))
-					}
+					opts.Dist = uint(p.parseIntVal(0, 64*1024))
 				} else {
+					p.unscan(eq)
 					panic(fmt.Errorf("%q found instead of =", eq))
 				}
 
 			// surrounding width
-			case strings.EqualFold(lex.literal, "WIDTH"),
+			case strings.EqualFold(lex.literal, "SURROUNDING_WIDTH"),
+				strings.EqualFold(lex.literal, "SURROUNDING"),
+				strings.EqualFold(lex.literal, "WIDTH"),
 				strings.EqualFold(lex.literal, "W"):
 				if eq := p.scanIgnoreSpace(); eq.token == EQ {
-					if val := p.scanIgnoreSpace(); val.token == INT {
-						w, err := strconv.ParseInt(val.literal, 10, 32)
-						if err != nil {
-							panic(fmt.Errorf("failed to parse integer from %q: %s", val, err))
-						}
-						if w < 0 || 64*1024 < w {
-							panic(fmt.Errorf("width %d is out of range", w))
-						}
-						opts.Width = uint(w) // OK
-					} else {
-						panic(fmt.Errorf("%q found instead of integer value", val))
-					}
+					opts.Width = uint(p.parseIntVal(0, 64*1024))
 				} else {
+					p.unscan(eq)
 					panic(fmt.Errorf("%q found instead of =", eq))
 				}
 
 			// case sensitivity flag
-			case strings.EqualFold(lex.literal, "CS"):
+			case strings.EqualFold(lex.literal, "CASE_SENSITIVE"),
+				strings.EqualFold(lex.literal, "CS"):
 				if eq := p.scanIgnoreSpace(); eq.token == EQ {
-					if val := p.scanIgnoreSpace(); val.token == INT || val.token == IDENT {
-						cs, err := strconv.ParseBool(val.literal)
-						if err != nil {
-							panic(fmt.Errorf("failed to parse boolean from %q: %s", val, err))
-						}
-						opts.Cs = cs // OK
-					} else {
-						panic(fmt.Errorf("%q found instead of boolean value", val))
-					}
+					opts.Cs = p.parseBoolVal()
 				} else {
+					p.unscan(eq)
 					panic(fmt.Errorf("%q found instead of =", eq))
 				}
 
 			default:
+				p.unscan(lex)
 				panic(fmt.Errorf("unknown argument %q found", lex))
 			}
 		} else if lex.token == COMMA {
 			continue
 		} else { // done
-			p.unscan()
+			p.unscan(lex)
 			break
 		}
 	}
@@ -426,10 +412,43 @@ func (p *Parser) parseStringExpr(start Lexeme) string {
 		if lex := p.scanIgnoreSpace(); lex.token == STRING || lex.token == WCARD {
 			buf.WriteString(lex.literal)
 		} else {
-			p.unscan()
+			p.unscan(lex)
 			break
 		}
 	}
 
 	return buf.String()
+}
+
+// parse integer value
+func (p *Parser) parseIntVal(min, max int64) int64 {
+	if val := p.scanIgnoreSpace(); val.token == INT {
+		i, err := strconv.ParseInt(val.literal, 10, 64)
+		if err != nil {
+			p.unscan(val)
+			panic(fmt.Errorf("failed to parse integer from %q: %s", val, err))
+		}
+		if i < min || max < i {
+			p.unscan(val)
+			panic(fmt.Errorf("value %d is out of range [%d,%d]", i, min, max))
+		}
+		return i // OK
+	} else {
+		p.unscan(val)
+		panic(fmt.Errorf("%q found instead of integer value", val))
+	}
+}
+
+// parse boolean value
+func (p *Parser) parseBoolVal() bool {
+	if val := p.scanIgnoreSpace(); val.token == INT || val.token == IDENT {
+		b, err := strconv.ParseBool(val.literal)
+		if err != nil {
+			panic(fmt.Errorf("failed to parse boolean from %q: %s", val, err))
+		}
+		return b // OK
+	} else {
+		p.unscan(val)
+		panic(fmt.Errorf("%q found instead of boolean value", val))
+	}
 }
