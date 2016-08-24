@@ -57,6 +57,9 @@ type Task struct {
 	KeepDataFile  bool
 	Delimiter     string
 
+	UnwindIndexesBasedOn *search.IndexFile
+	SaveUpdatedIndexesTo *search.IndexFile
+
 	// `ryftprim` process & output
 	tool_args []string      // command line arguments
 	tool_cmd  *exec.Cmd     // `ryftprim` executable process
@@ -108,10 +111,11 @@ func (task *Task) cancelIndex() {
 	// a chance to finish it's work (it might be blocked sending
 	// index record to the task.indexChan which DATA processing
 	// is not going to read anymore)
-	for idx := range task.indexChan {
-		task.log().WithField("index", idx).
-			Debugf("[%s]: INDEX ignored", TAG)
+	ignored := 0
+	for _ = range task.indexChan {
+		ignored++
 	}
+	task.log().Debugf("[%s]: %d INDEXes ignored", TAG, ignored)
 }
 
 // Cancel DATA processing subtask (hard stop).

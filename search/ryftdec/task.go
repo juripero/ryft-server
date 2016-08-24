@@ -98,7 +98,7 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId)
+				//task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId)
 				if saveRecords {
 					mux.ReportRecord(rec)
 				}
@@ -113,7 +113,7 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 
 			// drain the record channel
 			for rec := range res.RecordChan {
-				task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId)
+				//task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId)
 				if saveRecords {
 					mux.ReportRecord(rec)
 				}

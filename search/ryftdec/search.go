@@ -106,11 +106,12 @@ type SearchFunc func(cfg *search.Config) (*search.Result, error)
 // returns number of matches and corresponding statistics
 func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, searchFunc SearchFunc, mux *search.Result, isLast bool) (uint64, *search.Statistics, error) {
 	switch query.Type {
-	case QTYPE_SEARCH:
-	case QTYPE_DATE:
-	case QTYPE_TIME:
-	case QTYPE_NUMERIC:
-	case QTYPE_CURRENCY:
+	case QTYPE_SEARCH,
+		QTYPE_DATE,
+		QTYPE_TIME,
+		QTYPE_NUMERIC,
+		QTYPE_CURRENCY,
+		QTYPE_REGEX:
 		break // search later
 
 	case QTYPE_AND:
@@ -125,10 +126,8 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			task.Identifier, task.subtaskId, task.extension))
 		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
 			task.Identifier, task.subtaskId, ".txt"))
-		idx2 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-b%s",
-			task.Identifier, task.subtaskId, ".txt"))
-		//defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
-		//defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
+		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
+		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
 
 		task.log().WithField("temp", dat1).
 			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
@@ -140,7 +139,9 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = dat1
 		tempCfg.KeepIndexAs = idx1
-		tempCfg.Delimiter = "\n\f\n"
+		tempCfg.Delimiter = "\n\f\n\f\n"
+		tempCfg.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
+		tempCfg.SaveUpdatedIndexesTo = search.NewIndexFile(tempCfg.Delimiter)
 		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
 		if err1 != nil {
 			return 0, nil, err1
@@ -150,26 +151,17 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			// right: read input from temporary file
 			tempCfg.Files = []string{dat1}
 			tempCfg.KeepDataAs = cfg.KeepDataAs
-			if len(cfg.KeepIndexAs) > 0 {
-				// defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx2))
-				tempCfg.KeepIndexAs = idx2
-			}
+			tempCfg.KeepIndexAs = cfg.KeepIndexAs
 			tempCfg.Delimiter = cfg.Delimiter
+			tempCfg.UnwindIndexesBasedOn = tempCfg.SaveUpdatedIndexesTo
+			tempCfg.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
 			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 			if err2 != nil {
 				return 0, nil, err2
 			}
 
-			// merge indexes
 			if len(cfg.KeepIndexAs) > 0 {
-				err2 = ryftone.UnwindIndex(
-					filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
-					filepath.Join(mountPoint, homeDir, idx1),
-					filepath.Join(mountPoint, homeDir, idx2),
-					tempCfg.Delimiter)
-				if err2 != nil {
-					return 0, nil, err2
-				}
+				// TODO: save updated indexes back to text file!
 			}
 		}
 

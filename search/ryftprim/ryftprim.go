@@ -152,6 +152,10 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// limit number of records
 	task.Limit = uint64(cfg.Limit)
 
+	// unwind index feature
+	task.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
+	task.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
+
 	return nil // OK
 }
 
@@ -437,7 +441,17 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 	// try to process all INDEX records
 	r := bufio.NewReader(file)
+	offset := uint64(0)
 	for index := range task.indexChan {
+		if task.UnwindIndexesBasedOn != nil {
+			tmp := task.UnwindIndexesBasedOn.Unwind(index)
+			// task.log().Debugf("unwind %s => %s", index, tmp)
+			index = tmp
+		}
+		if task.SaveUpdatedIndexesTo != nil {
+			task.SaveUpdatedIndexesTo.AddIndex(index)
+		}
+
 		// trim mount point from file name! TODO: special option for this?
 		index.File = strings.TrimPrefix(index.File,
 			filepath.Join(engine.MountPoint, engine.HomeDir))
@@ -474,6 +488,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		}
 
 		res.ReportRecord(rec)
+		offset += index.Length
 
 		// read and check delimiter
 		if len(task.Delimiter) > 0 {
@@ -488,7 +503,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 			}
 			if string(tmp) != task.Delimiter {
 				task.log().WithField("actual", tmp).WithField("expected", task.Delimiter).
-					Warnf("unexpected delimiter found")
+					Warnf("unexpected delimiter found at %d", offset)
 				tmp = nil // force to cancel futher processing
 			}
 
@@ -500,6 +515,8 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 				return // no sense to continue processing
 			}
+
+			offset += uint64(len(task.Delimiter))
 		}
 	}
 }
