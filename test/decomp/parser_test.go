@@ -12,6 +12,59 @@ func testNewParser(data string) *Parser {
 	return NewParser(bytes.NewBufferString(data))
 }
 
+// test for panics
+func TestParserBadQueries(t *testing.T) {
+	data := []struct {
+		d string
+		e string
+	}{
+		{`(RAW_TEXT NOT_CONTAINS FHS)`, "found instead of ("},
+		{`(RAW_TEXT NOT_CONTAINS FHS(123))`, "no string expression found"},
+		{`(RAW_TEXT NOT_CONTAINS FHS("test" 123`, "found instead of )"},
+
+		{`(RAW_TEXT NOT_CONTAINS DATE 123)`, "found instead of ("},
+		{`(RAW_TEXT NOT_CONTAINS DATE (123`, "no expression ending found"},
+		{`(RAW_TEXT NOT_CONTAINS DATE (123()`, "no expression ending found"},
+
+		{`(RAW_TEXT NOT_CONTAINS FHS("test", CS=tru))`, "failed to parse boolean from"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", CS="f"))`, "found instead of boolean value"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", CS=,))`, "found instead of boolean value"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", CS no))`, "found instead of ="},
+
+		{`(RAW_TEXT NOT_CONTAINS FHS("test", W=tru))`, "found instead of integer value"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", W="f"))`, "found instead of integer value"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", W=,))`, "found instead of integer value"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", W=100000))`, "is out of range"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", W=1000000000000000000000000000000000))`, "failed to parse integer from"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", WIDTH=-1))`, "is out of range"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", W no))`, "found instead of ="},
+
+		{`(RAW_TEXT NOT_CONTAINS FHS("test", D=tru))`, "found instead of integer value"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", D="f"))`, "found instead of integer value"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", D=,))`, "found instead of integer value"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", D=100000))`, "is out of range"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", DIST=-1))`, "is out of range"},
+		{`(RAW_TEXT NOT_EQUALS FHS("test", D no))`, "found instead of ="},
+
+		{`(RAW_TEXT NOT_EQUALS FHS("test", NO=100))`, "unknown argument"},
+
+		{`(RECORD. EQUALS "123")`, "no field name found for RECORD"},
+		{`(RECORD.[  EQUALS "123")`, "no closing ] found"},
+		{`(RECORDZ  EQUALS "123")`, "expected RAW_TEXT or RECORD"},
+		{`(RECORD CONTAINZ "123")`, "expected CONTAINS or EQUALS"},
+		{`(RECORD CONTAINS UNKNOWN("123"))`, "is unexpected expression"},
+	}
+
+	for _, q := range data {
+		p := testNewParser(q.d)
+		if assert.NotNil(t, p, "no parser created (data:'%s')", q.d) {
+			_, err := p.ParseQuery()
+			assert.Error(t, err, "Error expected on '%s'", q.d)
+			assert.Contains(t, err.Error(), q.e, "Unexpected error on '%s'", q.d)
+		}
+	}
+}
+
 // test for invalid queries
 func TestParserInvalidQueries(t *testing.T) {
 	queries := []string{
@@ -73,6 +126,9 @@ func TestParserSimple(t *testing.T) {
 		{
 			`  (RECORD.body CONTAINS "FEDS")`,
 			`P{(RECORD.body CONTAINS "FEDS")}`},
+		{
+			`  (RECORD.body CONTAINS FHS("test"))`,
+			`P{(RECORD.body CONTAINS "test")[es]}`},
 		{
 			`  (RECORD.body CONTAINS FHS("test", cs = true, dist = 10, WIDTH = 100))`,
 			`P{(RECORD.body CONTAINS "test")[fhs,d=10,w=100,cs=true]}`},

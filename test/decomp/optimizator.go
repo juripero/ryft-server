@@ -70,27 +70,23 @@ func (o *Optimizator) isTheSameType(a Query, b Query) bool {
 
 // get the bool operations limit
 func (o *Optimizator) getLimit(a Query, b Query) int {
-	var modea, modeb string
-	if a.Simple != nil {
-		modea = a.Simple.Options.Mode
-	}
-	if b.Simple != nil {
-		modeb = b.Simple.Options.Mode
-	}
+	if a.Simple != nil && b.Simple != nil {
+		modea := a.Simple.Options.Mode
+		modeb := b.Simple.Options.Mode
 
-	var mode string
-	if modea == modeb {
-		mode = modea
-	}
-
-	// get "fhs" by default
-	if mode == "" {
-		mode = "fhs"
-	}
-
-	if mode != "" {
-		return o.OperatorLimits[mode]
+		if modea == modeb {
+			return o.getModeLimit(modea)
+		}
 	}
 
 	return 0 // not found
+}
+
+// get the bool operations limit
+func (o *Optimizator) getModeLimit(mode string) int {
+	if len(mode) == 0 {
+		mode = "fhs" // "fhs" by default
+	}
+
+	return o.OperatorLimits[mode]
 }
