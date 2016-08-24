@@ -34,19 +34,19 @@ import (
 	"fmt"
 )
 
-// Search configuration.
+// Config is a search configuration.
 // Contains all query related parameters.
 type Config struct {
-	Query         string
-	Files         []string
-	Mode          string
-	Surrounding   uint
-	Fuzziness     uint
-	CaseSensitive bool
-	Nodes         uint
-	Limit         uint
+	Query         string   // search criteria
+	Files         []string // input file set
+	Mode          string   // es, fhs, feds, ds, ts...
+	Surrounding   uint     // surrounding width
+	Fuzziness     uint     // fuzziness distance
+	CaseSensitive bool     // case sensitive flag
+	Nodes         uint     // number of hardware nodes to use
+	Limit         uint     // limit  the number of records
 
-	// if not empty keep the index and/or data file
+	// if not empty keep the INDEX and/or DATA file
 	KeepDataAs  string
 	KeepIndexAs string
 }
@@ -77,6 +77,6 @@ func (cfg *Config) AddFiles(files []string) {
 
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
-	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, surr:%d, fuzz:%d, case-sens:%t, nodes:%d}",
-		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes)
+	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, surr:%d, fuzz:%d, case-sens:%t, nodes:%d, limit:%d}",
+		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes, cfg.Limit)
 }

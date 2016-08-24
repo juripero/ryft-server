@@ -36,11 +36,10 @@ import (
 
 // TODO: replace with NodeInfo struct to support trees
 
-// Directory content.
+// DirInfo is directory's content.
 type DirInfo struct {
-	Path string
-
-	Files []string
+	Path  string   // directory path (relative to mount point)
+	Files []string // files
 	Dirs  []string // subdirectories
 }
 

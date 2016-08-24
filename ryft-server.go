@@ -460,16 +460,17 @@ func (s *Server) startUpdatingBusyness() {
 
 // notify server a search is started
 func (s *Server) onSearchStarted(config *search.Config) {
-	metric := atomic.AddInt32(&s.activeSearchCount, +1)
-	if s.busynessChanged != nil {
-		// notify to update metric
-		s.busynessChanged <- metric
-	}
+	s.onSearchChanged(config, +1)
 }
 
 // notify server a search is started
 func (s *Server) onSearchStopped(config *search.Config) {
-	metric := atomic.AddInt32(&s.activeSearchCount, -1)
+	s.onSearchChanged(config, -1)
+}
+
+// notify server a search is changed
+func (s *Server) onSearchChanged(config *search.Config, delta int32) {
+	metric := atomic.AddInt32(&s.activeSearchCount, delta)
 	if s.busynessChanged != nil {
 		// notify to update metric
 		s.busynessChanged <- metric

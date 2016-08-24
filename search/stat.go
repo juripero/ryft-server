@@ -34,7 +34,7 @@ import (
 	"fmt"
 )
 
-// Search processing statistics.
+// Statistics is search processing statistics.
 // Contains set of search statistics such as total processed bytes
 // and processing duration.
 type Statistics struct {

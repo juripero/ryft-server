@@ -40,6 +40,7 @@ import (
 func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	task := NewTask()
 	mux := search.NewResult()
+	engine.prepare(task, cfg)
 
 	// prepare requests
 	for _, backend := range engine.Backends {

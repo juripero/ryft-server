@@ -35,7 +35,7 @@ var (
 	factories = map[string]EngineFactory{}
 )
 
-// Engine factory function.
+// EngineFactory is a factory function.
 // Returns new engine and possible error.
 // Underlying engine can use custom options.
 type EngineFactory func(map[string]interface{}) (Engine, error)
@@ -56,7 +56,7 @@ func RegisterEngine(name string, f EngineFactory) {
 // GetAvailableEngines returns all the registered search engines.
 func GetAvailableEngines() []string {
 	names := make([]string, 0, len(factories))
-	for k, _ := range factories {
+	for k := range factories {
 		names = append(names, k)
 	}
 	return names

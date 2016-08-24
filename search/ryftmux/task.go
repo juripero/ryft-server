@@ -103,13 +103,13 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 						task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
 						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 
+						mux.ReportRecord(rec)
+
 						// check for records limit!
 						if task.Limit > 0 && mux.RecordsReported() >= task.Limit {
 							task.log().WithField("limit", task.Limit).Infof("[%s]: stopped by limit", TAG)
 							return // done!
 						}
-
-						mux.ReportRecord(rec)
 					}
 
 				case <-res.DoneChan:
@@ -124,6 +124,12 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 						task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG)
 						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 						mux.ReportRecord(rec)
+
+						// check for records limit!
+						if task.Limit > 0 && mux.RecordsReported() >= task.Limit {
+							task.log().WithField("limit", task.Limit).Infof("[%s]: *** stopped by limit", TAG)
+							return // done!
+						}
 					}
 
 					return // done!

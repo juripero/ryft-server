@@ -312,10 +312,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		task.log().Debugf("[%s]: waiting INDEX&DATA...", TAG)
 		// do wait in goroutine
 		// at the same time monitor the res.Cancel event!
-		done_ch := make(chan int, 1)
+		done_ch := make(chan struct{})
 		go func() {
 			task.subtasks.Wait()
-			done_ch <- 1
+			close(done_ch)
 		}()
 	WaitLoop:
 		for {
@@ -501,6 +501,8 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+		res.ReportRecord(rec)
+
 		if task.Limit > 0 && res.RecordsReported() >= task.Limit {
 			task.log().WithField("limit", task.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)
 
@@ -509,8 +511,6 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 			return // stop processing
 		}
-
-		res.ReportRecord(rec)
 	}
 }
 
@@ -542,7 +542,7 @@ func (engine *Engine) removeFile(name string) error {
 // openFile tries to open file until it's open
 // or until operation is cancelled by calling code
 // NOTE, if operation is cancelled the file is nil!
-func (task *Task) openFile(path string, poll time.Duration, cancel chan interface{}) (*os.File, error) {
+func (task *Task) openFile(path string, poll time.Duration, cancel chan struct{}) (*os.File, error) {
 	// task.log().Debugf("[%s] trying to open %q file...", TAG, path) // FIXME: DEBUG
 
 	for {

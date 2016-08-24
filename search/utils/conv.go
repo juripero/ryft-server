@@ -36,7 +36,7 @@ import (
 	"time"
 )
 
-// convert custom value to string.
+// AsString converts custom value to string.
 func AsString(opt interface{}) (string, error) {
 	switch v := opt.(type) {
 	// TODO: other types to string?
@@ -50,7 +50,7 @@ func AsString(opt interface{}) (string, error) {
 	// return fmt.Sprintf("%s", opt), nil
 }
 
-// convert custom value to time duration.
+// AsDuration converts custom value to time duration.
 func AsDuration(opt interface{}) (time.Duration, error) {
 	switch v := opt.(type) {
 	// TODO: other types to duration?
@@ -65,7 +65,7 @@ func AsDuration(opt interface{}) (time.Duration, error) {
 	return time.Duration(0), fmt.Errorf("%v is not a time duration", opt)
 }
 
-// convert custom value to uint64.
+// AsUint64 converts custom value to uint64.
 func AsUint64(opt interface{}) (uint64, error) {
 	switch v := opt.(type) {
 	// TODO: other types to uint64?
@@ -88,7 +88,7 @@ func AsUint64(opt interface{}) (uint64, error) {
 	return 0, fmt.Errorf("%v is not an uint64", opt)
 }
 
-// convert custom value to bool.
+// AsBool converts custom value to bool.
 func AsBool(opt interface{}) (bool, error) {
 	switch v := opt.(type) {
 	// TODO: other types to bool?
