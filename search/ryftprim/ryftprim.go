@@ -330,6 +330,9 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 					task.log().Debugf("[%s]: ***cancelling INDEX&DATA processing...", TAG)
 					task.cancelIndex()
 					task.cancelData()
+
+					// sleep a while to take subtasks a chance to finish
+					time.Sleep(engine.ReadFilePollTimeout)
 				}
 			}
 		}
