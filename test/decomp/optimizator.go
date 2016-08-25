@@ -4,25 +4,23 @@ import (
 	"fmt"
 )
 
+// Optimizator contains some optimizer options.
 type Optimizator struct {
 	// number of boolean operators per search type
 	OperatorLimits map[string]int // `json:"limits,omitempty" yaml:"limits,omitempty"`
 }
 
-// optimize query
+// Process optimizes input query.
 func (o *Optimizator) Process(q Query) Query {
 	if q.Operator != "" && len(q.Arguments) > 0 {
-		// fmt.Printf("  try to optimize %s\n", q)
 		a := o.Process(q.Arguments[0])
 
 		// preprocess and try to combine arguments
-		new_args := make([]Query, 0, len(q.Arguments))
+		args := make([]Query, 0, len(q.Arguments))
 		for i := 1; i < len(q.Arguments); i++ {
 			b := o.Process(q.Arguments[i])
 
 			boolOps := a.boolOps + b.boolOps
-			//fmt.Printf("try to combine %s %s %s\n", a, q.Operator, b)
-			//fmt.Printf(" the type is same:%t, limit:%d/%d\n", o.isTheSameType(a, b), boolOps, o.getLimit(a, b))
 			if o.isTheSameType(a, b) && boolOps < o.getLimit(a, b) {
 				// combine two arguments into one
 				tmp := Query{boolOps: boolOps + 1}
@@ -32,26 +30,20 @@ func (o *Optimizator) Process(q Query) Query {
 					q.Operator,
 					b.Simple.Expression)
 				a = tmp // next iteration
-				//fmt.Printf("    new_args:%s\n", new_args)
 			} else {
-				new_args = append(new_args, a) // leave it "as is"
-				a = b                          // next iteration
-				//fmt.Printf("   *new_args:%s\n", new_args)
+				args = append(args, a) // leave it "as is"
+				a = b                  // next iteration
 			}
 		}
 
 		// put the last argument "as is"
-		new_args = append(new_args, a)
+		args = append(args, a)
 
-		if len(new_args) == 1 {
-			q = new_args[0] // squeeze
-			//fmt.Printf("  squeezed to %s\n", q)
+		if len(args) == 1 {
+			q = args[0] // squeeze
 		} else {
-			q.Arguments = new_args
-			//fmt.Printf("  new args to %s\n", q)
+			q.Arguments = args
 		}
-	} else {
-		//fmt.Printf("  leave %s as is\n", q)
 	}
 
 	return q // nothing to optimize

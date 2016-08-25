@@ -50,6 +50,7 @@ func (p *Parser) scanIgnoreSpace() Lexeme {
 	}
 }
 
+// ParseQuery parses the input data and builds the non-optimized query tree.
 func (p *Parser) ParseQuery() (res Query, err error) {
 	// recover from panic
 	defer func() {
@@ -243,7 +244,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ns" // (!) as numeric search!
 
-		case lex.isRegex(): // "as is"
+		case lex.IsRegex(): // "as is"
 			// handle aliases REGEXP -> REGEX
 			if !strings.EqualFold(lex.literal, "REGEX") {
 				lex.literal = "REGEX"
@@ -251,7 +252,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "rs"
 
-		case lex.isIPv4(): // "as is"
+		case lex.IsIPv4(): // "as is"
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ipv4"
 
@@ -289,9 +290,9 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 		lex := p.scanIgnoreSpace() // p.scan()
 		switch lex.token {
 		case RPAREN:
-			deep -= 1
+			deep--
 		case LPAREN:
-			deep += 1
+			deep++
 		case EOF, ILLEGAL:
 			p.unscan(lex)
 			panic(fmt.Errorf("no expression ending found"))
@@ -428,10 +429,12 @@ func (p *Parser) parseIntVal(min, max int64) int64 {
 			p.unscan(val)
 			panic(fmt.Errorf("failed to parse integer from %q: %s", val, err))
 		}
+
 		if i < min || max < i {
 			p.unscan(val)
 			panic(fmt.Errorf("value %d is out of range [%d,%d]", i, min, max))
 		}
+
 		return i // OK
 	} else {
 		p.unscan(val)

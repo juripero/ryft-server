@@ -4,15 +4,15 @@ package main
 type Token int
 
 const (
-	// special tokens
+	// special tokens...
 	ILLEGAL Token = iota
-	EOF
-	WS
+	EOF           // end of file
+	WS            // whitespace
 
-	IDENT
-	INT
-	FLOAT
-	STRING
+	IDENT  // identifier
+	INT    // integer number
+	FLOAT  // float number
+	STRING // string (quoted)
 
 	EQ  // =
 	DEQ // ==

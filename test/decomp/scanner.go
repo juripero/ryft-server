@@ -61,111 +61,114 @@ func (s *Scanner) isDigit(r rune) bool {
 // Scan returns the next lexeme.
 // panics in case of bad syntax
 func (s *Scanner) Scan() Lexeme {
-	r := s.read() // next rune
-
-	if r == eof {
+	switch r := s.read(); {
+	case r == eof:
 		return NewLexeme(EOF, "")
-	} else if s.isSpace(r) {
+
+	case s.isSpace(r): // whitespaces
 		s.unread()
 		return s.scanSpace()
-	} else if s.isIdent(r) {
+
+	case s.isIdent(r): // identifier
 		s.unread()
 		return s.scanIdent()
-	} else if s.isDigit(r) {
+
+	case s.isDigit(r): // number
 		s.unread()
 		return s.scanNumber(false)
-	} else if r == '"' {
+
+	case r == '"': // quoted string
 		s.unread()
 		return s.scanString()
-	}
 
-	// Otherwise read the individual character.
-	switch r {
-	case '=':
-		r1 := s.read()
-		if r1 == '=' {
-			return NewLexeme1(DEQ, r, r1)
-		} else {
-			s.unread()
-			return NewLexeme1(EQ, r)
+	case r == '=': // ==, =
+		if r1 := s.read(); r1 == '=' {
+			return NewLexemeR(DEQ, r, r1)
 		}
-	case '!':
-		r1 := s.read()
-		if r1 == '=' {
-			return NewLexeme1(NEQ, r, r1)
-		} else {
-			s.unread()
-			return NewLexeme1(NOT, r)
-		}
-	case '<':
-		r1 := s.read()
-		if r1 == '=' {
-			return NewLexeme1(LEQ, r, r1)
-		} else {
-			s.unread()
-			return NewLexeme1(LS, r)
-		}
-	case '>':
-		r1 := s.read()
-		if r1 == '=' {
-			return NewLexeme1(GEQ, r, r1)
-		} else {
-			s.unread()
-			return NewLexeme1(GT, r)
-		}
-
-	case '+':
-		r1 := s.read()
 		s.unread()
-		if r1 == '.' || s.isDigit(r1) {
+		return NewLexemeR(EQ, r)
+
+	case r == '!': // !=, !
+		if r1 := s.read(); r1 == '=' {
+			return NewLexemeR(NEQ, r, r1)
+		}
+		s.unread()
+		return NewLexemeR(NOT, r)
+
+	case r == '<': // <=, <
+		if r1 := s.read(); r1 == '=' {
+			return NewLexemeR(LEQ, r, r1)
+		}
+		s.unread()
+		return NewLexemeR(LS, r)
+
+	case r == '>': // >=, >
+		if r1 := s.read(); r1 == '=' {
+			return NewLexemeR(GEQ, r, r1)
+		}
+		s.unread()
+		return NewLexemeR(GT, r)
+
+	case r == '+': // +, +number
+		if r1 := s.read(); r1 == '.' || s.isDigit(r1) {
+			s.unread()                    // r1
 			return s.scanNumber(false, r) // pass '+'
-		} else {
-			return NewLexeme1(PLUS, r)
 		}
-	case '-':
-		r1 := s.read()
 		s.unread()
-		if r1 == '.' || s.isDigit(r1) {
+		return NewLexemeR(PLUS, r)
+
+	case r == '-': // -, -number
+		if r1 := s.read(); r1 == '.' || s.isDigit(r1) {
+			s.unread()                    // r1
 			return s.scanNumber(false, r) // pass '-'
-		} else {
-			return NewLexeme1(MINUS, r)
 		}
-	case '?':
-		return NewLexeme1(WCARD, r)
-	case '/':
-		return NewLexeme1(SLASH, r)
-
-	case ',':
-		return NewLexeme1(COMMA, r)
-	case '.':
-		r1 := s.read()
 		s.unread()
-		if s.isDigit(r1) {
+		return NewLexemeR(MINUS, r)
+
+	case r == '?':
+		return NewLexemeR(WCARD, r)
+
+	case r == '/':
+		return NewLexemeR(SLASH, r)
+
+	case r == ',':
+		return NewLexemeR(COMMA, r)
+
+	case r == '.':
+		if r1 := s.read(); s.isDigit(r1) {
+			s.unread()                   // r1
 			return s.scanNumber(true, r) // pass '.'
-		} else {
-			return NewLexeme1(PERIOD, r)
 		}
-	case ':':
-		return NewLexeme1(COLON, r)
-	case ';':
-		return NewLexeme1(SEMICOLON, r)
+		s.unread()
+		return NewLexemeR(PERIOD, r)
 
-	case '(':
-		return NewLexeme1(LPAREN, r)
-	case ')':
-		return NewLexeme1(RPAREN, r)
-	case '[':
-		return NewLexeme1(LBRACK, r)
-	case ']':
-		return NewLexeme1(RBRACK, r)
-	case '{':
-		return NewLexeme1(LBRACE, r)
-	case '}':
-		return NewLexeme1(RBRACE, r)
+	case r == ':':
+		return NewLexemeR(COLON, r)
+
+	case r == ';':
+		return NewLexemeR(SEMICOLON, r)
+
+	case r == '(':
+		return NewLexemeR(LPAREN, r)
+
+	case r == ')':
+		return NewLexemeR(RPAREN, r)
+
+	case r == '[':
+		return NewLexemeR(LBRACK, r)
+
+	case r == ']':
+		return NewLexemeR(RBRACK, r)
+
+	case r == '{':
+		return NewLexemeR(LBRACE, r)
+
+	case r == '}':
+		return NewLexemeR(RBRACE, r)
+
+	default: // unknown rune
+		return NewLexemeR(ILLEGAL, r)
 	}
-
-	// unknown rune
-	return NewLexeme1(ILLEGAL, r)
 }
 
 // scanSpace consumes the current rune and all contiguous whitespaces.
@@ -308,10 +311,12 @@ func (s *Scanner) scanNumber(isDecimal bool, prefix ...rune) Lexeme {
 				buf.WriteRune(r2)
 				buf.WriteString(s.scanDigits())
 			} else {
+				s.unread()
 				panic(fmt.Errorf("bad float format, expected digital"))
 			}
 		} else {
 			s.unread()
+			panic(fmt.Errorf("bad float format, expected digital"))
 		}
 	} else {
 		s.unread()

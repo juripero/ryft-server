@@ -151,6 +151,9 @@ func TestScannerScanBad(t *testing.T) {
 	data := []string{
 		`"noquote`,
 		`"noescape\`,
+		// `.e0`,
+		`1.e`,
+		`1.0E nodigit`,
 		`1.0e+nodigit`,
 		`1.0E-nodigit`,
 

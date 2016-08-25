@@ -247,6 +247,7 @@ func TestOptimizator(t *testing.T) {
 		"ds":   2,
 		"ts":   2,
 		"rs":   0,
+		"ipv4": 0,
 	}
 
 	o := testNewOptimizator(limits)
@@ -264,6 +265,32 @@ func TestOptimizator(t *testing.T) {
 
 // test for optimization limits
 func TestOptimizatorLimits(t *testing.T) {
+	limits := map[string]int{
+		"es":   1,
+		"fhs":  2,
+		"feds": 3,
+		"ns":   4,
+		"ds":   5,
+		"ts":   6,
+		"rs":   7,
+		"ipv4": 8,
+	}
+
+	o := testNewOptimizator(limits)
+
+	assert.Equal(t, 0, o.getModeLimit("---"), "invalid mode")
+	assert.Equal(t, limits["fhs"], o.getModeLimit(""), "default to FHS")
+	for k, v := range limits {
+		assert.Equal(t, v, o.getModeLimit(k))
+	}
+
+	assert.Equal(t, 0, o.getLimit(Query{}, Query{}), "bad queries")
+	assert.Equal(t, 0, o.getLimit(Query{Simple: &SimpleQuery{Options: Options{Mode: "fhs"}}},
+		Query{Simple: &SimpleQuery{Options: Options{Mode: "feds"}}}), "bad queries")
+}
+
+// test for optimization limits
+func TestOptimizatorLimits2(t *testing.T) {
 	type TestItem struct {
 		limit     int
 		query     string
