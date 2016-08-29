@@ -94,6 +94,20 @@ func (s *Server) count(ctx *gin.Context) {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))
 	}
+	defer log.WithField("result", res).Infof("/count done")
+
+	// in case of unexpected panic
+	// we need to cancel search request
+	// to prevent resource leaks
+	defer func() {
+		if !res.IsDone() {
+			errors, records := res.Cancel() // cancel processing
+			if errors > 0 || records > 0 {
+				log.WithField("errors", errors).WithField("records", records).
+					Debugf("***some errors/records are ignored")
+			}
+		}
+	}()
 
 	s.onSearchStarted(cfg)
 	defer s.onSearchStopped(cfg)
@@ -113,8 +127,6 @@ func (s *Server) count(ctx *gin.Context) {
 			}
 
 		case <-res.DoneChan:
-			log.WithField("result", res).Infof("/count done")
-
 			if res.Stat != nil {
 				stat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, stat)

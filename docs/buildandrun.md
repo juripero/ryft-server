@@ -235,6 +235,7 @@ local-only: false
 debug-mode: false
 keep-results: false
 busyness-tolerance: 0
+http-timeout: 1h
 ```
 
 `local-only` is used to run `ryft-server` outside cluster. No consult dependency,
@@ -249,6 +250,9 @@ It's equivalent to `--keep` command line option.
 `busyness-tolerance` is used in cluster mode to customize node grouping algorithm.
 See [cluster document](./cluster.md#busyness) for more details.
 It's equivalent to `--busyness-tolerance` command line option.
+
+`http-timeout` is used as read request/write response timeout for HTTP/HTTPS connections.
+It's `1h` (one hour) by default.
 
 
 #### TLS server configuration

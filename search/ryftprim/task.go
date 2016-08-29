@@ -68,10 +68,12 @@ type Task struct {
 	// index & data
 	enableDataProcessing bool
 	indexChan            chan search.Index // INDEX to DATA
-	cancelIndexChan      chan interface{}  // to cancel INDEX processing (hard stop)
-	cancelDataChan       chan interface{}  // to cancel DATA processing (hard stop)
-	indexStopped         bool              // soft stop
-	dataStopped          bool              // soft stop
+	cancelIndexChan      chan struct{}     // to cancel INDEX processing (hard stop)
+	cancelDataChan       chan struct{}     // to cancel DATA processing (hard stop)
+	indexCancelled       int32             // hard stop, atomic
+	indexStopped         int32             // soft stop, atomic
+	dataCancelled        int32             // hard stop, atomic
+	dataStopped          int32             // soft stop, atomic
 	subtasks             sync.WaitGroup
 
 	// some processing statistics
@@ -98,14 +100,16 @@ func NewTask(enableProcessing bool) *Task {
 // Prepare INDEX&DATA processing subtasks.
 func (task *Task) prepareProcessing() {
 	task.indexChan = make(chan search.Index, 1024) // TODO: capacity constant from engine?
-	task.cancelIndexChan = make(chan interface{}, 2)
-	task.cancelDataChan = make(chan interface{}, 2)
+	task.cancelIndexChan = make(chan struct{})
+	task.cancelDataChan = make(chan struct{})
 }
 
 // Cancel INDEX processing subtask (hard stop).
 func (task *Task) cancelIndex() {
-	task.cancelIndexChan <- nil
-	task.stopIndex()
+	if atomic.CompareAndSwapInt32(&task.indexCancelled, 0, 1) {
+		close(task.cancelIndexChan) // hard stop
+	}
+	task.stopIndex() // also soft stop just in case
 
 	// need to drain index channel to give INDEX processing routine
 	// a chance to finish it's work (it might be blocked sending
@@ -115,21 +119,23 @@ func (task *Task) cancelIndex() {
 	for _ = range task.indexChan {
 		ignored++
 	}
-	task.log().Debugf("[%s]: %d INDEXes ignored", TAG, ignored)
+	task.log().Debugf("[%s]: %d INDEXes are ignored", TAG, ignored)
 }
 
 // Cancel DATA processing subtask (hard stop).
 func (task *Task) cancelData() {
-	task.cancelDataChan <- nil
-	task.stopData()
+	if atomic.CompareAndSwapInt32(&task.dataCancelled, 0, 1) {
+		close(task.cancelDataChan) // hard stop
+	}
+	task.stopData() // also soft stop just in case
 }
 
 // Stop INDEX processing subtask (soft stop).
 func (task *Task) stopIndex() {
-	task.indexStopped = true
+	atomic.StoreInt32(&task.indexStopped, 1)
 }
 
 // Stop DATA processing subtask (soft stop).
 func (task *Task) stopData() {
-	task.dataStopped = true
+	atomic.StoreInt32(&task.dataStopped, 1)
 }

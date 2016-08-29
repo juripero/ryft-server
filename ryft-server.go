@@ -82,6 +82,8 @@ type Server struct {
 	ListenAddress string `yaml:"address,omitempty"`
 	listenAddress *net.TCPAddr
 
+	HttpTimeout string `yaml:"http-timeout,omitempty"`
+
 	TLS struct {
 		Enabled       bool   `yaml:"enabled,omitempty"`
 		ListenAddress string `yaml:"address,omitempty"`
@@ -417,6 +419,20 @@ func (s *Server) getBackendOptions() map[string]interface{} {
 	return opts
 }
 
+// get read/write http timeout
+func (s *Server) getHttpTimeout() time.Duration {
+	if len(s.HttpTimeout) == 0 {
+		return 1 * time.Hour // default
+	}
+
+	d, err := time.ParseDuration(s.HttpTimeout)
+	if err != nil {
+		panic(err)
+	}
+
+	return d
+}
+
 // parse authentication token and home directory from context
 func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken string, homeDir string, userTag string) {
 	authToken = ctx.Request.Header.Get("Authorization") // may be empty
@@ -460,16 +476,17 @@ func (s *Server) startUpdatingBusyness() {
 
 // notify server a search is started
 func (s *Server) onSearchStarted(config *search.Config) {
-	metric := atomic.AddInt32(&s.activeSearchCount, +1)
-	if s.busynessChanged != nil {
-		// notify to update metric
-		s.busynessChanged <- metric
-	}
+	s.onSearchChanged(config, +1)
 }
 
 // notify server a search is started
 func (s *Server) onSearchStopped(config *search.Config) {
-	metric := atomic.AddInt32(&s.activeSearchCount, -1)
+	s.onSearchChanged(config, -1)
+}
+
+// notify server a search is changed
+func (s *Server) onSearchChanged(config *search.Config, delta int32) {
+	metric := atomic.AddInt32(&s.activeSearchCount, delta)
 	if s.busynessChanged != nil {
 		// notify to update metric
 		s.busynessChanged <- metric
@@ -600,9 +617,18 @@ func main() {
 		server.startUpdatingBusyness()
 	}
 
-	// start listening on HTTP or HTTPS ports
+	// start listening on HTTPS port
 	if server.TLS.Enabled {
-		go router.RunTLS(server.TLS.ListenAddress, server.TLS.CertFile, server.TLS.KeyFile)
+		https_ep := &http.Server{Addr: server.TLS.ListenAddress, Handler: router}
+		https_ep.ReadTimeout = server.getHttpTimeout()
+		https_ep.WriteTimeout = server.getHttpTimeout()
+
+		go https_ep.ListenAndServeTLS(server.TLS.CertFile, server.TLS.KeyFile)
 	}
-	router.Run(server.ListenAddress)
+
+	// start listening on HTTP port
+	http_ep := &http.Server{Addr: server.ListenAddress, Handler: router}
+	http_ep.ReadTimeout = server.getHttpTimeout()
+	http_ep.WriteTimeout = server.getHttpTimeout()
+	http_ep.ListenAndServe()
 }

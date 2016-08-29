@@ -42,12 +42,10 @@ func DumpAsString(v interface{}) string {
 	if b, ok := v.([]byte); ok {
 		if isAsciiPrintable(b) {
 			return string(b)
-		} else {
-			return "hex:" + hex.EncodeToString(b)
 		}
-	} else {
-		return fmt.Sprintf("%v", v)
+		return "hex:" + hex.EncodeToString(b)
 	}
+	return fmt.Sprintf("%v", v)
 }
 
 // check if data is printable ASCII

@@ -35,7 +35,7 @@ import (
 	"sync/atomic"
 )
 
-// Search result.
+// Result is asynchronous search result structure.
 // It's possible to cancel result (and stop futher processing).
 // All communication is done via channels (error, records, etc).
 // Need to read from Error and Record channels to prevent blocking!
@@ -53,14 +53,14 @@ type Result struct {
 
 	// Cancel channel is used to notify search engine
 	// to stop processing immideatelly (client -> Engine)
-	CancelChan  chan interface{}
-	isCancelled bool
+	CancelChan  chan struct{}
+	isCancelled int32 // atomic access
 
 	// Done channel is used to notify client search is done (Engine -> client)
-	DoneChan chan interface{}
-	isDone   bool
+	DoneChan chan struct{}
+	isDone   int32 // atomic access
 
-	// Search processing statistics
+	// Search processing statistics (optional)
 	Stat *Statistics
 }
 
@@ -70,8 +70,8 @@ func NewResult() *Result {
 
 	res.ErrorChan = make(chan error, 256)    // TODO: capacity constant?
 	res.RecordChan = make(chan *Record, 256) // TODO: capacity constant?
-	res.CancelChan = make(chan interface{}, 1)
-	res.DoneChan = make(chan interface{}, 1)
+	res.CancelChan = make(chan struct{})
+	res.DoneChan = make(chan struct{})
 
 	return res
 }
@@ -80,18 +80,18 @@ func NewResult() *Result {
 // actually prints statistics.
 func (res Result) String() string {
 	if res.Stat != nil {
-		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, stat:%s}",
-			res.recordsReported, res.errorsReported, res.isDone, res.Stat)
-	} else {
-		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, no stat}",
-			res.recordsReported, res.errorsReported, res.isDone)
+		return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, cancelled:%t, stat:%s}",
+			res.recordsReported, res.errorsReported, res.isDone != 0, res.isCancelled != 0, res.Stat)
 	}
+
+	return fmt.Sprintf("Result{records:%d, errors:%d, done:%t, cancelled:%t, no stat}",
+		res.recordsReported, res.errorsReported, res.isDone != 0, res.isCancelled != 0)
 }
 
 // ReportError sends error to Error channel.
 func (res *Result) ReportError(err error) {
 	atomic.AddUint64(&res.errorsReported, 1)
-	res.ErrorChan <- err
+	res.ErrorChan <- err // might be blocked!
 }
 
 // ErrorsReported gets the number of total errors reported
@@ -102,7 +102,7 @@ func (res *Result) ErrorsReported() uint64 {
 // ReportRecord sends data record to records channel.
 func (res *Result) ReportRecord(rec *Record) {
 	atomic.AddUint64(&res.recordsReported, 1)
-	res.RecordChan <- rec
+	res.RecordChan <- rec // might be blocked!
 }
 
 // RecordsReported gets the number of total records reported
@@ -111,29 +111,60 @@ func (res *Result) RecordsReported() uint64 {
 }
 
 // Cancel stops the search processing.
-func (res *Result) Cancel() {
-	if !res.isDone {
-		res.isCancelled = true
-		res.CancelChan <- nil
+//  return number of ignored errors and records
+func (res *Result) Cancel() (errors uint64, records uint64) {
+	if atomic.CompareAndSwapInt32(&res.isCancelled, 0, 1) {
+		close(res.CancelChan)
 	}
+
+	for !res.IsDone() {
+		select {
+		case <-res.DoneChan:
+			// drain the error channel
+			for _ = range res.ErrorChan {
+				errors++
+			}
+
+			// drain the record channel
+			for _ = range res.RecordChan {
+				records++
+			}
+
+		case err, ok := <-res.ErrorChan:
+			if ok && err != nil {
+				errors++
+			}
+
+		case rec, ok := <-res.RecordChan:
+			if ok && rec != nil {
+				records++
+			}
+		}
+	}
+
+	return // done!
 }
 
-// Is the result cancelled?
+// IsCancelled checks is the result cancelled?
 func (res *Result) IsCancelled() bool {
-	return res.isCancelled
+	return atomic.LoadInt32(&res.isCancelled) != 0
 }
 
 // ReportDone sends 'done' notification.
 func (res *Result) ReportDone() {
-	res.isDone = true
-	res.DoneChan <- nil
+	if atomic.CompareAndSwapInt32(&res.isDone, 0, 1) {
+		close(res.DoneChan)
+	}
+}
+
+// IsDone checks is the result done?
+func (res *Result) IsDone() bool {
+	return atomic.LoadInt32(&res.isDone) != 0
 }
 
 // Close closes all channels.
 // Is called by search Engine.
 func (res *Result) Close() {
-	close(res.CancelChan)
 	close(res.RecordChan)
 	close(res.ErrorChan)
-	close(res.DoneChan)
 }

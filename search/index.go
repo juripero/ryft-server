@@ -91,8 +91,7 @@ func (f *IndexFile) Find(offset uint64) int {
 // Unwind unwinds the index
 func (f *IndexFile) Unwind(index Index) Index {
 	if n := f.Find(index.Offset); n < len(f.items) {
-		base := f.items[n]
-		if base.dataBeg <= index.Offset && index.Offset < base.dataEnd {
+		if base := f.items[n]; base.dataBeg <= index.Offset && index.Offset < base.dataEnd {
 			index.Offset -= base.dataBeg
 			index.Offset += base.Offset
 			index.File = base.File

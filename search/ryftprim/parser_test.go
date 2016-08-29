@@ -106,7 +106,7 @@ func TestParseStatTotalBytes(t *testing.T) {
 
 	// all items contain the same stat
 	for _, d := range data {
-		s, err := ParseStat([]byte(d))
+		s, err := ParseStat([]byte(d), "")
 		if err != nil {
 			if assert.NoError(t, err) &&
 				assert.NotNil(t, s) {

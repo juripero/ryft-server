@@ -34,17 +34,17 @@ import (
 	"fmt"
 )
 
-// Search configuration.
+// Config is a search configuration.
 // Contains all query related parameters.
 type Config struct {
-	Query         string
-	Files         []string
-	Mode          string
-	Surrounding   uint
-	Fuzziness     uint
-	CaseSensitive bool
-	Nodes         uint
-	Limit         uint
+	Query         string   // search criteria
+	Files         []string // input file set
+	Mode          string   // es, fhs, feds, ds, ts...
+	Surrounding   uint     // surrounding width
+	Fuzziness     uint     // fuzziness distance
+	CaseSensitive bool     // case sensitive flag
+	Nodes         uint     // number of hardware nodes to use
+	Limit         uint     // limit  the number of records
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file

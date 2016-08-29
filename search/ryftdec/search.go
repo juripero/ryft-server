@@ -295,9 +295,21 @@ func statCombine(mux *search.Statistics, stat *search.Statistics) {
 	mux.Duration += stat.Duration
 	mux.FabricDuration += stat.FabricDuration
 
-	// update data rates
-	mux.FabricDataRate = (float64(mux.TotalBytes) / 1024 / 1024) / (float64(mux.FabricDuration) / 1000)
-	mux.DataRate = (float64(mux.TotalBytes) / 1024 / 1024) / (float64(mux.Duration) / 1000)
+	// update data rates (including TotalBytes/0=+Inf protection)
+	if mux.FabricDuration > 0 {
+		mb := float64(mux.TotalBytes) / 1024 / 1024
+		sec := float64(mux.FabricDuration) / 1000
+		mux.FabricDataRate = mb / sec
+	} else {
+		mux.FabricDataRate = 0.0
+	}
+	if mux.Duration > 0 {
+		mb := float64(mux.TotalBytes) / 1024 / 1024
+		sec := float64(mux.Duration) / 1000
+		mux.DataRate = mb / sec
+	} else {
+		mux.DataRate = 0.0
+	}
 
 	// save details
 	mux.Details = append(mux.Details, stat)

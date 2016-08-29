@@ -155,6 +155,20 @@ func (s *Server) search(ctx *gin.Context) {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))
 	}
+	defer log.WithField("result", res).Infof("/search done")
+
+	// in case of unexpected panic
+	// we need to cancel search request
+	// to prevent resource leaks
+	defer func() {
+		if !res.IsDone() {
+			errors, records := res.Cancel() // cancel processing
+			if errors > 0 || records > 0 {
+				log.WithField("errors", errors).WithField("records", records).
+					Debugf("***some errors/records are ignored")
+			}
+		}
+	}()
 
 	s.onSearchStarted(cfg)
 	defer s.onSearchStopped(cfg)
@@ -195,7 +209,7 @@ func (s *Server) search(ctx *gin.Context) {
 				panic(err)
 			}
 			num_records += 1
-			writer.Flush()
+			writer.Flush() // TODO: check performance!!!
 		}
 	}
 
@@ -203,7 +217,12 @@ func (s *Server) search(ctx *gin.Context) {
 	for {
 		select {
 		case <-gone:
-			res.Cancel() // cancel processing
+			log.Warnf("cancelling by user (connection is gone)...")
+			errors, records := res.Cancel() // cancel processing
+			if errors > 0 || records > 0 {
+				log.WithField("errors", errors).WithField("records", records).
+					Debugf("some errors/records are ignored")
+			}
 			return
 
 		case rec, ok := <-res.RecordChan:
@@ -246,7 +265,6 @@ func (s *Server) search(ctx *gin.Context) {
 				panic(err)
 			}
 
-			log.WithField("result", res).Infof("/search done")
 			return // stop
 		}
 	}
