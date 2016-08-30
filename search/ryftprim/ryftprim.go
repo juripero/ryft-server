@@ -260,6 +260,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	defer res.Close()
 	defer res.ReportDone()
 
+	// notify processing subtasks the tool is finished
+	// can check attempt limits!
+	atomic.StoreInt32(&task.tool_done, 1)
+
 	// tool output
 	out_buf := task.tool_out.Bytes()
 	if err != nil {
@@ -384,7 +388,10 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 	// try to read all index records
 	r := bufio.NewReader(file)
 	var parts [][]byte
-	for attempt := 0; attempt < engine.ReadFilePollLimit; attempt++ {
+
+	// if ryftprim tool is not finished (no index/data available)
+	// attempt limit check should be disabled!
+	for attempt := 0; attempt < engine.ReadFilePollLimit; attempt += int(atomic.LoadInt32(&task.tool_done)) {
 		// read line by line
 		part, err := r.ReadBytes('\n')
 		if len(part) > 0 {
@@ -589,7 +596,7 @@ func (task *Task) readDataFile(file *bufio.Reader, length uint64, poll time.Dura
 	buf := make([]byte, length)
 	pos := uint64(0) // actual number of bytes read
 
-	for attempt := 0; attempt < limit; attempt++ {
+	for attempt := 0; attempt < limit; attempt += int(atomic.LoadInt32(&task.tool_done)) {
 		n, err := file.Read(buf[pos:])
 		// task.log().Debugf("[%s]: read %d DATA byte(s)", TAG, n) // FIXME: DEBUG
 		if n > 0 {
