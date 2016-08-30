@@ -385,8 +385,8 @@ expression defined previously as follows:
 Different currency ranges can be searched for by modifying the expression provided.
 There are two general expression types supported:
 
-- `NUM operator1 "ValueA"`
-- `"ValueA" operator1 NUM operator2 "ValueB"`
+- `CUR operator1 "ValueA"`
+- `"ValueA" operator1 CUR operator2 "ValueB"`
 
 The box below contains a full list of the supported expressions.
 `ValueA` and `ValueB` represent the currency values to compare the input data against.
@@ -451,8 +451,8 @@ IPv4 Searches extend the general relational expression defined previously as fol
 Different ranges can be searched for by modifying the expression in the relational expression above.
 There are two general expression types supported:
 
-- `IPV4(IP operator "ValueB")`
-- `IPV4("ValueA" operator IP operator "ValueB")`
+- `IP operator "ValueB"`
+- `"ValueA" operator IP operator "ValueB"`
 
 The box below contains of list of supported expressions.
 `ValueA` and `ValueB` represent the IP addresses to compare the input data against.
