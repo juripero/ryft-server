@@ -3,6 +3,7 @@
 ./fakegen --count=500 --pattern '${rand(64)} hello world ${rand(64)}' > /ryftone/fake.txt
 
 curl -s 'http://localhost:8765/search?query=(RAW_TEXT%20CONTAINS%20"hello%20world")&files=fake10.txt&stats=true&mode=fhs&fuzziness=1' | jq -c '.results | sort_by(._index.offset) | .[]._index'
+curl -s 'http://localhost:8765/search?query=(RAW_TEXT%20CONTAINS%20"hello%20world")AND(RAW_TEXT%20CONTAINS%20FHS("hello%20world",DIST=0))&files=fake10.txt&stats=true&mode=fhs&fuzziness=1' | jq -c '.results | sort_by(._index.offset) | .[]._index'
 */
 package main
 
