@@ -57,6 +57,7 @@ type LdapAuth struct {
 }
 
 const (
+	// TODO: appropriate attribute names
 	attrHomeDir    = "postalAddress"
 	attrClusterTag = "postalCode"
 )

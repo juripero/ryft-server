@@ -1,11 +1,10 @@
+# Example of Ryft users file used for authentication.
+# Please change the default passwords!
+
 - username: "admin"
   password: "admin"
   home: "/"
 - username: "test"
   password: "test"
   home: "/test"
-  cluster-tag: "test-cluster"
-- username: "foo"
-  password: "foo"
-  home: "/foo"
-  cluster-tag: "foo-cluster"
+  cluster-tag: "test"
