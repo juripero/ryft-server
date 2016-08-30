@@ -52,7 +52,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	args := []string{}
 
 	// select search mode (fuzzy-hamming search by default)
-	switch cfg.Mode {
+	switch strings.ToLower(cfg.Mode) {
 	case "exact_search", "exact", "es":
 		args = append(args, "-p", "es")
 	case "fuzzy_hamming_search", "fuzzy_hamming", "fhs", "":
@@ -70,6 +70,8 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-p", "ns") // currency is a kind of numeric search
 	case "regexp_search", "regex_search", "regexp", "regex", "rs":
 		args = append(args, "-p", "rs")
+	case "ipv4_search", "ipv4":
+		args = append(args, "-p", "ipv4")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
