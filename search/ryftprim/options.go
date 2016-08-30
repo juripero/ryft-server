@@ -153,6 +153,9 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	} else {
 		engine.ReadFilePollLimit = 100
 	}
+	if engine.ReadFilePollLimit <= 0 {
+		return fmt.Errorf(`"read-limit" cannot be negative or zero`)
+	}
 
 	// keep result files
 	if v, ok := opts["keep-files"]; ok {

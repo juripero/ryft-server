@@ -64,6 +64,7 @@ type Task struct {
 	tool_args []string      // command line arguments
 	tool_cmd  *exec.Cmd     // `ryftprim` executable process
 	tool_out  *bytes.Buffer // combined STDOUT and STDERR
+	tool_done int32         // tool stopped, atomic
 
 	// index & data
 	enableDataProcessing bool

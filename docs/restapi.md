@@ -62,12 +62,13 @@ query=(RECORD.AlterEgo CONTAINS "The Batman")
 ```
 
 Depending on [search mode](#search-mode-parameter) exact search query format may differ.
-Check corresponding Ryft Open API for more details on search expressions.
+Check corresponding Ryft Open API or [short reference](./searchsyntax.md)
+for more details on search expressions.
 
 `ryft-server` supports simple plain queries - without any keywords.
 The `query=Batman` will be automatically converted to `query=(RAW_TEXT CONTAINS "Batman")`.
 NOTE: This only works for text search; it is not appropriate for structured search.
-(Actually, the query will be `query=(RAW_TEXT CONTAINS 4261746d616e)`,
+(Actually, the query will be `query=(RAW_TEXT CONTAINS "\x42\x61\x74\x6d\x61\x6e")`,
 `ryft-server` uses hex encoding to avoid any possible escaping problems).
 
 `ryft-server` also supports complex queries containing several search expressions of different types.
@@ -86,14 +87,14 @@ will not be split into subqueries because the Ryft hardware supports those type 
 There is also possible to use advanced text search queries to customize some parameters within search expression.
 For example: `(RAW_TEXT CONTAINS FHS("555",CS=true,DIST=1,WIDTH=2)) AND (RAW_TEXT CONTAINS FEDS("777",CS=true,DIST=1,WIDTH=4))`.
 The ryft server splits this expressions into two Ryft calls:
-- `(RAW_TEXT CONTAINS "555")` with `FHS` search type, `fuzziness=1` and `surrounding=2`
-- `(RAW_TEXT CONTAINS "777")` with `FEDS` search type, `fuzziness=1` and `surrounding=4`
+- `(RAW_TEXT CONTAINS "555")` with `fhs` search mode, `fuzziness=1` and `surrounding=2`
+- `(RAW_TEXT CONTAINS "777")` with `feds` search mode, `fuzziness=1` and `surrounding=4`
 
 This advanced search query syntax overrides the following global parameters:
 - search type: `FHS` or `FEDS` (exact search is used if fuzziness is zero)
-- case sensitivity
-- fuzziness distance
-- surrounding width
+- case sensitivity `CS=`
+- fuzziness distance `DIST=`
+- surrounding width `WIDTH=`
 
 If nothing provided the global options are used by default. Any option can be omitted: `(RAW_TEXT CONTAINS FHS("555")) AND (RAW_TEXT CONTAINS FEDS("777",CS=false))`.
 
@@ -120,6 +121,7 @@ Multiple files can be provided as:
 - `ts` for time search
 - `ns` for numeric or currency search
 - `rs` for regex search
+- `ipv4` for IPv4 search
 
 If no search mode is specified, fuzzy hamming search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
@@ -130,6 +132,9 @@ In case of complex search queries, the mode specified is used for text or struct
 Date, time and numeric search modes will be detected automatically by corresponding keywords.
 
 NOTE: The fuzzy edit distance search mode removes duplicates by default (`-r` option of ryftprim).
+
+Check corresponding Ryft Open API or [short reference](./searchsyntax.md)
+for more details on search expressions.
 
 
 ### Search `surrounding` parameter

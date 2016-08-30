@@ -80,6 +80,8 @@ func getSearchMode(query QueryType, opts Options) string {
 		return "ns" // numeric_search
 	case QTYPE_REGEX:
 		return "rs" // regex_search
+	case QTYPE_IPV4:
+		return "ipv4" // IPv4 search
 	}
 
 	return opts.Mode
