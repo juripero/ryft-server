@@ -34,6 +34,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -559,14 +560,16 @@ func (task *Task) openFile(path string, poll time.Duration, cancel chan struct{}
 
 	for {
 		// wait until file will be created by `ryftone`
-		if _, err := os.Stat(path); err == nil {
+		if true /*_, err := os.Stat(path); err == nil*/ {
 			// file exists, try to open
 			f, err := os.Open(path)
 			if err == nil {
 				return f, nil // OK
-			} else {
+			} else if os.IsNotExist(err) { // ignore just "not exists" errors
 				// task.log().WithError(err).Warnf("[%s] failed to open file", TAG) // FIXME: DEBUG
 				// will sleep a while and try again...
+			} else {
+				return nil, err // report others
 			}
 		} else {
 			// task.log().WithError(err).Warnf("[%s] failed to stat file", TAG) // FIXME: DEBUG
@@ -606,8 +609,12 @@ func (task *Task) readDataFile(file *bufio.Reader, length uint64, poll time.Dura
 		}
 		pos += uint64(n)
 		if err != nil {
-			// task.log().WithError(err).Debugf("[%s]: failed to read data file (%d of %d)", TAG, pos, length) // FIXME: DEBUG
-			// will sleep a while and try again
+			if err == io.EOF { // ignore just EOF
+				// task.log().WithError(err).Debugf("[%s]: failed to read data file (%d of %d)", TAG, pos, length) // FIXME: DEBUG
+				// will sleep a while and try again
+			} else {
+				return nil, err // report others
+			}
 		} else {
 			if pos >= length {
 				return buf, nil // OK
