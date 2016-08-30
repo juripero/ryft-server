@@ -67,6 +67,6 @@ func (i *Index) UpdateHost(host string) {
 
 // String gets the string representation of Index.
 func (i Index) String() string {
-	return fmt.Sprintf("Index{file:%s, offset:%d, length:%d, fuzz:%d}",
+	return fmt.Sprintf("{%s#%d, len:%d, d:%d}",
 		i.File, i.Offset, i.Length, i.Fuzziness)
 }

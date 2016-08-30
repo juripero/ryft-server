@@ -2,6 +2,9 @@
 
 RYFTONE=/ryftone
 AUTH=-u admin:admin
+ADDR=-a localhost:8765
+
+TEXT10=test-fake-10.txt
 TEXT10K=test-fake-10K.txt
 TEXT100K=test-fake-100K.txt
 TEXT1M=test-fake-1M.txt
@@ -16,38 +19,44 @@ test_unwind_index: test_unwind_index1
 
 # unwind index test
 TEXT_UNWIND_INDEX1=${TEXT100K}
-AUTH_UNWIND_INDEX1=${AUTH}
 test_unwind_index1: faketext "${RYFTONE}/${TEXT_UNWIND_INDEX1}"
-	ryftrest -p=fhs -d=1 -q '(RAW_TEXT CONTAINS "test-fake-test")' \
-		-f "${TEXT_UNWIND_INDEX1}" ${AUTH_UNWIND_INDEX1} --local --format=utf8 \
-		| jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind-1-a.txt
-	ryftrest -p=fhs -d=1 -w=16 -q '(RAW_TEXT CONTAINS "test-fake-test")AND(RAW_TEXT CONTAINS FHS("test-fake-test",DIST=0))' \
-		-f "${TEXT_UNWIND_INDEX1}" ${AUTH_UNWIND_INDEX1} --local --format=utf8 \
-		| jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind-1-b.txt
-	ryftrest -p=fhs -d=1 -w=16 -q '(RAW_TEXT CONTAINS "test-fake-test")AND(RAW_TEXT CONTAINS FHS("test-fake-test",DIST=0))AND(RAW_TEXT CONTAINS FEDS("test-fake-test",DIST=0))' \
-		-f "${TEXT_UNWIND_INDEX1}" ${AUTH_UNWIND_INDEX1} --local --format=utf8 \
-		| jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind-1-c.txt
-	wc -l test-unwind-1-a.txt test-unwind-1-b.txt test-unwind-1-c.txt
-	diff test-unwind-1-a.txt test-unwind-1-b.txt >/dev/null
-	diff test-unwind-1-a.txt test-unwind-1-c.txt >/dev/null
-	diff test-unwind-1-b.txt test-unwind-1-c.txt >/dev/null
+	@echo "check unwind index feature on ${RYFTONE}/${TEXT_UNWIND_INDEX1} file"
+	@echo "1a: call FHS(d=0) as reference..."
+	ryftrest -p=fhs -d=0 -q '(RAW_TEXT CONTAINS "test-fake-test")' \
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 \
+		| jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind1a.txt
+	@echo "1b: call FHS(d=1) then FHS(d=0)..."
+	ryftrest -p=fhs -d=1 -w=16 -q '(RAW_TEXT CONTAINS "test-fake-test")AND(RAW_TEXT CONTAINS FHS("test-fake-test",DIST=0,WIDTH=0))' \
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 \
+		| jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind1b.txt
+	@echo "1c: call FHS(d=1) then FHS(d=0) then FEDS(d=0)..."
+	ryftrest -p=fhs -d=1 -w=16 -q '(RAW_TEXT CONTAINS "test-fake-test")AND(RAW_TEXT CONTAINS FHS("test-fake-test",DIST=0))AND(RAW_TEXT CONTAINS FEDS("test-fake-test",DIST=0,WIDTH=0))' \
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 \
+		| jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind1c.txt
+	wc -l "${RYFTONE}/${TEXT_UNWIND_INDEX1}" test-unwind1a.txt test-unwind1b.txt test-unwind1c.txt
+	diff test-unwind1a.txt test-unwind1b.txt >/dev/null
+	diff test-unwind1a.txt test-unwind1c.txt >/dev/null
+	diff test-unwind1b.txt test-unwind1c.txt >/dev/null
 
+# 10 test file
+"${RYFTONE}/${TEXT10}": faketext
+	./faketext --count=10 --pattern '$${rand(64)} test-fake-test $${rand(64)}' > "${RYFTONE}/${TEXT10}"
 
 # 10K test file
 "${RYFTONE}/${TEXT10K}": faketext
-	./faketext --count=10000 --pattern "${rand(64)} test-fake-test ${rand(64)}" > "${RYFTONE}/${TEXT10K}"
+	./faketext --count=10000 --pattern '$${rand(64)} test-fake-test $${rand(64)}' > "${RYFTONE}/${TEXT10K}"
 
 # 100K test file
 "${RYFTONE}/${TEXT100K}": faketext
-	./faketext --count=100000 --pattern "${rand(64)} test-fake-test ${rand(64)}" > "${RYFTONE}/${TEXT100K}"
+	./faketext --count=100000 --pattern '$${rand(64)} test-fake-test $${rand(64)}' > "${RYFTONE}/${TEXT100K}"
 
 # 1M test file
 "${RYFTONE}/${TEXT1M}": faketext
-	./faketext --count=1000000 --pattern "${rand(64)} test-fake-test ${rand(64)}" > "${RYFTONE}/${TEXT1M}"
+	./faketext --count=1000000 --pattern '$${rand(64)} test-fake-test $${rand(64)}' > "${RYFTONE}/${TEXT1M}"
 
 # 10M test file
 "${RYFTONE}/${TEXT10M}": faketext
-	./faketext --count=10000000 --pattern "${rand(64)} test-fake-test ${rand(64)}" > "${RYFTONE}/${TEXT10M}"
+	./faketext --count=10000000 --pattern '$${rand(64)} test-fake-test $${rand(64)}' > "${RYFTONE}/${TEXT10M}"
 
 # faketext utility
 faketext:
@@ -55,6 +64,7 @@ faketext:
 
 # clean all fake data
 clean:
+	rm -f "${RYFTONE}/${TEXT10}"
 	rm -f "${RYFTONE}/${TEXT10K}"
 	rm -f "${RYFTONE}/${TEXT100K}"
 	rm -f "${RYFTONE}/${TEXT1M}"

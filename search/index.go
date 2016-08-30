@@ -31,6 +31,7 @@
 package search
 
 import (
+	"fmt"
 	"sort"
 )
 
@@ -43,6 +44,10 @@ type baseIndex struct {
 	Offset uint64 // base file offset
 	//Length uint64 // (dataEnd - dataBeg)
 	//Fuzziness uint8
+}
+
+func (i baseIndex) String() string {
+	return fmt.Sprintf("{%s#%d [%d..%d)}", i.File, i.Offset, i.dataBeg, i.dataEnd)
 }
 
 // IndexFile contains base indexes
@@ -92,11 +97,13 @@ func (f *IndexFile) Find(offset uint64) int {
 func (f *IndexFile) Unwind(index Index) Index {
 	if n := f.Find(index.Offset); n < len(f.items) {
 		if base := f.items[n]; base.dataBeg <= index.Offset && index.Offset < base.dataEnd {
+			// tmp := index
 			index.Offset -= base.dataBeg
 			index.Offset += base.Offset
 			index.File = base.File
 			// index.Length += 0
 			// index.Fuzziness += 0
+			// fmt.Printf("unwinding (base:%s) %s=>%s\n", base, tmp, index)
 		}
 	}
 
