@@ -36,4 +36,4 @@ if `busyness/node-a=10` and `busyness/node-b=13`:
 To customize this parameter the `--busyness-tolerance` command line option
 can be used. By default it is zero.
 
-See [corresponding demo](./demo-2016-07-28.md) for more details.
+See [corresponding demo](./demo-2016-07-28-busyness.md) for more details.
