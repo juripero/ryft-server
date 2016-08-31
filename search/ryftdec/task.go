@@ -89,18 +89,18 @@ func getSearchMode(query QueryType, opts Options) string {
 
 // Drain all records/errors from 'res' to 'mux'
 func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecords bool) {
-	for {
+	for !res.IsDone() {
 		select {
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
 				// TODO: mark error with subtask's tag?
-				task.log().WithError(err).Debugf("[%s]/%d: new error received", TAG, task.subtaskId)
+				// task.log().WithError(err).Debugf("[%s]/%d: new error received", TAG, task.subtaskId) // DEBUG
 				mux.ReportError(err)
 			}
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				//task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId)
+				// task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId) // DEBUG
 				if saveRecords {
 					mux.ReportRecord(rec)
 				}
@@ -109,13 +109,13 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 		case <-res.DoneChan:
 			// drain the error channel
 			for err := range res.ErrorChan {
-				task.log().WithError(err).Debugf("[%s]/%d: *** new error received", TAG, task.subtaskId)
+				// task.log().WithError(err).Debugf("[%s]/%d: *** new error received", TAG, task.subtaskId) // DEBUG
 				mux.ReportError(err)
 			}
 
 			// drain the record channel
 			for rec := range res.RecordChan {
-				//task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId)
+				// task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId) // DEBUG
 				if saveRecords {
 					mux.ReportRecord(rec)
 				}

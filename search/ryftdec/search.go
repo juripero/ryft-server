@@ -125,10 +125,10 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		instanceName, homeDir, mountPoint := engine.getBackendOptions()
 		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-and-a%s",
 			task.Identifier, task.subtaskId, task.extension))
-		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
-			task.Identifier, task.subtaskId, ".txt"))
+		// idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
+		// task.Identifier, task.subtaskId, ".txt"))
 		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
-		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
+		// defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
 
 		task.log().WithField("temp", dat1).
 			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
@@ -139,8 +139,8 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		// left: save results to temporary file
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = dat1
-		tempCfg.KeepIndexAs = idx1
-		tempCfg.Delimiter = "\n\f\n\f\n"
+		tempCfg.KeepIndexAs = ""   //idx1
+		tempCfg.Delimiter = "\n\n" // TODO: get delimiter from configuration?
 		tempCfg.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
 		tempCfg.SaveUpdatedIndexesTo = search.NewIndexFile(tempCfg.Delimiter)
 		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
@@ -188,14 +188,24 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		task.subtaskId += 1
 		instanceName, homeDir, mountPoint := engine.getBackendOptions()
-		tempResultA := filepath.Join(instanceName, fmt.Sprintf(".temp-%s-%d-or-a%s",
+		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-or-a%s",
 			task.Identifier, task.subtaskId, task.extension))
-		tempResultB := filepath.Join(instanceName, fmt.Sprintf(".temp-%s-%d-or-b%s",
+		dat2 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-or-b%s",
 			task.Identifier, task.subtaskId, task.extension))
-		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, tempResultA))
-		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, tempResultB))
+		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-or-a%s",
+			task.Identifier, task.subtaskId, ".txt"))
+		idx2 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-or-b%s",
+			task.Identifier, task.subtaskId, ".txt"))
+		if len(cfg.KeepDataAs) != 0 {
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat2))
+		}
+		if len(cfg.KeepIndexAs) != 0 {
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx2))
+		}
 
-		task.log().WithField("temp", []string{tempResultA, tempResultB}).
+		task.log().WithField("temp", []string{dat1, dat2}).
 			Infof("[%s]/%d: running OR", TAG, task.subtaskId)
 		var stat1, stat2 *search.Statistics
 		var err1, err2 error
@@ -203,53 +213,54 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		// left: save results to temporary file "A"
 		tempCfg := *cfg
-		tempCfg.KeepDataAs = tempResultA
+		if len(cfg.KeepDataAs) != 0 {
+			tempCfg.KeepDataAs = dat1
+		}
+		if len(cfg.KeepIndexAs) != 0 {
+			tempCfg.KeepIndexAs = idx1
+		}
+		// tempCfg.Delimiter
+		// tempCfg.UnwindIndexesBasedOn
+		// tempCfg.SaveUpdatedIndexesTo
 		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
 		if err1 != nil {
 			return 0, nil, err1
 		}
 
 		// right: save results to temporary file "B"
-		tempCfg.KeepDataAs = tempResultB
+		if len(cfg.KeepDataAs) != 0 {
+			tempCfg.KeepDataAs = dat2
+		}
+		if len(cfg.KeepIndexAs) != 0 {
+			tempCfg.KeepIndexAs = idx2
+		}
+		// tempCfg.Delimiter
+		// tempCfg.UnwindIndexesBasedOn
+		// tempCfg.SaveUpdatedIndexesTo
 		n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 		if err2 != nil {
 			return 0, nil, err2
 		}
 
-		// combine two temporary files into one
+		// combine two temporary DATA files into one
 		if len(cfg.KeepDataAs) != 0 {
-			// output file
-			f, err := os.Create(filepath.Join(mountPoint, homeDir, cfg.KeepDataAs))
+			_, err := fileJoin(filepath.Join(mountPoint, homeDir, cfg.KeepDataAs),
+				filepath.Join(mountPoint, homeDir, dat1),
+				filepath.Join(mountPoint, homeDir, dat2))
 			if err != nil {
-				return 0, nil, fmt.Errorf("failed to create output file: %s", err)
+				return 0, nil, err
 			}
-			defer f.Close()
+		}
 
-			// first input file
-			a, err := os.Open(filepath.Join(mountPoint, homeDir, tempResultA))
+		// combine two temporary INDEX files into one
+		if len(cfg.KeepIndexAs) != 0 {
+			_, err := fileJoin(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
+				filepath.Join(mountPoint, homeDir, idx1),
+				filepath.Join(mountPoint, homeDir, idx2))
 			if err != nil {
-				return 0, nil, fmt.Errorf("failed to open first input file: %s", err)
+				return 0, nil, err
 			}
-			defer a.Close()
-
-			// second input file
-			b, err := os.Open(filepath.Join(mountPoint, homeDir, tempResultB))
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to open second input file: %s", err)
-			}
-			defer b.Close()
-
-			// copy first file
-			_, err = io.Copy(f, a)
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to copy first file: %s", err)
-			}
-
-			// copy second file
-			_, err = io.Copy(f, b)
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to copy second file: %s", err)
-			}
+			// TODO: save updated indexes back to text file!
 		}
 
 		// combined statistics
@@ -286,6 +297,44 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		return res.Stat.Matches, res.Stat, nil // OK
 	}
 	return 0, nil, nil // OK?
+}
+
+// join two files
+func fileJoin(result, first, second string) (uint64, error) {
+	// output file
+	f, err := os.Create(result)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create output file: %s", err)
+	}
+	defer f.Close()
+
+	// first input file
+	a, err := os.Open(first)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open first input file: %s", err)
+	}
+	defer a.Close()
+
+	// second input file
+	b, err := os.Open(second)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open second input file: %s", err)
+	}
+	defer b.Close()
+
+	// copy first file
+	na, err := io.Copy(f, a)
+	if err != nil {
+		return uint64(na), fmt.Errorf("failed to copy first file: %s", err)
+	}
+
+	// copy second file
+	nb, err := io.Copy(f, b)
+	if err != nil {
+		return uint64(na + nb), fmt.Errorf("failed to copy second file: %s", err)
+	}
+
+	return uint64(na + nb), nil // OK
 }
 
 // combine statistics
