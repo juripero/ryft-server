@@ -200,7 +200,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
 func (engine *Engine) process(task *Task, res *search.Result) {
-	defer task.log().Debugf("[%s]: end TASK processing", TAG)
+	defer task.log().WithField("result", res).Debugf("[%s]: end TASK processing", TAG)
 	task.log().Debugf("[%s]: start TASK processing...", TAG)
 
 	// wait for process done

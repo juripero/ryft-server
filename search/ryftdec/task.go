@@ -89,7 +89,9 @@ func getSearchMode(query QueryType, opts Options) string {
 
 // Drain all records/errors from 'res' to 'mux'
 func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecords bool) {
-	for !res.IsDone() {
+	defer task.log().WithField("result", mux).Debugf("[%s]: got combined result", TAG)
+
+	for {
 		select {
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
