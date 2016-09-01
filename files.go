@@ -31,7 +31,8 @@ type DeleteFilesParams struct {
 
 // NewFilesParams query parameters for POST /files
 type NewFilesParams struct {
-	File string `form:"file" json:"file"`
+	File    string `form:"file" json:"file"`
+	Catalog string `form:"catalog" json:"catalog"`
 	// TODO: catalog options
 }
 
@@ -162,6 +163,8 @@ func (s *Server) newFiles(c *gin.Context) {
 			"no valid filename provided"))
 	}
 
+	catalog := randomizePath(params.Catalog)
+
 	userName, _, homeDir, _ := s.parseAuthAndHome(c)
 	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
@@ -179,21 +182,25 @@ func (s *Server) newFiles(c *gin.Context) {
 	log.WithField("file", params.File).
 		WithField("user", userName).
 		WithField("home", homeDir).
+		WithField("catalog", catalog).
 		Infof("saving new data...")
 
-	path, err := createFile(mountPoint, params.File, file)
+	path, length, err := createFile(mountPoint, params.File, file)
 
-	var result string
+	response := map[string]interface{}{}
+
 	if err != nil {
-		result = fmt.Sprintf("%s", err)
+		response["error"] = err.Error()
 		// TODO: use dedicated HTTP status code
 	} else {
-		result = "OK"
+		response["path"] = path
+		response["length"] = length
+
+		if len(catalog) != 0 {
+			response["catalog"] = catalog
+		}
 	}
 
-	response := map[string]string{
-		path: result,
-	}
 	c.JSON(http.StatusOK, response)
 }
 
@@ -234,8 +241,8 @@ func deleteAll(mountPoint string, items []string) map[string]error {
 
 // createFile creates new file.
 // Unique file name could be generated if path contains special keywords.
-// Returns generated path and error if any.
-func createFile(mountPoint string, path string, content io.Reader) (string, error) {
+// Returns generated path, length and error if any.
+func createFile(mountPoint string, path string, content io.Reader) (string, uint64, error) {
 	rbase := randomizePath(path) // first replace all <random> tokens
 	rpath := rbase
 
@@ -243,7 +250,7 @@ func createFile(mountPoint string, path string, content io.Reader) (string, erro
 	pdir := filepath.Join(mountPoint, filepath.Dir(rpath))
 	err := os.MkdirAll(pdir, 0755)
 	if err != nil {
-		return rpath, err
+		return rpath, 0, err
 	}
 
 	// try to create file, if file already exists try with updated name
@@ -259,12 +266,12 @@ func createFile(mountPoint string, path string, content io.Reader) (string, erro
 
 				continue
 			}
-			return rpath, err
+			return rpath, 0, err
 		}
 		defer f.Close()
 
 		// copy the file content
-		_, err = io.Copy(f, content)
+		w, err := io.Copy(f, content)
 		if err != nil {
 			log.WithError(err).WithField("file", rpath).
 				Warnf("failed to save data")
@@ -272,11 +279,11 @@ func createFile(mountPoint string, path string, content io.Reader) (string, erro
 			// do not leave partially saved data!
 			_ = os.RemoveAll(fullpath)
 
-			return rpath, err
+			return rpath, 0, err
 		}
 
 		// return path to file without mountpoint
-		return rpath, nil // OK
+		return rpath, uint64(w), nil // OK
 	}
 }
 
