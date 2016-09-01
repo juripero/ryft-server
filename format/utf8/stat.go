@@ -28,54 +28,28 @@
  * ============
  */
 
-package auth
+package utf8
 
 import (
-	"encoding/json"
-	"errors"
-	"io/ioutil"
-
-	"gopkg.in/yaml.v2"
-
-	"path/filepath"
-
-	"github.com/gin-gonic/gin"
+	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	constJson = ".json"
-	constYml  = ".yml"
-	constYaml = ".yaml"
-)
+// STATISTICS format specific data.
+// Is the same as RAW format statistics!
+type Statistics raw.Statistics
 
-func AuthBasicFile(fileName string) (gin.HandlerFunc, error) {
-	users, err := readUsersFile(fileName)
-	if err != nil {
-		return nil, err
-	}
-	return gin.BasicAuth(users), nil
-
+// NewStat creates new format specific data.
+func NewStat() interface{} {
+	return new(Statistics)
 }
 
-func readUsersFile(fileName string) (map[string]string, error) {
-	var users map[string]string
+// FromStat converts STATISTICS to format specific data.
+func FromStat(stat *search.Statistics) *Statistics {
+	return (*Statistics)(raw.FromStat(stat))
+}
 
-	ext := filepath.Ext(fileName)
-
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, err
-	}
-	if ext == constJson {
-		err = json.Unmarshal(data, &users)
-	} else if ext == constYaml || ext == constYml {
-		err = yaml.Unmarshal(data, &users)
-	} else {
-		err = errors.New("Unrecognized file extention " + ext)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	return users, nil
+// ToStat converts format specific data to STATISTICS.
+func ToStat(stat *Statistics) *search.Statistics {
+	return raw.ToStat((*raw.Statistics)(stat))
 }

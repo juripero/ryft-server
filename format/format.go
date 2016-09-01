@@ -36,12 +36,14 @@ import (
 
 	"github.com/getryft/ryft-server/format/json"
 	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/format/utf8"
 	"github.com/getryft/ryft-server/format/xml"
 	"github.com/getryft/ryft-server/search"
 )
 
 const (
 	JSON = "json"
+	UTF8 = "utf8"
 	RAW  = "raw"
 	XML  = "xml"
 )
@@ -69,6 +71,8 @@ func New(format string, opts map[string]interface{}) (Format, error) {
 	switch strings.ToLower(format) {
 	case JSON:
 		return json.New(opts)
+	case UTF8, "utf-8":
+		return utf8.New(opts)
 	case RAW:
 		return raw.New()
 	case XML:

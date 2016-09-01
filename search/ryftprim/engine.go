@@ -51,7 +51,9 @@ var (
 type Engine struct {
 	Instance   string // empty by default. might be some server instance name like ".server-1234"
 	ExecPath   string // "/usr/bin/ryftprim" by default
+	LegacyMode bool   // legacy mode to get machine readable statistics
 	MountPoint string // "/ryftone" by default
+	HomeDir    string // subdir of mountpoint
 
 	KeepResultFiles bool // false by default
 
@@ -88,8 +90,8 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftPrim{instance:%q, ryftone:%q, ryftprim:%q}",
-		engine.Instance, engine.MountPoint, engine.ExecPath)
+	return fmt.Sprintf("RyftPrim{instance:%q, ryftone:%q, home:%q, ryftprim:%q}",
+		engine.Instance, engine.MountPoint, engine.HomeDir, engine.ExecPath)
 	// TODO: other parameters?
 }
 

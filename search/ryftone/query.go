@@ -31,7 +31,7 @@
 package ryftone
 
 import (
-	"encoding/hex"
+	"bytes"
 	"fmt"
 	"strings"
 )
@@ -44,7 +44,19 @@ func PrepareQuery(query string) string {
 	} else {
 		// if no keywords - assume plain text query
 		// use hexadecimal encoding here to avoid escaping problems
-		return fmt.Sprintf("(RAW_TEXT CONTAINS %s)",
-			hex.EncodeToString([]byte(query)))
+		return fmt.Sprintf(`(RAW_TEXT CONTAINS "%s")`, hex([]byte(query)))
 	}
+}
+
+// convert any byte array to hex string
+func hex(str []byte) string {
+	var buf bytes.Buffer
+	buf.Grow(4 * len(str))
+	for _, b := range str {
+		buf.WriteByte('\\')
+		buf.WriteByte('x')
+		buf.WriteString(fmt.Sprintf("%02x", b))
+	}
+
+	return buf.String()
 }

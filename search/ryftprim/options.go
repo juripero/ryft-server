@@ -42,14 +42,16 @@ import (
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{
-		"instance-name": engine.Instance,
-		"ryftprim-exec": engine.ExecPath,
-		"ryftone-mount": engine.MountPoint,
-		"open-poll":     engine.OpenFilePollTimeout.String(),
-		"read-poll":     engine.ReadFilePollTimeout.String(),
-		"read-limit":    engine.ReadFilePollLimit,
-		"keep-files":    engine.KeepResultFiles,
-		"index-host":    engine.IndexHost,
+		"instance-name":   engine.Instance,
+		"ryftprim-exec":   engine.ExecPath,
+		"ryftprim-legacy": engine.LegacyMode,
+		"ryftone-mount":   engine.MountPoint,
+		"home-dir":        engine.HomeDir,
+		"open-poll":       engine.OpenFilePollTimeout.String(),
+		"read-poll":       engine.ReadFilePollTimeout.String(),
+		"read-limit":      engine.ReadFilePollLimit,
+		"keep-files":      engine.KeepResultFiles,
+		"index-host":      engine.IndexHost,
 	}
 }
 
@@ -78,6 +80,16 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 			engine.ExecPath, err)
 	}
 
+	// `ryftprim` legacy mode
+	if v, ok := opts["ryftprim-legacy"]; ok {
+		engine.LegacyMode, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "ryftprim-legacy" option: %s`, err)
+		}
+	} else {
+		engine.LegacyMode = true // enable by default
+	}
+
 	// `ryftone` mount point
 	if v, ok := opts["ryftone-mount"]; ok {
 		engine.MountPoint, err = utils.AsString(v)
@@ -93,8 +105,18 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 			engine.MountPoint, err)
 	}
 
+	// user's home directory
+	if v, ok := opts["home-dir"]; ok {
+		engine.HomeDir, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "home-dir" option: %s`, err)
+		}
+	} else {
+		engine.HomeDir = "/"
+	}
+
 	// create working directory
-	work_dir := filepath.Join(engine.MountPoint, engine.Instance)
+	work_dir := filepath.Join(engine.MountPoint, engine.HomeDir, engine.Instance)
 	// TODO: option to clear working dir before start?
 	err = os.MkdirAll(work_dir, os.ModeDir)
 	if err != nil {
@@ -130,6 +152,9 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		engine.ReadFilePollLimit = int(vv)
 	} else {
 		engine.ReadFilePollLimit = 100
+	}
+	if engine.ReadFilePollLimit <= 0 {
+		return fmt.Errorf(`"read-limit" cannot be negative or zero`)
 	}
 
 	// keep result files

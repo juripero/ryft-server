@@ -43,7 +43,7 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	log.WithField("path", path).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	fullPath := filepath.Join(engine.MountPoint, path)
+	fullPath := filepath.Join(engine.MountPoint, engine.HomeDir, path)
 	info, err := ryftone.GetDirInfo(fullPath, path)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)

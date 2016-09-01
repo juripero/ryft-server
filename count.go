@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 
@@ -56,7 +55,8 @@ func (s *Server) count(ctx *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local, params.Files)
+	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
+	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
@@ -79,35 +79,55 @@ func (s *Server) count(ctx *gin.Context) {
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 
+	log.WithField("config", cfg).WithField("user", userName).
+		WithField("home", homeDir).WithField("cluster", userTag).
+		Infof("start /count")
 	res, err := engine.Count(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))
 	}
+	defer log.WithField("result", res).Infof("/count done")
+
+	// in case of unexpected panic
+	// we need to cancel search request
+	// to prevent resource leaks
+	defer func() {
+		if !res.IsDone() {
+			errors, records := res.Cancel() // cancel processing
+			if errors > 0 || records > 0 {
+				log.WithField("errors", errors).WithField("records", records).
+					Debugf("***some errors/records are ignored")
+			}
+		}
+	}()
+
+	s.onSearchStarted(cfg)
+	defer s.onSearchStopped(cfg)
 
 	for {
 		select {
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				log.Printf("REC: %s", rec)
+				log.WithField("record", rec).Debugf("record ignored")
 				// ignore records
 			}
 
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
-				log.Printf("ERR: %s", err)
+				log.WithField("error", err).Debugf("error ignored")
 				// TODO: report error
 			}
 
 		case <-res.DoneChan:
 			if res.Stat != nil {
-				log.Printf("DONE: %s", res.Stat)
 				stat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, stat)
 			} else {
 				panic(NewServerError(http.StatusInternalServerError,
 					"no search statistics available"))
 			}
+
 			return
 		}
 	}

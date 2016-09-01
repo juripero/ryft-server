@@ -52,7 +52,8 @@ func (s *Server) getFiles(c *gin.Context) {
 	}
 
 	// get search engine
-	engine, err := s.getSearchEngine(params.Local, nil /*no files*/)
+	userName, authToken, homeDir, userTag := s.parseAuthAndHome(c)
+	engine, err := s.getSearchEngine(params.Local, nil /*no files*/, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
@@ -68,6 +69,9 @@ func (s *Server) getFiles(c *gin.Context) {
 			"Only JSON format is supported for now"))
 	}
 
+	log.WithField("dir", params.Dir).WithField("user", userName).
+		WithField("home", homeDir).WithField("cluster", userTag).
+		Infof("start /files")
 	info, err := engine.Files(params.Dir)
 	if err != nil {
 		// TODO: detail description?

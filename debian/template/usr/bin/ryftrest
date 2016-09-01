@@ -8,45 +8,62 @@ ryftrest is a ryftprim equivalent, it uses ryft-server as a backend.
 Usage: $0 [options]
 
 Search specific:
--h|--help        Prints this short help message.
--p|--mode        Specifies the search mode to run, which can be one of:
-                    - exact_search (or es)
-                    - fuzzy_hamming_search (or fhs) (used by default)
-                    - fuzzy_edit_distance_search (or feds)
-                    - date_search (or ds)
-                    - time_search (or ts)
-                    - numeric_search (or ns)
--f|--file        Specifies an input filename.
--i               Specifies case-insensitive analysis for supported primitives.
--n|--nodes       Specifies 1-4 RCAB processing nodes to use.
--d|--fuzziness   Specifies the fuzzy search distance.
--w|--width       Specifies the surrounding width.
--s|-q|--query    Specifies the search/query expression to use with *_search primitives.
--od|--data       Used to keep a data results file.
--oi|--index      Used to keep an index results file.
+-h|--help          Prints this short help message.
+-p|--mode=<mode>   Specifies the search mode to run, which can be one of:
+                     - exact_search (or es)
+                     - fuzzy_hamming_search (or fhs) (used by default)
+                     - fuzzy_edit_distance_search (or feds)
+                     - date_search (or ds)
+                     - time_search (or ts)
+                     - numeric_search (or ns) also used for currency
+                     - regex_search (or rs)
+                     - ipv4_search (or ipv4)
+-f|--file=<file>   Specifies an input filename.
+-i                 Specifies case-insensitive analysis for supported primitives.
+-n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use.
+-d|--fuzziness=<D> Specifies the fuzzy search distance.
+-w|--width=<W>     Specifies the surrounding width.
+-s|-q=<query>      Specifies the search/query expression to use.
+  |--query=<query>
+-od|--data=<file>  Used to keep a data results file.
+-oi|--index=<file> Used to keep an index results file.
 
 REST specific:
--a|--address     Specifies the ryft-server address.
-                   "http://localhost:8765" by default.
---search         Use /search endpoint (used by default)
---count          Use /count endpoint instead of /search
+-a|--address=<addr> Specifies the ryft-server address.
+                      "http://localhost:8765" by default.
+-u|--user=<cred> Use user credentials, "username:password".
+  |--auth
+--search         Use /search endpoint (used by default) to print all found items.
+--count          Use /count endpoint instead of /search to print just statistics.
+--limit=N        Specifies the limit on total number of records printed (used with /search).
 --local          Specifies the local search. Opposite to --cluster.
 --cluster        Specifies the cluster search. Opposite to --local. Used by default.
---format         Specifies format of the result records, can be:
+--format=<fmt>   Specifies format of the result records, can be:
                      - raw - base-64 encoded data, by default.
                      - xml - decode XML records
                      - json - decode JSON objects
---fields         Specifies coma-separated list of fields to return.
+                     - utf8 - for text search get utf-8 string
+                              instead of base-64 encoded raw bytes
+--fields=<list>  Specifies comma-separated list of fields to return.
                  This parameter is useful with XML and JSON formats.
 --no-stats       Disable statistics output.
---stream         Use stream format (is used for node communication within cluster).
---spark          Use SPARK format.
+--stream         Use stream output format. Provides a sequence of JSON
+                 "tag-object" pairs to be able to decode input data on the fly
+                 (is used for node communication within cluster).
 
 -v|--verbose     Tells curl to be verbose.
+-vv|--pretty     Get pretty (properly indented) formatting with jq tool.
 
 Examples:
 
-$0 -q=Joe -f=*.txt
+$0 -q 'Joe' -f '*.txt' -vv
+  will search and print all 'Joe' occurences in text files.
+
+$0 -q 'Joe' -f '*.txt' -vv --count
+  will just print the number of matches and some performance numbers.
+
+$0 -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --format=xml --fields=ID,Date -vv
+  will launch a structured search in pcrime files.
 EOF
 }
 
@@ -68,7 +85,9 @@ DATA=
 INDEX=
 
 ADDRESS=http://localhost:8765
+AUTH_USER=
 ENDPOINT=/search
+LIMIT=
 LOCAL=false
 FORMAT=
 FIELDS=
@@ -78,6 +97,7 @@ SPARK=
 
 # be silent by default
 VERBOSE=-s
+PRETTY=
 
 # parse options
 while [[ $# > 0 ]]; do
@@ -158,6 +178,14 @@ while [[ $# > 0 ]]; do
 		ADDRESS="$2"
 		shift 2
 		;;
+	-u=*|--user=*|--auth=*)
+		AUTH_USER="${1#*=}"
+		shift
+		;;
+	-u|--user|--auth)
+		AUTH_USER="$2"
+		shift 2
+		;;
 	--search)
 		ENDPOINT="/search"
 		shift
@@ -165,6 +193,14 @@ while [[ $# > 0 ]]; do
 	--count)
 		ENDPOINT="/count"
 		shift
+		;;
+	--limit=*)
+		LIMIT="${1#*=}"
+		shift
+		;;
+	--limit)
+		LIMIT="$2"
+		shift 2
 		;;
 	--local)
 		LOCAL="true"
@@ -202,8 +238,14 @@ while [[ $# > 0 ]]; do
 		SPARK="true"
 		shift
 		;;
+	-vv|--pretty)
+		VERBOSE="-s" # tell curl to be silent
+		PRETTY="jq ."
+		shift
+		;;
 	-v|--verbose)
 		VERBOSE="-v"
+		PRETTY=""
 		shift
 		;;
 	-h|--help)
@@ -221,6 +263,7 @@ done
 
 # build the URL
 URL_DATA=(--data-urlencode "local=$LOCAL")
+[[ ! -z "$AUTH_USER" ]] && URL_DATA=("${URL_DATA[@]}" -u "$AUTH_USER")
 [[ ! -z "$QUERY" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "query=$QUERY")
 IFS=':' read -r -a files <<< "$FILES"
 for file in "${files[@]}"; do
@@ -231,6 +274,7 @@ done
 [[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
 [[ ! -z "$MODE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "mode=$MODE")
+[[ ! -z "$LIMIT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "limit=$LIMIT")
 [[ ! -z "$DATA" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "data=$DATA")
 [[ ! -z "$INDEX" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "index=$INDEX")
 [[ ! -z "$FORMAT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "format=$FORMAT")
@@ -239,6 +283,13 @@ done
 [[ ! -z "$STREAM" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stream=$STREAM")
 [[ ! -z "$SPARK" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "spark=$SPARK")
 
+# check dependencies
+[[ -z `which curl`  ]] && fail "no curl found, run 'apt-get install curl' to install it"
+[[ ! -z "$PRETTY" ]] && [[ -z `which jq`  ]] && fail "no jq found, run 'apt-get install jq' to install it"
 
 # do the search and print error/results
-curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
+if [[ -z "$PRETTY" ]]; then
+	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
+else
+	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | $PRETTY
+fi

@@ -47,6 +47,7 @@ var (
 // RyftMUX task related data.
 type Task struct {
 	Identifier string // unique
+	Limit      uint64 // limit number of records
 
 	subtasks sync.WaitGroup
 	results  []*search.Result
@@ -101,7 +102,14 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					if ok && rec != nil {
 						task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
 						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+
 						mux.ReportRecord(rec)
+
+						// check for records limit!
+						if task.Limit > 0 && mux.RecordsReported() >= task.Limit {
+							task.log().WithField("limit", task.Limit).Infof("[%s]: stopped by limit", TAG)
+							return // done!
+						}
 					}
 
 				case <-res.DoneChan:
@@ -116,6 +124,12 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 						task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG)
 						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 						mux.ReportRecord(rec)
+
+						// check for records limit!
+						if task.Limit > 0 && mux.RecordsReported() >= task.Limit {
+							task.log().WithField("limit", task.Limit).Infof("[%s]: *** stopped by limit", TAG)
+							return // done!
+						}
 					}
 
 					return // done!
@@ -136,7 +150,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					Infof("[%s]: subtask is finished", TAG)
 				if res.Stat != nil {
 					if mux.Stat == nil {
-						mux.Stat = search.NewStat()
+						mux.Stat = search.NewStat(engine.IndexHost)
 					}
 					mux.Stat.Merge(res.Stat)
 				}
@@ -149,7 +163,11 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 			task.log().Infof("[%s]: cancel all unfinished subtasks", TAG)
 			for _, r := range task.results {
 				if !finished[r] {
-					r.Cancel()
+					errors, records := r.Cancel()
+					if errors > 0 || records > 0 {
+						task.log().WithField("errors", errors).WithField("records", records).
+							Debugf("[%s]: some errors/records are ignored", TAG)
+					}
 				}
 			}
 
