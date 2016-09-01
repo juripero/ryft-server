@@ -598,7 +598,7 @@ func main() {
 	private.GET("/cluster/members", server.members)
 	private.GET("/files", server.getFiles)
 	private.DELETE("/files", server.deleteFiles)
-	private.POST("/files", server.newFile)
+	private.POST("/files", server.newFiles)
 
 	// static asset
 	for _, asset := range AssetNames() {

@@ -30,7 +30,7 @@ type DeleteFilesParams struct {
 }
 
 // NewFilesParams query parameters for POST /files
-type NewFileParams struct {
+type NewFilesParams struct {
 	File string `form:"file" json:"file"`
 	// TODO: catalog options
 }
@@ -88,6 +88,9 @@ func (s *Server) getFiles(c *gin.Context) {
 }
 
 // DELETE /files method
+/* to test method:
+curl -X DELETE -s "http://localhost:8765/files?file=p*.txt" | jq .
+*/
 func (s *Server) deleteFiles(c *gin.Context) {
 	defer RecoverFromPanic(c)
 
@@ -136,14 +139,27 @@ func (s *Server) deleteFiles(c *gin.Context) {
 }
 
 // POST /files method
-func (s *Server) newFile(c *gin.Context) {
-	// recover from panics if any
+/* to test method:
+curl -X POST -F content=@/path/to/file.txt -s "http://localhost:8765/files?file=file<random>.txt" | jq .
+*/
+func (s *Server) newFiles(c *gin.Context) {
 	defer RecoverFromPanic(c)
 
-	params := NewFileParams{}
+	// parse request parameters
+	params := NewFilesParams{}
 	if err := c.Bind(&params); err != nil {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
+	}
+
+	// get name from "filename" form value if it's not provided in query
+	if fn := c.Request.FormValue("filename"); len(fn) != 0 && len(params.File) == 0 {
+		params.File = fn
+	}
+
+	if len(params.File) == 0 {
+		panic(NewServerError(http.StatusBadRequest,
+			"no valid filename provided"))
 	}
 
 	userName, _, homeDir, _ := s.parseAuthAndHome(c)
@@ -153,17 +169,18 @@ func (s *Server) newFile(c *gin.Context) {
 			err.Error(), "failed to get mount point"))
 	}
 
-	log.WithField("file", params.File).
-		WithField("user", userName).
-		WithField("home", homeDir).
-		Infof("saving new data")
-
 	file, _, err := c.Request.FormFile("content")
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "no \"content\" form data provided"))
+			err.Error(), `no "content" form data provided`))
 	}
 	defer file.Close()
+
+	log.WithField("file", params.File).
+		WithField("user", userName).
+		WithField("home", homeDir).
+		Infof("saving new data...")
+
 	path, err := createFile(mountPoint, params.File, file)
 
 	var result string
@@ -171,13 +188,11 @@ func (s *Server) newFile(c *gin.Context) {
 		result = fmt.Sprintf("%s", err)
 		// TODO: use dedicated HTTP status code
 	} else {
-		log.Printf("saved to %q", path)
 		result = "OK"
 	}
 
 	response := map[string]string{
-		"path":   path,
-		"result": result,
+		path: result,
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -251,7 +266,12 @@ func createFile(mountPoint string, path string, content io.Reader) (string, erro
 		// copy the file content
 		_, err = io.Copy(f, content)
 		if err != nil {
-			// TODO: remove corrupted file?
+			log.WithError(err).WithField("file", rpath).
+				Warnf("failed to save data")
+
+			// do not leave partially saved data!
+			_ = os.RemoveAll(fullpath)
+
 			return rpath, err
 		}
 
@@ -268,6 +288,8 @@ func randomizePath(path string) string {
 		return fmt.Sprintf("%016x", time.Now().UnixNano())
 	}
 
-	re := regexp.MustCompile("<random>")
+	// TODO: use some hash here
+
+	re := regexp.MustCompile(`<random>`)
 	return re.ReplaceAllStringFunc(path, token)
 }
