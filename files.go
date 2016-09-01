@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -179,25 +181,32 @@ func (s *Server) newFiles(c *gin.Context) {
 	}
 	defer file.Close()
 
+	response := map[string]interface{}{}
 	log.WithField("file", params.File).
 		WithField("user", userName).
 		WithField("home", homeDir).
 		WithField("catalog", catalog).
 		Infof("saving new data...")
 
-	path, length, err := createFile(mountPoint, params.File, file)
+	if len(catalog) != 0 {
+		path, length, err := updateCatalog(mountPoint, catalog, params.File, file)
 
-	response := map[string]interface{}{}
-
-	if err != nil {
-		response["error"] = err.Error()
-		// TODO: use dedicated HTTP status code
-	} else {
-		response["path"] = path
-		response["length"] = length
-
-		if len(catalog) != 0 {
+		if err != nil {
+			response["error"] = err.Error()
+		} else {
 			response["catalog"] = catalog
+			response["path"] = path     // data path to search
+			response["length"] = length // not total, just this part
+		}
+	} else { // regular file
+		path, length, err := createFile(mountPoint, params.File, file)
+
+		if err != nil {
+			response["error"] = err.Error()
+			// TODO: use dedicated HTTP status code
+		} else {
+			response["path"] = path
+			response["length"] = length
 		}
 	}
 
@@ -287,6 +296,96 @@ func createFile(mountPoint string, path string, content io.Reader) (string, uint
 	}
 }
 
+// writes file to the catalog
+func updateCatalog(mountPoint string, catalog, filename string, content io.Reader) (string, uint64, error) {
+	dataPath, indexPath, lockPath := splitCatalog(catalog)
+
+	tmp, err := ioutil.TempFile("", "temp_file")
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to create temp file: %s", err)
+	}
+	defer func() {
+		tmp.Close()
+		os.RemoveAll(tmp.Name())
+	}()
+
+	length, err := io.Copy(tmp, content)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
+	}
+	tmp.Seek(0, 0) // begin
+
+	offset := uint64(0)
+	for attempt := 0; ; attempt++ {
+		err := func() error {
+			lock, err := os.OpenFile(filepath.Join(mountPoint, lockPath), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+			if err != nil {
+				time.Sleep(100 * time.Millisecond)
+				return io.ErrNoProgress
+			}
+			defer func() {
+				lock.Close()
+				os.RemoveAll(filepath.Join(mountPoint, lockPath))
+			}()
+
+			index, err := os.OpenFile(filepath.Join(mountPoint, indexPath), os.O_RDWR|os.O_CREATE, 0644)
+			if err != nil {
+				fmt.Errorf("failed to open index file: %s", err)
+			}
+			defer index.Close()
+
+			type Header struct {
+				Signature       uint32
+				TotalItemsCount uint32
+				TotalDataLength uint64
+			}
+
+			header := &Header{}
+			order := binary.LittleEndian
+			err = binary.Read(index, order, header)
+			if err != nil {
+				header.Signature = 0xdeadbeaf
+			}
+
+			// TODO: check signature
+			offset = header.TotalDataLength
+			header.TotalItemsCount += 1
+			header.TotalDataLength += uint64(length)
+
+			index.Seek(0, 0) // begin
+			binary.Write(index, order, header)
+
+			index.Seek(0, 2) // end
+			index.WriteString(fmt.Sprintf("%s,%d,%d,0\n", filename, offset, length))
+
+			return nil
+		}()
+		if err != nil {
+			if err == io.ErrNoProgress {
+				continue
+			}
+			return "", 0, err
+		}
+
+		break
+	}
+
+	// done index update
+	data, err := os.OpenFile(filepath.Join(mountPoint, dataPath), os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to open data file: %s", err)
+	}
+	defer data.Close()
+
+	data.Seek(int64(offset), 0)
+	_, err = io.Copy(data, tmp)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to copy data: %s", err)
+	}
+
+	return dataPath, uint64(length), nil // OK
+}
+
 // replace <random> sections of filename with random token.
 // random token is based on current unix time in nanoseconds.
 // multiple <random> are possible
@@ -299,4 +398,18 @@ func randomizePath(path string) string {
 
 	re := regexp.MustCompile(`<random>`)
 	return re.ReplaceAllStringFunc(path, token)
+}
+
+// get a few meta names from catalog name
+func splitCatalog(catalog string) (data, index, lock string) {
+	// catalog = dir + file + ext
+	dir, file := filepath.Split(catalog)
+	ext := filepath.Ext(file)
+	file = strings.TrimSuffix(file, ext)
+
+	data = filepath.Join(dir, fmt.Sprintf("%s%s", file, ext))
+	index = filepath.Join(dir, fmt.Sprintf(".%s-index%s", file, ext))
+	lock = filepath.Join(dir, fmt.Sprintf(".%s-lock%s", file, ext))
+
+	return
 }
