@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,8 +22,6 @@ type GetFilesParams struct {
 	Local bool   `form:"local" json:"local"`
 }
 
-// TODO: unsafe!!! need authentication!!!
-
 // DeleteFilesParams query parameters for DELETE /files
 // there is no actual difference between dirs and files - everything will be deleted
 type DeleteFilesParams struct {
@@ -35,19 +32,17 @@ type DeleteFilesParams struct {
 // NewFilesParams query parameters for POST /files
 type NewFileParams struct {
 	File string `form:"file" json:"file"`
+	// TODO: catalog options
 }
 
 // GET /files method
 func (s *Server) getFiles(c *gin.Context) {
-	// recover from panics if any
 	defer RecoverFromPanic(c)
-
-	var err error
 
 	// parse request parameters
 	params := GetFilesParams{}
-	if err = c.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+	if err := c.Bind(&params); err != nil {
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
 
@@ -94,42 +89,47 @@ func (s *Server) getFiles(c *gin.Context) {
 
 // DELETE /files method
 func (s *Server) deleteFiles(c *gin.Context) {
-	// recover from panics if any
 	defer RecoverFromPanic(c)
 
+	// parse request parameters
 	params := DeleteFilesParams{}
 	if err := c.Bind(&params); err != nil {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
 
-	mountPoint, err := s.getMountPoint()
+	userName, _, homeDir, _ := s.parseAuthAndHome(c)
+	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get mount point"))
 	}
 
+	log.WithField("dirs", params.Dirs).
+		WithField("files", params.Files).
+		WithField("user", userName).
+		WithField("home", homeDir).
+		Info("deleting...")
+
 	result := map[string]string{}
-
-	//log.WithField("dirs", params.Dirs).WithField("files", params.Files).Info("deleting")
-	log.Printf("deleting files:%q dirs:%q", params.Files, params.Dirs)
-
-	items := make([]string, 0, len(params.Dirs)+len(params.Files))
-	items = append(items, params.Files...)
-	items = append(items, params.Dirs...)
-
-	// delete files and directories
-	errs := deleteAll(mountPoint, items)
-	for k, err := range errs {
-		name := items[k]
-
+	updateResult := func(name string, err error) {
 		// in case of duplicate input
 		// last result will be reported
 		if err != nil {
 			result[name] = err.Error()
 		} else {
-			result[name] = "OK"
+			result[name] = "OK" // "DELETED"
 		}
+	}
+
+	// delete directories first ...
+	for dir, err := range deleteAll(mountPoint, params.Dirs) {
+		updateResult(dir, err)
+	}
+
+	// ... then delete files
+	for file, err := range deleteAll(mountPoint, params.Files) {
+		updateResult(file, err)
 	}
 
 	c.JSON(http.StatusOK, result)
@@ -146,14 +146,17 @@ func (s *Server) newFile(c *gin.Context) {
 			err.Error(), "failed to parse request parameters"))
 	}
 
-	mountPoint, err := s.getMountPoint()
+	userName, _, homeDir, _ := s.parseAuthAndHome(c)
+	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get mount point"))
 	}
 
-	//log.WithField("file", params.File).Infof("saving new data")
-	log.Printf("saving new data for %q", params.File)
+	log.WithField("file", params.File).
+		WithField("user", userName).
+		WithField("home", homeDir).
+		Infof("saving new data")
 
 	file, _, err := c.Request.FormFile("content")
 	if err != nil {
@@ -179,9 +182,9 @@ func (s *Server) newFile(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// get mount point path from search engine
-func (s *Server) getMountPoint() (string, error) {
-	engine, err := s.getSearchEngine(true, []string{})
+// get mount point path from local search engine
+func (s *Server) getMountPoint(homeDir string) (string, error) {
+	engine, err := s.getLocalSearchEngine(homeDir)
 	if err != nil {
 		return "", err
 	}
@@ -191,12 +194,26 @@ func (s *Server) getMountPoint() (string, error) {
 }
 
 // remove directories or/and files
-func deleteAll(mountPoint string, items []string) []error {
-	res := make([]error, len(items))
-	for k, item := range items {
+func deleteAll(mountPoint string, items []string) map[string]error {
+	res := map[string]error{}
+	for _, item := range items {
 		path := filepath.Join(mountPoint, item)
-		res[k] = os.RemoveAll(path)
+		matches, err := filepath.Glob(path)
+		if err != nil {
+			res[item] = err
+			continue
+		}
+
+		// remove all matches
+		for _, file := range matches {
+			rel, err := filepath.Rel(mountPoint, file)
+			if err != nil {
+				rel = file // ignore error and get absolute path
+			}
+			res[rel] = os.RemoveAll(file)
+		}
 	}
+
 	return res
 }
 

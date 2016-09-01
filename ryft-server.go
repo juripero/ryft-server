@@ -596,7 +596,7 @@ func main() {
 	private.GET("/search", server.search)
 	private.GET("/count", server.count)
 	private.GET("/cluster/members", server.members)
-	private.GET("/files", server.files)
+	private.GET("/files", server.getFiles)
 	private.DELETE("/files", server.deleteFiles)
 	private.POST("/files", server.newFile)
 

@@ -268,7 +268,7 @@
           "files"
         ],
         "summary": "List a directory content",
-        "description": "Endpoint to query mode/cluster file system structure",
+        "description": "Endpoint to query node/cluster file system structure",
         "operationId": "files",
         "parameters": [
           {
@@ -281,6 +281,50 @@
             "name": "local",
             "type": "boolean",
             "description": "Return file structure from local node only or whole cluster",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of files and directories for node/cluster",
+            "schema": {
+              "$ref": "#/definitions/FilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Delete directories and files",
+        "description": "Endpoint to delete node's directories and files",
+        "operationId": "files",
+        "parameters": [
+          {
+            "name": "dir",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "The directory path to delete. Wildcards are supported.",
+            "in": "query"
+          },
+          {
+            "name": "file",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "The file path to delete. Wildcards are supported.",
             "in": "query"
           }
         ],
