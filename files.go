@@ -172,12 +172,28 @@ func (s *Server) newFiles(c *gin.Context) {
 			err.Error(), "failed to get mount point"))
 	}
 
-	file, _, err := c.Request.FormFile("content")
-	if err != nil {
+	var file io.Reader
+	var fileLen int64 // -1 unknown
+
+	contentType := c.ContentType()
+	switch strings.ToLower(strings.TrimSpace(contentType)) {
+	case "multipart/form-data":
+		f, _, err := c.Request.FormFile("content")
+		if err != nil {
+			panic(NewServerErrorWithDetails(http.StatusBadRequest,
+				err.Error(), `no "content" form data provided`))
+		}
+		defer f.Close()
+		fileLen = c.Request.ContentLength
+
+	case "application/octet-stream":
+		file = c.Request.Body
+		fileLen = c.Request.ContentLength
+
+	default:
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), `no "content" form data provided`))
+			contentType, "unexpected content type"))
 	}
-	defer file.Close()
 
 	response := map[string]interface{}{}
 	log.WithField("file", params.File).
@@ -187,7 +203,7 @@ func (s *Server) newFiles(c *gin.Context) {
 		Infof("saving new data...")
 
 	if len(catalog) != 0 {
-		path, length, err := updateCatalog(mountPoint, catalog, params.File, file)
+		path, length, err := updateCatalog(mountPoint, catalog, params.File, file, fileLen)
 
 		if err != nil {
 			response["error"] = err.Error()

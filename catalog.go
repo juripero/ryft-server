@@ -123,22 +123,25 @@ func (cf *CatalogFile) unlock() error {
 }
 
 // writes file to the catalog
-func updateCatalog(mountPoint string, catalog, filename string, content io.Reader) (string, uint64, error) {
-	// save to temp file to determine data length
-	tmp, err := ioutil.TempFile("", "temp_file")
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to create temp file: %s", err)
-	}
-	defer func() {
-		tmp.Close()
-		os.RemoveAll(tmp.Name())
-	}()
+func updateCatalog(mountPoint string, catalog, filename string, content io.Reader, length int64) (string, uint64, error) {
+	if length < 0 {
+		// save to temp file to determine data length
+		tmp, err := ioutil.TempFile("", "temp_file")
+		if err != nil {
+			return "", 0, fmt.Errorf("failed to create temp file: %s", err)
+		}
+		defer func() {
+			tmp.Close()
+			os.RemoveAll(tmp.Name())
+		}()
 
-	length, err := io.Copy(tmp, content)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
+		length, err = io.Copy(tmp, content)
+		if err != nil {
+			return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
+		}
+		tmp.Seek(0, 0) // go to begin
+		content = tmp
 	}
-	tmp.Seek(0, 0) // go to begin
 
 	// open and update catalog atomically
 	cf, err := OpenCatalog(filepath.Join(mountPoint, catalog))
@@ -160,9 +163,12 @@ func updateCatalog(mountPoint string, catalog, filename string, content io.Reade
 	defer data.Close()
 
 	data.Seek(int64(offset), 0)
-	_, err = io.Copy(data, tmp)
+	n, err := io.Copy(data, content)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to copy data: %s", err)
+	}
+	if n != length {
+		return "", 0, fmt.Errorf("only %d bytes copied of %d", n, length)
 	}
 
 	dataRel, _ := filepath.Rel(mountPoint, dataPath)
