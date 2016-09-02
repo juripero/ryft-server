@@ -48,7 +48,7 @@ func (cf *CatalogFile) Close() error {
 func (cf *CatalogFile) AddFile(filename string, length uint64) (offset uint64, err error) {
 	err = cf.lock()
 	if err != nil {
-		return
+		return offset, fmt.Errorf("failed to lock: %s", err)
 	}
 	defer cf.unlock()
 
@@ -66,6 +66,7 @@ func (cf *CatalogFile) AddFile(filename string, length uint64) (offset uint64, e
 	err = binary.Read(cf.file, order, header)
 	if err != nil {
 		header.Signature = 0xafbeadde
+		err = nil // suppress
 	}
 
 	// TODO: check signature for various versions
@@ -123,12 +124,14 @@ func (cf *CatalogFile) unlock() error {
 }
 
 // writes file to the catalog
-func updateCatalog(mountPoint string, catalog, filename string, content io.Reader, length int64) (string, uint64, error) {
+func updateCatalog(mountPoint string, catalog, filename string, content io.Reader, length int64) (string, uint64, uint64, error) {
 	if length < 0 {
+		log.Debugf("saving content to TEMP file to get length")
+
 		// save to temp file to determine data length
 		tmp, err := ioutil.TempFile("", "temp_file")
 		if err != nil {
-			return "", 0, fmt.Errorf("failed to create temp file: %s", err)
+			return "", 0, 0, fmt.Errorf("failed to create temp file: %s", err)
 		}
 		defer func() {
 			tmp.Close()
@@ -137,40 +140,44 @@ func updateCatalog(mountPoint string, catalog, filename string, content io.Reade
 
 		length, err = io.Copy(tmp, content)
 		if err != nil {
-			return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
+			return "", 0, 0, fmt.Errorf("failed to copy content to temp file: %s", err)
 		}
 		tmp.Seek(0, 0) // go to begin
 		content = tmp
+		log.WithField("length", length).Debugf("TEMP file length")
 	}
 
-	// open and update catalog atomically
+	// open catalog
 	cf, err := OpenCatalog(filepath.Join(mountPoint, catalog))
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, fmt.Errorf("failed to open catalog file: %s ", err)
 	}
+	defer cf.Close()
+
+	// update catalog atomically
 	offset, err := cf.AddFile(filename, uint64(length))
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, fmt.Errorf("failed to add file to catalog: %s", err)
 	}
 
-	dataPath := cf.dataPath
-
 	// done index update
-	data, err := os.OpenFile(dataPath, os.O_WRONLY|os.O_CREATE, 0644)
+	data, err := os.OpenFile(cf.dataPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to open data file: %s", err)
+		return "", 0, 0, fmt.Errorf("failed to open data file: %s", err)
 	}
 	defer data.Close()
 
 	data.Seek(int64(offset), 0)
+	log.WithField("offset", offset).WithField("length", length).
+		Infof("saving catalog content")
 	n, err := io.Copy(data, content)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to copy data: %s", err)
+		return "", 0, 0, fmt.Errorf("failed to copy data: %s", err)
 	}
 	if n != length {
-		return "", 0, fmt.Errorf("only %d bytes copied of %d", n, length)
+		return "", 0, 0, fmt.Errorf("only %d bytes copied of %d", n, length)
 	}
 
-	dataRel, _ := filepath.Rel(mountPoint, dataPath)
-	return dataRel, uint64(length), nil // OK
+	path, _ := filepath.Rel(mountPoint, cf.dataPath)
+	return path, offset, uint64(length), nil // OK
 }

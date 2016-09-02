@@ -142,6 +142,7 @@ func (s *Server) deleteFiles(c *gin.Context) {
 // POST /files method
 /* to test method:
 curl -X POST -F content=@/path/to/file.txt -s "http://localhost:8765/files?file=file<random>.txt" | jq .
+curl -X POST --data "hello" -H 'Content-Type: application/octet-stream' -s "http://localhost:8765/files?file=file<random>.txt" | jq .
 */
 func (s *Server) newFiles(c *gin.Context) {
 	defer RecoverFromPanic(c)
@@ -184,11 +185,14 @@ func (s *Server) newFiles(c *gin.Context) {
 				err.Error(), `no "content" form data provided`))
 		}
 		defer f.Close()
-		fileLen = c.Request.ContentLength
+		file = f
+		fileLen = -1 // c.Request.ContentLength
+		log.WithField("length", fileLen).Debugf("saving multipart form data...")
 
 	case "application/octet-stream":
 		file = c.Request.Body
 		fileLen = c.Request.ContentLength
+		log.WithField("length", fileLen).Debugf("saving octet-stream...")
 
 	default:
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
@@ -203,13 +207,14 @@ func (s *Server) newFiles(c *gin.Context) {
 		Infof("saving new data...")
 
 	if len(catalog) != 0 {
-		path, length, err := updateCatalog(mountPoint, catalog, params.File, file, fileLen)
+		path, offset, length, err := updateCatalog(mountPoint, catalog, params.File, file, fileLen)
 
 		if err != nil {
 			response["error"] = err.Error()
 		} else {
 			response["catalog"] = catalog
-			response["path"] = path     // data path to search
+			response["path"] = path // data path to search
+			response["offset"] = offset
 			response["length"] = length // not total, just this part
 		}
 	} else { // regular file
