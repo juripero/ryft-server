@@ -17,6 +17,7 @@ func testParserParse(t *testing.T, data string, parsed string) {
 	p := testNewParser(data)
 	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
 		res, err := p.ParseQuery()
+		assert.True(t, p.EOF(), "not fully parsed")
 		assert.NoError(t, err, "valid query expected (data:%s)", data)
 		assert.Equal(t, parsed, res.String(), "not expected (data:%s)", data)
 	}
@@ -27,8 +28,9 @@ func testParserBad(t *testing.T, data string, expectedError string) {
 	p := testNewParser(data)
 	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
 		_, err := p.ParseQuery()
-		assert.Error(t, err, "error expected (data:%s)", data)
-		assert.Contains(t, err.Error(), expectedError, "unexpected error (data:%s)", data)
+		if assert.Error(t, err, "error expected (data:%s)", data) {
+			assert.Contains(t, err.Error(), expectedError, "unexpected error (data:%s)", data)
+		}
 	}
 }
 
@@ -44,12 +46,12 @@ func TestParserBad(t *testing.T) {
 	testParserBad(t, "))", "expected RAW_TEXT or RECORD")
 	testParserBad(t, ")(", "expected RAW_TEXT or RECORD")
 
-	testParserBad(t, `TEST`, "expected RAW_TEXT or RECORD")
-	testParserBad(t, ` TEST `, "expected RAW_TEXT or RECORD")
-	testParserBad(t, ` TEST   FOO   TEST  `, "expected RAW_TEXT or RECORD")
-	testParserBad(t, `AND`, "expected RAW_TEXT or RECORD")
-	testParserBad(t, ` AND `, "expected RAW_TEXT or RECORD")
-	testParserBad(t, `   AND  `, "expected RAW_TEXT or RECORD")
+	// testParserBad(t, `TEST`, "expected RAW_TEXT or RECORD")
+	// testParserBad(t, ` TEST `, "expected RAW_TEXT or RECORD")
+	// testParserBad(t, ` TEST   FOO   TEST  `, "expected RAW_TEXT or RECORD")
+	// testParserBad(t, `AND`, "expected RAW_TEXT or RECORD")
+	// testParserBad(t, ` AND `, "expected RAW_TEXT or RECORD")
+	// testParserBad(t, `   AND  `, "expected RAW_TEXT or RECORD")
 
 	testParserBad(t, `))OR((`, "expected RAW_TEXT or RECORD")
 	testParserBad(t, `() AND ()`, "expected RAW_TEXT or RECORD")
@@ -90,7 +92,7 @@ func TestParserBad(t *testing.T) {
 
 	testParserBad(t, `(RECORD. EQUALS "123")`, "no field name found for RECORD")
 	testParserBad(t, `(RECORD.[  EQUALS "123")`, "no closing ] found")
-	testParserBad(t, `(RECORDZ  EQUALS "123")`, "expected RAW_TEXT or RECORD")
+	testParserBad(t, `(RECORDZ  EQUALS "123")`, "found instead of closing )")
 	testParserBad(t, `(RECORD CONTAINZ "123")`, "expected CONTAINS or EQUALS")
 	testParserBad(t, `(RECORD CONTAINS UNKNOWN("123"))`, "is unexpected expression")
 }
@@ -116,6 +118,18 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t,
 		` ( RAW_TEXT CONTAINS ?)  `,
 		`P{(RAW_TEXT CONTAINS ?)}`)
+
+	testParserParse(t,
+		`                    hello  `,
+		`(RAW_TEXT CONTAINS "hello")`)
+
+	testParserParse(t,
+		`                    123  `,
+		`(RAW_TEXT CONTAINS "123")`)
+
+	testParserParse(t,
+		`                    123.456  `,
+		`(RAW_TEXT CONTAINS "123.456")`)
 
 	testParserParse(t,
 		` ( ( RAW_TEXT CONTAINS "hello " ) ) `,

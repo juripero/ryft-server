@@ -50,6 +50,16 @@ func (p *Parser) scanIgnoreSpace() Lexeme {
 	}
 }
 
+// EOF checks if no more data to parse
+func (p *Parser) EOF() bool {
+	if lex := p.scan(); lex.token == EOF {
+		return true
+	} else {
+		p.unscan(lex)
+		return false
+	}
+}
+
 // ParseQuery parses the input data and builds the non-optimized query tree.
 func (p *Parser) ParseQuery() (res Query, err error) {
 	// recover from panic
@@ -149,11 +159,6 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 
 	// input specifier (RAW_TEXT or RECORD)
 	switch lex := p.scanIgnoreSpace(); {
-	case lex.token == STRING:
-		input = "RAW_TEXT"
-		operator = "CONTAINS"
-		expression = p.parseStringExpr(lex) // plain simple query
-
 	case lex.IsRawText():
 		input = lex.literal
 
@@ -186,6 +191,18 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			}
 		}
 		input = buf.String()
+
+	case lex.token == STRING:
+		input = "RAW_TEXT"
+		operator = "CONTAINS"
+		expression = p.parseStringExpr(lex) // plain simple query
+
+	case lex.token == IDENT,
+		lex.token == INT,
+		lex.token == FLOAT:
+		input = "RAW_TEXT"
+		operator = "CONTAINS"
+		expression = fmt.Sprintf(`"%s"`, lex) // plain simple query
 
 	default:
 		p.unscan(lex)
