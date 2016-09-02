@@ -34,6 +34,7 @@ func testOptimizatorLimits(t *testing.T, limit int, data string, optimized strin
 		"ts":   limit,
 		"rs":   limit,
 		"ipv4": limit,
+		"ipv6": limit,
 	}
 
 	o := testNewOptimizator(limits)
@@ -51,6 +52,7 @@ func TestOptimizatorProcess(t *testing.T) {
 		"ts":   2,
 		"rs":   0,
 		"ipv4": 0,
+		"ipv6": 0,
 	}
 
 	o := testNewOptimizator(limits)
@@ -336,6 +338,7 @@ func TestOptimizatorLimits(t *testing.T) {
 		"ts":   6,
 		"rs":   7,
 		"ipv4": 8,
+		"ipv6": 9,
 	}
 
 	o := testNewOptimizator(limits)

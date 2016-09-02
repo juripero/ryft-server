@@ -186,6 +186,10 @@ func TestParserParse(t *testing.T) {
 		`P{(RECORD.body CONTAINS IPV4(IP>"127.0.0.1"))[ipv4]}`)
 
 	testParserParse(t,
+		`  (RECORD.body CONTAINS IPV6(IP > "10::1"))`,
+		`P{(RECORD.body CONTAINS IPV6(IP>"10::1"))[ipv6]}`)
+
+	testParserParse(t,
 		`  (RAW_TEXT CONTAINS "100")`,
 		`P{(RAW_TEXT CONTAINS "100")}`)
 

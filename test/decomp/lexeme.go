@@ -109,3 +109,8 @@ func (lex Lexeme) IsRegex() bool {
 func (lex Lexeme) IsIPv4() bool {
 	return lex.token == IDENT && strings.EqualFold(lex.literal, "IPv4")
 }
+
+// IsIPv6 checks "IPv6" search type.
+func (lex Lexeme) IsIPv6() bool {
+	return lex.token == IDENT && strings.EqualFold(lex.literal, "IPv6")
+}

@@ -256,6 +256,10 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ipv4"
 
+		case lex.IsIPv6(): // "as is"
+			expression = p.parseParenExpr(lex)
+			res.Options.Mode = "ipv6"
+
 		// consume all continous strings and wildcards
 		case lex.token == STRING,
 			lex.token == WCARD:
