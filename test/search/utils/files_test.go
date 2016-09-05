@@ -99,9 +99,9 @@ func testFileRandomName(t *testing.T) {
 	prepare()
 	defer cleanup()
 
-	path, err := utils.CreateFile(mount, "/file<random>.txt", reader())
+	path, err := utils.CreateFile(mount, "/file{{random}}.txt", reader())
 	assert.NoError(t, err)
-	assert.NotEqual(t, path, "/file<random>.txt")
+	assert.NotEqual(t, path, "/file{{random}}.txt")
 }
 
 // create test directory - a few folders and text files

@@ -141,8 +141,8 @@ func (s *Server) deleteFiles(c *gin.Context) {
 
 // POST /files method
 /* to test method:
-curl -X POST -F content=@/path/to/file.txt -s "http://localhost:8765/files?file=file<random>.txt" | jq .
-curl -X POST --data "hello" -H 'Content-Type: application/octet-stream' -s "http://localhost:8765/files?file=file<random>.txt" | jq .
+curl -X POST -F content=@/path/to/file.txt -s "http://localhost:8765/files?file=/test/file\{\{random\}\}.txt" | jq .
+curl -X POST --data "hello" -H 'Content-Type: application/octet-stream' -s "http://localhost:8765/files?file=/test/file\{\{random\}\}.txt" | jq .
 */
 func (s *Server) newFiles(c *gin.Context) {
 	defer RecoverFromPanic(c)
@@ -271,7 +271,7 @@ func deleteAll(mountPoint string, items []string) map[string]error {
 // Unique file name could be generated if path contains special keywords.
 // Returns generated path, length and error if any.
 func createFile(mountPoint string, path string, content io.Reader) (string, uint64, error) {
-	rbase := randomizePath(path) // first replace all <random> tokens
+	rbase := randomizePath(path) // first replace all {{random}} tokens
 	rpath := rbase
 
 	// create all parent directories
@@ -315,9 +315,9 @@ func createFile(mountPoint string, path string, content io.Reader) (string, uint
 	}
 }
 
-// replace <random> sections of filename with random token.
+// replace {{random}} sections of filename with random token.
 // random token is based on current unix time in nanoseconds.
-// multiple <random> are possible
+// multiple {{random}} are possible
 func randomizePath(path string) string {
 	token := func(string) string {
 		return fmt.Sprintf("%016x", time.Now().UnixNano())
@@ -325,6 +325,6 @@ func randomizePath(path string) string {
 
 	// TODO: use some hash here
 
-	re := regexp.MustCompile(`<random>`)
+	re := regexp.MustCompile(`{{random}}`)
 	return re.ReplaceAllStringFunc(path, token)
 }
