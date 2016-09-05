@@ -39,7 +39,7 @@ import (
 
 var (
 	delimiters     = []string{" AND ", " OR "}
-	markers        = []string{" DATE(", " TIME(", " NUMBER(", " FHS(", " FEDS(", " CURRENCY(", "REGEX(", "IPV4("}
+	markers        = []string{" DATE(", " TIME(", " NUMBER(", " FHS(", " FEDS(", " CURRENCY(", "REGEX(", "IPV4(", "IPV6("}
 	maxDepth   int = 1
 )
 

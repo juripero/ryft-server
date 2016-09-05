@@ -73,6 +73,8 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-p", "rs")
 	case "ipv4_search", "ipv4":
 		args = append(args, "-p", "ipv4")
+	case "ipv6_search", "ipv6":
+		args = append(args, "-p", "ipv6")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}

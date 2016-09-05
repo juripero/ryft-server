@@ -19,6 +19,7 @@ func decomposerOptions() Options {
 		"rs":   0,
 		"cs":   0,
 		"ipv4": 1,
+		"ipv6": 1,
 	}}
 }
 
@@ -42,6 +43,8 @@ func dumpType(q QueryType, opts Options) string {
 		return "  RE"
 	case QTYPE_IPV4:
 		return "IPv4"
+	case QTYPE_IPV6:
+		return "IPv6"
 	case QTYPE_AND:
 		return " AND"
 	case QTYPE_OR:
@@ -299,4 +302,8 @@ func TestQueries(t *testing.T) {
 		`[ AND]:
   [IPv4]: (RECORD.ip CONTAINS IPV4(127.0.0.1 <= IP <= 127.255.255.255))
   [DATE]: (RECORD.date CONTAINS DATE("100301"))`)
+
+
+	testQueryTreet, `(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`,
+		`[IPv6]: (RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`
 }
