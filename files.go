@@ -207,14 +207,15 @@ func (s *Server) newFiles(c *gin.Context) {
 		Infof("saving new data...")
 
 	if len(catalog) != 0 {
-		path, offset, length, err := updateCatalog(mountPoint, catalog, params.File, file, fileLen)
+		filename := randomizePath(params.File)
+		path, offset, length, err := updateCatalog(mountPoint, catalog, filename, file, fileLen)
 
 		if err != nil {
 			response["error"] = err.Error()
 		} else {
 			response["catalog"] = catalog
-			response["path"] = path // data path to search
-			response["offset"] = offset
+			response["data_path"] = path // data path to search
+			response["data_pos"] = offset
 			response["length"] = length // not total, just this part
 		}
 	} else { // regular file
