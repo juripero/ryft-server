@@ -33,12 +33,13 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-
-	"math/rand"
 	"mime"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
@@ -64,30 +65,6 @@ var (
 	log = logrus.New()
 )
 
-var (
-	serverConfig = kingpin.Flag("config", "Server configuration in YML format.").String()
-
-	// KeepResults console flag for keeping results files
-	KeepResults = kingpin.Flag("keep", "Keep search results temporary files.").Short('k').Bool()
-	debug       = kingpin.Flag("debug", "Run http server in debug mode.").Short('d').Bool()
-
-	authType      = kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Enum("none", "file", "ldap")
-	authUsersFile = kingpin.Flag("users-file", "File with user credentials. Required for --auth=file.").ExistingFile()
-
-	authLdapServer = kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").TCP()
-	authLdapUser   = kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").String()
-	authLdapPass   = kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").String()
-	authLdapQuery  = kingpin.Flag("ldap-query", "LDAP user lookup query. Defauls is '(&(uid=%s))'. Required for --auth=ldap.").Default("(&(uid=%s))").String()
-	authLdapBase   = kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups.'. Required for --auth=ldap.").String()
-
-	listenAddress = kingpin.Arg("address", "Address:port to listen on. Default is 0.0.0.0:8765.").Default("0.0.0.0:8765").TCP()
-
-	tlsEnabled       = kingpin.Flag("tls", "Enable TLS/SSL. Default 'false'.").Short('t').Bool()
-	tlsCrtFile       = kingpin.Flag("tls-crt", "Certificate file. Required for --tls=true.").ExistingFile()
-	tlsKeyFile       = kingpin.Flag("tls-key", "Key-file. Required for --tls=true.").ExistingFile()
-	tlsListenAddress = kingpin.Flag("tls-address", "Address:port to listen on HTTPS. Default is 0.0.0.0:8766").Default("0.0.0.0:8766").TCP()
-)
-
 // customized via Makefile
 var (
 	Version string
@@ -96,16 +73,151 @@ var (
 
 // Server instance
 type Server struct {
-	SearchBackend  string                 `yaml:"searchBackend,omitempty"`
-	BackendOptions map[string]interface{} `yaml:"backendOptions,omitempty"`
+	SearchBackend  string                 `yaml:"search-backend,omitempty"`
+	BackendOptions map[string]interface{} `yaml:"backend-options,omitempty"`
+	LocalOnly      bool                   `yaml:"local-only,omitempty"`
+	DebugMode      bool                   `yaml:"debug-mode,omitempty"`
+	KeepResults    bool                   `yaml:"keep-results,omitempty"`
+
+	ListenAddress string `yaml:"address,omitempty"`
+	listenAddress *net.TCPAddr
+
+	HttpTimeout string `yaml:"http-timeout,omitempty"`
+
+	TLS struct {
+		Enabled       bool   `yaml:"enabled,omitempty"`
+		ListenAddress string `yaml:"address,omitempty"`
+		CertFile      string `yaml:"cert-file,omitempty"`
+		KeyFile       string `yaml:"key-file,omitempty"`
+	} `yaml:"tls,omitempty"`
+
+	AuthType string `yaml:"auth-type,omitempty"`
+
+	AuthFile struct {
+		UsersFile string `yaml:"users-file,omitempty"`
+	} `yaml:"auth-file,omitempty"`
+
+	AuthLdap auth.LdapConfig `yaml:"auth-ldap,omitempty"`
+
+	AuthJwt struct {
+		Algorithm string `yaml:"algorithm,omitempty"`
+		Secret    string `yaml:"secret,omitempty"`
+		Lifetime  string `yaml:"lifetime,omitempty"`
+	} `yaml:"auth-jwt,omitempty"`
+
+	BusynessTolerance int `yaml:"busyness-tolerance,omitempty"`
+
+	// the number of active search requests on this node
+	// is used as a metric for "busyness"
+	// worker thread is started if "local mode" is disabled
+	activeSearchCount int32
+	busynessChanged   chan int32
+
+	BooleansPerExpression map[string]int `yaml:"booleans-per-expression"`
+
+	// consul client is cached here
+	consulClient interface{}
+}
+
+// config file name kingpin.Value
+type serverConfigValue struct {
+	s *Server
+	v string
+}
+
+// set server's configuration file
+func (f *serverConfigValue) Set(s string) error {
+	f.v = s
+	return f.s.parseConfig(f.v)
+}
+
+// get server's configuration file
+func (f *serverConfigValue) String() string {
+	return f.v
+}
+
+// create new server instance
+func NewServer() (*Server, error) {
+	s := new(Server)
+
+	// default configuration
+	s.SearchBackend = "ryftprim"
+	s.BackendOptions = map[string]interface{}{}
+
+	config := &serverConfigValue{s: s}
+	kingpin.Flag("config", "Server configuration in YML format.").SetValue(config)
+	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&s.LocalOnly)
+	kingpin.Flag("keep", "Keep temporary search result files.").Short('k').BoolVar(&s.KeepResults)
+	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&s.DebugMode)
+	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&s.BusynessTolerance)
+
+	kingpin.Flag("address", "Address:port to listen on.").Short('l').Default(":8765").StringVar(&s.ListenAddress)
+	kingpin.Flag("tls", "Enable TLS/SSL.").Short('t').BoolVar(&s.TLS.Enabled)
+	kingpin.Flag("tls-cert", "Certificate file. Required for --tls enabled.").StringVar(&s.TLS.CertFile)
+	kingpin.Flag("tls-key", "Key-file. Required for --tls enabled.").StringVar(&s.TLS.KeyFile)
+	kingpin.Flag("tls-address", "HTTPS address:port to listen on.").Default(":8766").StringVar(&s.TLS.ListenAddress)
+
+	kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Default("none").EnumVar(&s.AuthType, "none", "file", "ldap")
+	kingpin.Flag("users-file", "User credentials filename. Required for --auth=file.").ExistingFileVar(&s.AuthFile.UsersFile)
+	kingpin.Flag("jwt-alg", "JWT signing algorithm.").Default("HS256").StringVar(&s.AuthJwt.Algorithm)
+	kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").StringVar(&s.AuthJwt.Secret)
+	kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").StringVar(&s.AuthJwt.Lifetime)
+
+	kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").StringVar(&s.AuthLdap.ServerAddress)
+	kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.BindUsername)
+	kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").StringVar(&s.AuthLdap.BindPassword)
+	kingpin.Flag("ldap-query", "LDAP user lookup query. Required for --auth=ldap.").Default("(&(uid=%s))").StringVar(&s.AuthLdap.QueryFormat)
+	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups. Required for --auth=ldap.").StringVar(&s.AuthLdap.BaseDN)
+
+	kingpin.Parse()
+
+	// check extra dependencies logic not handled by kingpin
+	var err error
+
+	switch strings.ToLower(s.AuthType) {
+	case "file":
+		switch {
+		case len(s.AuthFile.UsersFile) == 0:
+			kingpin.FatalUsage("users-file is required for file authentication.")
+		case len(s.AuthJwt.Secret) == 0:
+			kingpin.FatalUsage("jwt-secret is required for any authentication.")
+		}
+
+	case "ldap":
+		switch {
+		case len(s.AuthLdap.ServerAddress) == 0:
+			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
+		case len(s.AuthLdap.BindUsername) == 0:
+			kingpin.FatalUsage("ldap-user is required for ldap authentication.")
+		case len(s.AuthLdap.BindPassword) == 0:
+			kingpin.FatalUsage("ldap-pass is required for ldap authentication.")
+		case len(s.AuthLdap.BaseDN) == 0:
+			kingpin.FatalUsage("ldap-basedn is required for ldap authentication.")
+		case len(s.AuthJwt.Secret) == 0:
+			kingpin.FatalUsage("jwt-secret is required for any authentication.")
+		}
+	}
+
+	if s.TLS.Enabled {
+		switch {
+		case len(s.TLS.ListenAddress) == 0:
+			kingpin.FatalUsage("tls-address option is required for TLS enabled")
+		case len(s.TLS.CertFile) == 0:
+			kingpin.FatalUsage("tls-cert option is required for TLS enabled")
+		case len(s.TLS.KeyFile) == 0:
+			kingpin.FatalUsage("tls-key option is required for TLS enabled")
+		}
+	}
+
+	if s.listenAddress, err = net.ResolveTCPAddr("tcp", s.ListenAddress); err != nil {
+		kingpin.FatalUsage("%q is not a valid TCP address: %s", s.ListenAddress, err)
+	}
+
+	return s, nil // OK
 }
 
 // parse server configuration from YML file
 func (s *Server) parseConfig(fileName string) error {
-	// default configuration if no file provided
-	s.SearchBackend = "ryftprim"
-	s.BackendOptions = map[string]interface{}{}
-
 	if len(fileName) == 0 {
 		return nil // OK
 	}
@@ -132,133 +244,147 @@ func ensureDefault(flag *string, message string) {
 }
 
 // get search backend with options
-func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine, error) {
-	if !localOnly {
-		// cluster search
+func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, homeDir, userTag string) (search.Engine, error) {
+	if !s.LocalOnly && !localOnly {
+		return s.getClusterSearchEngine(files, authToken, homeDir, userTag)
+	}
 
-		// for each service create corresponding search engine
-		backends := []search.Engine{}
-		nodes, tags, err := GetConsulInfo(files)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get consul services: %s", err)
+	return s.getLocalSearchEngine(homeDir)
+}
+
+// get cluster's search engine
+func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, userTag string) (search.Engine, error) {
+	// for each service create corresponding search engine
+	services, tags, err := s.getConsulInfo(userTag, files)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get consul services: %s", err)
+	}
+
+	// if no tags required - use all nodes
+	all_nodes := (len(tags) == 0)
+	is_local := true // assume local service is used
+
+	// list of tags required
+	tags_required := make(map[string]bool)
+	for _, t := range tags {
+		tags_required[t] = true
+	}
+
+	// go through service tags and update `tags_required` map
+	// return match count, matched tags are removed
+	update_tags := func(serviceTags []string) int {
+		count := 0
+		for _, s := range serviceTags {
+			if _, ok := tags_required[s]; ok {
+				delete(tags_required, s)
+				count += 1
+			}
 		}
-		local_node, remote_nodes := SplitToLocalAndRemote(nodes)
-		log.WithField("tags", tags).Debug("cluster search tags")
+		return count
+	}
 
-		// if no tags required - use all nodes
-		all_nodes := (len(tags) == 0)
-
-		// list of tags required
-		tags_required := make(map[string]bool)
-		for _, t := range tags {
-			tags_required[t] = true
+	// all services should be already arranged based on metrics
+	backends := []search.Engine{}
+	nodes := []string{}
+	for _, service := range services {
+		// stop if no more tags required
+		if !all_nodes && len(tags_required) == 0 {
+			break
 		}
 
-		// go through service tags and update `tags_required` map
-		// return match count, matched tags are removed
-		update_tags := func(serviceTags []string) int {
-			count := 0
-			for _, s := range serviceTags {
-				if _, ok := tags_required[s]; ok {
-					delete(tags_required, s)
-					count += 1
-				}
-			}
-			return count
+		// skip if no required tags found
+		log.WithField("service", service.Node).WithField("tags", service.ServiceTags).Debug("remote node tags")
+		if !all_nodes && update_tags(service.ServiceTags) == 0 {
+			continue // no tags found, skip this node
 		}
+		log.WithField("tags", tags_required).Debug("remain (remote) tags required")
 
-		// prefer local service first...
-		if local_node != nil {
-			log.WithField("tags", local_node.ServiceTags).Debug("local node tags")
-			if all_nodes || update_tags(local_node.ServiceTags) > 0 {
-				// local node: just use normal backend
-				engine, err := s.getSearchEngine(true, files)
-				if err != nil {
-					return nil, err
-				}
-				backends = append(backends, engine)
-			}
-			log.WithField("tags", tags_required).Debug("remain (local) tags required")
-		}
-
-		// ... then remote services (shuffled)
-		for _, k := range rand.Perm(len(remote_nodes)) {
-			service := remote_nodes[k]
-
-			// stop if no more tags required
-			if !all_nodes && len(tags_required) == 0 {
-				break
-			}
-
-			// skip if no required tags found
-			log.WithField("tags", service.ServiceTags).Debug("remote node tags")
-			if !all_nodes && update_tags(service.ServiceTags) == 0 {
-				continue // no tags found, skip this node
-			}
-			log.WithField("tags", tags_required).Debug("remain (remote) tags required")
-
-			// remote node: use RyftHTTP backend
-			port := service.ServicePort
-			scheme := "http"
-			var url string
-			if port == 0 { // TODO: review the URL building!
-				url = fmt.Sprintf("%s://%s:%s", scheme, service.Address, DefaultPort)
-			} else {
-				url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-			}
-
-			opts := map[string]interface{}{
-				"server-url": url,
-				"local-only": true,
-				"skip-stat":  false,
-				"index-host": url,
-			}
-			// log level
-			if _, ok := opts["log-level"]; !ok && *debug {
-				opts["log-level"] = "debug"
-			}
-
-			engine, err := search.NewEngine("ryfthttp", opts)
+		// use native search engine for local services!
+		// (no sense to do extra HTTP call)
+		if s.isLocalService(service) {
+			engine, err := s.getLocalSearchEngine(homeDir)
 			if err != nil {
 				return nil, err
 			}
 			backends = append(backends, engine)
+			nodes = append(nodes, service.Node)
+
+			continue
 		}
 
-		// fail if there is remaining required tags
-		if !all_nodes && len(tags_required) > 0 {
-			rem := []string{} // remaining tags
-			for k, _ := range tags_required {
-				rem = append(rem, k)
-			}
-			return nil, fmt.Errorf("no services found for tags: %q", rem)
+		// remote node: use RyftHTTP backend
+		port := service.ServicePort
+		scheme := "http"
+		var url string
+		if port == 0 { // TODO: review the URL building!
+			url = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+		} else {
+			url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
 		}
 
-		if len(backends) > 0 {
-			engine, err := ryftmux.NewEngine(backends...)
-			log.WithField("engine", engine).Debug("cluster search")
-			return engine, err
+		opts := map[string]interface{}{
+			"server-url": url,
+			"auth-token": authToken,
+			"local-only": true,
+			"skip-stat":  false,
+			"index-host": url,
+		}
+		// log level
+		if _, ok := opts["log-level"]; !ok && s.DebugMode {
+			opts["log-level"] = "debug"
 		}
 
-		// no services from consule, just use local search as a fallback
-		log.Printf("no cluster built, use local search as fallback")
-		return s.getSearchEngine(true, files)
+		engine, err := search.NewEngine("ryfthttp", opts)
+		if err != nil {
+			return nil, err
+		}
+		backends = append(backends, engine)
+		nodes = append(nodes, service.Node)
+		is_local = false
 	}
 
-	// local node search
-	opts := s.BackendOptions
+	// fail if there is remaining required tags
+	if !all_nodes && len(tags_required) > 0 {
+		rem := []string{} // remaining tags
+		for k, _ := range tags_required {
+			rem = append(rem, k)
+		}
+		return nil, fmt.Errorf("no services found for tags: %q", rem)
+	}
+
+	log.WithField("tags", tags).WithField("nodes", nodes).Infof("cluster search")
+
+	if len(backends) > 0 && !is_local {
+		engine, err := ryftmux.NewEngine(backends...)
+		log.WithField("engine", engine).Debug("cluster search")
+		return engine, err
+	}
+
+	// no services from consule, just use local search as a fallback
+	log.Debugf("use local search as fallback")
+	return s.getLocalSearchEngine(homeDir)
+}
+
+// get local search engine
+func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
+	opts := s.getBackendOptions()
 
 	// some auto-options
 	switch s.SearchBackend {
 	case "ryftprim":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
-			opts["instance-name"] = fmt.Sprintf("RyftServer-%d", (*listenAddress).Port)
+			opts["instance-name"] = fmt.Sprintf(".rest-%d", s.listenAddress.Port)
+		}
+
+		// home-dir (override settings)
+		if _, ok := opts["home-dir"]; !ok || len(homeDir) > 0 {
+			opts["home-dir"] = homeDir
 		}
 
 		// keep-files
 		if _, ok := opts["keep-files"]; !ok {
-			opts["keep-files"] = *KeepResults
+			opts["keep-files"] = s.KeepResults
 		}
 
 		// index-host
@@ -267,7 +393,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 		}
 
 		// log level
-		if _, ok := opts["log-level"]; !ok && *debug {
+		if _, ok := opts["log-level"]; !ok && s.DebugMode {
 			opts["log-level"] = "debug"
 		}
 	}
@@ -278,10 +404,93 @@ func (s *Server) getSearchEngine(localOnly bool, files []string) (search.Engine,
 	}
 
 	// special query decomposer
-	if *debug {
+	if s.DebugMode {
 		ryftdec.SetLogLevel("debug")
 	}
-	return ryftdec.NewEngine(backend)
+	return ryftdec.NewEngine(backend, s.BooleansPerExpression)
+}
+
+// deep copy of backend options
+func (s *Server) getBackendOptions() map[string]interface{} {
+	opts := make(map[string]interface{})
+	for k, v := range s.BackendOptions {
+		opts[k] = v
+	}
+	return opts
+}
+
+// get read/write http timeout
+func (s *Server) getHttpTimeout() time.Duration {
+	if len(s.HttpTimeout) == 0 {
+		return 1 * time.Hour // default
+	}
+
+	d, err := time.ParseDuration(s.HttpTimeout)
+	if err != nil {
+		panic(err)
+	}
+
+	return d
+}
+
+// parse authentication token and home directory from context
+func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken string, homeDir string, userTag string) {
+	authToken = ctx.Request.Header.Get("Authorization") // may be empty
+
+	// get home directory
+	if v, exists := ctx.Get(gin.AuthUserKey); exists && v != nil {
+		if user, ok := v.(*auth.UserInfo); ok {
+			userName = user.Name
+			homeDir = user.Home
+			userTag = user.ClusterTag
+		}
+	}
+
+	return
+}
+
+// update busyness thread
+func (s *Server) startUpdatingBusyness() {
+	s.busynessChanged = make(chan int32, 256)
+	go func(metric int32) {
+		var reported int32 = -1 // to force update metric ASAP
+		for {
+			select {
+			case metric = <-s.busynessChanged:
+				log.WithField("metric", metric).Debug("metric changed")
+				continue
+			case <-time.After(time.Second): // update latency
+				if metric != reported {
+					reported = metric
+					log.WithField("metric", metric).Debug("metric reporting...")
+					err := s.updateConsulMetric(int(metric))
+					if err != nil {
+						log.WithError(err).Warnf("failed to update consul metric")
+					}
+				}
+				// TODO: graceful shutdown
+			}
+		}
+	}(s.activeSearchCount)
+}
+
+// notify server a search is started
+func (s *Server) onSearchStarted(config *search.Config) {
+	s.onSearchChanged(config, +1)
+}
+
+// notify server a search is started
+func (s *Server) onSearchStopped(config *search.Config) {
+	s.onSearchChanged(config, -1)
+}
+
+// notify server a search is changed
+func (s *Server) onSearchChanged(config *search.Config, delta int32) {
+	metric := atomic.AddInt32(&s.activeSearchCount, delta)
+	if s.busynessChanged != nil {
+		// notify to update metric
+		s.busynessChanged <- metric
+	}
 }
 
 // get local host name
@@ -290,43 +499,19 @@ func getHostName() string {
 	return hostName
 }
 
-func parseParams() {
-	kingpin.Parse()
-	// check extra dependencies logic not handled by kingpin
-	switch *authType {
-	case "file":
-		ensureDefault(authUsersFile, "users-file is required for file authentication.")
-		break
-	case "ldap":
-		if (*authLdapServer) == nil {
-			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
-		}
-		if (*authLdapServer).IP == nil {
-			kingpin.FatalUsage("ldap-server requires addresse name part, not only port.")
-		}
-
-		ensureDefault(authLdapUser, "ldap-user is required for ldap authentication.")
-		ensureDefault(authLdapPass, "ldap-pass is required for ldap authentication.")
-		ensureDefault(authLdapBase, "ldap-basedn is required for ldap authentication.")
-
-		break
-	}
-	if *tlsEnabled {
-		ensureDefault(tlsCrtFile, "tls-crt is required for enabled tls property")
-		ensureDefault(tlsKeyFile, "tls-key is required for enabled tls property")
-	}
-}
-
 var serverStats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
 
-	// parse command line arguments
-	parseParams()
+	server, err := NewServer()
+	if err != nil {
+		log.WithError(err).Fatalf("Failed to read server configuration")
+	}
+	log.WithField("config", server).Infof("server configuration")
 
 	// be quiet and efficient in production
-	if !*debug {
+	if !server.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
 		log.Level = logrus.DebugLevel
@@ -334,14 +519,6 @@ func main() {
 
 	// Create a rounter with default middleware: logger, recover
 	router := gin.Default()
-
-	// Configure required middlewares
-	var server Server
-	err := server.parseConfig(*serverConfig)
-	if err != nil {
-		log.Fatalf("Failed to read server configuration: %s", err)
-	}
-	log.WithField("config", server).Infof("server configuration")
 
 	// Logging & error recovery
 	//	router.Use(gin.Logger())
@@ -362,22 +539,46 @@ func main() {
 	// Enable GZip compression support
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
+	// private endpoints
+	private := router.Group("")
+
 	// Enable authentication if configured
-	switch *authType {
+	var auth_provider auth.Provider
+	switch strings.ToLower(server.AuthType) {
 	case "file":
-		auth, err := auth.AuthBasicFile(*authUsersFile)
+		file, err := auth.NewFile(server.AuthFile.UsersFile)
 		if err != nil {
-			log.WithError(err).Fatal("Error reading users file")
+			log.WithError(err).Fatal("Failed to read users file")
 		}
-		router.Use(auth)
-		break
+		auth_provider = file
 	case "ldap":
-		router.Use(auth.BasicAuthLDAP((*authLdapServer).String(), *authLdapUser,
-			*authLdapPass, *authLdapQuery, *authLdapBase))
+		ldap, err := auth.NewLDAP(server.AuthLdap)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to init LDAP authentication")
+		}
+		auth_provider = ldap
+	case "none", "":
 		break
+	default:
+		log.WithField("auth", server.AuthType).Fatalf("unknown authentication type")
 	}
 
-	// Configure routes
+	// authentication enabled
+	if auth_provider != nil {
+		mw := auth.NewMiddleware(auth_provider, "")
+		secret, err := auth.ParseSecret(server.AuthJwt.Secret)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to parse JWT secret")
+		}
+		lifetime, err := time.ParseDuration(server.AuthJwt.Lifetime)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to parse JWT lifetime")
+		}
+		mw.EnableJwt(secret, server.AuthJwt.Algorithm, lifetime)
+		private.Use(mw.Authentication())
+		private.GET("/token/refresh", mw.RefreshHandler())
+		router.POST("/login", mw.LoginHandler())
+	}
 
 	router.GET("/version", func(ctx *gin.Context) {
 		info := map[string]interface{}{
@@ -392,10 +593,10 @@ func main() {
 		c.JSON(http.StatusOK, serverStats.Data())
 	})
 
-	router.GET("/search", server.search)
-	router.GET("/count", server.count)
-	router.GET("/cluster/members", server.members)
-	router.GET("/files", server.files)
+	private.GET("/search", server.search)
+	private.GET("/count", server.count)
+	private.GET("/cluster/members", server.members)
+	private.GET("/files", server.files)
 
 	// static asset
 	for _, asset := range AssetNames() {
@@ -412,11 +613,22 @@ func main() {
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
 
-	// Startup preparatory
-
-	// start listening on HTTP or HTTPS ports
-	if *tlsEnabled {
-		go router.RunTLS((*tlsListenAddress).String(), *tlsCrtFile, *tlsKeyFile)
+	if !server.LocalOnly {
+		server.startUpdatingBusyness()
 	}
-	router.Run((*listenAddress).String())
+
+	// start listening on HTTPS port
+	if server.TLS.Enabled {
+		https_ep := &http.Server{Addr: server.TLS.ListenAddress, Handler: router}
+		https_ep.ReadTimeout = server.getHttpTimeout()
+		https_ep.WriteTimeout = server.getHttpTimeout()
+
+		go https_ep.ListenAndServeTLS(server.TLS.CertFile, server.TLS.KeyFile)
+	}
+
+	// start listening on HTTP port
+	http_ep := &http.Server{Addr: server.ListenAddress, Handler: router}
+	http_ep.ReadTimeout = server.getHttpTimeout()
+	http_ep.WriteTimeout = server.getHttpTimeout()
+	http_ep.ListenAndServe()
 }

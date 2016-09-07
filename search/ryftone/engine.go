@@ -54,6 +54,7 @@ var (
 type Engine struct {
 	Instance   string // empty by default. might be some server instance name like ".server-1234"
 	MountPoint string // "/ryftone" by default
+	HomeDir    string // subdir of mountpoint
 
 	KeepResultFiles bool // false by default
 
@@ -90,8 +91,8 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftOne{instance:%q, ryftone:%q}",
-		engine.Instance, engine.MountPoint)
+	return fmt.Sprintf("RyftOne{instance:%q, ryftone:%q, home:%q}",
+		engine.Instance, engine.MountPoint, engine.HomeDir)
 	// TODO: other parameters?
 }
 
@@ -128,7 +129,7 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	log.WithField("path", path).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	fullPath := filepath.Join(engine.MountPoint, path)
+	fullPath := filepath.Join(engine.MountPoint, engine.HomeDir, path)
 	info, err := GetDirInfo(fullPath, path)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)

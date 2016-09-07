@@ -9,10 +9,15 @@ This document contains information about REST API.
 
 The main API endpoints are `/search` and `/count`.
 
+If authentication is enabled, there are also a few endpoints related to
+[JWT](./auth.md#JWT-login).
 
 # Search
 
 The GET `/search` endpoint is used to search data on Ryft boxes.
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
 
 ## Search query parameters
 
@@ -33,10 +38,10 @@ The list of supported query parameters are the following (check detailed descrip
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
+| `limit`       | int     | [Limit the total number of records reported](#search-limit-parameter). |
 | `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-and-spark-parameters). |
 | `spark`       | boolean | **Internal** [The spark output format flag](#search-stream-and-spark--parameters). |
 | `ep`          | boolean | **Internal** [The error prefix flag](#search-ep-parameter). |
-
 
 ### Search `query` parameter
 
@@ -56,12 +61,13 @@ query=(RECORD.AlterEgo CONTAINS "The Batman")
 ```
 
 Depending on [search mode](#search-mode-parameter) exact search query format may differ.
-Check corresponding Ryft Open API for more details on search expressions.
+Check corresponding Ryft Open API or [short reference](./searchsyntax.md)
+for more details on search expressions.
 
 `ryft-server` supports simple plain queries - without any keywords.
 The `query=Batman` will be automatically converted to `query=(RAW_TEXT CONTAINS "Batman")`.
 NOTE: This only works for text search; it is not appropriate for structured search.
-(Actually, the query will be `query=(RAW_TEXT CONTAINS 4261746d616e)`,
+(Actually, the query will be `query=(RAW_TEXT CONTAINS "\x42\x61\x74\x6d\x61\x6e")`,
 `ryft-server` uses hex encoding to avoid any possible escaping problems).
 
 `ryft-server` also supports complex queries containing several search expressions of different types.
@@ -76,6 +82,20 @@ Expression tree is built and each node is passed to the Ryft hardware. Then resu
 
 NOTE: If search query contains two or more expressions of the same type (text, date, time, numeric) that query
 will not be split into subqueries because the Ryft hardware supports those type of queries directly.
+
+There is also possible to use advanced text search queries to customize some parameters within search expression.
+For example: `(RAW_TEXT CONTAINS FHS("555",CS=true,DIST=1,WIDTH=2)) AND (RAW_TEXT CONTAINS FEDS("777",CS=true,DIST=1,WIDTH=4))`.
+The ryft server splits this expressions into two Ryft calls:
+- `(RAW_TEXT CONTAINS "555")` with `fhs` search mode, `fuzziness=1` and `surrounding=2`
+- `(RAW_TEXT CONTAINS "777")` with `feds` search mode, `fuzziness=1` and `surrounding=4`
+
+This advanced search query syntax overrides the following global parameters:
+- search type: `FHS` or `FEDS` (exact search is used if fuzziness is zero)
+- case sensitivity `CS=`
+- fuzziness distance `DIST=`
+- surrounding width `WIDTH=`
+
+If nothing provided the global options are used by default. Any option can be omitted: `(RAW_TEXT CONTAINS FHS("555")) AND (RAW_TEXT CONTAINS FEDS("777",CS=false))`.
 
 
 ### Search `files` parameter
@@ -98,17 +118,21 @@ Multiple files can be provided as:
 - `feds` for fuzzy edit distance search
 - `ds` for date search
 - `ts` for time search
-- `ns` for numeric search
+- `ns` for numeric or currency search
+- `rs` for regex search
 
 If no search mode is specified, fuzzy hamming search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
 keyword then date search will be used. It's the same when `TIME` keyword is used for time search,
-and `NUMERIC` for numeric search.
+and `NUMBER` or `CURRENCY` for numeric search.
 
 In case of complex search queries, the mode specified is used for text or structured search only.
 Date, time and numeric search modes will be detected automatically by corresponding keywords.
 
 NOTE: The fuzzy edit distance search mode removes duplicates by default (`-r` option of ryftprim).
+
+Check corresponding Ryft Open API or [short reference](./searchsyntax.md)
+for more details on search expressions.
 
 
 ### Search `surrounding` parameter
@@ -228,6 +252,12 @@ To execute a search on single node just pass `local=true`.
 
 The statistics is not reported **by default**.
 To check total number of matches and performance number just pass `stats=true`.
+
+
+### Search `limit` parameter
+
+This parameter is used to limit the total number of records reported.
+There is no any limit **by default** or when `limit=0`.
 
 
 ### Search `stream` and `spark` parameters
@@ -396,6 +426,9 @@ The GET `/count` endpoint is also used to search data on Ryft boxes.
 However, it does not transfer all found data, it will just print
 the number of matches and associated performance numbers.
 
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
+
 ## Count query parameters
 
 The list of supported query parameters are the following:
@@ -442,6 +475,9 @@ will report the following output:
 
 The GET `/files` endpoint is used to get Ryft box directory content.
 The name of all subdirectories and files are reported.
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](./auth.md) for more details.
 
 
 ## Files query parameters

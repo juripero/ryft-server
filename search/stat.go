@@ -34,7 +34,7 @@ import (
 	"fmt"
 )
 
-// Search processing statistics.
+// Statistics is search processing statistics.
 // Contains set of search statistics such as total processed bytes
 // and processing duration.
 type Statistics struct {
@@ -46,18 +46,23 @@ type Statistics struct {
 
 	FabricDuration uint64  // fabric processing duration, milliseconds
 	FabricDataRate float64 // MB/sec, TotalBytes/FabricDuration
+
+	// merge details - all statistics grouped by hostname
+	Details []*Statistics
+	Host    string // optional host address (used in cluster mode)
 }
 
 // NewStat creates empty statistics.
-func NewStat() *Statistics {
+func NewStat(host string) *Statistics {
 	stat := new(Statistics)
+	stat.Host = host
 	return stat
 }
 
 // String gets string representation of statistics.
 func (s Statistics) String() string {
-	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms (fabric: %d ms)}",
-		s.Matches, s.TotalBytes, s.Duration, s.FabricDuration)
+	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms (fabric: %d ms), details:%d}",
+		s.Matches, s.TotalBytes, s.Duration, s.FabricDuration, len(s.Details))
 }
 
 // Merge merges statistics from another node.
@@ -78,4 +83,7 @@ func (s *Statistics) Merge(a *Statistics) {
 	// just sum all data rates
 	s.FabricDataRate += a.FabricDataRate
 	s.DataRate += a.DataRate
+
+	// save details
+	s.Details = append(s.Details, a)
 }

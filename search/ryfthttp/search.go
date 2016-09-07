@@ -33,6 +33,7 @@ package ryfthttp
 import (
 	"fmt"
 	"net/http"
+	"sync/atomic"
 
 	//codec "github.com/getryft/ryft-server/codec/json"
 	codec "github.com/getryft/ryft-server/codec/msgpack.v2"
@@ -49,7 +50,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	url := engine.prepareUrl(cfg, "raw")
 	url.Path += "/search"
 
-	// prepare request, TODO: authentication?
+	// prepare request
 	task.log().WithField("url", url.String()).Debugf("[%s]: sending GET", TAG)
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
@@ -60,6 +61,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	// we expect MSGPACK format for streaming
 	req.Header.Set("Accept", codec.MIME)
 
+	// authorization
+	if len(engine.AuthToken) != 0 {
+		req.Header.Set("Authorization", engine.AuthToken)
+	}
+
 	res := search.NewResult()
 
 	// handle GET response
@@ -67,6 +73,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// some futher cleanup
 		defer res.Close()
 		defer res.ReportDone()
+
+		done_ch := make(chan struct{})
+		defer close(done_ch)
+
+		cancel_ch := make(chan struct{})
+		req.Cancel = cancel_ch
+		var cancelled int32
 
 		// do HTTP request
 		resp, err := engine.httpClient.Do(req)
@@ -88,9 +101,22 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// read response and report records and/or statistics
 		dec, _ := codec.NewStreamDecoder(resp.Body)
 
-		// TODO: task cancellation!!
+		// handle task cancellation
+		go func() {
+			select {
+			case <-res.CancelChan:
+				task.log().Warnf("[%s]: cancelled by user...", TAG)
+				if atomic.CompareAndSwapInt32(&cancelled, 0, 1) {
+					close(cancel_ch) // cancel the request
+				}
 
-		for {
+			case <-done_ch:
+				task.log().Debugf("[%s]: finished", TAG)
+				return
+			}
+		}()
+
+		for atomic.LoadInt32(&cancelled) != 0 {
 			tag, _ := dec.NextTag()
 			switch tag {
 			case codec.TAG_EOF:
@@ -106,7 +132,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 					return // stop processing
 				} else {
 					rec := format.ToRecord(&item)
-					task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
+					// task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
 					rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 					res.ReportRecord(rec)
 					// continue
@@ -121,7 +147,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 					return // stop processing
 				} else {
 					err := fmt.Errorf("%s", msg)
-					task.log().WithError(err).Debugf("[%s]: new error received", TAG)
+					// task.log().WithError(err).Debugf("[%s]: new error received", TAG)
 					res.ReportError(err)
 					// continue
 				}
@@ -137,6 +163,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 			default:
 				task.log().WithField("tag", tag).Errorf("unknown tag, ignored")
+				return // no sense to continue processing
 			}
 		}
 	}()

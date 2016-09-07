@@ -1,9 +1,9 @@
 {
   "swagger": "2.0",
   "info": {
-    "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples. For more details visit project page https://github.com/getryft/ryft-server",
+    "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "RyftOne REST API",
-    "version": "1.2"
+    "version": "0.8.0"
   },
   "paths": {
     "/search": {
@@ -12,6 +12,7 @@
         "tags": [
           "search"
         ],
+        "summary": "Text or structured search",
         "operationId": "search",
         "parameters": [
           {
@@ -39,8 +40,8 @@
             "type": "string",
             "name": "mode",
             "x-go-name": "Mode",
-            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts) or numeric search (ns)",
-            "enum": ["es", "fhs", "feds", "ds", "ts", "ns"]
+            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs)",
+            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs"]
           },
           {
             "in": "query",
@@ -122,21 +123,26 @@
             "name": "stats",
             "x-go-name": "Stats",
             "description": "Include search statistics in response. Default 'false'."
+          },
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint",
+            "name": "limit",
+            "x-go-name": "Limit",
+            "description": "Limit the total number of records reported."
           }
         ],
         "responses": {
           "200": {
             "description": "SearchResponseOK is a search result in an array with an elements of various structure",
             "schema": {
-              "description": "CountResponse returns matches for query",
-              "type": "object",
               "$ref": "#/definitions/SearchResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -149,7 +155,7 @@
         "tags": [
           "count"
         ],
-        "summary": "Count",
+        "summary": "Count the search matches",
         "operationId": "count",
         "parameters": [
           {
@@ -244,14 +250,12 @@
           "200": {
             "description": "SearchResponseOK is a search result in an array with an elements of various structure",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/CountResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -263,7 +267,7 @@
         "tags": [
           "files"
         ],
-        "summary": "Files",
+        "summary": "List a directory content",
         "description": "Endpoint to query mode/cluster file system structure",
         "operationId": "files",
         "parameters": [
@@ -284,14 +288,12 @@
           "200": {
             "description": "List of files and directories for node/cluster",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/FilesResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -303,21 +305,80 @@
         "tags": [
           "version"
         ],
-        "summary": "Version",
+        "summary": "Get server's version",
         "description": "Endpoint to query current build version",
         "operationId": "version",
         "responses": {
           "200": {
             "description": "Hash and version",
             "schema": {
-              "type": "object",
               "$ref": "#/definitions/VersionResponse"
             }
           },
           "default": {
             "description": "Error responses",
             "schema": {
-              "type": "object",
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": [
+          "login"
+        ],
+        "summary": "Authentication",
+        "description": "Endpoint to authenticate an user",
+        "operationId": "login",
+        "consumes": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "User's credentials",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/LoginRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JWT",
+            "schema": {
+              "$ref": "#/definitions/LoginResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/token/refresh": {
+      "get": {
+        "tags": [
+          "token_refresh"
+        ],
+        "summary": "Refresh authentication",
+        "description": "Endpoint to refresh existing authentication token",
+        "operationId": "token_refresh",
+        "responses": {
+          "200": {
+            "description": "JWT",
+            "schema": {
+              "$ref": "#/definitions/LoginResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
               "$ref": "#/definitions/ErrorResponse"
             }
           }
@@ -354,6 +415,9 @@
     },
     "SearchResponse": {
       "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      },
       "required": [
         "results"
       ],
@@ -367,8 +431,13 @@
             }
           }
         },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "stats": {
-          "type": "object",
           "$ref": "#/definitions/CountResponse"
         }
       }
@@ -404,6 +473,28 @@
         }
       }
     },
+    "LoginRequest": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "LoginResponse": {
+      "type": "object",
+      "properties": {
+        "expire": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      }
+    },
     "ErrorResponse": {
       "type": "object",
       "additionalProperties": {
@@ -418,5 +509,20 @@
         }
       }
     }
-  }
+  },
+  "securityDefinitions": {
+    "jwt": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    },
+    "basic": {
+      "type": "basic"
+    }
+  },
+  "security": [
+    {
+      "jwt": []
+    }
+  ]
 }

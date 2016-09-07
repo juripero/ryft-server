@@ -31,9 +31,10 @@
 package ryftdec
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 func containsString(slice []string, item string) bool {
@@ -45,15 +46,29 @@ func containsString(slice []string, item string) bool {
 	return false
 }
 
-// Detect extension using input file set.
-func detectExtension(fileNames []string) (string, error) {
+func containsAnySubString(s string, subs []string) string {
+	for _, v := range subs {
+		if strings.Contains(s, v) {
+			return v
+		}
+	}
+	return ""
+}
+
+// Detect extension using input file set and optional data file.
+func detectExtension(fileNames []string, dataOut string) (string, error) {
 	extensions := map[string]int{}
+
+	// output data file
+	if ext := filepath.Ext(dataOut); len(ext) != 0 {
+		extensions[ext] += 1
+	}
 
 	// collect unique extensions
 	for _, file := range fileNames {
 		ext := filepath.Ext(file)
 		if len(ext) != 0 {
-			extensions[ext] = 1
+			extensions[ext] += 1
 		}
 	}
 
@@ -67,10 +82,6 @@ func detectExtension(fileNames []string) (string, error) {
 	return "", fmt.Errorf("unable to detect extension from %v", extensions)
 }
 
-func buildError(message string) error {
-	return errors.New(message)
-}
-
 func indexOfToken(tokens []string, token string) int {
 	for index, value := range tokens {
 		if value == token {
@@ -78,4 +89,11 @@ func indexOfToken(tokens []string, token string) int {
 		}
 	}
 	return -1
+}
+
+func removeQuotedText(expr string) string {
+	s := []byte(expr)
+	repl := []byte("")
+	reg := regexp.MustCompile(`\"(.*?)\"`)
+	return string(reg.ReplaceAll(s, repl))
 }

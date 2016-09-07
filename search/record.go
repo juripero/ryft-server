@@ -36,7 +36,7 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
-// Search INDEX and DATA combined.
+// Record is INDEX and DATA combined.
 type Record struct {
 	Index Index
 	Data  []byte
@@ -48,7 +48,7 @@ func (r Record) String() string {
 		r.Index, utils.DumpAsString(r.Data))
 }
 
-// Search INDEX record.
+// Index is INDEX meta-data.
 type Index struct {
 	File      string
 	Offset    uint64

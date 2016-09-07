@@ -65,19 +65,24 @@ func NewTask(config *search.Config) *Task {
 }
 
 // get search mode based on query type
-func getSearchMode(query QueryType, defaultMode string) string {
+func getSearchMode(query QueryType, opts Options) string {
 	switch query {
 	case QTYPE_SEARCH:
-		return defaultMode
+		if opts.Dist == 0 {
+			return "es" // exact_search if fuzziness is zero
+		}
+		return opts.Mode
 	case QTYPE_DATE:
 		return "ds" // date_search
 	case QTYPE_TIME:
 		return "ts" // time_search
-	case QTYPE_NUMERIC:
+	case QTYPE_NUMERIC, QTYPE_CURRENCY:
 		return "ns" // numeric_search
+	case QTYPE_REGEX:
+		return "rs" // regex_search
 	}
 
-	return defaultMode
+	return opts.Mode
 }
 
 // Drain all records/errors from 'res' to 'mux'
@@ -111,15 +116,6 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 				task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId)
 				if saveRecords {
 					mux.ReportRecord(rec)
-				}
-			}
-
-			// statistics
-			if saveRecords && res.Stat != nil {
-				if mux.Stat == nil {
-					mux.Stat = res.Stat
-				} else {
-					mux.Stat.Merge(res.Stat)
 				}
 			}
 

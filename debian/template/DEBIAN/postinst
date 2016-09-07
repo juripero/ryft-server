@@ -1,5 +1,7 @@
 #!/bin/bash
 
+NAME=ryft-server-d
+
 # force destination uid gid if needed
 target_uid=ryftuser
 target_gid=ryftuser
@@ -18,5 +20,5 @@ fixUIDGID /usr/bin/ryft_status
 fixUIDGID /usr/bin/ryft-server
 fixUIDGID /etc/init/ryft-server-d.conf
 
-echo ryft-server-d starting...
-service ryft-server-d start
+echo $NAME starting...
+service $NAME start
