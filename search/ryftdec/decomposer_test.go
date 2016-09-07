@@ -18,6 +18,8 @@ func decomposerOptions() Options {
 		"ts":   5,
 		"rs":   0,
 		"cs":   0,
+		"ipv4": 1,
+		"ipv6": 1,
 	}}
 }
 
@@ -31,14 +33,18 @@ func dumpType(q QueryType, opts Options) string {
 		return "    " // general search (es, fhs, feds)
 	case QTYPE_DATE:
 		return "DATE"
-	case QTYPE_REGEX:
-		return "  RE"
 	case QTYPE_TIME:
 		return "TIME"
 	case QTYPE_NUMERIC:
 		return " NUM"
 	case QTYPE_CURRENCY:
 		return "CURR"
+	case QTYPE_REGEX:
+		return "  RE"
+	case QTYPE_IPV4:
+		return "IPv4"
+	case QTYPE_IPV6:
+		return "IPv6"
 	case QTYPE_AND:
 		return " AND"
 	case QTYPE_OR:
@@ -289,4 +295,15 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS FHS("1")) AND (RAW_TEXT CONTAINS FHS("2"))`,
 		`[es-0/0-false]: (RAW_TEXT CONTAINS "1") AND (RAW_TEXT CONTAINS "2")`)
+
+	testQueryTree(t, `(RECORD.ip CONTAINS IPV4(127.0.0.1 <= IP <= 127.255.255.255)) AND (RECORD.ip CONTAINS IPV4(192.168.0.1 < IP))`,
+		`[IPv4]: (RECORD.ip CONTAINS IPV4(127.0.0.1 <= IP <= 127.255.255.255)) AND (RECORD.ip CONTAINS IPV4(192.168.0.1 < IP))`)
+	testQueryTree(t, `(RECORD.ip CONTAINS IPV4(127.0.0.1 <= IP <= 127.255.255.255)) AND (RECORD.date CONTAINS DATE("100301"))`,
+		`[ AND]:
+  [IPv4]: (RECORD.ip CONTAINS IPV4(127.0.0.1 <= IP <= 127.255.255.255))
+  [DATE]: (RECORD.date CONTAINS DATE("100301"))`)
+
+
+	testQueryTreet, `(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`,
+		`[IPv6]: (RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`
 }

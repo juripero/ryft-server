@@ -34,6 +34,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,7 +53,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	args := []string{}
 
 	// select search mode (fuzzy-hamming search by default)
-	switch cfg.Mode {
+	switch strings.ToLower(cfg.Mode) {
 	case "exact_search", "exact", "es":
 		args = append(args, "-p", "es")
 	case "fuzzy_hamming_search", "fuzzy_hamming", "fhs", "":
@@ -70,6 +71,10 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-p", "ns") // currency is a kind of numeric search
 	case "regexp_search", "regex_search", "regexp", "regex", "rs":
 		args = append(args, "-p", "rs")
+	case "ipv4_search", "ipv4":
+		args = append(args, "-p", "ipv4")
+	case "ipv6_search", "ipv6":
+		args = append(args, "-p", "ipv6")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
@@ -258,6 +263,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	defer res.Close()
 	defer res.ReportDone()
 
+	// notify processing subtasks the tool is finished
+	// can check attempt limits!
+	atomic.StoreInt32(&task.tool_done, 1)
+
 	// tool output
 	out_buf := task.tool_out.Bytes()
 	if err != nil {
@@ -382,7 +391,10 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 	// try to read all index records
 	r := bufio.NewReader(file)
 	var parts [][]byte
-	for attempt := 0; attempt < engine.ReadFilePollLimit; attempt++ {
+
+	// if ryftprim tool is not finished (no index/data available)
+	// attempt limit check should be disabled!
+	for attempt := 0; attempt < engine.ReadFilePollLimit; attempt += int(atomic.LoadInt32(&task.tool_done)) {
 		// read line by line
 		part, err := r.ReadBytes('\n')
 		if len(part) > 0 {
@@ -550,14 +562,16 @@ func (task *Task) openFile(path string, poll time.Duration, cancel chan struct{}
 
 	for {
 		// wait until file will be created by `ryftone`
-		if _, err := os.Stat(path); err == nil {
+		if true /*_, err := os.Stat(path); err == nil*/ {
 			// file exists, try to open
 			f, err := os.Open(path)
 			if err == nil {
 				return f, nil // OK
-			} else {
+			} else if os.IsNotExist(err) { // ignore just "not exists" errors
 				// task.log().WithError(err).Warnf("[%s] failed to open file", TAG) // FIXME: DEBUG
 				// will sleep a while and try again...
+			} else {
+				return nil, err // report others
 			}
 		} else {
 			// task.log().WithError(err).Warnf("[%s] failed to stat file", TAG) // FIXME: DEBUG
@@ -587,7 +601,7 @@ func (task *Task) readDataFile(file *bufio.Reader, length uint64, poll time.Dura
 	buf := make([]byte, length)
 	pos := uint64(0) // actual number of bytes read
 
-	for attempt := 0; attempt < limit; attempt++ {
+	for attempt := 0; attempt < limit; attempt += int(atomic.LoadInt32(&task.tool_done)) {
 		n, err := file.Read(buf[pos:])
 		// task.log().Debugf("[%s]: read %d DATA byte(s)", TAG, n) // FIXME: DEBUG
 		if n > 0 {
@@ -597,8 +611,12 @@ func (task *Task) readDataFile(file *bufio.Reader, length uint64, poll time.Dura
 		}
 		pos += uint64(n)
 		if err != nil {
-			// task.log().WithError(err).Debugf("[%s]: failed to read data file (%d of %d)", TAG, pos, length) // FIXME: DEBUG
-			// will sleep a while and try again
+			if err == io.EOF { // ignore just EOF
+				// task.log().WithError(err).Debugf("[%s]: failed to read data file (%d of %d)", TAG, pos, length) // FIXME: DEBUG
+				// will sleep a while and try again
+			} else {
+				return nil, err // report others
+			}
 		} else {
 			if pos >= length {
 				return buf, nil // OK
