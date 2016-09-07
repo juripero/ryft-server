@@ -7,15 +7,19 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
-	dbVersion  = 1 // current schema version
-	catalogTag = "catalog"
+	dbVersion = 1 // current schema version
+)
+
+var (
+	catalogCache     = map[string]*CatalogFile{}
+	catalogCacheLock sync.Mutex
 )
 
 // CatalogFile contains catalog related meta-data
@@ -24,31 +28,86 @@ type CatalogFile struct {
 
 	db   *sql.DB // database connection
 	path string  // path to db file
+
+	lock sync.Mutex
+	drop *time.Timer
 }
 
 // OpenCatalog opens catalog file.
-func OpenCatalog(path string) (*CatalogFile, error) {
-	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_txlock=exclusive", path))
+func OpenCatalog(path string, id int) (*CatalogFile, error) {
+	cf, err := getCatalog(path)
 	if err != nil {
 		return nil, err
 	}
 
-	cf := new(CatalogFile)
-	cf.DataSizeLimit = 100 * 1024
-	cf.path = path
-	cf.db = db
+	// just in case
+	cf.stopDropTimer()
 
-	// update scheme
-	if err := cf.updateSchema(); err != nil {
-		db.Close()
+	// update database scheme
+	if err := cf.updateScheme(); err != nil {
+		dropCatalog(path)
 		return nil, err
 	}
 
 	return cf, nil // OK
 }
 
+// get catalog (from cache or new)
+func getCatalog(path string) (*CatalogFile, error) {
+	catalogCacheLock.Lock()
+	defer catalogCacheLock.Unlock()
+
+	// try to get existing catalog
+	if cf, ok := catalogCache[path]; ok && cf != nil {
+		log.WithField("catalog", path).Debugf("use catalog from cache")
+		return cf, nil // OK
+	}
+
+	// create new one and put to cache
+	cf, err := openCatalog(path)
+	if err == nil && cf != nil {
+		catalogCache[path] = cf
+	}
+
+	log.WithField("catalog", path).Debugf("use new catalog")
+	return cf, err
+}
+
+// open catalog
+func openCatalog(path string) (*CatalogFile, error) {
+	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_txlock=exclusive", path))
+	if err != nil {
+		return nil, err
+	}
+
+	cf := new(CatalogFile)
+	cf.DataSizeLimit = 100 * 1024 // TODO: appropriate configuration
+	cf.path = path
+	cf.db = db
+
+	return cf, nil // OK
+}
+
+// drop catalog from cache
+func dropCatalog(path string) {
+	catalogCacheLock.Lock()
+	defer catalogCacheLock.Unlock()
+
+	// try to drop existing catalog
+	if cf, ok := catalogCache[path]; ok && cf != nil {
+		log.WithField("catalog", path).Debugf("close and remove catalog from cache")
+		delete(catalogCache, path)
+		_ = cf.closeDb()
+	}
+}
+
 // Close closes catalog file.
-func (cf *CatalogFile) Close() error {
+func (cf *CatalogFile) Close() {
+	cf.startDropTimer() // will be close and dropped from cache later
+}
+
+// Close the database
+func (cf *CatalogFile) closeDb() error {
 	if db := cf.db; db != nil {
 		cf.db = nil
 		return db.Close()
@@ -57,8 +116,37 @@ func (cf *CatalogFile) Close() error {
 	return nil // already closed
 }
 
-// creates/updates database schema
-func (cf *CatalogFile) updateSchema() error {
+// start drop timer
+func (cf *CatalogFile) startDropTimer() {
+	cf.lock.Lock()
+	defer cf.lock.Unlock()
+
+	timeout := 2 * time.Second // TODO: appropriate configuration
+	if cf.drop != nil {
+		cf.drop.Reset(timeout)
+	} else {
+		cf.drop = time.AfterFunc(timeout, func() {
+			dropCatalog(cf.path)
+		})
+	}
+}
+
+// stop drop timer if any
+func (cf *CatalogFile) stopDropTimer() {
+	cf.lock.Lock()
+	defer cf.lock.Unlock()
+
+	if cf.drop != nil {
+		cf.drop.Stop()
+		cf.drop = nil
+	}
+}
+
+// creates/updates database scheme (protected method)
+func (cf *CatalogFile) updateScheme() error {
+	cf.lock.Lock()
+	defer cf.lock.Unlock()
+
 	var version int32
 	db := cf.db
 
@@ -68,18 +156,17 @@ func (cf *CatalogFile) updateSchema() error {
 		return fmt.Errorf("failed to get schema version: %s", err)
 	}
 
-	log.WithField("version", version).Debugf("current catalog version")
 	if version >= dbVersion {
 		// nothing to do, version is actual
 		return nil // OK
 	}
 
 	// need to update schema, should be done under exclusive transaction
-	//	tx, err := db.Begin()
-	//	if err != nil {
-	//		return fmt.Errorf("failed to begin update scheme transaction: %s", err)
-	//	}
-	//	defer tx.Rollback() // just in case
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin update scheme transaction: %s", err)
+	}
+	defer tx.Rollback() // just in case
 
 	// 0 => 1
 	if version <= 0 {
@@ -98,10 +185,25 @@ CREATE TABLE IF NOT EXISTS parts (
 	data_pos INTEGER NOT NULL,
 	status INTEGER DEFAULT (0)
 );
+CREATE TRIGGER IF NOT EXISTS part_insert
+	AFTER INSERT ON parts FOR EACH ROW
+BEGIN
+	UPDATE data SET length = (length + NEW.length) WHERE id = NEW.data_id;
+END;
+CREATE TRIGGER IF NOT EXISTS part_delete
+	AFTER DELETE ON parts FOR EACH ROW
+BEGIN
+	UPDATE data SET length = (length - OLD.length) WHERE id = OLD.data_id;
+END;
+CREATE TRIGGER IF NOT EXISTS part_update
+	AFTER UPDATE ON parts FOR EACH ROW
+BEGIN
+	UPDATE data SET length = (length - OLD.length) WHERE id = OLD.data_id;
+	UPDATE data SET length = (length + NEW.length) WHERE id = NEW.data_id;
+END;
 PRAGMA user_version = 1;`
 
-		log.Debugf("creating table...")
-		if _, err := db.Exec(SCRIPT); err != nil {
+		if _, err := tx.Exec(SCRIPT); err != nil {
 			return fmt.Errorf(`failed to create tables: %s`, err)
 		}
 	}
@@ -113,21 +215,24 @@ ALTER TABLE data ADD COLUMN foo INTEGER;
 ALTER TABLE parts ADD COLUMN foo INTEGER;
 PRAGMA user_version = 2;`
 
-		if _, err := db.Exec(SCRIPT); err != nil {
+		if _, err := tx.Exec(SCRIPT); err != nil {
 			return fmt.Errorf(`failed to update to version 2: %s`, err)
 		}
 	}
 
 	// commit changes
-	//	if err := tx.Commit(); err != nil {
-	//		return fmt.Errorf("failed to commit update scheme transaction: %s", err)
-	//	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit update scheme transaction: %s", err)
+	}
 
 	return nil // OK
 }
 
 // AddFile adds item to catalog.
 func (cf *CatalogFile) AddFile(filename string, length uint64) (string, uint64, error) {
+	cf.lock.Lock()
+	defer cf.lock.Unlock()
+
 	// should be done under exclusive transaction
 	tx, err := cf.db.Begin()
 	if err != nil {
@@ -141,16 +246,10 @@ func (cf *CatalogFile) AddFile(filename string, length uint64) (string, uint64, 
 		return "", 0, err
 	}
 
-	// insert new part
+	// insert new part (data file updated by trigger)
 	_, err = tx.Exec(`INSERT INTO parts(file, length, data_id, data_pos) VALUES (?, ?, ?, ?)`, filename, length, data_id, data_pos)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to insert item: %s", err)
-	}
-
-	// update data file
-	_, err = tx.Exec(`UPDATE data SET length = length + ? WHERE id = ?`, length, data_id)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to update data: %s", err)
 	}
 
 	// commit transaction
@@ -158,6 +257,8 @@ func (cf *CatalogFile) AddFile(filename string, length uint64) (string, uint64, 
 		return "", 0, fmt.Errorf("failed to commit transaction: %s", err)
 	}
 
+	dir, _ := filepath.Split(cf.path)
+	data_path = filepath.Join(dir, data_path)
 	return data_path, data_pos, nil // OK
 }
 
@@ -189,10 +290,8 @@ func (cf *CatalogFile) findDataFile(tx *sql.Tx, length uint64) (int64, string, u
 
 // generate new data file path
 func (cf *CatalogFile) generateNewDataFilePath() string {
-	dir, file := filepath.Split(cf.path)
-	ext := filepath.Ext(file)
-	base := strings.TrimSuffix(file, ext)
-	return fmt.Sprintf("%s.%s-%016x%s", dir, base, time.Now().UnixNano(), ext)
+	_, file := filepath.Split(cf.path)
+	return fmt.Sprintf(".%016x-%s", time.Now().UnixNano(), file)
 }
 
 // writes file to the catalog
@@ -220,7 +319,7 @@ func updateCatalog(mountPoint string, catalog, filename string, content io.Reade
 	}
 
 	// open catalog
-	cf, err := OpenCatalog(filepath.Join(mountPoint, catalog))
+	cf, err := OpenCatalog(filepath.Join(mountPoint, catalog), 0)
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("failed to open catalog file: %s ", err)
 	}
