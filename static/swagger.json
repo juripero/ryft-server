@@ -40,8 +40,8 @@
             "type": "string",
             "name": "mode",
             "x-go-name": "Mode",
-            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4)",
-            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4"]
+            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6)",
+            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6"]
           },
           {
             "in": "query",
@@ -183,8 +183,8 @@
             "type": "string",
             "name": "mode",
             "x-go-name": "Mode",
-            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4)",
-            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4"]
+            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6)",
+            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6"]
           },
           {
             "in": "query",

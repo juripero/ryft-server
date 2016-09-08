@@ -18,6 +18,7 @@ Search specific:
                      - numeric_search (or ns) also used for currency
                      - regex_search (or rs)
                      - ipv4_search (or ipv4)
+                     - ipv6_search (or ipv6)
 -f|--file=<file>   Specifies an input filename.
 -i                 Specifies case-insensitive analysis for supported primitives.
 -n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use.
