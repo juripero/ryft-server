@@ -91,6 +91,11 @@ func (engine *Engine) String() string {
 	// TODO: other parameters?
 }
 
+// IsLocal checks the "local" engines
+func (engine *Engine) IsLocal() bool {
+	return false
+}
+
 // prepareUrl formats proper URL based on search configuration.
 func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	// server URL should be parsed in engine initialization
@@ -102,7 +107,10 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	q.Set("format", format)
 	q.Set("query", cfg.Query)
 	for _, file := range cfg.Files {
-		q.Add("files", file)
+		q.Add("files", file) // TODO: replace with "file", "files" will be deprecated
+	}
+	for _, catalog := range cfg.Catalogs {
+		q.Add("catalog", catalog)
 	}
 	if len(cfg.Mode) != 0 {
 		q.Set("mode", cfg.Mode)

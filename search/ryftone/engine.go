@@ -140,6 +140,11 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	return info, nil // OK
 }
 
+// IsLocal checks the "local" engines
+func (engine *Engine) IsLocal() bool {
+	return true
+}
+
 // SetLogLevel changes global module log level.
 func SetLogLevel(level string) error {
 	ll, err := logrus.ParseLevel(level)

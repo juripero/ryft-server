@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,10 +15,12 @@ import (
 )
 
 const (
-	dbVersion = 1 // current schema version
+	dbVersion = 1 // current scheme version
 )
 
 var (
+	ErrNotCatalog = errors.New("not a catalog")
+
 	catalogCache     = map[string]*CatalogFile{}
 	catalogCacheLock sync.Mutex
 )
@@ -34,7 +37,7 @@ type CatalogFile struct {
 }
 
 // OpenCatalog opens catalog file.
-func OpenCatalog(path string, id int) (*CatalogFile, error) {
+func OpenCatalog(path string, readOnly bool) (*CatalogFile, error) {
 	cf, err := getCatalog(path)
 	if err != nil {
 		return nil, err
@@ -44,12 +47,29 @@ func OpenCatalog(path string, id int) (*CatalogFile, error) {
 	cf.stopDropTimer()
 
 	// update database scheme
-	if err := cf.updateScheme(); err != nil {
-		dropCatalog(path)
-		return nil, err
+	if !readOnly {
+		if err := cf.updateScheme(); err != nil {
+			dropCatalog(path)
+			return nil, err
+		}
 	}
 
 	return cf, nil // OK
+}
+
+// IsCatalog check if file is a catalog
+func IsCatalog(path string) bool {
+	cf, err := OpenCatalog(path, true)
+	if err != nil {
+		return false
+	}
+	defer cf.Close()
+
+	if ok, err := cf.checkScheme(); err != nil || !ok {
+		return false
+	}
+
+	return true
 }
 
 // get catalog (from cache or new)
@@ -148,12 +168,11 @@ func (cf *CatalogFile) updateScheme() error {
 	defer cf.lock.Unlock()
 
 	var version int32
-	db := cf.db
 
-	// get current schema version
-	row := db.QueryRow("PRAGMA user_version;")
+	// get current scheme version
+	row := cf.db.QueryRow("PRAGMA user_version;")
 	if err := row.Scan(&version); err != nil {
-		return fmt.Errorf("failed to get schema version: %s", err)
+		return fmt.Errorf("failed to get scheme version: %s", err)
 	}
 
 	if version >= dbVersion {
@@ -161,8 +180,8 @@ func (cf *CatalogFile) updateScheme() error {
 		return nil // OK
 	}
 
-	// need to update schema, should be done under exclusive transaction
-	tx, err := db.Begin()
+	// need to update scheme, should be done under exclusive transaction
+	tx, err := cf.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin update scheme transaction: %s", err)
 	}
@@ -173,7 +192,7 @@ func (cf *CatalogFile) updateScheme() error {
 		SCRIPT := `
 CREATE TABLE IF NOT EXISTS data (
 	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	path TEXT NOT NULL,
+	file TEXT NOT NULL,
 	length INTEGER DEFAULT (0),
 	status INTEGER DEFAULT (0)
 );
@@ -228,6 +247,27 @@ PRAGMA user_version = 2;`
 	return nil // OK
 }
 
+// check database scheme (protected method)
+func (cf *CatalogFile) checkScheme() (bool, error) {
+	cf.lock.Lock()
+	defer cf.lock.Unlock()
+
+	var version int32
+
+	// get current scheme version
+	row := cf.db.QueryRow("PRAGMA user_version;")
+	if err := row.Scan(&version); err != nil {
+		return false, fmt.Errorf("failed to get scheme version: %s", err)
+	}
+
+	if version >= dbVersion {
+		// nothing to do, version is actual
+		return true, nil // OK
+	}
+
+	return false, nil // OK
+}
+
 // AddFile adds item to catalog.
 func (cf *CatalogFile) AddFile(filename string, length uint64) (string, uint64, error) {
 	cf.lock.Lock()
@@ -262,13 +302,42 @@ func (cf *CatalogFile) AddFile(filename string, length uint64) (string, uint64, 
 	return data_path, data_pos, nil // OK
 }
 
+// get list of data files (absolute path)
+func (cf *CatalogFile) GetDataFiles() ([]string, error) {
+	cf.lock.Lock()
+	defer cf.lock.Unlock()
+
+	rows, err := cf.db.Query(`SELECT path FROM data`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data files: %s", err)
+	}
+	defer rows.Close()
+
+	res := []string{}
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, fmt.Errorf("failed to scan data file: %s", err)
+		}
+		res = append(res, path)
+	}
+
+	// convert to absolute path
+	dir, _ := filepath.Split(cf.path)
+	for i := 0; i < len(res); i++ {
+		res[i] = filepath.Join(dir, res[i])
+	}
+
+	return res, nil
+}
+
 // find appropriate data file and reserve space
 // return data id, data path and write offset
 func (cf *CatalogFile) findDataFile(tx *sql.Tx, length uint64) (int64, string, uint64, error) {
 	var data_id, offset int64
 	var path string
 
-	row := tx.QueryRow(`SELECT id,path,length FROM data WHERE (length+?) <= ?`, length, cf.DataSizeLimit)
+	row := tx.QueryRow(`SELECT id,file,length FROM data WHERE (length+?) <= ?`, length, cf.DataSizeLimit)
 	if err := row.Scan(&data_id, &path, &offset); err != nil {
 		if err != sql.ErrNoRows {
 			return 0, "", 0, fmt.Errorf("failed to find appropriate data file: %s", err)
@@ -276,7 +345,7 @@ func (cf *CatalogFile) findDataFile(tx *sql.Tx, length uint64) (int64, string, u
 
 		// create new data file
 		path, offset = cf.generateNewDataFilePath(), 0
-		res, err := tx.Exec(`INSERT INTO data(path,length) VALUES (?,0)`, path)
+		res, err := tx.Exec(`INSERT INTO data(file,length) VALUES (?,0)`, path)
 		if err != nil {
 			return 0, "", 0, fmt.Errorf("failed to insert new data file: %s", err)
 		}
@@ -292,6 +361,43 @@ func (cf *CatalogFile) findDataFile(tx *sql.Tx, length uint64) (int64, string, u
 func (cf *CatalogFile) generateNewDataFilePath() string {
 	_, file := filepath.Split(cf.path)
 	return fmt.Sprintf(".%016x-%s", time.Now().UnixNano(), file)
+}
+
+// get catalog related data files to search
+func (s *Server) getCatalogFiles(catalog string) ([]string, error) {
+	cf, err := OpenCatalog(catalog, true)
+	if err != nil {
+		// TODO: check if not a catalog!
+		return nil, err
+	}
+	defer cf.Close()
+
+	return cf.GetDataFiles()
+}
+
+// get catalog related data files to search
+// use several catalogs, support glob masks
+func (s *Server) getAllCatalogFiles(mountPoint string, catalogs []string) ([]string, error) {
+	var files []string
+
+	// iterate all arguments
+	for _, mask := range catalogs {
+		matches, err := filepath.Glob(filepath.Join(mountPoint, mask))
+		if err != nil {
+			return nil, fmt.Errorf("failed to glob catalog file: %s", err)
+		}
+
+		// iterate all matches
+		for _, catalog := range matches {
+			cfs, err := s.getCatalogFiles(catalog)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get catalog files: %s", err)
+			}
+			files = append(files, cfs...)
+		}
+	}
+
+	return files, nil // OK
 }
 
 // writes file to the catalog
@@ -319,7 +425,7 @@ func updateCatalog(mountPoint string, catalog, filename string, content io.Reade
 	}
 
 	// open catalog
-	cf, err := OpenCatalog(filepath.Join(mountPoint, catalog), 0)
+	cf, err := OpenCatalog(filepath.Join(mountPoint, catalog), false)
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("failed to open catalog file: %s ", err)
 	}

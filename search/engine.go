@@ -47,6 +47,9 @@ type Engine interface {
 
 	// Run *synchronous* "/files" operation.
 	Files(path string) (*DirInfo, error)
+
+	// Check is "local" engine (ryftprim or ryftone).
+	IsLocal() bool
 }
 
 // NewEngine creates new search engine by name.

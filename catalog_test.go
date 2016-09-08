@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"sort"
@@ -16,7 +17,7 @@ import (
 // add file to catalog
 func testFileUpload(t *testing.T, id int, catalog string, filename string, length int64) (string, uint64) {
 	// open catalog
-	cf, err := OpenCatalog(catalog, id)
+	cf, err := OpenCatalog(catalog, false)
 	if assert.NoError(t, err, "run-id:%d", id) && assert.NotNil(t, cf, "run-id:%d", id) {
 		defer cf.Close()
 
@@ -55,7 +56,7 @@ func TestFileUpload(t *testing.T) {
 	log.Formatter = &logrus.TextFormatter{TimestampFormat: "04:05.000"}
 
 	res_ch := make(chan FileUploadResult)
-	count := 10000
+	count := 10
 
 	expected_len := uint64(0)
 	actual_len := uint64(0)
@@ -106,4 +107,9 @@ func TestFileUpload(t *testing.T) {
 	}
 
 	assert.Equal(t, expected_len, actual_len, "invalid total data length")
+
+	assert.True(t, IsCatalog(catalog))
+	assert.False(t, IsCatalog(catalog+".missing"))
+	ioutil.WriteFile("/tmp/catalog.db.bad", []byte("hello"), 0644)
+	assert.False(t, IsCatalog(catalog+".bad"))
 }

@@ -46,7 +46,9 @@ import (
 // for the /search endpoint.
 type SearchParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
-	Files         []string `form:"files" json:"files" binding:"required"`
+	OldFiles      []string `form:"files" json:"files" binding:"required"`
+	Files         []string `form:"file" json:"file" binding:"required"`
+	Catalogs      []string `form:"catalog" json:"catalogs" binding:"required"`
 	Mode          string   `form:"mode" json:"mode"`
 	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
 	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
@@ -77,6 +79,9 @@ func (s *Server) search(ctx *gin.Context) {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
+
+	// backward compatibility (old files name)
+	params.Files = append(params.Files, params.OldFiles...)
 
 	// TODO: can cause problems when query is kind of: `(RAW_TEXT CONTAINS "RECORD")`
 	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
@@ -116,7 +121,8 @@ func (s *Server) search(ctx *gin.Context) {
 
 	// get search engine
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
+	notesForTags := append(params.Files[:], params.Catalogs...)
+	engine, err := s.getSearchEngine(params.Local, notesForTags, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
@@ -131,6 +137,17 @@ func (s *Server) search(ctx *gin.Context) {
 		cfg.Query = q
 	}
 	cfg.AddFiles(params.Files) // TODO: unescape?
+	if engine.IsLocal() {
+		mountPoint, _ := s.getMountPoint(homeDir)
+		if files, err := s.getAllCatalogFiles(mountPoint, params.Catalogs); err != nil {
+			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+				err.Error(), "failed to get catalog files"))
+		} else {
+			cfg.AddFiles(files)
+		}
+	} else {
+		cfg.AddCatalogs(params.Catalogs)
+	}
 	cfg.Mode = params.Mode
 	cfg.Surrounding = uint(params.Surrounding)
 	cfg.Fuzziness = uint(params.Fuzziness)

@@ -137,6 +137,11 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	return res, nil // OK
 }
 
+// IsLocal checks the "local" engines
+func (engine *Engine) IsLocal() bool {
+	return true
+}
+
 // SetLogLevel changes global module log level.
 func SetLogLevel(level string) error {
 	ll, err := logrus.ParseLevel(level)
