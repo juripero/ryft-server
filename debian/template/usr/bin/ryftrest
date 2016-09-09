@@ -23,6 +23,8 @@ Search specific:
 -n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use.
 -d|--fuzziness=<D> Specifies the fuzzy search distance.
 -w|--width=<W>     Specifies the surrounding width.
+-e|--delimiter=<E> Specifies the delimiter used between found records.
+                   For example pass Windows new line as -e $'\r\n'.
 -s|-q=<query>      Specifies the search/query expression to use.
   |--query=<query>
 -od|--data=<file>  Used to keep a data results file.
@@ -80,6 +82,7 @@ CASE_INSENS=
 NODES=
 FUZZINESS=
 SURROUNDING=
+DELIMITER=
 QUERY=
 DATA=
 INDEX=
@@ -144,6 +147,14 @@ while [[ $# > 0 ]]; do
 		;;
 	-w|--width)
 		SURROUNDING="$2"
+		shift 2
+		;;
+	-e=*|--delimiter=*)
+		DELIMITER="${1#*=}"
+		shift
+		;;
+	-e|--delimiter)
+		DELIMITER="$2"
 		shift 2
 		;;
 	-s=*|-q=*|--query=*)
@@ -273,6 +284,7 @@ done
 [[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")
 [[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
+[[ ! -z "$DELIMITER" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "delimiter=$DELIMITER")
 [[ ! -z "$MODE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "mode=$MODE")
 [[ ! -z "$LIMIT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "limit=$LIMIT")
 [[ ! -z "$DATA" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "data=$DATA")

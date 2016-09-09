@@ -32,41 +32,80 @@ package search
 
 import (
 	"fmt"
-
-	"github.com/getryft/ryft-server/search/utils"
+	"sort"
 )
 
-// Record is INDEX and DATA combined.
-type Record struct {
-	Index Index
-	Data  []byte
+// base index item
+type baseIndex struct {
+	dataBeg uint64 // begin of data
+	dataEnd uint64 // end of data (without delimiter)
+
+	File   string // base file
+	Offset uint64 // base file offset
+	//Length uint64 // (dataEnd - dataBeg)
+	//Fuzziness uint8
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
+func (i baseIndex) String() string {
+	return fmt.Sprintf("{%s#%d [%d..%d)}", i.File, i.Offset, i.dataBeg, i.dataEnd)
 }
 
-// Index is INDEX meta-data.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
+// IndexFile contains base indexes
+type IndexFile struct {
+	items  []baseIndex
+	delim  string // data delimiter
+	offset uint64
 }
 
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
+// NewIndexFile creates new empty index file
+// data delimiter is used to adjust data offsets
+func NewIndexFile(delimiter string) *IndexFile {
+	f := new(IndexFile)
+	f.items = make([]baseIndex, 0, 1024) // TODO: initial capacity
+	f.delim = delimiter
+	f.offset = 0
+	return f
+}
+
+// AddIndex adds base index to the list
+func (f *IndexFile) AddIndex(index Index) {
+	f.items = append(f.items, baseIndex{
+		//order:  i,
+		dataBeg: f.offset,
+		dataEnd: f.offset + index.Length,
+		File:    index.File,
+		Offset:  index.Offset,
+		//Length:  index.Length,
+	})
+
+	f.offset += index.Length + uint64(len(f.delim))
+}
+
+// get the length
+func (f *IndexFile) Len() int {
+	return len(f.items)
+}
+
+// Find base item index for specific offset
+func (f *IndexFile) Find(offset uint64) int {
+	return sort.Search(len(f.items), func(i int) bool {
+		return offset < f.items[i].dataEnd
+	})
+}
+
+// Unwind unwinds the index
+func (f *IndexFile) Unwind(index Index) Index {
+	if n := f.Find(index.Offset); n < len(f.items) {
+		if base := f.items[n]; base.dataBeg <= index.Offset && index.Offset < base.dataEnd {
+			// tmp := index
+			index.Offset -= base.dataBeg
+			index.Offset += base.Offset
+			index.File = base.File
+			// index.Length += 0
+			// index.Fuzziness += 0
+			// fmt.Printf("unwinding (base:%s) %s=>%s\n", base, tmp, index)
+		}
 	}
-}
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("{%s#%d, len:%d, d:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+	return index
 }

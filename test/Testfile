@@ -1,0 +1,121 @@
+# This is simple Makefile for complex tests
+
+AUTH=-u admin:admin
+ADDR=-a localhost:8765
+
+# no spaces allowed!
+RYFTONE=/ryftone
+
+TEXT10=test-fake-10.txt
+TEXT10K=test-fake-10K.txt
+TEXT100K=test-fake-100K.txt
+TEXT1M=test-fake-1M.txt
+TEXT10M=test-fake-10M.txt
+
+CRIME10=test-fake-10.pcrime
+CRIME10K=test-fake-10K.pcrime
+CRIME100K=test-fake-100K.pcrime
+CRIME1M=test-fake-1M.pcrime
+CRIME10M=test-fake-10M.pcrime
+
+TEXT_UNWIND_INDEX1=${TEXT10K}
+TEXT_UNWIND_INDEX2=${CRIME10K}
+
+.PHONY: all
+all: test_unwind_index
+
+# unwind index tests
+.PHONY: test_unwind_index test_unwind_index1 test_unwind_index2
+test_unwind_index: test_unwind_index1 test_unwind_index2
+
+# unwind index test, AND operator
+test_unwind_index1: ${RYFTONE}/${TEXT_UNWIND_INDEX1}
+	@echo "check unwind index feature on ${RYFTONE}/${TEXT_UNWIND_INDEX1} file"
+	@echo "1a: call FHS(d=0) as reference..."
+	ryftrest -p=fhs -d=0 -q '(RAW_TEXT CONTAINS "test-fake-test")' \
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind1a.dat
+	@echo "1b: call FHS(d=1) AND FHS(d=0)..."
+	ryftrest -p=fhs -d=1 -w=16 -q '(RAW_TEXT CONTAINS "test-fake-test")AND(RAW_TEXT CONTAINS FHS("test-fake-test",DIST=0,WIDTH=0))' \
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind1b.dat
+	@echo "1c: call FHS(d=1) AND FHS(d=0) AND FEDS(d=0)..."
+	ryftrest -p=fhs -d=1 -w=16 -q '(RAW_TEXT CONTAINS "test-fake-test")AND(RAW_TEXT CONTAINS FHS("test-fake-test",DIST=0))AND(RAW_TEXT CONTAINS FEDS("test-fake-test",DIST=0,WIDTH=0))' \
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind1c.dat
+	@echo "extracting indexes..."
+	cat test-unwind1a.dat | jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind1a.txt
+	cat test-unwind1b.dat | jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind1b.txt
+	cat test-unwind1c.dat | jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind1c.txt
+	wc -l "${RYFTONE}/${TEXT_UNWIND_INDEX1}" test-unwind1a.txt test-unwind1b.txt test-unwind1c.txt
+	diff test-unwind1a.txt test-unwind1b.txt >/dev/null
+	diff test-unwind1a.txt test-unwind1c.txt >/dev/null
+	@echo "test PASSED"
+
+# unwind index test, OR operator
+test_unwind_index2: ${RYFTONE}/${TEXT_UNWIND_INDEX2}
+	@echo "check unwind index feature on ${RYFTONE}/${TEXT_UNWIND_INDEX2} file"
+	@echo "2a: call FHS(d=0) as reference..."
+	ryftrest -p=fhs -d=0 -q '(RECORD.primaryType CONTAINS "test-fake-test")' \
+		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind2a.dat
+	@echo "2b: call FHS(d=1) OR FHS(d=0)..."
+	ryftrest -p=fhs -d=1 -w=16 -q '(RECORD.primaryType CONTAINS "test-fake-test")OR(RECORD.primaryType CONTAINS FHS("test-fake-test",DIST=0,WIDTH=0))' \
+		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind2b.dat
+	@echo "2c: call FHS(d=1) AND (FHS(d=1) OR FHS(d=0))..."
+	ryftrest -p=fhs -d=1 -w=16 -q '(RECORD.primaryType CONTAINS "test-fake-test")AND((RECORD.primaryType CONTAINS "test-fake-test")OR(RECORD.primaryType CONTAINS FHS("test-fake-test",DIST=0,WIDTH=0)))' \
+		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind2c.dat
+	@echo "2d: call (FHS(d=1) OR FHS(d=0)) AND FHS(d=1)..."
+	ryftrest -p=fhs -d=1 -w=16 -q '((RECORD.primaryType CONTAINS "test-fake-test")OR(RECORD.primaryType CONTAINS FHS("test-fake-test",DIST=0))) AND (RECORD.primaryType CONTAINS FHS("test-fake-test",WIDTH=0))' \
+		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind2d.dat
+	@echo "extracting indexes..."
+# have to duplicate reference output! de-duplication is not supported yet!
+	cat test-unwind2a.dat | jq -c '.results + .results | sort_by(._index.offset) | .[]._index' > test-unwind2a.txt
+	cat test-unwind2b.dat | jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind2b.txt
+	cat test-unwind2c.dat | jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind2c.txt
+	cat test-unwind2d.dat | jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind2d.txt
+	wc -l "${RYFTONE}/${TEXT_UNWIND_INDEX2}" test-unwind2a.txt test-unwind2b.txt test-unwind2c.txt test-unwind2d.txt
+	diff test-unwind2a.txt test-unwind2b.txt >/dev/null
+	diff test-unwind2a.txt test-unwind2c.txt >/dev/null
+	diff test-unwind2a.txt test-unwind2d.txt >/dev/null
+	@echo "test PASSED"
+	
+
+TEXT_PATTERN=$${rand(32,64)} test-fake-test $${rand(32,64)}
+CRIME_PATTERN=<rec><ID>id_$${rand(8,16)}</ID><PrimaryType>$${rand(8,16)} test-fake-test $${rand(8,16)}</PrimaryType></rec>
+
+# 10 test file
+${RYFTONE}/${TEXT10}: faketext
+	./faketext --count=10 --pattern '${TEXT_PATTERN}' > "${RYFTONE}/${TEXT10}"
+${RYFTONE}/${CRIME10}: faketext
+	./faketext --count=10 --pattern '${CRIME_PATTERN}' > "${RYFTONE}/${CRIME10}"
+
+# 10K test file
+${RYFTONE}/${TEXT10K}: faketext
+	./faketext --count=10000 --pattern '${TEXT_PATTERN}' > "${RYFTONE}/${TEXT10K}"
+${RYFTONE}/${CRIME10K}: faketext
+	./faketext --count=10000 --pattern '${CRIME_PATTERN}' > "${RYFTONE}/${CRIME10K}"
+
+# 100K test file
+${RYFTONE}/${TEXT100K}: faketext
+	./faketext --count=100000 --pattern '${TEXT_PATTERN}' > "${RYFTONE}/${TEXT100K}"
+${RYFTONE}/${CRIME100K}: faketext
+	./faketext --count=100000 --pattern '${CRIME_PATTERN}' > "${RYFTONE}/${CRIME100K}"
+
+# 1M test file
+${RYFTONE}/${TEXT1M}: faketext
+	./faketext --count=1000000 --pattern '${TEXT_PATTERN}' > "${RYFTONE}/${TEXT1M}"
+${RYFTONE}/${CRIME1M}: faketext
+	./faketext --count=1000000 --pattern '${CRIME_PATTERN}' > "${RYFTONE}/${CRIME1M}"
+
+# 10M test file
+${RYFTONE}/${TEXT10M}: faketext
+	./faketext --count=10000000 --pattern '${TEXT_PATTERN}' > "${RYFTONE}/${TEXT10M}"
+${RYFTONE}/${CRIME10M}: faketext
+	./faketext --count=10000000 --pattern '${CRIME_PATTERN}' > "${RYFTONE}/${CRIME10M}"
+
+# faketext utility
+faketext:
+	go build -o faketext ./fakegen/
+
+# clean all fake data
+clean:
+	rm -f ${RYFTONE}/test-fake-*.txt
+	rm -f ${RYFTONE}/test-fake-*.pcrime
+	rm -f test-unwind*.dat test-unwind*.txt

@@ -48,8 +48,13 @@ type Config struct {
 	Limit         uint     // limit  the number of records
 
 	// if not empty keep the INDEX and/or DATA file
+	// delimiter is used between records in DATA file
 	KeepDataAs  string
 	KeepIndexAs string
+	Delimiter   string
+
+	UnwindIndexesBasedOn *IndexFile
+	SaveUpdatedIndexesTo *IndexFile
 }
 
 // NewEmptyConfig creates new empty search configuration.

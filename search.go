@@ -63,6 +63,7 @@ type SearchParams struct {
 	ErrorPrefix   bool     `form:"ep" json:"ep"`
 	KeepDataAs    string   `form:"data" json:"data"`
 	KeepIndexAs   string   `form:"index" json:"index"`
+	Delimiter     string   `form:"delimiter" json:"delimiter"`
 	Limit         int      `form:"limit" json:"limit"`
 }
 
@@ -156,6 +157,12 @@ func (s *Server) search(ctx *gin.Context) {
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 	cfg.Limit = uint(params.Limit)
+	if d, err := url.QueryUnescape(params.Delimiter); err != nil {
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to unescape delimiter"))
+	} else {
+		cfg.Delimiter = d
+	}
 
 	log.WithField("config", cfg).WithField("user", userName).
 		WithField("home", homeDir).WithField("cluster", userTag).

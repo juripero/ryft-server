@@ -48,12 +48,17 @@ var (
 
 // RyftPrim task related data.
 type Task struct {
-	Identifier    string // unique
+	Identifier string // unique
+	Limit      uint64 // limit number of records
+
 	IndexFileName string
 	DataFileName  string
 	KeepIndexFile bool
 	KeepDataFile  bool
-	Limit         uint64 // limit number of records
+	Delimiter     string
+
+	UnwindIndexesBasedOn *search.IndexFile
+	SaveUpdatedIndexesTo *search.IndexFile
 
 	// `ryftprim` process & output
 	tool_args []string      // command line arguments

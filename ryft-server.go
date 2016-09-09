@@ -503,12 +503,14 @@ var serverStats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
-
 	server, err := NewServer()
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to read server configuration")
 	}
-	log.WithField("config", server).Infof("server configuration")
+	log.WithField("config", server).
+		WithField("version", Version).
+		WithField("git-hash", GitHash).
+		Infof("starting server...")
 
 	// be quiet and efficient in production
 	if !server.DebugMode {

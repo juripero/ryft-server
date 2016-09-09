@@ -57,7 +57,7 @@ func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
 		return stat, fmt.Errorf("failed to parse ryftprim output: %s", err)
 	}
 
-	log.WithField("stat", v).Debugf("[%s] output as YAML", TAG)
+	log.WithField("stat", v).Debugf("[%s]: output as YAML", TAG)
 	stat = search.NewStat(host)
 
 	// Duration

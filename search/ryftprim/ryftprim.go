@@ -79,8 +79,9 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
 
-	// disable data separator
-	args = append(args, "-e", "")
+	// data separator
+	args = append(args, "-e", cfg.Delimiter)
+	task.Delimiter = cfg.Delimiter
 
 	// enable verbose mode to grab statistics
 	args = append(args, "-v")
@@ -157,6 +158,10 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// limit number of records
 	task.Limit = uint64(cfg.Limit)
 
+	// unwind index feature
+	task.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
+	task.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
+
 	return nil // OK
 }
 
@@ -198,7 +203,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
 func (engine *Engine) process(task *Task, res *search.Result) {
-	defer task.log().Debugf("[%s]: end TASK processing", TAG)
+	defer task.log().WithField("result", res).Debugf("[%s]: end TASK processing", TAG)
 	task.log().Debugf("[%s]: start TASK processing...", TAG)
 
 	// wait for process done
@@ -484,7 +489,17 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 	// try to process all INDEX records
 	r := bufio.NewReader(file)
+	offset := uint64(0)
 	for index := range task.indexChan {
+		if task.UnwindIndexesBasedOn != nil {
+			tmp := task.UnwindIndexesBasedOn.Unwind(index)
+			// task.log().Debugf("unwind %s => %s", index, tmp)
+			index = tmp
+		}
+		if task.SaveUpdatedIndexesTo != nil {
+			task.SaveUpdatedIndexesTo.AddIndex(index)
+		}
+
 		// trim mount point from file name! TODO: special option for this?
 		index.File = strings.TrimPrefix(index.File,
 			filepath.Join(engine.MountPoint, engine.HomeDir))
@@ -517,6 +532,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 		res.ReportRecord(rec)
+		offset += index.Length
 
 		if task.Limit > 0 && res.RecordsReported() >= task.Limit {
 			task.log().WithField("limit", task.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)
@@ -525,6 +541,35 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 			task.cancelIndex()
 
 			return // stop processing
+		}
+
+		// read and check delimiter
+		if len(task.Delimiter) > 0 {
+			tmp, err := task.readDataFile(r,
+				uint64(len(task.Delimiter)),
+				engine.ReadFilePollTimeout,
+				engine.ReadFilePollLimit)
+
+			if err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to read DATA delimiter", TAG)
+				res.ReportError(fmt.Errorf("failed to read DATA delimiter: %s", err))
+			}
+			if string(tmp) != task.Delimiter {
+				task.log().WithField("actual", tmp).WithField("expected", task.Delimiter).
+					Warnf("unexpected delimiter found at %d", offset)
+				tmp = nil // force to cancel futher processing
+			}
+
+			if err != nil || tmp == nil {
+				task.log().Debugf("[%s]: DATA processing cancelled", TAG)
+
+				// just in case, also stop INDEX processing
+				task.cancelIndex()
+
+				return // no sense to continue processing
+			}
+
+			offset += uint64(len(task.Delimiter))
 		}
 	}
 }
