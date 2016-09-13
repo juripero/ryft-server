@@ -1,7 +1,7 @@
 # This is simple Makefile for complex tests
 
 AUTH=-u admin:admin
-ADDR=-a localhost:8765
+ADDR=localhost:8765
 
 # no spaces allowed!
 RYFTONE=/ryftone
@@ -24,6 +24,27 @@ TEXT_UNWIND_INDEX2=${CRIME10K}
 .PHONY: all
 all: test_unwind_index
 
+# test_create_catalog
+TEST_CATALOG=/test22/my-test.catalog
+test_create_catalog:
+	curl -X DELETE ${AUTH} -s "http://${ADDR}/files?catalog=${TEST_CATALOG}" | jq .
+# first parts
+	curl --data "11111-hello-11111" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=1.txt&catalog=${TEST_CATALOG}" | jq .
+	curl --data "22222-hello-22222" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=2.txt&catalog=${TEST_CATALOG}" | jq .
+	curl --data "33333-hello-33333" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=3.txt&catalog=${TEST_CATALOG}" | jq .
+	curl --data "44444-hello-44444" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=4.txt&catalog=${TEST_CATALOG}" | jq .
+	curl --data "55555-hello-55555" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=5.txt&catalog=${TEST_CATALOG}" | jq .
+# second parts
+	curl --data "aaaaa-hello-aaaaa" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=1.txt&catalog=${TEST_CATALOG}" | jq .
+	curl --data "bbbbb-hello-bbbbb" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=2.txt&catalog=${TEST_CATALOG}" | jq .
+	curl --data "ccccc-hello-ccccc" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=3.txt&catalog=${TEST_CATALOG}" | jq .
+	curl --data "ddddd-hello-ddddd" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=4.txt&catalog=${TEST_CATALOG}" | jq .
+	curl --data "eeeee-hello-eeeee" -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=5.txt&catalog=${TEST_CATALOG}" | jq .
+
+test_search_catalog:
+	ryftrest -p=fhs -d=0 -w=3 -q '(RAW_TEXT CONTAINS "hello")' \
+		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv -od /test22/data.txt -oi /test22/index.txt
+
 # unwind index tests
 .PHONY: test_unwind_index test_unwind_index1 test_unwind_index2
 test_unwind_index: test_unwind_index1 test_unwind_index2
@@ -33,13 +54,13 @@ test_unwind_index1: ${RYFTONE}/${TEXT_UNWIND_INDEX1}
 	@echo "check unwind index feature on ${RYFTONE}/${TEXT_UNWIND_INDEX1} file"
 	@echo "1a: call FHS(d=0) as reference..."
 	ryftrest -p=fhs -d=0 -q '(RAW_TEXT CONTAINS "test-fake-test")' \
-		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind1a.dat
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} -a ${ADDR} --local --format=utf8 > test-unwind1a.dat
 	@echo "1b: call FHS(d=1) AND FHS(d=0)..."
 	ryftrest -p=fhs -d=1 -w=16 -q '(RAW_TEXT CONTAINS "test-fake-test")AND(RAW_TEXT CONTAINS FHS("test-fake-test",DIST=0,WIDTH=0))' \
-		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind1b.dat
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} -a ${ADDR} --local --format=utf8 > test-unwind1b.dat
 	@echo "1c: call FHS(d=1) AND FHS(d=0) AND FEDS(d=0)..."
 	ryftrest -p=fhs -d=1 -w=16 -q '(RAW_TEXT CONTAINS "test-fake-test")AND(RAW_TEXT CONTAINS FHS("test-fake-test",DIST=0))AND(RAW_TEXT CONTAINS FEDS("test-fake-test",DIST=0,WIDTH=0))' \
-		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind1c.dat
+		-f "${TEXT_UNWIND_INDEX1}" ${AUTH} -a ${ADDR} --local --format=utf8 > test-unwind1c.dat
 	@echo "extracting indexes..."
 	cat test-unwind1a.dat | jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind1a.txt
 	cat test-unwind1b.dat | jq -c '.results | sort_by(._index.offset) | .[]._index' > test-unwind1b.txt
@@ -54,16 +75,16 @@ test_unwind_index2: ${RYFTONE}/${TEXT_UNWIND_INDEX2}
 	@echo "check unwind index feature on ${RYFTONE}/${TEXT_UNWIND_INDEX2} file"
 	@echo "2a: call FHS(d=0) as reference..."
 	ryftrest -p=fhs -d=0 -q '(RECORD.primaryType CONTAINS "test-fake-test")' \
-		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind2a.dat
+		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} -a ${ADDR} --local --format=utf8 > test-unwind2a.dat
 	@echo "2b: call FHS(d=1) OR FHS(d=0)..."
 	ryftrest -p=fhs -d=1 -w=16 -q '(RECORD.primaryType CONTAINS "test-fake-test")OR(RECORD.primaryType CONTAINS FHS("test-fake-test",DIST=0,WIDTH=0))' \
-		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind2b.dat
+		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} -a ${ADDR} --local --format=utf8 > test-unwind2b.dat
 	@echo "2c: call FHS(d=1) AND (FHS(d=1) OR FHS(d=0))..."
 	ryftrest -p=fhs -d=1 -w=16 -q '(RECORD.primaryType CONTAINS "test-fake-test")AND((RECORD.primaryType CONTAINS "test-fake-test")OR(RECORD.primaryType CONTAINS FHS("test-fake-test",DIST=0,WIDTH=0)))' \
-		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind2c.dat
+		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} -a ${ADDR} --local --format=utf8 > test-unwind2c.dat
 	@echo "2d: call (FHS(d=1) OR FHS(d=0)) AND FHS(d=1)..."
 	ryftrest -p=fhs -d=1 -w=16 -q '((RECORD.primaryType CONTAINS "test-fake-test")OR(RECORD.primaryType CONTAINS FHS("test-fake-test",DIST=0))) AND (RECORD.primaryType CONTAINS FHS("test-fake-test",WIDTH=0))' \
-		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} ${ADDR} --local --format=utf8 > test-unwind2d.dat
+		-f "${TEXT_UNWIND_INDEX2}" ${AUTH} -a ${ADDR} --local --format=utf8 > test-unwind2d.dat
 	@echo "extracting indexes..."
 # have to duplicate reference output! de-duplication is not supported yet!
 	cat test-unwind2a.dat | jq -c '.results + .results | sort_by(._index.offset) | .[]._index' > test-unwind2a.txt
