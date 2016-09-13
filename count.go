@@ -13,9 +13,9 @@ import (
 // CountParams is a parameters for matches count endpoint
 type CountParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
-	OldFiles      []string `form:"files" json:"files" binding:"required"`
-	Files         []string `form:"file" json:"file" binding:"required"`
-	Catalogs      []string `form:"catalog" json:"catalogs" binding:"required"`
+	OldFiles      []string `form:"files" json:"files"`
+	Files         []string `form:"file" json:"file"`
+	Catalogs      []string `form:"catalog" json:"catalogs"`
 	Mode          string   `form:"mode" json:"mode"`
 	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
 	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
@@ -43,12 +43,16 @@ func (s *Server) count(ctx *gin.Context) {
 	// parse request parameters
 	params := CountParams{}
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
 
 	// backward compatibility (old files name)
 	params.Files = append(params.Files, params.OldFiles...)
+	if len(params.Files) == 0 && len(params.Catalogs) == 0 {
+		panic(NewServerError(http.StatusBadRequest,
+			"no any file or catalog provided"))
+	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
 	// default to JSON

@@ -46,9 +46,9 @@ import (
 // for the /search endpoint.
 type SearchParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
-	OldFiles      []string `form:"files" json:"files" binding:"required"`
-	Files         []string `form:"file" json:"file" binding:"required"`
-	Catalogs      []string `form:"catalog" json:"catalogs" binding:"required"`
+	OldFiles      []string `form:"files" json:"files"`
+	Files         []string `form:"file" json:"file"`
+	Catalogs      []string `form:"catalog" json:"catalogs"`
 	Mode          string   `form:"mode" json:"mode"`
 	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
 	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
@@ -83,6 +83,10 @@ func (s *Server) search(ctx *gin.Context) {
 
 	// backward compatibility (old files name)
 	params.Files = append(params.Files, params.OldFiles...)
+	if len(params.Files) == 0 && len(params.Catalogs) == 0 {
+		panic(NewServerError(http.StatusBadRequest,
+			"no any file or catalog provided"))
+	}
 
 	// TODO: can cause problems when query is kind of: `(RAW_TEXT CONTAINS "RECORD")`
 	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
