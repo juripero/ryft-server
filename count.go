@@ -78,17 +78,7 @@ func (s *Server) count(ctx *gin.Context) {
 		cfg.Query = q
 	}
 	cfg.AddFiles(params.Files) // TODO: unescape?
-	if engine.IsLocal() {
-		mountPoint, _ := s.getMountPoint(homeDir)
-		if files, err := s.getAllCatalogFiles(mountPoint, params.Catalogs); err != nil {
-			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-				err.Error(), "failed to get catalog files"))
-		} else {
-			cfg.AddFiles(files)
-		}
-	} else {
-		cfg.AddCatalogs(params.Catalogs)
-	}
+	cfg.AddCatalogs(params.Catalogs)
 	cfg.Mode = params.Mode
 	cfg.Surrounding = uint(params.Surrounding)
 	cfg.Fuzziness = uint(params.Fuzziness)

@@ -57,8 +57,8 @@ type Task struct {
 	KeepDataFile  bool
 	Delimiter     string
 
-	UnwindIndexesBasedOn *search.IndexFile
-	SaveUpdatedIndexesTo *search.IndexFile
+	UnwindIndexesBasedOn map[string]*search.IndexFile
+	SaveUpdatedIndexesTo map[string]*search.IndexFile
 
 	// `ryftprim` process & output
 	tool_args []string      // command line arguments

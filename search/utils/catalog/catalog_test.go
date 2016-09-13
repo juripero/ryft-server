@@ -1,8 +1,9 @@
-package main
+package catalog
 
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
 	"sort"
@@ -10,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func testFileUpload(t *testing.T, id int, catalog string, filename string, lengt
 
 		// update catalog atomically
 		// TODO: check unknown length (length <= 0)!
-		data_path, data_pos, err := cf.AddFile(filename, uint64(length))
+		data_path, data_pos, err := cf.AddFile(filename, 0, length)
 		assert.NoError(t, err, "failed to add file to catalog %s run-id:%d", catalog, id)
 
 		return data_path, data_pos
@@ -53,17 +53,15 @@ func TestFileUpload(t *testing.T) {
 	catalog := "/tmp/catalog.db"
 	os.RemoveAll(catalog)
 
-	log.Formatter = &logrus.TextFormatter{TimestampFormat: "04:05.000"}
-
 	res_ch := make(chan FileUploadResult)
-	count := 10
+	count := 100
 
 	expected_len := uint64(0)
 	actual_len := uint64(0)
 
 	start := time.Now()
-	log.Infof("starting %d upload tests", count)
-	defer func() { log.Infof("end upload tests in %s", time.Since(start)) }()
+	log.Printf("starting %d upload tests", count)
+	defer func() { log.Printf("end upload tests in %s", time.Since(start)) }()
 
 	// do requests simultaneously
 	for i := 0; i < count; i++ {
@@ -78,7 +76,6 @@ func TestFileUpload(t *testing.T) {
 	}
 
 	// wait for all results
-	log.Infof("waiting %d upload results", count)
 	data_files := make(map[string]FileUploadParts)
 	for i := 0; i < count; i++ {
 		res := <-res_ch
@@ -88,7 +85,6 @@ func TestFileUpload(t *testing.T) {
 	}
 
 	// check all data files
-	log.Infof("checking %d upload results (%d data files)", count, len(data_files))
 	for data, parts := range data_files {
 		sort.Sort(parts)
 
@@ -112,4 +108,6 @@ func TestFileUpload(t *testing.T) {
 	assert.False(t, IsCatalog(catalog+".missing"))
 	ioutil.WriteFile("/tmp/catalog.db.bad", []byte("hello"), 0644)
 	assert.False(t, IsCatalog(catalog+".bad"))
+
+	time.Sleep(20 * time.Second)
 }

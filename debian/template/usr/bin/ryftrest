@@ -18,7 +18,8 @@ Search specific:
                      - numeric_search (or ns) also used for currency
                      - regex_search (or rs)
                      - ipv4_search (or ipv4)
--f|--file=<file>   Specifies an input filename.
+-f|--file=<path>   Specifies an input filename.
+-c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
 -n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use.
 -d|--fuzziness=<D> Specifies the fuzzy search distance.
@@ -78,6 +79,7 @@ fail() {
 # default values
 MODE=
 FILES=
+CATALOGS=
 CASE_INSENS=
 NODES=
 FUZZINESS=
@@ -119,6 +121,14 @@ while [[ $# > 0 ]]; do
 		;;
 	-f|--file)
 		FILES="$FILES:$2"
+		shift 2
+		;;
+	-c=*|--catalog=*)
+		CATALOGS="$CATALOGS:${1#*=}"
+		shift
+		;;
+	-c|--catalog)
+		CATALOGS="$CATALOGS:$2"
 		shift 2
 		;;
 	-i)
@@ -270,7 +280,7 @@ while [[ $# > 0 ]]; do
 done
 
 [[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
-[[ -z "$FILES" ]] && fail "no any file provided, run '$0 --help' for help"
+[[ -z "$FILES" && -z "$CATALOGS" ]] && fail "no any file or catalog provided, run '$0 --help' for help"
 
 # build the URL
 URL_DATA=(--data-urlencode "local=$LOCAL")
@@ -278,7 +288,11 @@ URL_DATA=(--data-urlencode "local=$LOCAL")
 [[ ! -z "$QUERY" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "query=$QUERY")
 IFS=':' read -r -a files <<< "$FILES"
 for file in "${files[@]}"; do
-	[[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "files=$file")
+	[[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "file=$file")
+done
+IFS=':' read -r -a catalogs <<< "$CATALOGS"
+for catalog in "${catalogs[@]}"; do
+	[[ ! -z $catalog ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "catalog=$catalog")
 done
 [[ -z "$CASE_INSENS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=true") # inverted!
 [[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")

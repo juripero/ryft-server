@@ -31,6 +31,7 @@
 package search
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 )
@@ -65,6 +66,29 @@ func NewIndexFile(delimiter string) *IndexFile {
 	f.delim = delimiter
 	f.offset = 0
 	return f
+}
+
+func (f *IndexFile) String() string {
+	buf := bytes.Buffer{}
+
+	buf.WriteString(fmt.Sprintf("delim:%q, offset:%d\n", f.delim, f.offset))
+	for _, i := range f.items {
+		buf.WriteString(i.String())
+		buf.WriteRune('\n')
+	}
+
+	return buf.String()
+}
+
+// AddIndex adds base index to the list
+func (f *IndexFile) Add(file string, offset, length, data_pos uint64) {
+	f.items = append(f.items, baseIndex{
+		dataBeg: data_pos,
+		dataEnd: data_pos + length,
+		File:    file,
+		Offset:  offset,
+		//Length:  length,
+	})
 }
 
 // AddIndex adds base index to the list

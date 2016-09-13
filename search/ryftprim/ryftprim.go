@@ -44,6 +44,7 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftone"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
 // Prepare `ryftprim` command line arguments.
@@ -119,6 +120,52 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		path := filepath.Join(engine.HomeDir, file)
 		path = engine.relativeToMountPoint(path)
 		args = append(args, "-f", path)
+	}
+
+	// catalogs
+	if 0 < len(cfg.Catalogs) {
+		for _, mask := range cfg.Catalogs {
+			// relative -> absolute (mount point + home + ...)
+			matches, err := filepath.Glob(filepath.Join(engine.MountPoint, engine.HomeDir, mask))
+			if err != nil {
+				return fmt.Errorf("failed to glob catalog file: %s", err)
+			}
+
+			// iterate all matches
+			for _, catalogPath := range matches {
+				cat, err := catalog.OpenCatalog(catalogPath, true)
+				if err != nil {
+					return fmt.Errorf("failed to open catalog: %s", err)
+				}
+				defer cat.Close()
+
+				// data files (absolute path)
+				files, err := cat.GetDataFiles()
+				if err != nil {
+					return fmt.Errorf("failed to get catalog files: %s", err)
+				}
+
+				// unwind indexes
+				indexes, err := cat.GetSearchIndexFile()
+				if err != nil {
+					return fmt.Errorf("failed to get catalog indexes: %s", err)
+				}
+
+				// relative to mount point
+				for _, file := range files {
+					path, err := filepath.Rel(engine.MountPoint, file)
+					if err != nil {
+						path = file // "as is" in case of an error
+					}
+					args = append(args, "-f", path)
+				}
+
+				// update unwind index base
+				for path, f := range indexes {
+					cfg.SetUnwindIndexesBasedOn(path, f)
+				}
+			}
+		}
 	}
 
 	// INDEX results file
@@ -492,12 +539,20 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 	offset := uint64(0)
 	for index := range task.indexChan {
 		if task.UnwindIndexesBasedOn != nil {
-			tmp := task.UnwindIndexesBasedOn.Unwind(index)
-			// task.log().Debugf("unwind %s => %s", index, tmp)
-			index = tmp
+			if f, ok := task.UnwindIndexesBasedOn[index.File]; ok && f != nil {
+				tmp := f.Unwind(index)
+				// task.log().Debugf("unwind %s => %s", index, tmp)
+				index = tmp
+			}
 		}
 		if task.SaveUpdatedIndexesTo != nil {
-			task.SaveUpdatedIndexesTo.AddIndex(index)
+			var f *search.IndexFile
+			if f, ok := task.SaveUpdatedIndexesTo[index.File]; !ok || f == nil {
+				f = search.NewIndexFile("") // TODO: where to get delimiter???
+				task.SaveUpdatedIndexesTo[index.File] = f
+			}
+
+			f.AddIndex(index)
 		}
 
 		// trim mount point from file name! TODO: special option for this?

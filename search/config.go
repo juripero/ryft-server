@@ -53,8 +53,8 @@ type Config struct {
 	KeepIndexAs string
 	Delimiter   string
 
-	UnwindIndexesBasedOn *IndexFile
-	SaveUpdatedIndexesTo *IndexFile
+	UnwindIndexesBasedOn map[string]*IndexFile
+	SaveUpdatedIndexesTo map[string]*IndexFile
 }
 
 // NewEmptyConfig creates new empty search configuration.
@@ -89,6 +89,15 @@ func (cfg *Config) AddCatalog(catalogs ...string) {
 // AddCatalogs adds one or more catalogs to the search configuration.
 func (cfg *Config) AddCatalogs(catalogs []string) {
 	cfg.Catalogs = append(cfg.Catalogs, catalogs...)
+}
+
+// Set "unwind indexes" base
+func (cfg *Config) SetUnwindIndexesBasedOn(path string, f *IndexFile) {
+	if cfg.UnwindIndexesBasedOn == nil {
+		cfg.UnwindIndexesBasedOn = map[string]*IndexFile{path: f}
+	} else {
+		cfg.UnwindIndexesBasedOn[path] = f
+	}
 }
 
 // String gets the string representation of the configuration.
