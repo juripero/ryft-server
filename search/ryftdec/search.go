@@ -145,9 +145,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		tempCfg.KeepIndexAs = ""   //idx1
 		tempCfg.Delimiter = "\n\n" // TODO: get delimiter from configuration?
 		tempCfg.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
-		tempCfg.SaveUpdatedIndexesTo = map[string]*search.IndexFile{
-			filepath.Join(mountPoint, homeDir, dat1): search.NewIndexFile(tempCfg.Delimiter),
-		}
+		tempCfg.SaveUpdatedIndexesTo = search.NewIndexFile(tempCfg.Delimiter)
 		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
 		if err1 != nil {
 			return 0, nil, err1
@@ -159,7 +157,9 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			tempCfg.KeepDataAs = cfg.KeepDataAs
 			tempCfg.KeepIndexAs = cfg.KeepIndexAs
 			tempCfg.Delimiter = cfg.Delimiter
-			tempCfg.UnwindIndexesBasedOn = tempCfg.SaveUpdatedIndexesTo
+			tempCfg.UnwindIndexesBasedOn = map[string]*search.IndexFile{
+				filepath.Join(mountPoint, homeDir, dat1): tempCfg.SaveUpdatedIndexesTo,
+			}
 			tempCfg.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
 			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 			if err2 != nil {

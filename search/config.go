@@ -54,7 +54,7 @@ type Config struct {
 	Delimiter   string
 
 	UnwindIndexesBasedOn map[string]*IndexFile
-	SaveUpdatedIndexesTo map[string]*IndexFile
+	SaveUpdatedIndexesTo *IndexFile
 }
 
 // NewEmptyConfig creates new empty search configuration.

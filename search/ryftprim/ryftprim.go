@@ -546,13 +546,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 			}
 		}
 		if task.SaveUpdatedIndexesTo != nil {
-			var f *search.IndexFile
-			if f, ok := task.SaveUpdatedIndexesTo[index.File]; !ok || f == nil {
-				f = search.NewIndexFile("") // TODO: where to get delimiter???
-				task.SaveUpdatedIndexesTo[index.File] = f
-			}
-
-			f.AddIndex(index)
+			task.SaveUpdatedIndexesTo.AddIndex(index)
 		}
 
 		// trim mount point from file name! TODO: special option for this?
