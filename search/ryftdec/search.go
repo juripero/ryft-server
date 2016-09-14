@@ -64,7 +64,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return engine.Backend.Search(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
+	task.extension, err = detectExtension(cfg.Files, cfg.Catalogs, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)
@@ -154,6 +154,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		if n1 > 0 { // no sense to run search on empty input
 			// right: read input from temporary file
 			tempCfg.Files = []string{dat1}
+			tempCfg.Catalogs = nil
 			tempCfg.KeepDataAs = cfg.KeepDataAs
 			tempCfg.KeepIndexAs = cfg.KeepIndexAs
 			tempCfg.Delimiter = cfg.Delimiter

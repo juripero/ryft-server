@@ -235,38 +235,34 @@ func (cat *Catalog) updateSchemeToVersion1(tx *sql.Tx) error {
 	SCRIPT := ` -- create tables
 CREATE TABLE IF NOT EXISTS data (
 	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	file TEXT NOT NULL,           -- data filename, relative to catalog file
+	file STRING NOT NULL,         -- data filename, relative to catalog file
 	length INTEGER DEFAULT (0),   -- total data length, offset for the next file part
-	status INTEGER DEFAULT (0)    -- TBD
+	status INTEGER DEFAULT (0),   -- TBD (busy/activity monitor)
+	delim BLOB                    -- delimiter, should be set once
 );
 CREATE TABLE IF NOT EXISTS parts (
 	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	file TEXT NOT NULL,           -- filename
+	file STRING NOT NULL,           -- filename
 	offset INTEGER NOT NULL,      -- part offset
 	length INTEGER NOT NULL,      -- part length, -1 if unknown yet
+	status INTEGER DEFAULT (0),   -- TBD (busy/activity monitor, deleted, corrupted)
 	data_id INTEGER NOT NULL REFERENCES data (id) ON DELETE CASCADE,
-	data_pos INTEGER NOT NULL,    -- position in data file
-	status INTEGER DEFAULT (0)    -- TBD
+	data_pos INTEGER NOT NULL     -- position in data file
 );
 
 -- create triggers
 CREATE TRIGGER IF NOT EXISTS part_insert
-	AFTER INSERT ON parts FOR EACH ROW
+	AFTER INSERT ON parts
+	FOR EACH ROW WHEN (0 < NEW.length)
 BEGIN
 	-- on part insert update data file
 	UPDATE data SET length = (length + NEW.length) WHERE id = NEW.data_id;
 END;
-CREATE TRIGGER IF NOT EXISTS part_delete
-	BEFORE DELETE ON parts FOR EACH ROW
-BEGIN
-	-- RAISE(FAIL) should NOT be called - data integrity will be broken!
-	UPDATE data SET length = (length - OLD.length) WHERE id = OLD.data_id;
-END;
 CREATE TRIGGER IF NOT EXISTS part_update
-	BEFORE UPDATE ON parts FOR EACH ROW
+	BEFORE UPDATE ON parts
+	FOR EACH ROW WHEN (OLD.length <= 0) AND (0 < NEW.length)
 BEGIN
-	-- RAISE(FAIL) should NOT be called - data integrity will be broken!
-	UPDATE data SET length = (length - OLD.length) WHERE id = OLD.data_id;
+	-- UPDATE data SET length = (length - OLD.length) WHERE id = OLD.data_id;
 	UPDATE data SET length = (length + NEW.length) WHERE id = NEW.data_id;
 END;
 

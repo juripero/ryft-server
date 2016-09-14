@@ -57,7 +57,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		return engine.Backend.Count(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
+	task.extension, err = detectExtension(cfg.Files, cfg.Catalogs, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)
