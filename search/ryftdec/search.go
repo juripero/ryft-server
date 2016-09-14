@@ -130,6 +130,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		// left: save results to temporary file
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = tempResult
+		tempCfg.KeepIndexAs = ""
 		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
 		if err1 != nil {
 			return 0, nil, err1
@@ -139,14 +140,17 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			// right: read input from temporary file
 			tempCfg.Files = []string{tempResult}
 			tempCfg.KeepDataAs = cfg.KeepDataAs
+			tempCfg.KeepIndexAs = cfg.KeepIndexAs
 			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 			if err2 != nil {
 				return 0, nil, err2
 			}
 		}
 
-		// remove temporary file TODO: defer!!!
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResult))
+		if !engine.KeepResultFiles {
+			// remove temporary file TODO: defer!!!
+			_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResult))
+		}
 
 		// combined statistics
 		var stat *search.Statistics
@@ -235,9 +239,11 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			}
 		}
 
-		// remove temporary files TODO: defer!!!
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultA))
-		_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultB))
+		if !engine.KeepResultFiles {
+			// remove temporary files TODO: defer!!!
+			_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultA))
+			_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultB))
+		}
 
 		// combined statistics
 		var stat *search.Statistics

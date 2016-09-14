@@ -49,13 +49,15 @@ var (
 type Engine struct {
 	Backend               search.Engine
 	BooleansPerExpression map[string]int
+	KeepResultFiles       bool // false by default
 }
 
 // NewEngine creates new RyftDEC search engine.
-func NewEngine(backend search.Engine, booleansLimit map[string]int) (*Engine, error) {
+func NewEngine(backend search.Engine, booleansLimit map[string]int, keepResults bool) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backend = backend
 	engine.BooleansPerExpression = booleansLimit
+	engine.KeepResultFiles = keepResults
 	return engine, nil
 }
 
