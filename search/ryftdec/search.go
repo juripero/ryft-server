@@ -128,8 +128,10 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			task.Identifier, task.subtaskId, task.extension))
 		// idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
 		// task.Identifier, task.subtaskId, ".txt"))
-		defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
-		// defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
+		if !engine.KeepResultFiles {
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
+			// defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
+		}
 
 		task.log().WithField("temp", dat1).
 			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
@@ -199,11 +201,11 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			task.Identifier, task.subtaskId, ".txt"))
 		idx2 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-or-b%s",
 			task.Identifier, task.subtaskId, ".txt"))
-		if len(cfg.KeepDataAs) != 0 {
+		if len(cfg.KeepDataAs) != 0 && !engine.KeepResultFiles {
 			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
 			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat2))
 		}
-		if len(cfg.KeepIndexAs) != 0 {
+		if len(cfg.KeepIndexAs) != 0 && !engine.KeepResultFiles {
 			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
 			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx2))
 		}
