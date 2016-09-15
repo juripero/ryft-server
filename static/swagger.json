@@ -313,6 +313,57 @@
           }
         }
       },
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload files",
+        "description": "Endpoint to upload files",
+        "operationId": "files",
+        "parameters": [
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The uploading filename. Use {{random}} for random names.",
+            "required": true,
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The catalog to append file to.",
+            "in": "query"
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part offset.",
+            "in": "query"
+          },
+          {
+            "name": "length",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part length.",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of files and directories deleted",
+            "schema": {
+              "$ref": "#/definitions/FilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "files"
@@ -340,11 +391,21 @@
             "collectionFormat": "multi",
             "description": "The file path to delete. Wildcards are supported.",
             "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "The catalog path to delete. Wildcards are supported.",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "List of files and directories for node/cluster",
+            "description": "Map of files and directories deleted",
             "schema": {
               "$ref": "#/definitions/FilesResponse"
             }

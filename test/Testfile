@@ -45,11 +45,11 @@ test_create_catalog:
 
 test_search_catalog:
 	ryftrest -p=fhs -d=0 -w=3 -q '(RAW_TEXT CONTAINS "hello")' \
-		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv
+		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv | jq -c '.results[], .stats'
 
 test_search2_catalog:
 	ryftrest -p=fhs -d=0 -w=3 -q '(RAW_TEXT CONTAINS "hello") AND (RAW_TEXT CONTAINS FEDS("hello",WIDTH=2))' \
-		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv
+		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv | jq -c '.results[], .stats'
 
 # unwind index tests
 .PHONY: test_unwind_index test_unwind_index1 test_unwind_index2

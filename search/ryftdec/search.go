@@ -146,7 +146,8 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		tempCfg.Delimiter = "\n\n" // TODO: get delimiter from configuration?
 		tempCfg.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
 		tempCfg.SaveUpdatedIndexesTo = search.NewIndexFile(tempCfg.Delimiter)
-		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
+		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg,
+			searchFunc /*engine.Backend.Count*/, mux, isLast && false)
 		if err1 != nil {
 			return 0, nil, err1
 		}

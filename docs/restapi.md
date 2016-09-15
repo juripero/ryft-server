@@ -489,26 +489,62 @@ will report the following output:
 The GET `/files` endpoint is used to get Ryft box directory content.
 The name of all subdirectories and files are reported.
 
-Note, this endpoint is protected and user should provide valid credentials.
+The POST `/files` endpoint is used to upload a file to Ryft box.
+The catalog feature is supported to upload a bunch of small files.
+
+To delete any file, directory ot catalog the DELETE `/files` endpoint is used.
+
+Note, these endpoints are protected and user should provide valid credentials.
 See [authentication](./auth.md) for more details.
 
 
 ## Files query parameters
 
-The list of supported query parameters are the following:
+The list of supported query parameters for the GET endpoint are the following:
 
 | Parameter | Type    | Description |
 | --------- | ------- | ----------- |
-| `dir`     | string  | [The directory to get content of](#files-dir-parameter). |
+| `dir`     | string  | [The directory to get content of](#get-files-dir-parameter). |
+| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
+
+The list of supported query parameters for the POST endpoint are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `file`    | string  | [The directory to get content of](#get-files-dir-parameter). |
+| `catalog` | string  | [The directory to get content of](#get-files-dir-parameter). |
+| `offset`  | integer | [The directory to get content of](#get-files-dir-parameter). |
+| `length`  | integer | [The directory to get content of](#get-files-dir-parameter). |
+| `force`   | boolean | [The directory to get content of](#get-files-dir-parameter). |
+| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
+
+The list of supported query parameters for the DELETE endpoint are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `dir`     | string  | [The directory to delete](#delete-files-parameters). |
+| `file`    | string  | [The standalone file to delete](#delete-files-parameters). |
+| `catalog` | string  | [The catalog to delete](#delete-files-parameters). |
 | `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
 
 
-### Files `dir` parameter
+### GET files `dir` parameter
 
 The directory to get content of. Root directory `dir=/` is used **by default**.
 
-The directory name should be relative to the Ryft volume.
-The `dir=/test` request will report content of `/ryftone/test` directory on the Ryft box.
+The directory name should be relative to the Ryft volume and user's home.
+The `dir=/foo` request will report content of `/ryftone/test/fo` directory on the Ryft box.
+
+
+### DELETE files parameters
+
+It's possible to specify file, directory or catalog to delete.
+Multiple parameters can be used.
+
+Also wildcards are supported. To delete all JSON files just pass `file=*.json`.
+
+All the names should be relative to the Ryft volume and user's home.
+The `file=/foo.txt` request will delete `/ryftone/test/foo.txt` on the Ryft box.
 
 
 ## Files example
@@ -516,7 +552,7 @@ The `dir=/test` request will report content of `/ryftone/test` directory on the 
 The following request:
 
 ```
-/files?dir=/&local=true
+GET /files?dir=/&local=true
 ```
 
 will print the root `/ryftone` content:
@@ -535,6 +571,14 @@ will print the root `/ryftone` content:
   ]
 }
 ```
+
+The following request:
+
+```
+DELETE /files?dir=demo&file=*.pcrime&file=p*.txt&local=true
+```
+
+will delete specified nodes.
 
 
 # Version
