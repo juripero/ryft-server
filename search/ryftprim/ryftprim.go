@@ -455,8 +455,15 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 		}
 
 		if err != nil {
-			// task.log().WithError(err).Debugf("[%s]: failed to read line from INDEX file", TAG) // FIXME: DEBUG
-			// will sleep a while and try again...
+			if err == io.EOF {
+				// task.log().WithError(err).Debugf("[%s]: failed to read line from INDEX file", TAG) // FIXME: DEBUG
+				// will sleep a while and try again...
+			} else {
+				task.log().WithError(err).Warnf("[%s]: INDEX processing failed", TAG)
+				res.ReportError(err)
+				task.cancelData() // force to cancel DATA processing
+				return
+			}
 		} else {
 			line := bytes.Join(parts, nil)
 			parts = parts[0:0] // clear
