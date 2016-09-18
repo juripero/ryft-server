@@ -623,12 +623,18 @@ func main() {
 		https_ep.ReadTimeout = server.getHttpTimeout()
 		https_ep.WriteTimeout = server.getHttpTimeout()
 
-		go https_ep.ListenAndServeTLS(server.TLS.CertFile, server.TLS.KeyFile)
+		go func() {
+			if err := https_ep.ListenAndServeTLS(server.TLS.CertFile, server.TLS.KeyFile); err != nil {
+				log.WithError(err).WithField("port", server.TLS.ListenAddress).Fatalf("failed to listen HTTPS")
+			}
+		}()
 	}
 
 	// start listening on HTTP port
 	http_ep := &http.Server{Addr: server.ListenAddress, Handler: router}
 	http_ep.ReadTimeout = server.getHttpTimeout()
 	http_ep.WriteTimeout = server.getHttpTimeout()
-	http_ep.ListenAndServe()
+	if err := http_ep.ListenAndServe(); err != nil {
+		log.WithError(err).WithField("port", server.ListenAddress).Fatalf("failed to listen HTTP")
+	}
 }
