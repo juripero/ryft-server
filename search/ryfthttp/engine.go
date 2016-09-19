@@ -91,11 +91,6 @@ func (engine *Engine) String() string {
 	// TODO: other parameters?
 }
 
-// IsLocal checks the "local" engines
-func (engine *Engine) IsLocal() bool {
-	return false
-}
-
 // prepareUrl formats proper URL based on search configuration.
 func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	// server URL should be parsed in engine initialization

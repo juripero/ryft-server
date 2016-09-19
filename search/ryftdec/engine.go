@@ -72,11 +72,6 @@ func (engine *Engine) Options() map[string]interface{} {
 	return engine.Backend.Options()
 }
 
-// IsLocal checks the "local" engines
-func (engine *Engine) IsLocal() bool {
-	return engine.Backend.IsLocal()
-}
-
 // SetLogLevel changes global module log level.
 func SetLogLevel(level string) error {
 	ll, err := logrus.ParseLevel(level)
