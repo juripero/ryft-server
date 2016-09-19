@@ -211,12 +211,14 @@ func (s *Server) newFiles(ctx *gin.Context) {
 		WithField("user", userName).
 		WithField("home", homeDir).
 		Infof("saving new data...")
+	status := http.StatusOK
 
 	if len(params.Catalog) != 0 { // append to catalog
 		catalog, length, err := updateCatalog(mountPoint, params, file)
 
 		if err != nil {
 			response["error"] = err.Error()
+			status = http.StatusBadRequest
 		} else {
 			response["catalog"] = catalog
 			response["length"] = length // not total, just this part
@@ -226,14 +228,14 @@ func (s *Server) newFiles(ctx *gin.Context) {
 
 		if err != nil {
 			response["error"] = err.Error()
-			// TODO: use dedicated HTTP status code
+			status = http.StatusBadRequest
 		} else {
 			response["path"] = path
 			response["length"] = length
 		}
 	}
 
-	ctx.JSON(http.StatusOK, response)
+	ctx.JSON(status, response)
 }
 
 // get mount point path from local search engine

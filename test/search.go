@@ -104,7 +104,7 @@ func newRyftHttp(log Logger) search.Engine {
 // create new ryftdec search engine
 func newRyftDec(log Logger, backend search.Engine) search.Engine {
 	name := "ryftdec"
-	engine, err := ryftdec.NewEngine(backend, map[string]int{})
+	engine, err := ryftdec.NewEngine(backend, map[string]int{}, false)
 	if err != nil {
 		log("failed to get %q search engine: %s", name, err)
 		panic(err)
