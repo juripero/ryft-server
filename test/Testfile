@@ -43,13 +43,19 @@ test_create_catalog:
 	curl --data "ddddd-hello-ddddd" ${OCTET_STREAM} -s "http://${ADDR}/files?file=4.txt&catalog=${TEST_CATALOG}" | jq .
 	curl --data "eeeee-hello-eeeee" ${OCTET_STREAM} -s "http://${ADDR}/files?file=5.txt&catalog=${TEST_CATALOG}" | jq .
 
-test_search_catalog:
-	ryftrest -p=fhs -d=0 -w=3 -q '(RAW_TEXT CONTAINS "hello")' \
-		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv | jq -c '.results[], .stats'
+test_search_catalog: test_search1_catalog test_search2_catalog test_search3_catalog
+
+test_search1_catalog:
+	ryftrest -p=fhs -d=0 -w=4 -q '(RAW_TEXT CONTAINS "hello")' \
+		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv | jq -c '.results[]'
 
 test_search2_catalog:
-	ryftrest -p=fhs -d=0 -w=3 -q '(RAW_TEXT CONTAINS "hello") AND (RAW_TEXT CONTAINS FEDS("hello",WIDTH=2))' \
-		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv | jq -c '.results[], .stats'
+	ryftrest -p=fhs -d=0 -w=4 -q '(RAW_TEXT CONTAINS "hello") AND (RAW_TEXT CONTAINS FEDS("hello",WIDTH=3))' \
+		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv | jq -c '.results[]'
+
+test_search3_catalog:
+	ryftrest -p=fhs -d=0 -w=4 -q '(RAW_TEXT CONTAINS "hello") AND (RAW_TEXT CONTAINS FEDS("hello",WIDTH=3)) AND (RAW_TEXT CONTAINS FEDS("hello",WIDTH=2))' \
+		-c "${TEST_CATALOG}" ${AUTH} -a ${ADDR} --local --format=utf8 -vv | jq -c '.results[]'
 
 # unwind index tests
 .PHONY: test_unwind_index test_unwind_index1 test_unwind_index2

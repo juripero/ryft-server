@@ -31,6 +31,7 @@
 package ryftdec
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -126,11 +127,11 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		instanceName, homeDir, mountPoint := engine.getBackendOptions()
 		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-and-a%s",
 			task.Identifier, task.subtaskId, task.extension))
-		// idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
-		// task.Identifier, task.subtaskId, ".txt"))
+		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
+			task.Identifier, task.subtaskId, ".txt"))
 		if !engine.KeepResultFiles {
 			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
-			// defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
 		}
 
 		task.log().WithField("temp", dat1).
@@ -142,17 +143,25 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		// left: save results to temporary file
 		tempCfg := *cfg
 		tempCfg.KeepDataAs = dat1
-		tempCfg.KeepIndexAs = ""   //idx1
+		tempCfg.KeepIndexAs = idx1
 		tempCfg.Delimiter = "\n\n" // TODO: get delimiter from configuration?
 		tempCfg.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
 		tempCfg.SaveUpdatedIndexesTo = search.NewIndexFile(tempCfg.Delimiter)
+		// !!! use /count here, to disable INDEX&DATA processing on intermediate results
+		// !!! otherwise (sometimes) Ryft hardware may be crashed on the second call
 		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg,
-			searchFunc /*engine.Backend.Count*/, mux, isLast && false)
+			engine.Backend.Count, mux, isLast && false)
 		if err1 != nil {
 			return 0, nil, err1
 		}
 
 		if n1 > 0 { // no sense to run search on empty input
+			err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, idx1),
+				tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo)
+			if err != nil {
+				return 0, nil, fmt.Errorf("failed to unwind first intermediate indexes: %s", err)
+			}
+
 			// right: read input from temporary file
 			tempCfg.Files = []string{dat1}
 			tempCfg.Catalogs = nil
@@ -163,9 +172,22 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 				filepath.Join(mountPoint, homeDir, dat1): tempCfg.SaveUpdatedIndexesTo,
 			}
 			tempCfg.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
-			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
+			if !isLast { // intermediate result
+				// as for the first call - no sense to process INDEX&DATA
+				searchFunc = engine.Backend.Count
+			}
+			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg,
+				searchFunc, mux, isLast && true)
 			if err2 != nil {
 				return 0, nil, err2
+			}
+
+			if !isLast && n2 > 0 {
+				err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
+					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo)
+				if err != nil {
+					return 0, nil, fmt.Errorf("failed to unwind second intermediate indexes: %s", err)
+				}
 			}
 
 			if len(cfg.KeepIndexAs) > 0 {
@@ -304,6 +326,52 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		return res.Stat.Matches, res.Stat, nil // OK
 	}
 	return 0, nil, nil // OK?
+}
+
+// parse INDEX file and update indexes
+func (task *Task) parseAndUnwindIndexes(indexPath string, basedOn map[string]*search.IndexFile, saveTo *search.IndexFile) error {
+	file, err := os.Open(indexPath)
+	if err != nil {
+		return fmt.Errorf("failed to open: %s", err)
+	}
+	defer file.Close() // close at the end
+
+	// try to read all index records
+	r := bufio.NewReader(file)
+
+	for {
+		// read line by line
+		line, err := r.ReadBytes('\n')
+		if len(line) > 0 {
+			index, err := ryftone.ParseIndex(line)
+			if err != nil {
+				return fmt.Errorf("failed to parse index: %s", err)
+			}
+
+			if basedOn != nil {
+				if f, ok := basedOn[index.File]; ok && f != nil {
+					tmp := f.Unwind(index)
+					// task.log().Debugf("unwind %s => %s", index, tmp)
+					index = tmp
+				} else {
+					task.log().Warnf("no base found for: %s", index)
+				}
+			}
+			if saveTo != nil {
+				saveTo.AddIndex(index)
+			}
+		}
+
+		if err != nil {
+			if err == io.EOF {
+				break // done
+			} else {
+				return fmt.Errorf("failed to read: %s", err)
+			}
+		}
+	}
+
+	return nil // OK
 }
 
 // join two files
