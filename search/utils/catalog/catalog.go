@@ -300,7 +300,7 @@ PRAGMA user_version = 2;`
 
 // AddFile adds file part to catalog.
 // return data file path (absolute) and offset where to write
-func (cat *Catalog) AddFile(filename string, offset, length int64) (string, uint64, error) {
+func (cat *Catalog) AddFile(filename string, offset, length int64) (string, int64, error) {
 	// TODO: several attempts if DB is locked
 	data_file, data_pos, err := cat.addFileSync(filename, offset, length)
 	if err != nil {
@@ -315,7 +315,7 @@ func (cat *Catalog) AddFile(filename string, offset, length int64) (string, uint
 }
 
 // adds file part to catalog (synchronized).
-func (cat *Catalog) addFileSync(filename string, offset, length int64) (string, uint64, error) {
+func (cat *Catalog) addFileSync(filename string, offset, length int64) (string, int64, error) {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()
 
@@ -323,13 +323,38 @@ func (cat *Catalog) addFileSync(filename string, offset, length int64) (string, 
 }
 
 // adds file part to catalog (unsynchronized).
-func (cat *Catalog) addFile(filename string, offset int64, length int64) (string, uint64, error) {
+func (cat *Catalog) addFile(filename string, offset int64, length int64) (string, int64, error) {
 	// should be done under exclusive transaction
 	tx, err := cat.db.Begin()
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to begin transaction: %s", err)
 	}
 	defer tx.Rollback() // just in case
+
+	// find existing part first
+	if 0 <= offset {
+		row := tx.QueryRow(`SELECT
+parts.id,parts.offset,parts.length,parts.data_pos,data.file FROM parts
+JOIN data ON data.id = parts.data_id
+WHERE parts.file IS ?
+AND ? BETWEEN parts.offset AND parts.offset+parts.length-1`, filename, offset)
+
+		var p_id, p_offset, p_length, data_pos int64
+		var data_file string
+		if err := row.Scan(&p_id, &p_offset, &p_length, &data_pos, &data_file); err == nil {
+			// check new part fits existing part
+			beg, end := offset, offset+length
+			p_beg, p_end := p_offset, p_offset+p_length
+			if p_beg <= beg && beg < p_end && p_beg <= end && end < p_end {
+				return data_file, data_pos + (beg - p_beg), nil // use this part
+			}
+
+			// TODO: can we do something better? write a new part and delete previous?
+			return "", 0, fmt.Errorf("part will override existing part [%d..%d)", p_beg, p_end)
+		} else if err != sql.ErrNoRows {
+			return "", 0, fmt.Errorf("failed to find existing part: %s", err)
+		}
+	}
 
 	// find appropriate data file
 	data_id, data_file, data_pos, err := cat.findDataFile(tx, length)
@@ -339,7 +364,7 @@ func (cat *Catalog) addFile(filename string, offset int64, length int64) (string
 
 	if offset < 0 { // automatic offset
 		var val sql.NullInt64
-		row := tx.QueryRow(`SELECT SUM(length) FROM parts WHERE file = ? LIMIT 1`, filename)
+		row := tx.QueryRow(`SELECT SUM(length) FROM parts WHERE file IS ? LIMIT 1`, filename)
 		if err := row.Scan(&val); err != nil {
 			return "", 0, fmt.Errorf("failed to calculate offset: %s", err)
 		}
@@ -469,7 +494,7 @@ ORDER BY parts.offset`)
 
 // find appropriate data file and reserve space
 // return data id, data path and write offset
-func (cat *Catalog) findDataFile(tx *sql.Tx, length int64) (id int64, file string, offset uint64, err error) {
+func (cat *Catalog) findDataFile(tx *sql.Tx, length int64) (id int64, file string, offset int64, err error) {
 	// TODO: if length is unknown - lock whole data by setting status=1...
 	// need to run monitor to prevent infinite data file locking...
 

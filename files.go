@@ -218,7 +218,7 @@ func (s *Server) newFiles(ctx *gin.Context) {
 
 		if err != nil {
 			response["error"] = err.Error()
-			status = http.StatusBadRequest
+			status = http.StatusBadRequest // TODO: appropriate status code?
 		} else {
 			response["catalog"] = catalog
 			response["length"] = length // not total, just this part
@@ -228,7 +228,7 @@ func (s *Server) newFiles(ctx *gin.Context) {
 
 		if err != nil {
 			response["error"] = err.Error()
-			status = http.StatusBadRequest
+			status = http.StatusBadRequest // TODO: appropriate status code?
 		} else {
 			response["path"] = path
 			response["length"] = length
@@ -445,6 +445,8 @@ func updateCatalog(mountPoint string, params NewFilesParams, content io.Reader) 
 		return "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
 	}
 
+	// TODO: in case of write error mark corresponding part as "bad"
+
 	// write file content
 	data, err := os.OpenFile(data_path, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
@@ -457,7 +459,7 @@ func updateCatalog(mountPoint string, params NewFilesParams, content io.Reader) 
 		return "", 0, fmt.Errorf("failed to seek data file: %s", err)
 	}
 
-	n, err := io.Copy(data, content) // TODO: check length
+	n, err := io.Copy(data, content)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to copy data: %s", err)
 	}
