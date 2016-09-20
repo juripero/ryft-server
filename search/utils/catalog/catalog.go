@@ -242,34 +242,37 @@ func (cat *Catalog) updateSchemeToVersion1(tx *sql.Tx) error {
 CREATE TABLE IF NOT EXISTS data (
 	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
 	file STRING NOT NULL,         -- data filename, relative to catalog file
-	length INTEGER DEFAULT (0),   -- total data length, offset for the next file part
-	status INTEGER DEFAULT (0),   -- TBD (busy/activity monitor)
+	len INTEGER DEFAULT (0),      -- total data length, offset for the next file part
+	opt INTEGER DEFAULT (0),      -- TBD (busy/activity monitor)
 	delim BLOB                    -- delimiter, should be set once
 );
 CREATE TABLE IF NOT EXISTS parts (
 	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	file STRING NOT NULL,           -- filename
-	offset INTEGER NOT NULL,      -- part offset
-	length INTEGER NOT NULL,      -- part length, -1 if unknown yet
-	status INTEGER DEFAULT (0),   -- TBD (busy/activity monitor, deleted, corrupted)
-	data_id INTEGER NOT NULL REFERENCES data (id) ON DELETE CASCADE,
-	data_pos INTEGER NOT NULL     -- position in data file
+	name STRING NOT NULL,         -- filename
+	pos INTEGER NOT NULL,         -- part offset
+	len INTEGER NOT NULL,         -- part length, -1 if unknown yet
+	opt INTEGER DEFAULT (0),      -- TBD (busy/activity monitor, deleted, corrupted)
+	d_id INTEGER NOT NULL REFERENCES data (id) ON DELETE CASCADE,
+	d_pos INTEGER NOT NULL        -- position in data file
 );
 
 -- create triggers
 CREATE TRIGGER IF NOT EXISTS part_insert
 	AFTER INSERT ON parts
-	FOR EACH ROW WHEN (0 < NEW.length)
+	FOR EACH ROW WHEN (0 < NEW.len)
 BEGIN
-	-- on part insert update data file
-	UPDATE data SET length = (length + NEW.length) WHERE id = NEW.data_id;
+	-- on part insert update data file's length
+	UPDATE data SET
+		len = len + NEW.len + ifnull(length(data.delim),0)
+	WHERE data.id = NEW.d_id;
 END;
 CREATE TRIGGER IF NOT EXISTS part_update
 	BEFORE UPDATE ON parts
-	FOR EACH ROW WHEN (OLD.length <= 0) AND (0 < NEW.length)
+	FOR EACH ROW WHEN (OLD.len <= 0) AND (0 < NEW.len)
 BEGIN
-	-- UPDATE data SET length = (length - OLD.length) WHERE id = OLD.data_id;
-	UPDATE data SET length = (length + NEW.length) WHERE id = NEW.data_id;
+	UPDATE data SET
+		len = len + NEW.len + ifnull(length(data.delim),0)
+	WHERE data.id = NEW.d_id;
 END;
 
 -- update scheme version
@@ -334,19 +337,19 @@ func (cat *Catalog) addFile(filename string, offset int64, length int64) (string
 	// find existing part first
 	if 0 <= offset {
 		row := tx.QueryRow(`SELECT
-parts.id,parts.offset,parts.length,parts.data_pos,data.file FROM parts
-JOIN data ON data.id = parts.data_id
-WHERE parts.file IS ?
-AND ? BETWEEN parts.offset AND parts.offset+parts.length-1`, filename, offset)
+parts.id,parts.pos,parts.len,parts.d_pos,data.file FROM parts
+JOIN data ON data.id = parts.d_id
+WHERE parts.name IS ?
+AND ? BETWEEN parts.pos AND parts.pos+parts.len-1`, filename, offset)
 
-		var p_id, p_offset, p_length, data_pos int64
+		var p_id, p_pos, p_len, d_pos int64
 		var data_file string
-		if err := row.Scan(&p_id, &p_offset, &p_length, &data_pos, &data_file); err == nil {
+		if err := row.Scan(&p_id, &p_pos, &p_len, &d_pos, &data_file); err == nil {
 			// check new part fits existing part
 			beg, end := offset, offset+length
-			p_beg, p_end := p_offset, p_offset+p_length
+			p_beg, p_end := p_pos, p_pos+p_len
 			if p_beg <= beg && beg < p_end && p_beg <= end && end < p_end {
-				return data_file, data_pos + (beg - p_beg), nil // use this part
+				return data_file, d_pos + (beg - p_beg), nil // use this part
 			}
 
 			// TODO: can we do something better? write a new part and delete previous?
@@ -364,7 +367,7 @@ AND ? BETWEEN parts.offset AND parts.offset+parts.length-1`, filename, offset)
 
 	if offset < 0 { // automatic offset
 		var val sql.NullInt64
-		row := tx.QueryRow(`SELECT SUM(length) FROM parts WHERE file IS ? LIMIT 1`, filename)
+		row := tx.QueryRow(`SELECT SUM(len) FROM parts WHERE name IS ? LIMIT 1`, filename)
 		if err := row.Scan(&val); err != nil {
 			return "", 0, fmt.Errorf("failed to calculate offset: %s", err)
 		}
@@ -377,8 +380,8 @@ AND ? BETWEEN parts.offset AND parts.offset+parts.length-1`, filename, offset)
 
 	// insert new file part (data file will be updated by INSERT trigger!)
 	_, err = tx.Exec(`INSERT
-INTO parts(file, offset, length, data_id, data_pos)
-VALUES (?, ?, ?, ?, ?)`, filename, offset, length, data_id, data_pos)
+INTO parts(name,pos,len,d_id,d_pos)
+VALUES (?,?,?,?,?)`, filename, offset, length, data_id, data_pos)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to insert file part: %s", err)
 	}
@@ -465,9 +468,9 @@ func (cat *Catalog) getSearchIndexFileSync() (map[string]*search.IndexFile, erro
 // get list of parts (unsynchronized)
 func (cat *Catalog) getSearchIndexFile() (map[string]*search.IndexFile, error) {
 	rows, err := cat.db.Query(`SELECT
-parts.file,parts.offset,parts.length,data.file,parts.data_pos FROM parts
-JOIN data ON parts.data_id = data.id
-ORDER BY parts.offset`)
+parts.name,parts.pos,parts.len,data.file,parts.d_pos FROM parts
+JOIN data ON parts.d_id = data.id
+ORDER BY parts.pos`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parts: %s", err)
 	}
@@ -495,10 +498,10 @@ ORDER BY parts.offset`)
 // find appropriate data file and reserve space
 // return data id, data path and write offset
 func (cat *Catalog) findDataFile(tx *sql.Tx, length int64) (id int64, file string, offset int64, err error) {
-	// TODO: if length is unknown - lock whole data by setting status=1...
+	// TODO: if length is unknown - lock whole data by setting opt|=1...
 	// need to run monitor to prevent infinite data file locking...
 
-	row := tx.QueryRow(`SELECT id,file,length FROM data WHERE (length+?) <= ? LIMIT 1`, length, cat.DataSizeLimit)
+	row := tx.QueryRow(`SELECT id,file,len FROM data WHERE (len+?) <= ? LIMIT 1`, length, cat.DataSizeLimit)
 	if err = row.Scan(&id, &file, &offset); err != nil {
 		if err != sql.ErrNoRows {
 			return 0, "", 0, fmt.Errorf("failed to find data file: %s", err)
@@ -509,7 +512,7 @@ func (cat *Catalog) findDataFile(tx *sql.Tx, length int64) (id int64, file strin
 		// ... create new data file
 		file, offset = cat.newDataFilePath(), 0
 		var res sql.Result
-		res, err = tx.Exec(`INSERT INTO data(file,length) VALUES (?,0)`, file)
+		res, err = tx.Exec(`INSERT INTO data(file,len) VALUES (?,0)`, file)
 		if err != nil {
 			return 0, "", 0, fmt.Errorf("failed to insert new data file: %s", err)
 		}
