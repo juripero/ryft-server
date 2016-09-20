@@ -48,6 +48,7 @@ REST specific:
                      - json - decode JSON objects
                      - utf8 - for text search get utf-8 string
                               instead of base-64 encoded raw bytes
+                     - null|none - ignores all data
 --fields=<list>  Specifies comma-separated list of fields to return.
                  This parameter is useful with XML and JSON formats.
 --no-stats       Disable statistics output.

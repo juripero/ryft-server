@@ -166,10 +166,11 @@ That means that found data are reported as base-64 encoded raw bytes.
 
 There are two other options: `format=xml` and `format=json`.
 
-If input file set contains XML data, the found records could be decoded. Just pass `format=xml` query parameter
-and records will be translated from XML to JSON.
+If input file set contains XML data, the found records could be decoded.
+Just pass `format=xml` query parameter and records will be translated
+from XML to JSON.
 
-The same is true for JSON data. 
+The same is true for JSON data.
 
 See also [fields parameter](#search-fields-parameter).
 
@@ -191,6 +192,10 @@ instead of `format=raw` - base-64 encoded raw bytes:
   "_index": {}
 }
 ```
+
+If data are not so important the `format=null` can be used.
+This format tells `ryft-server` to ignore all data and to keep indexes only.
+
 
 
 ### Search `cs` parameter

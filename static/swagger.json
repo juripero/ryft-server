@@ -68,8 +68,8 @@
             "type": "string",
             "name": "format",
             "x-go-name": "Format",
-            "description": "Input data format. Parameter is used with structured search.",
-            "enum": ["raw", "xml", "json", "utf8"]
+            "description": "Input data format. Parameter is used with structured or RAW text search.",
+            "enum": ["raw", "xml", "json", "utf8", "null"]
           },
           {
             "in": "query",

@@ -28,60 +28,47 @@
  * ============
  */
 
-package format
+package null
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/getryft/ryft-server/format/json"
-	"github.com/getryft/ryft-server/format/null"
-	"github.com/getryft/ryft-server/format/raw"
-	"github.com/getryft/ryft-server/format/utf8"
-	"github.com/getryft/ryft-server/format/xml"
 	"github.com/getryft/ryft-server/search"
 )
 
+// RECORD format specific data.
+type Record map[string]interface{}
+
 const (
-	JSON = "json"
-	UTF8 = "utf8"
-	NULL = "null"
-	RAW  = "raw"
-	XML  = "xml"
+	recFieldIndex = "_index"
+	recFieldError = "_error"
+	recFieldData  = "data"
 )
 
-// Abstract Format interface.
-// Support conversion from/to basic search data types.
-// NewXXX() methods are used to decode data from stream.
-type Format interface {
-	NewIndex() interface{}
-	FromIndex(search.Index) interface{}
-	ToIndex(interface{}) search.Index
-
-	NewRecord() interface{}
-	FromRecord(*search.Record) interface{}
-	ToRecord(interface{}) *search.Record
-
-	NewStat() interface{}
-	FromStat(*search.Statistics) interface{}
-	ToStat(interface{}) *search.Statistics
+// NewRecord creates new format specific data.
+func NewRecord() interface{} {
+	return new(Record)
 }
 
-// New creates new formatter instance.
-// XML format supports some options.
-func New(format string, opts map[string]interface{}) (Format, error) {
-	switch strings.ToLower(format) {
-	case JSON:
-		return json.New(opts)
-	case UTF8, "utf-8":
-		return utf8.New(opts)
-	case NULL, "none":
-		return null.New()
-	case RAW:
-		return raw.New()
-	case XML:
-		return xml.New(opts)
+// FromRecord converts RECORD to format specific data.
+func FromRecord(rec *search.Record) *Record {
+	if rec == nil {
+		return nil
 	}
 
-	return nil, fmt.Errorf("%q is unsupported format", format)
+	res := Record{
+		recFieldIndex: FromIndex(rec.Index),
+	}
+
+	return &res
+}
+
+// ToRecord converts format specific data to RECORD.
+func ToRecord(rec *Record) *search.Record {
+	if rec == nil {
+		return nil
+	}
+
+	panic("NULL ToRecord is not implemented!")
+	//res := new(search.Record)
+	//res.Index = ToIndex(rec.Index)
+	//return res
 }

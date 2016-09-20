@@ -28,60 +28,64 @@
  * ============
  */
 
-package format
+package null
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/getryft/ryft-server/format/json"
-	"github.com/getryft/ryft-server/format/null"
-	"github.com/getryft/ryft-server/format/raw"
-	"github.com/getryft/ryft-server/format/utf8"
-	"github.com/getryft/ryft-server/format/xml"
 	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	JSON = "json"
-	UTF8 = "utf8"
-	NULL = "null"
-	RAW  = "raw"
-	XML  = "xml"
-)
+// NULL format, ignores record data at all.
+type Format struct{}
 
-// Abstract Format interface.
-// Support conversion from/to basic search data types.
-// NewXXX() methods are used to decode data from stream.
-type Format interface {
-	NewIndex() interface{}
-	FromIndex(search.Index) interface{}
-	ToIndex(interface{}) search.Index
-
-	NewRecord() interface{}
-	FromRecord(*search.Record) interface{}
-	ToRecord(interface{}) *search.Record
-
-	NewStat() interface{}
-	FromStat(*search.Statistics) interface{}
-	ToStat(interface{}) *search.Statistics
+// New creates new NULL formatter.
+func New() (*Format, error) {
+	return new(Format), nil
 }
 
-// New creates new formatter instance.
-// XML format supports some options.
-func New(format string, opts map[string]interface{}) (Format, error) {
-	switch strings.ToLower(format) {
-	case JSON:
-		return json.New(opts)
-	case UTF8, "utf-8":
-		return utf8.New(opts)
-	case NULL, "none":
-		return null.New()
-	case RAW:
-		return raw.New()
-	case XML:
-		return xml.New(opts)
-	}
+// NewIndex creates new format specific data.
+func (*Format) NewIndex() interface{} {
+	return NewIndex()
+}
 
-	return nil, fmt.Errorf("%q is unsupported format", format)
+// Convert INDEX to NULL format specific data.
+func (*Format) FromIndex(idx search.Index) interface{} {
+	return FromIndex(idx)
+}
+
+// Convert NULL format specific data to INDEX.
+// WARN: will panic if argument is not of null.Index type!
+func (*Format) ToIndex(idx interface{}) search.Index {
+	return ToIndex(idx.(Index))
+}
+
+// NewRecord creates new format specific data.
+func (*Format) NewRecord() interface{} {
+	return NewRecord()
+}
+
+// Convert RECORD to NULL format specific data.
+func (f *Format) FromRecord(rec *search.Record) interface{} {
+	return FromRecord(rec)
+}
+
+// Convert NULL format spcific data to RECORD.
+// WARN: will panic if argument is not of null.Record type!
+func (*Format) ToRecord(rec interface{}) *search.Record {
+	return ToRecord(rec.(*Record))
+}
+
+// NewStat creates new format specific data.
+func (*Format) NewStat() interface{} {
+	return NewStat()
+}
+
+// Convert STATISTICS to NULL format specific data.
+func (f *Format) FromStat(stat *search.Statistics) interface{} {
+	return FromStat(stat)
+}
+
+// Convert NULL format specific data to STATISTICS.
+// WARN: will panic if argument is not of null.Statistics type!
+func (f *Format) ToStat(stat interface{}) *search.Statistics {
+	return ToStat(stat.(*Statistics))
 }
