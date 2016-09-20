@@ -405,7 +405,10 @@ func updateCatalog(mountPoint string, params NewFilesParams, content io.Reader) 
 
 	if params.Length < 0 {
 		// save to temp file to determine data length
-		tmp, err := ioutil.TempFile("", "temp_file")
+		if len(catalog.DefaultTempDirectory) > 0 {
+			_ = os.MkdirAll(catalog.DefaultTempDirectory, 0755)
+		}
+		tmp, err := ioutil.TempFile(catalog.DefaultTempDirectory, filepath.Base(params.File))
 		if err != nil {
 			return "", 0, fmt.Errorf("failed to create temp file: %s", err)
 		}
