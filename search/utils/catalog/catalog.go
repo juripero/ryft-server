@@ -49,10 +49,16 @@ const (
 )
 
 // default data size limit used by all new catalogs
-var DefaultDataSizeLimit uint64 = 100 * 1024
+var DefaultDataSizeLimit uint64 = 64 * 1024 * 1024 // 64 MB by default
 
 // default cache drop timeout
 var DefaultCacheDropTimeout time.Duration = 10 * time.Second
+
+// default data delimiter
+var DefaultDataDelimiter string
+
+// default temp directory
+var DefaultTempDirectory string = "/tmp/"
 
 // Catalog struct contains catalog related meta-data.
 type Catalog struct {

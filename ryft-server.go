@@ -48,6 +48,8 @@ import (
 	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
+	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 
 	"github.com/getryft/ryft-server/middleware/auth"
 	"github.com/getryft/ryft-server/middleware/cors"
@@ -114,6 +116,14 @@ type Server struct {
 	busynessChanged   chan int32
 
 	BooleansPerExpression map[string]int `yaml:"booleans-per-expression"`
+
+	// catalogs related options
+	Catalogs struct {
+		MaxDataFileSize  string `yaml:"max-data-file-size"`
+		CacheDropTimeout string `yaml:"cache-drop-timeout"`
+		DataDelimiter    string `yaml:"data-delim"`
+		TempDirectory    string `yaml:"temp-dir"`
+	} `yaml:"catalogs,omitempty"`
 
 	// consul client is cached here
 	consulClient interface{}
@@ -234,13 +244,31 @@ func (s *Server) parseConfig(fileName string) error {
 		return fmt.Errorf("failed to parse configuration from %q: %s", fileName, err)
 	}
 
-	return nil // OK
-}
-
-func ensureDefault(flag *string, message string) {
-	if *flag == "" {
-		kingpin.FatalUsage(message)
+	// validate catalog's maximum data file size
+	if len(s.Catalogs.MaxDataFileSize) > 0 {
+		if lim, err := utils.ParseDataSize(s.Catalogs.MaxDataFileSize); err != nil {
+			return fmt.Errorf("failed to parse catalog maximum data size: %s", err)
+		} else if lim == 0 {
+			return fmt.Errorf("catalog maximum data size cannot be zero")
+		} else {
+			catalog.DefaultDataSizeLimit = lim
+		}
 	}
+
+	// validate catalog's cache drop timeout
+	if len(s.Catalogs.CacheDropTimeout) > 0 {
+		if t, err := time.ParseDuration(s.Catalogs.CacheDropTimeout); err != nil {
+			return fmt.Errorf("failed to parse catalog cache drop timeout: %s", err)
+		} else {
+			catalog.DefaultCacheDropTimeout = t
+		}
+	}
+
+	// assign other catalog options
+	catalog.DefaultDataDelimiter = s.Catalogs.DataDelimiter
+	catalog.DefaultTempDirectory = s.Catalogs.TempDirectory
+
+	return nil // OK
 }
 
 // get search backend with options

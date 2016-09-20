@@ -213,16 +213,16 @@ that also can be customized. Note these options may be overriden by command line
 For example if your configuration file contains:
 
 ```{.yaml}
-address: 0.0.0.0:8000
+address: :8000
 ```
 
 but the server starts as:
 
 ```{.sh}
-ryft-server --config=/etc/ryft-server.conf --address=0.0.0.0:9000
+ryft-server --config=/etc/ryft-server.conf --address=:9000
 ```
 
-the actual option for the address will be `0.0.0.0:9000` since it goes last.
+the actual option for the address will be `:9000` since it goes last.
 
 Using `address` option its possible to customize server's listen address.
 It's equivalent to the `--address` command line option.
@@ -349,6 +349,39 @@ certificate) just set `insecure-skip-verify: true`. It is not recommended to
 define these `insecure-*` options in production.
 
 See [authentication](./auth.md) document for more details.
+
+
+### Catalog configuration
+
+Some catalog related options can be customized via the following configuration
+section:
+
+```{.yaml}
+catalogs:
+  max-data-file-size: 64MB       # data file size limit: KB, MB, GB, TB
+  cache-drop-timeout: 10s        # internal cache lifetime
+  data-delim: "\n\f\n"           # default data delimiter
+  temp-dir: /tmp/ryft/catalogs   # for temporary files
+```
+
+It's possible to customize catalog data size limit via `max-data-file-size`
+option. If there is no more space in current catalog's data file, then new one
+will be started. It's possible to use various units, for example `MB` for
+megabytes (1024*1024) and `GB` for gigabytes (1024*1024*1024).
+
+There is an internal catalog cache. Each catalog entry has it's own drop timeout
+or lifetime. By default it's 10 seconds but can be changed via
+`cache-drop-timeout` option. There is also possible to use various units,
+for example `h` for hours or `ms` for milliseconds.
+
+Data delimiter is used to separate different small files inside a bigger data file.
+If delimiter is non empty, it will be placed each time a new file part is written
+to catalog. The main purpose of this delimiter is to separate RAW text to avoid
+possible collisions on the file boundaries. For structured data the data delimiter
+is not so important. Anyway it can be customized via `data-delim` option.
+
+Sometimes catalog need to save file content into temporary file. These
+temporary files are placed in `temp-dir` directory.
 
 
 # Debian package
