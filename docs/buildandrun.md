@@ -47,6 +47,9 @@ Note, `make debian` should be run in the project's root directory. In this case 
 and corresponding deb package is created. If you run `make` from `debian/` subdirectory then only
 deb package is created - `ryft-server` is not rebuilt, just used from your `$GOPATH/bin`.
 
+It's recommended to run `make update` periodically to update all 3rd-party
+dependencies.
+ 
 
 ## Version
 
