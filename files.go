@@ -392,9 +392,9 @@ func createFile(mountPoint string, params NewFilesParams, content io.Reader) (st
 	// copy the file content
 	var w int64
 	if 0 < params.Length {
-		w, err = io.Copy(out, content)
-	} else {
 		w, err = io.CopyN(out, content, params.Length)
+	} else {
+		w, err = io.Copy(out, content)
 	}
 	if err != nil {
 		log.WithError(err).WithField("file", rpath).
