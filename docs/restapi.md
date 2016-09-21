@@ -518,6 +518,7 @@ The list of supported query parameters for the POST endpoint are the following:
 | --------- | ------- | ----------- |
 | `file`    | string  | [The directory to get content of](#get-files-dir-parameter). |
 | `catalog` | string  | [The directory to get content of](#get-files-dir-parameter). |
+| `delimiter`| string | [The directory to get content of](#get-files-dir-parameter). |
 | `offset`  | integer | [The directory to get content of](#get-files-dir-parameter). |
 | `length`  | integer | [The directory to get content of](#get-files-dir-parameter). |
 | `force`   | boolean | [The directory to get content of](#get-files-dir-parameter). |

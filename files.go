@@ -34,11 +34,12 @@ type DeleteFilesParams struct {
 
 // NewFilesParams query parameters for POST /files
 type NewFilesParams struct {
-	Catalog string `form:"catalog" json:"catalog"`
-	File    string `form:"file" json:"file"`
-	Offset  int64  `form:"offset" json:"offset"`
-	Length  int64  `form:"length" json:"length"`
-	Force   bool   `form:"force" json:"force"` // force to rewrite file
+	Catalog   string `form:"catalog" json:"catalog"`     // catalog to save to
+	Delimiter string `form:"delimiter" json:"delimiter"` // data delimiter
+	File      string `form:"file" json:"file"`           // filename to save
+	Offset    int64  `form:"offset" json:"offset"`       // offset inside file, used to rewrite
+	Length    int64  `form:"length" json:"length"`       // data length
+	Force     bool   `form:"force" json:"force"`         // force to rewrite file flag
 	// TODO: catalog options
 }
 
@@ -156,16 +157,26 @@ func (s *Server) deleteFiles(ctx *gin.Context) {
 curl -X POST -F file=@/path/to/file.txt -s "http://localhost:8765/files?file=/test/file\{\{random\}\}.txt" | jq .
 curl -X POST --data "hello" -H 'Content-Type: application/octet-stream' -s "http://localhost:8765/files?file=/test/file\{\{random\}\}.txt" | jq .
 */
-func (s *Server) newFiles(ctx *gin.Context) {
+func (s *Server) postFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 
 	// parse request parameters
+	noDelim := fmt.Sprintf("no-binding-%x", time.Now().UnixNano()) // use random marker!
 	params := NewFilesParams{}
+	params.Delimiter = noDelim
 	params.Offset = -1 // mark as "unspecified"
 	params.Length = -1
 	if err := ctx.Bind(&params); err != nil {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
+	}
+
+	// if delimiter is provided this value will be NOT NIL
+	var delim *string
+	if params.Delimiter != noDelim {
+		delim = &params.Delimiter
+	} else {
+		params.Delimiter = ""
 	}
 
 	if len(params.File) == 0 {
@@ -214,7 +225,7 @@ func (s *Server) newFiles(ctx *gin.Context) {
 	status := http.StatusOK
 
 	if len(params.Catalog) != 0 { // append to catalog
-		catalog, length, err := updateCatalog(mountPoint, params, file)
+		catalog, length, err := updateCatalog(mountPoint, params, delim, file)
 
 		if err != nil {
 			response["error"] = err.Error()
@@ -399,7 +410,7 @@ func createFile(mountPoint string, params NewFilesParams, content io.Reader) (st
 
 // append file to catalog
 // Returns generated catalog path (relative), length and error if any.
-func updateCatalog(mountPoint string, params NewFilesParams, content io.Reader) (string, uint64, error) {
+func updateCatalog(mountPoint string, params NewFilesParams, delim *string, content io.Reader) (string, uint64, error) {
 	catalogPath := randomizePath(params.Catalog)
 	filePath := randomizePath(params.File)
 
@@ -440,7 +451,7 @@ func updateCatalog(mountPoint string, params NewFilesParams, content io.Reader) 
 	defer cat.Close()
 
 	// update catalog atomically
-	data_path, data_pos, err := cat.AddFile(filePath, params.Offset, params.Length)
+	data_path, data_pos, data_delim, err := cat.AddFile(filePath, params.Offset, params.Length, delim)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
 	}
@@ -465,6 +476,17 @@ func updateCatalog(mountPoint string, params NewFilesParams, content io.Reader) 
 	}
 	if n != params.Length {
 		return "", 0, fmt.Errorf("only %d bytes copied of %d", n, params.Length)
+	}
+
+	// write data delimiter
+	if len(data_delim) > 0 {
+		nn, err := data.WriteString(data_delim)
+		if err != nil {
+			return "", 0, fmt.Errorf("failed to write delimiter: %s", err)
+		}
+		if nn != len(data_delim) {
+			return "", 0, fmt.Errorf("only %d bytes copied of %d", nn, len(data_delim))
+		}
 	}
 
 	// TODO: notify catalog write is done

@@ -302,35 +302,35 @@ PRAGMA user_version = 2;`
 }
 
 // AddFile adds file part to catalog.
-// return data file path (absolute) and offset where to write
-func (cat *Catalog) AddFile(filename string, offset, length int64) (string, int64, error) {
+// return data file path (absolute), offset where to write and delimiter
+func (cat *Catalog) AddFile(filename string, offset, length int64, pdelim *string) (string, int64, string, error) {
 	// TODO: several attempts if DB is locked
-	data_file, data_pos, err := cat.addFileSync(filename, offset, length)
+	data_file, data_pos, delim, err := cat.addFileSync(filename, offset, length, pdelim)
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 
 	// convert to absolute path
 	dir, _ := filepath.Split(cat.path)
 	data_file = filepath.Join(dir, data_file)
 
-	return data_file, data_pos, nil // OK
+	return data_file, data_pos, delim, nil // OK
 }
 
 // adds file part to catalog (synchronized).
-func (cat *Catalog) addFileSync(filename string, offset, length int64) (string, int64, error) {
+func (cat *Catalog) addFileSync(filename string, offset, length int64, pdelim *string) (string, int64, string, error) {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()
 
-	return cat.addFile(filename, offset, length)
+	return cat.addFile(filename, offset, length, pdelim)
 }
 
 // adds file part to catalog (unsynchronized).
-func (cat *Catalog) addFile(filename string, offset int64, length int64) (string, int64, error) {
+func (cat *Catalog) addFile(filename string, offset int64, length int64, pdelim *string) (string, int64, string, error) {
 	// should be done under exclusive transaction
 	tx, err := cat.db.Begin()
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to begin transaction: %s", err)
+		return "", 0, "", fmt.Errorf("failed to begin transaction: %s", err)
 	}
 	defer tx.Rollback() // just in case
 
@@ -349,27 +349,28 @@ AND ? BETWEEN parts.pos AND parts.pos+parts.len-1`, filename, offset)
 			beg, end := offset, offset+length
 			p_beg, p_end := p_pos, p_pos+p_len
 			if p_beg <= beg && beg < p_end && p_beg <= end && end < p_end {
-				return data_file, d_pos + (beg - p_beg), nil // use this part
+				return data_file, d_pos + (beg - p_beg), "", nil // use this part
+				// no delimiter should be provided since we write into the mid of file part!
 			}
 
 			// TODO: can we do something better? write a new part and delete previous?
-			return "", 0, fmt.Errorf("part will override existing part [%d..%d)", p_beg, p_end)
+			return "", 0, "", fmt.Errorf("part will override existing part [%d..%d)", p_beg, p_end)
 		} else if err != sql.ErrNoRows {
-			return "", 0, fmt.Errorf("failed to find existing part: %s", err)
+			return "", 0, "", fmt.Errorf("failed to find existing part: %s", err)
 		}
 	}
 
 	// find appropriate data file
-	data_id, data_file, data_pos, err := cat.findDataFile(tx, length)
+	data_id, data_file, data_pos, delim, err := cat.findDataFile(tx, length, pdelim)
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 
 	if offset < 0 { // automatic offset
 		var val sql.NullInt64
 		row := tx.QueryRow(`SELECT SUM(len) FROM parts WHERE name IS ? LIMIT 1`, filename)
 		if err := row.Scan(&val); err != nil {
-			return "", 0, fmt.Errorf("failed to calculate offset: %s", err)
+			return "", 0, "", fmt.Errorf("failed to calculate offset: %s", err)
 		}
 		if val.Valid {
 			offset = val.Int64
@@ -383,15 +384,15 @@ AND ? BETWEEN parts.pos AND parts.pos+parts.len-1`, filename, offset)
 INTO parts(name,pos,len,d_id,d_pos)
 VALUES (?,?,?,?,?)`, filename, offset, length, data_id, data_pos)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to insert file part: %s", err)
+		return "", 0, "", fmt.Errorf("failed to insert file part: %s", err)
 	}
 
 	// commit transaction
 	if err := tx.Commit(); err != nil {
-		return "", 0, fmt.Errorf("failed to commit transaction: %s", err)
+		return "", 0, "", fmt.Errorf("failed to commit transaction: %s", err)
 	}
 
-	return data_file, data_pos, nil // OK
+	return data_file, data_pos, delim, nil // OK
 }
 
 // GetDataFiles gets the list of data files (absolute path)
@@ -497,28 +498,43 @@ ORDER BY parts.pos`)
 
 // find appropriate data file and reserve space
 // return data id, data path and write offset
-func (cat *Catalog) findDataFile(tx *sql.Tx, length int64) (id int64, file string, offset int64, err error) {
+func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id int64, file string, offset int64, delim string, err error) {
 	// TODO: if length is unknown - lock whole data by setting opt|=1...
 	// need to run monitor to prevent infinite data file locking...
 
-	row := tx.QueryRow(`SELECT id,file,len FROM data WHERE (len+?) <= ? LIMIT 1`, length, cat.DataSizeLimit)
-	if err = row.Scan(&id, &file, &offset); err != nil {
+	var data_delim sql.NullString
+	row := tx.QueryRow(`SELECT id,file,len,delim FROM data WHERE (len+?) <= ? LIMIT 1`, length, cat.DataSizeLimit)
+	if err = row.Scan(&id, &file, &offset, &data_delim); err != nil {
 		if err != sql.ErrNoRows {
-			return 0, "", 0, fmt.Errorf("failed to find data file: %s", err)
+			return 0, "", 0, "", fmt.Errorf("failed to find data file: %s", err)
 		} else {
 			err = nil // ignore error, and...
+
+			if pdelim != nil {
+				delim = *pdelim
+			} else {
+				delim = DefaultDataDelimiter
+			}
 		}
 
 		// ... create new data file
 		file, offset = cat.newDataFilePath(), 0
 		var res sql.Result
-		res, err = tx.Exec(`INSERT INTO data(file,len) VALUES (?,0)`, file)
+		res, err = tx.Exec(`INSERT INTO data(file,len,delim) VALUES (?,0,?)`, file, delim)
 		if err != nil {
-			return 0, "", 0, fmt.Errorf("failed to insert new data file: %s", err)
+			return 0, "", 0, "", fmt.Errorf("failed to insert new data file: %s", err)
 		}
 		if id, err = res.LastInsertId(); err != nil {
-			return 0, "", 0, fmt.Errorf("failed to get new data file id: %s", err)
+			return 0, "", 0, "", fmt.Errorf("failed to get new data file id: %s", err)
 		}
+
+		return // OK
+	}
+
+	// ensure delimiter is the same each time
+	fmt.Printf("delimiter check (old:#%x, new:#%x)\n", data_delim.String, *pdelim)
+	if data_delim.Valid && pdelim != nil && data_delim.String != *pdelim {
+		return 0, "", 0, "", fmt.Errorf("delimiter cannot be changed (old:#%x, new:#%x)", data_delim.String, *pdelim)
 	}
 
 	return // OK

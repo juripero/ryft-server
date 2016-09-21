@@ -121,7 +121,7 @@ type Server struct {
 	Catalogs struct {
 		MaxDataFileSize  string `yaml:"max-data-file-size"`
 		CacheDropTimeout string `yaml:"cache-drop-timeout"`
-		DataDelimiter    string `yaml:"data-delim"`
+		DataDelimiter    string `yaml:"default-data-delim"`
 		TempDirectory    string `yaml:"temp-dir"`
 	} `yaml:"catalogs,omitempty"`
 
@@ -628,7 +628,7 @@ func main() {
 	private.GET("/cluster/members", server.members)
 	private.GET("/files", server.getFiles)
 	private.DELETE("/files", server.deleteFiles)
-	private.POST("/files", server.newFiles)
+	private.POST("/files", server.postFiles)
 
 	// static asset
 	for _, asset := range AssetNames() {
