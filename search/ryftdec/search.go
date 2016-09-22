@@ -112,6 +112,8 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		QTYPE_NUMERIC,
 		QTYPE_CURRENCY,
 		QTYPE_REGEX,
+		QTYPE_IPV4,
+		QTYPE_IPV6:
 		break // search later
 
 	case QTYPE_AND:

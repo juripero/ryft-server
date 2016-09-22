@@ -10,6 +10,7 @@ Ryft supports several search modes:
 - `ns` for [number](#number-search) or [currency search](#currency-search)
 - `rs` for [regex search](#regex-search)
 - `ipv4` for [IPv4 search](#ipv4-search)
+- `ipv6` for [IPv6 search](#ipv6-search)
 
 # General search syntax
 
@@ -480,4 +481,51 @@ the field tag is `ipaddr`, use:
 
 ```
 (RECORD.ipaddr CONTAINS IPV4("10.10.0.0" <= IP <= "10.10.255.255"))
+```
+
+# IPv6 search
+
+The IPv6 Search operation can be used to search for exact IPv6 addresses or
+IPv6 addresses in a particular range in both structured and unstructured text
+using the standard “a:b:c:d:e:f:g:h” format for IPv6 addresses.
+The double colon (::) is also supported, per RFC guidelines.
+
+IPv6 searches extend the general relational expression defined previously as follows:
+
+```
+(input_specifier relational_operator IPV6(expression))
+```
+
+Different ranges can be searched for by modifying the expression in the relational
+expression above. There are two general expression types supported:
+
+- `IP operator "ValueB"`
+- `"ValueA" operator IP operator "ValueB"`
+
+The box below contains of list of supported expressions. `ValueA` and `ValueB`
+represent the IP addresses to compare the input data against.
+
+- `IP = "ValueB"`
+- `IP != "ValueB"` (Not equals operator)
+- `IP >= "ValueB"`
+- `IP > "ValueB"`
+- `IP <= "ValueB"`
+- `IP < "ValueB"`
+- `"ValueA" <= IP <= "ValueB"`
+- `"ValueA" < IP < "ValueB"`
+- `"ValueA" < IP <= "ValueB"`
+- `"ValueA" <= IP < "ValueB"`
+
+For example, to find all IP addresses greater than `1abc:2::8`,
+use the following search query criteria:
+
+```
+(RAW_TEXT CONTAINS IPV6(IP > "1abc:2::8"))
+```
+
+To find all matching IPv6 addresses between `10::1` and `10::1:1`, inclusive,
+in a record/field construct where the field tag is `ipaddr6`, use:
+
+```
+(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))
 ```
