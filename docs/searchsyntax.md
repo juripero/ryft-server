@@ -476,7 +476,7 @@ For example, to find all IP addresses greater than `10.11.12.13`, use the follow
 
 To find all matching IPv4 addresses adhering to `10.10.0.0/16` (that is, all IP addresses
 from `10.10.0.0` through `10.10.255.255` inclusive) in a record/field construct where
-the field tag is ipaddr, use:
+the field tag is `ipaddr`, use:
 
 ```
 (RECORD.ipaddr CONTAINS IPV4("10.10.0.0" <= IP <= "10.10.255.255"))

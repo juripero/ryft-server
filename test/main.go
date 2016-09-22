@@ -86,7 +86,7 @@ Matches            : 971
 Fabric Data Rate   : 10307.835938 MB/sec
 `
 
-	stat, err := ryftprim.ParseStat([]byte(s))
+	stat, err := ryftprim.ParseStat([]byte(s), "")
 	if err != nil {
 		log("Failed to parse stat: %s", err)
 	} else {

@@ -55,7 +55,7 @@ func testEncoder() {
 		e.EncodeRecord(rx2)
 	}
 
-	s1 := search.NewStat()
+	s1 := search.NewStat("")
 	s1.Matches = 100
 	s1.Duration = 200
 	s1.TotalBytes = 300

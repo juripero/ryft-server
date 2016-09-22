@@ -237,12 +237,6 @@ func (s *Server) parseConfig(fileName string) error {
 	return nil // OK
 }
 
-func ensureDefault(flag *string, message string) {
-	if *flag == "" {
-		kingpin.FatalUsage(message)
-	}
-}
-
 // get search backend with options
 func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, homeDir, userTag string) (search.Engine, error) {
 	if !s.LocalOnly && !localOnly {
@@ -407,7 +401,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	if s.DebugMode {
 		ryftdec.SetLogLevel("debug")
 	}
-	return ryftdec.NewEngine(backend, s.BooleansPerExpression)
+	return ryftdec.NewEngine(backend, s.BooleansPerExpression, s.KeepResults)
 }
 
 // deep copy of backend options
@@ -503,12 +497,14 @@ var serverStats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
-
 	server, err := NewServer()
 	if err != nil {
 		log.WithError(err).Fatalf("Failed to read server configuration")
 	}
-	log.WithField("config", server).Infof("server configuration")
+	log.WithField("config", server).
+		WithField("version", Version).
+		WithField("git-hash", GitHash).
+		Infof("starting server...")
 
 	// be quiet and efficient in production
 	if !server.DebugMode {

@@ -44,7 +44,7 @@ func ParseIndex(buf []byte) (index search.Index, err error) {
 	fields := bytes.Split(bytes.TrimSpace(buf), sep)
 	n := len(fields)
 	if n < 4 {
-		return index, fmt.Errorf("invalid number of fields in %q", string(buf))
+		return index, fmt.Errorf("invalid number of fields in '%s'", string(buf))
 	}
 
 	// NOTE: filename (first field) may contains ','

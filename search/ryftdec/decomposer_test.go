@@ -31,14 +31,14 @@ func dumpType(q QueryType, opts Options) string {
 		return "    " // general search (es, fhs, feds)
 	case QTYPE_DATE:
 		return "DATE"
-	case QTYPE_REGEX:
-		return "  RE"
 	case QTYPE_TIME:
 		return "TIME"
 	case QTYPE_NUMERIC:
 		return " NUM"
 	case QTYPE_CURRENCY:
 		return "CURR"
+	case QTYPE_REGEX:
+		return "  RE"
 	case QTYPE_AND:
 		return " AND"
 	case QTYPE_OR:
