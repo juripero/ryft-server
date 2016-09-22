@@ -532,7 +532,9 @@ func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id i
 	}
 
 	// ensure delimiter is the same each time
-	fmt.Printf("delimiter check (old:#%x, new:#%x)\n", data_delim.String, *pdelim)
+	if pdelim != nil {
+		fmt.Printf("delimiter check (old:#%x, new:#%x)\n", data_delim.String, pdelim)
+	}
 	if data_delim.Valid && pdelim != nil && data_delim.String != *pdelim {
 		return 0, "", 0, "", fmt.Errorf("delimiter cannot be changed (old:#%x, new:#%x)", data_delim.String, *pdelim)
 	}
