@@ -519,7 +519,6 @@ The list of supported query parameters for the POST standalone files are the fol
 | `file`    | string  | [The filename to upload](#post-files-file-parameter). |
 | `offset`  | integer | [The optional position of uploaded chunk](#post-files-offset-parameter). |
 | `length`  | integer | [The optional length of uploaded chunk](#post-files-length-parameter). |
-| `force`   | boolean | [The optional flag to force file override](#post-files-force-parameter). |
 | `local`   | boolean | [The optional local/cluster flag](#search-local-parameter). (NOT IMPLEMENTED YET) |
 
 The list of supported query parameters for the POST files to catalog:
@@ -614,12 +613,6 @@ Or just split file and upload it in chunks.
 This optional parameters is used to specify uploading data length in bytes.
 This parameter can help ryft server to avoid extra data copy. So if it's
 possible this parameter should be provided.
-
-
-### POST files `force` parameter
-
-Ryft server prevents file overriding. If file with that name is already exists
-it fails by default. However if `force=true` is provided then file will be rewritten.
 
 
 ### POST files

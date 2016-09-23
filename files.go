@@ -39,8 +39,6 @@ type NewFilesParams struct {
 	File      string `form:"file" json:"file"`           // filename to save
 	Offset    int64  `form:"offset" json:"offset"`       // offset inside file, used to rewrite
 	Length    int64  `form:"length" json:"length"`       // data length
-	Force     bool   `form:"force" json:"force"`         // force to rewrite file flag
-	// TODO: catalog options
 }
 
 // GET /files method
@@ -357,8 +355,9 @@ func createFile(mountPoint string, params NewFilesParams, content io.Reader) (st
 	flags := os.O_WRONLY | os.O_CREATE
 
 	// if offset provided - file probably already exists
+	// if no offset provided - file must not exist
 	// if force flag is provided - we can override file
-	if params.Offset < 0 && !params.Force {
+	if params.Offset < 0 /*&& !params.Force*/ {
 		flags |= os.O_EXCL
 	}
 
