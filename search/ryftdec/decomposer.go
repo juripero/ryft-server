@@ -39,7 +39,7 @@ import (
 
 var (
 	delimiters     = []string{" AND ", " OR "}
-	markers        = []string{" DATE(", " TIME(", " NUMBER(", " FHS(", " FEDS(", " CURRENCY(", "REGEX("}
+	markers        = []string{" DATE(", " TIME(", " NUMBER(", " FHS(", " FEDS(", " CURRENCY(", "REGEX(", "IPV4(", "IPV6("}
 	maxDepth   int = 1
 )
 
@@ -102,20 +102,20 @@ func formatQuery(query string) string {
 // Parse expression and build query tree
 func parse(currentNode *Node, query string, opts Options) {
 	if !validateQuery(query) {
-		panic(fmt.Errorf("Invalid query: %q", query))
+		panic(fmt.Errorf("Invalid query: '%s'", query))
 	}
 
 	tokens := tokenize(query)
 
 	if !validateTokens(tokens) {
-		panic(fmt.Errorf("Invalid query: %q (bad tokens)", query))
+		panic(fmt.Errorf("Invalid query: '%s' (bad tokens)", query))
 	}
 
 	tokens = translateToPrefixNotation(tokens)
 	currentNode = addToTree(currentNode, tokens, opts)
 
 	if !validateTree(currentNode) {
-		panic(fmt.Errorf("Invalid query: %q (bad tree)", query))
+		panic(fmt.Errorf("Invalid query: '%s' (bad tree)", query))
 	}
 }
 

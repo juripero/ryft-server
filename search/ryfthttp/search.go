@@ -41,7 +41,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// Search starts asynchronous "/search" with RyftPrim engine.
+// Search starts asynchronous "/search" with RyftHttp engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	task := NewTask()
 	task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
@@ -116,7 +116,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			}
 		}()
 
-		for atomic.LoadInt32(&cancelled) != 0 {
+		for atomic.LoadInt32(&cancelled) == 0 {
 			tag, _ := dec.NextTag()
 			switch tag {
 			case codec.TAG_EOF:

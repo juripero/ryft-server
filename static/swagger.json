@@ -40,8 +40,8 @@
             "type": "string",
             "name": "mode",
             "x-go-name": "Mode",
-            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs)",
-            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs"]
+            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6)",
+            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6"]
           },
           {
             "in": "query",
@@ -68,7 +68,7 @@
             "type": "string",
             "name": "format",
             "x-go-name": "Format",
-            "description": "Input data format. Parameter is used with structured search.",
+            "description": "Input data format. Parameter is used with structured or RAW text search.",
             "enum": ["raw", "xml", "json", "utf8"]
           },
           {
@@ -183,8 +183,8 @@
             "type": "string",
             "name": "mode",
             "x-go-name": "Mode",
-            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts) or numeric search (ns)",
-            "enum": ["es", "fhs", "feds", "ds", "ts", "ns"]
+            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6)",
+            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6"]
           },
           {
             "in": "query",
@@ -268,7 +268,7 @@
           "files"
         ],
         "summary": "List a directory content",
-        "description": "Endpoint to query mode/cluster file system structure",
+        "description": "Endpoint to query node/cluster file system structure",
         "operationId": "files",
         "parameters": [
           {

@@ -47,6 +47,9 @@ Note, `make debian` should be run in the project's root directory. In this case 
 and corresponding deb package is created. If you run `make` from `debian/` subdirectory then only
 deb package is created - `ryft-server` is not rebuilt, just used from your `$GOPATH/bin`.
 
+It's recommended to run `make update` periodically to update all 3rd-party
+dependencies.
+
 
 ## Version
 
@@ -213,16 +216,16 @@ that also can be customized. Note these options may be overriden by command line
 For example if your configuration file contains:
 
 ```{.yaml}
-address: 0.0.0.0:8000
+address: :8000
 ```
 
 but the server starts as:
 
 ```{.sh}
-ryft-server --config=/etc/ryft-server.conf --address=0.0.0.0:9000
+ryft-server --config=/etc/ryft-server.conf --address=:9000
 ```
 
-the actual option for the address will be `0.0.0.0:9000` since it goes last.
+the actual option for the address will be `:9000` since it goes last.
 
 Using `address` option its possible to customize server's listen address.
 It's equivalent to the `--address` command line option.

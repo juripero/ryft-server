@@ -120,6 +120,8 @@ Multiple files can be provided as:
 - `ts` for time search
 - `ns` for numeric or currency search
 - `rs` for regex search
+- `ipv4` for IPv4 search
+- `ipv6` for IPv6 search
 
 If no search mode is specified, fuzzy hamming search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
@@ -163,10 +165,11 @@ That means that found data are reported as base-64 encoded raw bytes.
 
 There are two other options: `format=xml` and `format=json`.
 
-If input file set contains XML data, the found records could be decoded. Just pass `format=xml` query parameter
-and records will be translated from XML to JSON.
+If input file set contains XML data, the found records could be decoded.
+Just pass `format=xml` query parameter and records will be translated
+from XML to JSON.
 
-The same is true for JSON data. 
+The same is true for JSON data.
 
 See also [fields parameter](#search-fields-parameter).
 
@@ -503,7 +506,7 @@ The `dir=/test` request will report content of `/ryftone/test` directory on the 
 The following request:
 
 ```
-/files?dir=/&local=true
+GET /files?dir=/&local=true
 ```
 
 will print the root `/ryftone` content:

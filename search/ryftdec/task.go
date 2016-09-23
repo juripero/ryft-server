@@ -80,6 +80,10 @@ func getSearchMode(query QueryType, opts Options) string {
 		return "ns" // numeric_search
 	case QTYPE_REGEX:
 		return "rs" // regex_search
+	case QTYPE_IPV4:
+		return "ipv4" // IPv4 search
+	case QTYPE_IPV6:
+		return "ipv6" // IPv6 search
 	}
 
 	return opts.Mode
@@ -87,18 +91,20 @@ func getSearchMode(query QueryType, opts Options) string {
 
 // Drain all records/errors from 'res' to 'mux'
 func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecords bool) {
+	defer task.log().WithField("result", mux).Debugf("[%s]: got combined result", TAG)
+
 	for {
 		select {
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
 				// TODO: mark error with subtask's tag?
-				task.log().WithError(err).Debugf("[%s]/%d: new error received", TAG, task.subtaskId)
+				// task.log().WithError(err).Debugf("[%s]/%d: new error received", TAG, task.subtaskId) // DEBUG
 				mux.ReportError(err)
 			}
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId)
+				// task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId) // DEBUG
 				if saveRecords {
 					mux.ReportRecord(rec)
 				}
@@ -107,13 +113,13 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 		case <-res.DoneChan:
 			// drain the error channel
 			for err := range res.ErrorChan {
-				task.log().WithError(err).Debugf("[%s]/%d: *** new error received", TAG, task.subtaskId)
+				// task.log().WithError(err).Debugf("[%s]/%d: *** new error received", TAG, task.subtaskId) // DEBUG
 				mux.ReportError(err)
 			}
 
 			// drain the record channel
 			for rec := range res.RecordChan {
-				task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId)
+				// task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId) // DEBUG
 				if saveRecords {
 					mux.ReportRecord(rec)
 				}

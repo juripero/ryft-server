@@ -24,7 +24,7 @@ func TestInvalidQueries(t *testing.T) {
 
 	for _, q := range queries {
 		_, err := Decompose(q, decomposerOptions())
-		assert.Error(t, err, "Invalid query: `%s`", q)
+		assert.Error(t, err, "Invalid query: '%s'", q)
 	}
 }
 
