@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,6 +32,20 @@ type DeleteFilesParams struct {
 	Files    []string `form:"file" json:"file"`
 	Dirs     []string `form:"dir" json:"dir"`
 	Catalogs []string `form:"catalog" json:"catalog"`
+	Local    bool     `form:"local" json:"local"`
+}
+
+// to string
+func (p DeleteFilesParams) String() string {
+	return fmt.Sprintf("{files:%s, dirs:%s, catalogs:%s}",
+		p.Files, p.Dirs, p.Catalogs)
+}
+
+// check is empty
+func (p DeleteFilesParams) isEmpty() bool {
+	return len(p.Files) == 0 &&
+		len(p.Dirs) == 0 &&
+		len(p.Catalogs) == 0
 }
 
 // NewFilesParams query parameters for POST /files
@@ -39,6 +55,7 @@ type NewFilesParams struct {
 	File      string `form:"file" json:"file"`           // filename to save
 	Offset    int64  `form:"offset" json:"offset"`       // offset inside file, used to rewrite
 	Length    int64  `form:"length" json:"length"`       // data length
+	Local     bool   `form:"local" json:"local"`
 }
 
 // GET /files method
@@ -107,7 +124,7 @@ func (s *Server) deleteFiles(ctx *gin.Context) {
 			err.Error(), "failed to parse request parameters"))
 	}
 
-	userName, _, homeDir, _ := s.parseAuthAndHome(ctx)
+	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -121,14 +138,100 @@ func (s *Server) deleteFiles(ctx *gin.Context) {
 		WithField("home", homeDir).
 		Info("deleting...")
 
-	result := map[string]string{}
+	// for each requested file|dir|catalog get list of tags from consul KV/partition.
+	// based of these tags determine the list of nodes having such file|dir|catalog.
+	// for each node (with non empty list) call DELETE /files passing
+	// list of files whose tags are matched.
+
+	result := make(map[string]interface{})
+	if !params.Local {
+		files := params.Dirs[:]
+		files = append(files, params.Files...)
+		files = append(files, params.Catalogs...)
+
+		services, tags, err := s.getConsulInfoForFiles(userTag, files)
+		if err != nil || len(tags) != len(files) {
+			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+				err.Error(), "failed to map files to tags"))
+		}
+
+		type Node struct {
+			IsLocal bool
+			Name    string
+			Address string
+			Params  DeleteFilesParams
+		}
+
+		// build list of nodes to call
+		nodes := make([]Node, len(services))
+		for k, f := range files {
+			for i, service := range services {
+				scheme := "http"
+				if port := service.ServicePort; port == 0 { // TODO: review the URL building!
+					nodes[i].Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+				} else {
+					nodes[i].Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+				}
+				nodes[i].IsLocal = s.isLocalService(service)
+				nodes[i].Name = service.Node
+				nodes[i].Params.Local = true
+
+				// check tags (no tags - all nodes)
+				if len(tags[k]) == 0 || hasSomeTag(service.ServiceTags, tags[k]) {
+					// based on 'k' index detect what the 'f' is: dir, file or catalog
+					if k < len(params.Dirs) {
+						nodes[i].Params.Dirs = append(nodes[i].Params.Dirs, f)
+					} else if k < len(params.Dirs)+len(params.Files) {
+						nodes[i].Params.Files = append(nodes[i].Params.Files, f)
+					} else {
+						nodes[i].Params.Catalogs = append(nodes[i].Params.Catalogs, f)
+					}
+				}
+			}
+		}
+
+		// call each node TODO: do it in goroutine simultaneously
+		for _, node := range nodes {
+			if node.Params.isEmpty() {
+				continue // nothing to do
+			}
+
+			if node.IsLocal {
+				log.WithField("what", node.Params).Debugf("deleting on local node")
+				result[node.Name] = s.deleteLocalFiles(mountPoint, node.Params)
+			} else {
+				log.WithField("what", node.Params).
+					WithField("node", node.Name).
+					WithField("addr", node.Address).
+					Debugf("deleting on remote node")
+				res, err := s.deleteRemoteFiles(node.Address, authToken, node.Params)
+				if err != nil {
+					result[node.Name] = map[string]interface{}{
+						"error": err.Error(),
+					}
+				} else {
+					result[node.Name] = res
+				}
+			}
+		}
+	} else {
+		result = s.deleteLocalFiles(mountPoint, params)
+	}
+
+	ctx.JSON(http.StatusOK, result)
+}
+
+// delete local nodes: files, dirs, catalogs
+func (s *Server) deleteLocalFiles(mountPoint string, params DeleteFilesParams) map[string]interface{} {
+	res := make(map[string]interface{})
+
 	updateResult := func(name string, err error) {
 		// in case of duplicate input
 		// last result will be reported
 		if err != nil {
-			result[name] = err.Error()
+			res[name] = err.Error()
 		} else {
-			result[name] = "OK" // "DELETED"
+			res[name] = "OK" // "DELETED"
 		}
 	}
 
@@ -147,7 +250,61 @@ func (s *Server) deleteFiles(ctx *gin.Context) {
 		updateResult(cat, err)
 	}
 
-	ctx.JSON(http.StatusOK, result)
+	return res
+}
+
+// delete remote nodes: files, dirs, catalogs
+func (s *Server) deleteRemoteFiles(address string, authToken string, params DeleteFilesParams) (map[string]interface{}, error) {
+	// prepare query
+	u, err := url.Parse(address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL: %s", err)
+	}
+	q := url.Values{}
+	q.Set("local", fmt.Sprintf("%t", params.Local))
+	for _, file := range params.Files {
+		q.Add("file", file)
+	}
+	for _, dir := range params.Dirs {
+		q.Add("dir", dir)
+	}
+	for _, catalog := range params.Catalogs {
+		q.Add("catalog", catalog)
+	}
+	u.RawQuery = q.Encode()
+	u.Path += "/files"
+
+	// prepare request
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %s", err)
+	}
+
+	// authorization
+	if len(authToken) != 0 {
+		req.Header.Set("Authorization", authToken)
+	}
+
+	// do HTTP request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send HTTP request: %s", err)
+	}
+
+	defer resp.Body.Close() // close it later
+
+	// check status code
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
+	}
+
+	res := make(map[string]interface{})
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %s", err)
+	}
+
+	return res, nil // OK
 }
 
 // POST /files method
@@ -226,8 +383,9 @@ func (s *Server) postFiles(ctx *gin.Context) {
 		catalog, length, err := updateCatalog(mountPoint, params, delim, file)
 
 		if err != nil {
-			response["error"] = err.Error()
 			status = http.StatusBadRequest // TODO: appropriate status code?
+			response["error"] = err.Error()
+			response["length"] = length
 		} else {
 			response["catalog"] = catalog
 			response["length"] = length // not total, just this part
@@ -236,8 +394,9 @@ func (s *Server) postFiles(ctx *gin.Context) {
 		path, length, err := createFile(mountPoint, params, file)
 
 		if err != nil {
-			response["error"] = err.Error()
 			status = http.StatusBadRequest // TODO: appropriate status code?
+			response["error"] = err.Error()
+			response["length"] = length
 		} else {
 			response["path"] = path
 			response["length"] = length
@@ -505,4 +664,17 @@ func randomizePath(path string) string {
 
 	re := regexp.MustCompile(`{{random}}`)
 	return re.ReplaceAllStringFunc(path, token)
+}
+
+// check intersection is non empty
+func hasSomeTag(tags []string, what []string) bool {
+	for _, t := range tags {
+		for _, x := range what {
+			if x == t {
+				return true
+			}
+		}
+	}
+
+	return false
 }

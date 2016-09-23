@@ -80,6 +80,27 @@ func (s *Server) getConsulClient() (*consul.Client, error) {
 	return client, nil      // OK
 }
 
+// GetConsulInfo gets the list of ryft services
+func (s *Server) getConsulInfoForFiles(userTag string, files []string) (services []*consul.CatalogService, tags [][]string, err error) {
+	client, err := s.getConsulClient()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get consul client: %s", err)
+	}
+
+	catalog := client.Catalog()
+	services, _, err = catalog.Service("ryft-rest-api", "", nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get consul services: %s", err)
+	}
+
+	tags, err = findAllMatches(client, userTag, files)
+	if err != nil {
+		return services, nil, fmt.Errorf("failed to get match tags: %s", err)
+	}
+
+	return services, tags, err
+}
+
 // GetConsulInfo gets the list of ryft services and
 // the service tags related to requested set of files.
 // the services are arranged based on "busyness" metric!
@@ -225,6 +246,39 @@ func (s *Server) isLocalService(service *consul.CatalogService) bool {
 	return false
 }
 
+// get partition info from the KV storage
+// return map: mask -> list of tags
+func getPartitionInfo(client *consul.Client, userTag string) (map[string][]string, error) {
+	// get all wildcards (keys) and tags
+	prefix := filepath.Join(userTag, "partitions") + "/"
+	pairs, _, err := client.KV().List(prefix, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags from KV: %s", err)
+	}
+
+	tags := make(map[string][]string)
+	for _, kvp := range pairs {
+		mask, _ := url.QueryUnescape(kvp.Key)
+		k := strings.TrimPrefix(mask, prefix)
+		v := strings.Split(string(kvp.Value), ",")
+		list := []string{}
+
+		// trim spaces from tags, remove empty
+		for _, t := range v {
+			if tt := strings.TrimSpace(t); len(tt) > 0 {
+				list = append(list, tt)
+			}
+		}
+
+		if len(list) > 0 {
+			tags[k] = list
+		}
+	}
+
+	log.WithField("tags", tags).Debugf("partition info")
+	return tags, nil // OK
+}
+
 // find best matched service tags for the file list
 // userTag is used for multitenancy support
 // no tags means "use all nodes"
@@ -233,32 +287,23 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 		return nil, nil // no files - no tags
 	}
 
-	// get all wildcards (keys) and tags
-	prefix := filepath.Join(userTag, "partitions") + "/"
-	pairs, _, err := client.KV().List(prefix, nil)
+	// get partition info from consul KV
+	tags, err := getPartitionInfo(client, userTag)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get tags from KV: %s", err)
+		return nil, err
 	}
 
-	keys := make([]string, len(pairs))
-	tags := make([][]string, len(pairs))
-	for i, kvp := range pairs {
-		mask, _ := url.QueryUnescape(kvp.Key)
-		keys[i] = strings.TrimPrefix(mask, prefix)
-		tags[i] = strings.Split(string(kvp.Value), ",")
-
-		// trim spaces from tags
-		for k := range tags[i] {
-			tags[i][k] = strings.TrimSpace(tags[i][k])
-		}
-		// log.WithField("key", keys[i]).WithField("tags", tags[i]).Debugf("partition info")
+	// extract keys
+	keys := make([]string, 0, len(tags))
+	for k, _ := range tags {
+		keys = append(keys, k)
 	}
 
 	// match files and wildcards
 	tags_map := make(map[string]int)
 	for _, f := range files {
 		if found := wildmatch.IsSubsetOfAny(f, keys...); found >= 0 {
-			for _, tag := range tags[found] {
+			for _, tag := range tags[keys[found]] {
 				tags_map[tag] += 1
 			}
 		} else {
@@ -276,4 +321,47 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 	}
 
 	return res, nil
+}
+
+// find all matched service tags for the file list
+// userTag is used for multitenancy support
+// no tags means "use all nodes"
+func findAllMatches(client *consul.Client, userTag string, files []string) ([][]string, error) {
+	if len(files) == 0 {
+		return nil, nil // no files - no tags
+	}
+
+	// get partition info from consul KV
+	tags, err := getPartitionInfo(client, userTag)
+	if err != nil {
+		return nil, err
+	}
+
+	// extract keys
+	keys := make([]string, 0, len(tags))
+	for k, _ := range tags {
+		keys = append(keys, k)
+	}
+
+	// match files and wildcards
+	res := make([][]string, len(files))
+	for i, f := range files {
+		tags_map := make(map[string]int)
+		if found := wildmatch.IsSubsetOfAny(f, keys...); found >= 0 {
+			for _, tag := range tags[keys[found]] {
+				tags_map[tag] += 1
+			}
+		} else {
+			// if no any tag found we have to search all nodes.
+			res[i] = nil // search all nodes!
+			continue
+		}
+
+		// map keys -> slice
+		for k := range tags_map {
+			res[i] = append(res[i], k)
+		}
+	}
+
+	return res, nil // OK
 }
