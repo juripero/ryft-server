@@ -535,10 +535,9 @@ func createFile(mountPoint string, params NewFilesParams, content io.Reader) (st
 	flags := os.O_WRONLY | os.O_CREATE
 
 	// if offset provided - file probably already exists
-	// if no offset provided - file must not exist
-	// if force flag is provided - we can override file
-	if params.Offset < 0 /*&& !params.Force*/ {
-		flags |= os.O_EXCL
+	// if no offset provided - data will append!
+	if params.Offset < 0 {
+		flags |= os.O_APPEND
 	}
 
 	// try to create file, if file already exists try with updated name
@@ -561,7 +560,7 @@ func createFile(mountPoint string, params NewFilesParams, content io.Reader) (st
 	}
 
 	defer out.Close()
-	if 0 < params.Offset {
+	if 0 <= params.Offset {
 		_, err = out.Seek(params.Offset, 0)
 		if err != nil {
 			return rpath, 0, err
