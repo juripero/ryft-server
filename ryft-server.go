@@ -45,7 +45,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
-	"github.com/thoas/stats"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -76,8 +75,6 @@ func (f *serverConfigValue) Set(s string) error {
 func (f *serverConfigValue) String() string {
 	return f.v
 }
-
-var serverStats = stats.New()
 
 // RyftAPI include search, index, count
 func main() {
@@ -167,23 +164,10 @@ func main() {
 	// Create a rounter with default middleware: logger, recover
 	router := gin.Default()
 
-	// Logging & error recovery
-	//	router.Use(gin.Logger())
-	//	router.Use(srverr.Recovery())
-
-	// Setting up Stats measurement middleware
-	router.Use(func() gin.HandlerFunc {
-		return func(c *gin.Context) {
-			beginning := time.Now()
-			c.Next()
-			serverStats.End(beginning, stats.NewRecorderResponseWriter(c.Writer, http.StatusOK))
-		}
-	}())
-
 	// Allow CORS requests for * (all domains)
 	router.Use(cors.Cors("*"))
 
-	// Enable GZip compression support
+	// Enable GZip compression
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	// private endpoints
@@ -233,11 +217,6 @@ func main() {
 			"git-hash": GitHash,
 		}
 		ctx.JSON(http.StatusOK, info)
-	})
-
-	// stats page
-	router.GET("/about", func(c *gin.Context) {
-		c.JSON(http.StatusOK, serverStats.Data())
 	})
 
 	private.GET("/search", server.DoSearch)
