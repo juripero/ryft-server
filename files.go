@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/codec"
@@ -517,6 +518,86 @@ func deleteAllCatalogs(mountPoint string, items []string) map[string]error {
 	return res
 }
 
+// file lock system
+type FileWriter struct {
+	path   string
+	refs   int32
+	length int64
+	lock   sync.Mutex
+}
+
+var (
+	fileWriters     = make(map[string]*FileWriter)
+	fileWritersLock sync.Mutex
+)
+
+// get file writer
+func getFileWriter(path string) *FileWriter {
+	fileWritersLock.Lock()
+	defer fileWritersLock.Unlock()
+
+	// find existing
+	if fw, ok := fileWriters[path]; ok && fw != nil {
+		fw.Acquire()
+		return fw
+	}
+
+	// create new one
+	fw := new(FileWriter)
+	fw.path = path
+	fw.length = -1 // unknown
+	fileWriters[path] = fw
+	fw.Acquire()
+	return fw
+}
+
+// acquire reference
+func (fw *FileWriter) Acquire() {
+	atomic.AddInt32(&fw.refs, +1)
+}
+
+// release reference
+func (fw *FileWriter) Release() {
+	if atomic.AddInt32(&fw.refs, -1) == 0 {
+		fileWritersLock.Lock()
+		defer fileWritersLock.Unlock()
+
+		// if no more references just delete
+		delete(fileWriters, fw.path)
+	}
+}
+
+// append a part, return offset
+func (fw *FileWriter) Append(length int64) (int64, error) {
+	if length < 0 {
+		// TODO: lock the whole file until write is finished
+		return 0, fmt.Errorf("unknown length")
+	}
+
+	fw.lock.Lock()
+	defer fw.lock.Unlock()
+
+	if fw.length < 0 {
+		// length is unknown, update the length
+		info, err := os.Stat(fw.path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				fw.length = 0
+			} else {
+				return 0, err
+			}
+		} else {
+			fw.length = info.Size()
+		}
+	}
+
+	// length is known
+	offset := fw.length
+	fw.length += length
+
+	return offset, nil // OK
+}
+
 // createFile creates new file.
 // Unique file name could be generated if path contains special keywords.
 // Returns generated path (relative), length and error if any.
@@ -533,12 +614,6 @@ func createFile(mountPoint string, params NewFilesParams, content io.Reader) (st
 
 	var out *os.File
 	flags := os.O_WRONLY | os.O_CREATE
-
-	// if offset provided - file probably already exists
-	// if no offset provided - data will append!
-	if params.Offset < 0 {
-		flags |= os.O_APPEND
-	}
 
 	// try to create file, if file already exists try with updated name
 	for k := 0; ; k++ {
@@ -557,6 +632,21 @@ func createFile(mountPoint string, params NewFilesParams, content io.Reader) (st
 		}
 
 		break
+	}
+
+	fw := getFileWriter(out.Name())
+	defer fw.Release()
+
+	// if offset provided - file probably already exists
+	// if no offset provided - data will append!
+	if params.Offset < 0 {
+		if params.Length < 0 {
+			return rpath, 0, fmt.Errorf("no valid length provided")
+		}
+		params.Offset, err = fw.Append(params.Length)
+		if err != nil {
+			return rpath, 0, err
+		}
 	}
 
 	defer out.Close()
