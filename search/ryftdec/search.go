@@ -182,7 +182,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 				return 0, nil, err2
 			}
 
-			if !isLast && n2 > 0 {
+			if !isLast && n2 > 0 && len(cfg.KeepIndexAs) > 0 && tempCfg.SaveUpdatedIndexesTo != nil {
 				err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
 					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo)
 				if err != nil {
@@ -190,7 +190,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 				}
 			}
 
-			if len(cfg.KeepIndexAs) > 0 {
+			if isLast && len(cfg.KeepIndexAs) > 0 {
 				// TODO: save updated indexes back to text file!
 			}
 		}
@@ -343,7 +343,7 @@ func (task *Task) parseAndUnwindIndexes(indexPath string, basedOn map[string]*se
 		// read line by line
 		line, err := r.ReadBytes('\n')
 		if len(line) > 0 {
-			index, err := ryftone.ParseIndex(line)
+			index, err := search.ParseIndex(line)
 			if err != nil {
 				return fmt.Errorf("failed to parse index: %s", err)
 			}

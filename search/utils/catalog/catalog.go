@@ -65,6 +65,8 @@ type Catalog struct {
 	DataSizeLimit    uint64 // data file size limit, bytes. 0 to disable limit
 	CacheDropTimeout time.Duration
 
+	UseAbsoluteDataPath bool
+
 	db    *sql.DB    // database connection
 	path  string     // absolute path to db file
 	mutex sync.Mutex // to synchronize access to catalog
@@ -117,6 +119,11 @@ func (cat *Catalog) DropFromCache() error {
 	}
 
 	return nil // already closed
+}
+
+// Get catalog's path
+func (cat *Catalog) GetPath() string {
+	return cat.path
 }
 
 // cache: add reference

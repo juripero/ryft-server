@@ -28,18 +28,16 @@
  * ============
  */
 
-package ryftone
+package search
 
 import (
 	"bytes"
 	"fmt"
 	"strconv"
-
-	"github.com/getryft/ryft-server/search"
 )
 
 // ParseIndex parses Index record from custom line.
-func ParseIndex(buf []byte) (index search.Index, err error) {
+func ParseIndex(buf []byte) (index Index, err error) {
 	sep := []byte(",")
 	fields := bytes.Split(bytes.TrimSpace(buf), sep)
 	n := len(fields)

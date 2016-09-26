@@ -472,7 +472,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 			// task.log().WithField("line", string(bytes.TrimSpace(line))).
 			// 	Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
 
-			index, err := parseIndex(line)
+			index, err := search.ParseIndex(line)
 			if err != nil {
 				task.log().WithError(err).Warnf("failed to parse index from %q", bytes.TrimSpace(line))
 				res.ReportError(fmt.Errorf("failed to parse index: %s", err))

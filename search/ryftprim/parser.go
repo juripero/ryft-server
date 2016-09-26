@@ -36,14 +36,8 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/utils"
 )
-
-// parseIndex parses Index record from custom line.
-func parseIndex(buf []byte) (index search.Index, err error) {
-	return ryftone.ParseIndex(buf)
-}
 
 // ParseStat parses statistics from ryftprim output.
 func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
