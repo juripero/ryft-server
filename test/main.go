@@ -29,7 +29,7 @@ type Logger func(format string, args ...interface{})
 func main() {
 	defer func() {
 		if e := recover(); e != nil {
-			stdlog.Fatalf("FAILED")
+			stdlog.Fatalf("FAILED: %s", e)
 		}
 	}()
 

@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/getryft/ryft-server/codec"
@@ -160,60 +161,81 @@ func (s *Server) deleteFiles(ctx *gin.Context) {
 			Name    string
 			Address string
 			Params  DeleteFilesParams
+
+			Result interface{}
+			Error  error
 		}
 
 		// build list of nodes to call
-		nodes := make([]Node, len(services))
+		nodes := make([]*Node, len(services))
 		for k, f := range files {
 			for i, service := range services {
+				node := new(Node)
 				scheme := "http"
 				if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-					nodes[i].Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+					node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
 				} else {
-					nodes[i].Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+					node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
 				}
-				nodes[i].IsLocal = s.isLocalService(service)
-				nodes[i].Name = service.Node
-				nodes[i].Params.Local = true
+				node.IsLocal = s.isLocalService(service)
+				node.Name = service.Node
+				node.Params.Local = true
 
 				// check tags (no tags - all nodes)
 				if len(tags[k]) == 0 || hasSomeTag(service.ServiceTags, tags[k]) {
 					// based on 'k' index detect what the 'f' is: dir, file or catalog
 					if k < len(params.Dirs) {
-						nodes[i].Params.Dirs = append(nodes[i].Params.Dirs, f)
+						node.Params.Dirs = append(node.Params.Dirs, f)
 					} else if k < len(params.Dirs)+len(params.Files) {
-						nodes[i].Params.Files = append(nodes[i].Params.Files, f)
+						node.Params.Files = append(node.Params.Files, f)
 					} else {
-						nodes[i].Params.Catalogs = append(nodes[i].Params.Catalogs, f)
+						node.Params.Catalogs = append(node.Params.Catalogs, f)
 					}
 				}
+
+				nodes[i] = node
 			}
 		}
 
-		// call each node TODO: do it in goroutine simultaneously
+		// call each node in dedicated goroutine
+		var wg sync.WaitGroup
 		for _, node := range nodes {
 			if node.Params.isEmpty() {
 				continue // nothing to do
 			}
 
-			if node.IsLocal {
-				log.WithField("what", node.Params).Debugf("deleting on local node")
-				result[node.Name] = s.deleteLocalFiles(mountPoint, node.Params)
-			} else {
-				log.WithField("what", node.Params).
-					WithField("node", node.Name).
-					WithField("addr", node.Address).
-					Debugf("deleting on remote node")
-				res, err := s.deleteRemoteFiles(node.Address, authToken, node.Params)
-				if err != nil {
-					result[node.Name] = map[string]interface{}{
-						"error": err.Error(),
-					}
+			wg.Add(1)
+			go func(node *Node) {
+				defer wg.Done()
+				if node.IsLocal {
+					log.WithField("what", node.Params).Debugf("deleting on local node")
+					node.Result, node.Error = s.deleteLocalFiles(mountPoint, node.Params), nil
 				} else {
-					result[node.Name] = res
+					log.WithField("what", node.Params).
+						WithField("node", node.Name).
+						WithField("addr", node.Address).
+						Debugf("deleting on remote node")
+					node.Result, node.Error = s.deleteRemoteFiles(node.Address, authToken, node.Params)
 				}
+			}(node)
+		}
+
+		// wait and report all results
+		wg.Wait()
+		for _, node := range nodes {
+			if node.Params.isEmpty() {
+				continue // nothing to do
+			}
+
+			if node.Error != nil {
+				result[node.Name] = map[string]interface{}{
+					"error": err.Error(),
+				}
+			} else {
+				result[node.Name] = node.Result
 			}
 		}
+
 	} else {
 		result = s.deleteLocalFiles(mountPoint, params)
 	}
@@ -468,7 +490,6 @@ func deleteAllCatalogs(mountPoint string, items []string) map[string]error {
 			defer func() {
 				cat.DropFromCache()
 				cat.Close() // it's ok to close later at function exit
-				// TODO: force to remove from cache
 				res[rel] = os.RemoveAll(catalogPath)
 			}()
 
