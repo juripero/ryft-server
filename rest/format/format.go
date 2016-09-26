@@ -28,28 +28,60 @@
  * ============
  */
 
-package null
+package format
 
 import (
-	"github.com/getryft/ryft-server/format/raw"
+	"fmt"
+	"strings"
+
+	"github.com/getryft/ryft-server/rest/format/json"
+	"github.com/getryft/ryft-server/rest/format/null"
+	"github.com/getryft/ryft-server/rest/format/raw"
+	"github.com/getryft/ryft-server/rest/format/utf8"
+	"github.com/getryft/ryft-server/rest/format/xml"
 	"github.com/getryft/ryft-server/search"
 )
 
-// INDEX format specific data.
-// Is the same as RAW format index!
-type Index raw.Index
+const (
+	JSON = "json"
+	UTF8 = "utf8"
+	NULL = "null"
+	RAW  = "raw"
+	XML  = "xml"
+)
 
-// NewIndex creates new format specific data.
-func NewIndex() interface{} {
-	return Index{}
+// Abstract Format interface.
+// Support conversion from/to basic search data types.
+// NewXXX() methods are used to decode data from stream.
+type Format interface {
+	NewIndex() interface{}
+	FromIndex(search.Index) interface{}
+	ToIndex(interface{}) search.Index
+
+	NewRecord() interface{}
+	FromRecord(*search.Record) interface{}
+	ToRecord(interface{}) *search.Record
+
+	NewStat() interface{}
+	FromStat(*search.Statistics) interface{}
+	ToStat(interface{}) *search.Statistics
 }
 
-// FromIndex converts INDEX to format specific data.
-func FromIndex(idx search.Index) Index {
-	return Index(raw.FromIndex(idx))
-}
+// New creates new formatter instance.
+// XML format supports some options.
+func New(format string, opts map[string]interface{}) (Format, error) {
+	switch strings.ToLower(format) {
+	case JSON:
+		return json.New(opts)
+	case UTF8, "utf-8":
+		return utf8.New(opts)
+	case NULL, "none":
+		return null.New()
+	case RAW:
+		return raw.New()
+	case XML:
+		return xml.New(opts)
+	}
 
-// ToIndex converts format specific data to INDEX.
-func ToIndex(idx Index) search.Index {
-	return raw.ToIndex(raw.Index(idx))
+	return nil, fmt.Errorf("%q is unsupported format", format)
 }

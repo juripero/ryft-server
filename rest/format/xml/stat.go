@@ -28,10 +28,10 @@
  * ============
  */
 
-package json
+package xml
 
 import (
-	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
 

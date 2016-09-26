@@ -28,7 +28,7 @@
  * ============
  */
 
-package main
+package rest
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/getryft/ryft-server/codec"
+	"github.com/getryft/ryft-server/rest/codec"
 )
 
 type ServerError struct {

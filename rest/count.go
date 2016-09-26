@@ -1,11 +1,11 @@
-package main
+package rest
 
 import (
 	"net/http"
 	"net/url"
 
-	"github.com/getryft/ryft-server/codec"
-	format "github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/rest/codec"
+	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
 )
@@ -34,7 +34,7 @@ type CountResponse struct {
 }
 
 // Handle /count endpoint.
-func (s *Server) count(ctx *gin.Context) {
+func (s *Server) DoCount(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 

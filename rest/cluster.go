@@ -28,7 +28,7 @@
  * ============
  */
 
-package main
+package rest
 
 import (
 	"fmt"
@@ -47,7 +47,7 @@ import (
 )
 
 // handle /cluster/members endpoint: information about cluster's nodes
-func (s *Server) members(c *gin.Context) {
+func (s *Server) DoClusterMembers(c *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(c)
 
@@ -239,7 +239,7 @@ func (s *Server) splitToLocalAndRemote(services []*consul.CatalogService) (local
 
 // check if service is local
 func (s *Server) isLocalService(service *consul.CatalogService) bool {
-	if compareIP(service.Address) && service.ServicePort == s.listenAddress.Port {
+	if compareIP(service.Address) && service.ServicePort == s.ListenAddressParsed.Port {
 		return true
 	}
 

@@ -28,28 +28,75 @@
  * ============
  */
 
-package utf8
+package codec
 
 import (
-	"github.com/getryft/ryft-server/format/raw"
-	"github.com/getryft/ryft-server/search"
+	"fmt"
+	"io"
+
+	"github.com/getryft/ryft-server/rest/codec/json"
+	"github.com/getryft/ryft-server/rest/codec/msgpack.v2"
 )
 
-// STATISTICS format specific data.
-// Is the same as RAW format statistics!
-type Statistics raw.Statistics
+const (
+	MIME_JSON     = json.MIME
+	MIME_XMSGPACK = msgpack.X_MIME
+	MIME_MSGPACK  = msgpack.MIME
+)
 
-// NewStat creates new format specific data.
-func NewStat() interface{} {
-	return new(Statistics)
+// Abstract Encoder interface.
+type Encoder interface {
+	EncodeRecord(rec interface{}) error
+	EncodeStat(stat interface{}) error
+	EncodeError(err error) error
+
+	io.Closer
 }
 
-// FromStat converts STATISTICS to format specific data.
-func FromStat(stat *search.Statistics) *Statistics {
-	return (*Statistics)(raw.FromStat(stat))
+// Abstract Decoder interface.
+type Decoder interface {
+	io.Closer
 }
 
-// ToStat converts format specific data to STATISTICS.
-func ToStat(stat *Statistics) *search.Statistics {
-	return raw.ToStat((*raw.Statistics)(stat))
+// Get list of supported MIME types.
+func GetSupportedMimeTypes() []string {
+	types := []string{}
+	types = append(types, MIME_JSON)
+	types = append(types, MIME_MSGPACK)
+	types = append(types, MIME_XMSGPACK)
+	return types
+}
+
+// Create new encoder instance by MIME type.
+func NewEncoder(w io.Writer, mime string, stream bool, spark bool) (Encoder, error) {
+	switch mime {
+	case MIME_JSON:
+		if spark {
+			return json.NewSparkEncoder(w)
+		} else if stream {
+			return json.NewStreamEncoder(w)
+		} else {
+			return json.NewSimpleEncoder(w)
+		}
+	case MIME_XMSGPACK, MIME_MSGPACK:
+		if spark {
+			enc, err := msgpack.NewSimpleEncoder(w)
+			if err != nil {
+				return nil, err
+			}
+			enc.RecordsOnly = true // Spark format
+			return enc, err
+		} else if stream {
+			return msgpack.NewStreamEncoder(w)
+		} else {
+			return msgpack.NewSimpleEncoder(w)
+		}
+	default:
+		return nil, fmt.Errorf("%q is unsupported MIME type", mime)
+	}
+}
+
+// Create new decoder instance by MIME type.
+func NewDecoder(r io.Reader, mime string, stream bool) (Decoder, error) {
+	return nil, fmt.Errorf("%q not implemented yet", mime)
 }

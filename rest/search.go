@@ -28,7 +28,7 @@
  * ============
  */
 
-package main
+package rest
 
 import (
 	"fmt"
@@ -36,8 +36,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/getryft/ryft-server/codec"
-	"github.com/getryft/ryft-server/format"
+	"github.com/getryft/ryft-server/rest/codec"
+	"github.com/getryft/ryft-server/rest/format"
 	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
 )
@@ -68,7 +68,7 @@ type SearchParams struct {
 }
 
 // Handle /search endpoint.
-func (s *Server) search(ctx *gin.Context) {
+func (s *Server) DoSearch(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 

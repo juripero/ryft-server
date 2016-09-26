@@ -1,4 +1,4 @@
-package main
+package rest
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/getryft/ryft-server/codec"
+	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
@@ -61,7 +61,7 @@ type NewFilesParams struct {
 }
 
 // GET /files method
-func (s *Server) getFiles(ctx *gin.Context) {
+func (s *Server) DoGetFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 
 	// parse request parameters
@@ -116,7 +116,7 @@ func (s *Server) getFiles(ctx *gin.Context) {
 /* to test method:
 curl -X DELETE -s "http://localhost:8765/files?file=p*.txt" | jq .
 */
-func (s *Server) deleteFiles(ctx *gin.Context) {
+func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 
 	// parse request parameters
@@ -335,7 +335,7 @@ func (s *Server) deleteRemoteFiles(address string, authToken string, params Dele
 curl -X POST -F file=@/path/to/file.txt -s "http://localhost:8765/files?file=/test/file\{\{random\}\}.txt" | jq .
 curl -X POST --data "hello" -H 'Content-Type: application/octet-stream' -s "http://localhost:8765/files?file=/test/file\{\{random\}\}.txt" | jq .
 */
-func (s *Server) postFiles(ctx *gin.Context) {
+func (s *Server) DoPostFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 
 	// parse request parameters
