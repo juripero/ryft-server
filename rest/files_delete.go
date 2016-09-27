@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
+
+	"github.com/getryft/ryft-server/search/utils/catalog"
 
 	"github.com/gin-gonic/gin"
 )
@@ -248,4 +252,82 @@ func (s *Server) deleteRemoteFiles(address string, authToken string, params Dele
 	}
 
 	return res, nil // OK
+}
+
+// remove directories or/and files
+func deleteAll(mountPoint string, items []string) map[string]error {
+	res := map[string]error{}
+	for _, item := range items {
+		path := filepath.Join(mountPoint, item)
+		matches, err := filepath.Glob(path)
+		if err != nil {
+			res[item] = err
+			continue
+		}
+
+		// remove all matches
+		for _, file := range matches {
+			rel, err := filepath.Rel(mountPoint, file)
+			if err != nil {
+				rel = file // ignore error and get absolute path
+			}
+			res[rel] = os.RemoveAll(file)
+		}
+	}
+
+	return res
+}
+
+// remove catalogs
+func deleteAllCatalogs(mountPoint string, items []string) map[string]error {
+	res := map[string]error{}
+	for _, item := range items {
+		path := filepath.Join(mountPoint, item)
+		matches, err := filepath.Glob(path)
+		if err != nil {
+			res[item] = err
+			continue
+		}
+
+		// remove all matches
+		for _, catalogPath := range matches {
+			rel, err := filepath.Rel(mountPoint, catalogPath)
+			if err != nil {
+				rel = catalogPath // ignore error and get absolute path
+			}
+
+			// get catalog
+			cat, err := catalog.OpenCatalog(catalogPath, true)
+			if err != nil {
+				res[rel] = err
+				continue
+			}
+			defer func() {
+				cat.DropFromCache()
+				cat.Close() // it's ok to close later at function exit
+				res[rel] = os.RemoveAll(catalogPath)
+			}()
+
+			// get data files
+			files, err := cat.GetDataFiles()
+			if err != nil {
+				res[rel] = err
+				continue
+			}
+
+			// make relative path
+			for i, f := range files {
+				if rf, err := filepath.Rel(mountPoint, f); err == nil {
+					files[i] = rf
+				}
+			}
+
+			// delete all data files
+			for name, err := range deleteAll(mountPoint, files) {
+				res[name] = err
+			}
+		}
+	}
+
+	return res
 }

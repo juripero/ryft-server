@@ -1,10 +1,13 @@
 package rest
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,19 +16,24 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
 )
 
-// NewFilesParams query parameters for POST /files
-type NewFilesParams struct {
+// PostFilesParams query parameters for POST /files
+type PostFilesParams struct {
 	Catalog   string `form:"catalog" json:"catalog"`     // catalog to save to
 	Delimiter string `form:"delimiter" json:"delimiter"` // data delimiter
 	File      string `form:"file" json:"file"`           // filename to save
 	Offset    int64  `form:"offset" json:"offset"`       // offset inside file, used to rewrite
 	Length    int64  `form:"length" json:"length"`       // data length
 	Local     bool   `form:"local" json:"local"`
+}
+
+// is empty?
+func (p PostFilesParams) isEmpty() bool {
+	return len(p.Catalog) == 0 &&
+		len(p.File) == 0
 }
 
 // POST /files method
@@ -38,7 +46,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 	// parse request parameters
 	noDelim := fmt.Sprintf("no-binding-%x", time.Now().UnixNano()) // use random marker!
-	params := NewFilesParams{}
+	params := PostFilesParams{}
 	params.Delimiter = noDelim
 	params.Offset = -1 // mark as "unspecified"
 	params.Length = -1
@@ -60,7 +68,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			"no valid filename provided"))
 	}
 
-	userName, _, homeDir, _ := s.parseAuthAndHome(ctx)
+	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
@@ -93,11 +101,115 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			contentType, "unexpected content type"))
 	}
 
-	response := map[string]interface{}{}
+	result := map[string]interface{}{}
 	log.WithField("params", params).
 		WithField("user", userName).
 		WithField("home", homeDir).
 		Infof("saving new data...")
+	status := http.StatusOK
+
+	if !params.Local {
+		files := []string{params.Catalog}
+		if len(params.Catalog) == 0 {
+			files[0] = params.File
+		}
+
+		services, tags, err := s.getConsulInfoForFiles(userTag, files)
+		if err != nil || len(tags) != len(files) {
+			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+				err.Error(), "failed to map files to tags"))
+		}
+
+		type Node struct {
+			IsLocal bool
+			Name    string
+			Address string
+
+			Params PostFilesParams
+			buf    *bytes.Buffer
+			data   io.Reader
+
+			Result interface{}
+			Error  error
+		}
+
+		// build list of nodes to call
+		nodes := make([]*Node, len(services))
+		bufs := make([]io.Writer, 0, len(nodes))
+		for i, service := range services {
+			node := new(Node)
+			scheme := "http"
+			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
+				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+			} else {
+				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+			}
+			node.IsLocal = s.isLocalService(service)
+			node.Name = service.Node
+			node.Params.Local = true
+
+			// check tags (no tags - all nodes)
+			if len(tags[0]) == 0 || hasSomeTag(service.ServiceTags, tags[0]) {
+				node.Params = params
+
+				node.buf = new(bytes.Buffer)
+				bufs = append(bufs, node.buf)
+			}
+
+			nodes[i] = node
+		}
+
+		io.Copy(io.MultiWriter(bufs...), file)
+
+		// call each node in dedicated goroutine
+		var wg sync.WaitGroup
+		for _, node := range nodes {
+			if node.Params.isEmpty() {
+				continue // nothing to do
+			}
+
+			wg.Add(1)
+			go func(node *Node) {
+				defer wg.Done()
+				if node.IsLocal {
+					log.WithField("what", node.Params).Debugf("copying on local node")
+					//node.Result, node.Error =
+					s.postLocalFiles(mountPoint, node.Params, delim, node.data)
+				} else {
+					log.WithField("what", node.Params).
+						WithField("node", node.Name).
+						WithField("addr", node.Address).
+						Debugf("copying on remote node")
+					node.Result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, node.data)
+				}
+			}(node)
+		}
+
+		// wait and report all results
+		wg.Wait()
+		for _, node := range nodes {
+			if node.Params.isEmpty() {
+				continue // nothing to do
+			}
+
+			if node.Error != nil {
+				result[node.Name] = map[string]interface{}{
+					"error": err.Error(),
+				}
+			} else {
+				result[node.Name] = node.Result
+			}
+		}
+	} else {
+		status, result = s.postLocalFiles(mountPoint, params, delim, file)
+	}
+
+	ctx.JSON(status, result)
+}
+
+// post local nodes: files, dirs, catalogs
+func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, map[string]interface{}) {
+	res := make(map[string]interface{})
 	status := http.StatusOK
 
 	if len(params.Catalog) != 0 { // append to catalog
@@ -105,115 +217,88 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
-			response["error"] = err.Error()
-			response["length"] = length
+			res["error"] = err.Error()
+			res["length"] = length
 		} else {
-			response["catalog"] = catalog
-			response["length"] = length // not total, just this part
+			res["catalog"] = catalog
+			res["length"] = length // not total, just this part
 		}
 	} else { // standalone file
 		path, length, err := createFile(mountPoint, params, file)
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
-			response["error"] = err.Error()
-			response["length"] = length
+			res["error"] = err.Error()
+			res["length"] = length
 		} else {
-			response["path"] = path
-			response["length"] = length
+			res["path"] = path
+			res["length"] = length
 		}
 	}
 
-	ctx.JSON(status, response)
+	return status, res
 }
 
-// get mount point path from local search engine
-func (s *Server) getMountPoint(homeDir string) (string, error) {
-	engine, err := s.getLocalSearchEngine(homeDir)
+// post remote nodes: files
+func (s *Server) postRemoteFiles(address string, authToken string, params PostFilesParams, delim *string, file io.Reader) (map[string]interface{}, error) {
+	// prepare query
+	u, err := url.Parse(address)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to parse URL: %s", err)
+	}
+	q := url.Values{}
+	q.Set("local", fmt.Sprintf("%t", params.Local))
+	if len(params.Catalog) > 0 {
+		q.Add("catalog", params.Catalog)
+	}
+	if delim != nil {
+		q.Add("delimiter", *delim)
+	}
+	if len(params.File) > 0 {
+		q.Add("file", params.File)
 	}
 
-	opts := engine.Options()
-	return utils.AsString(opts["ryftone-mount"])
-}
+	if 0 <= params.Offset {
+		q.Add("offset", fmt.Sprintf("%d", params.Offset))
+	}
+	if 0 <= params.Length {
+		q.Add("length", fmt.Sprintf("%d", params.Length))
+	}
+	u.RawQuery = q.Encode()
+	u.Path += "/files"
 
-// remove directories or/and files
-func deleteAll(mountPoint string, items []string) map[string]error {
-	res := map[string]error{}
-	for _, item := range items {
-		path := filepath.Join(mountPoint, item)
-		matches, err := filepath.Glob(path)
-		if err != nil {
-			res[item] = err
-			continue
-		}
+	// prepare request
+	req, err := http.NewRequest("POST", u.String(), file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %s", err)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
 
-		// remove all matches
-		for _, file := range matches {
-			rel, err := filepath.Rel(mountPoint, file)
-			if err != nil {
-				rel = file // ignore error and get absolute path
-			}
-			res[rel] = os.RemoveAll(file)
-		}
+	// authorization
+	if len(authToken) != 0 {
+		req.Header.Set("Authorization", authToken)
 	}
 
-	return res
-}
-
-// remove catalogs
-func deleteAllCatalogs(mountPoint string, items []string) map[string]error {
-	res := map[string]error{}
-	for _, item := range items {
-		path := filepath.Join(mountPoint, item)
-		matches, err := filepath.Glob(path)
-		if err != nil {
-			res[item] = err
-			continue
-		}
-
-		// remove all matches
-		for _, catalogPath := range matches {
-			rel, err := filepath.Rel(mountPoint, catalogPath)
-			if err != nil {
-				rel = catalogPath // ignore error and get absolute path
-			}
-
-			// get catalog
-			cat, err := catalog.OpenCatalog(catalogPath, true)
-			if err != nil {
-				res[rel] = err
-				continue
-			}
-			defer func() {
-				cat.DropFromCache()
-				cat.Close() // it's ok to close later at function exit
-				res[rel] = os.RemoveAll(catalogPath)
-			}()
-
-			// get data files
-			files, err := cat.GetDataFiles()
-			if err != nil {
-				res[rel] = err
-				continue
-			}
-
-			// make relative path
-			for i, f := range files {
-				if rf, err := filepath.Rel(mountPoint, f); err == nil {
-					files[i] = rf
-				}
-			}
-
-			// delete all data files
-			for name, err := range deleteAll(mountPoint, files) {
-				res[name] = err
-			}
-		}
+	// do HTTP request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send HTTP request: %s", err)
 	}
 
-	return res
+	defer resp.Body.Close() // close it later
+
+	// check status code
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
+	}
+
+	res := make(map[string]interface{})
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %s", err)
+	}
+
+	return res, nil // OK
 }
 
 // file lock system
@@ -299,7 +384,7 @@ func (fw *FileWriter) Append(length int64) (int64, error) {
 // createFile creates new file.
 // Unique file name could be generated if path contains special keywords.
 // Returns generated path (relative), length and error if any.
-func createFile(mountPoint string, params NewFilesParams, content io.Reader) (string, uint64, error) {
+func createFile(mountPoint string, params PostFilesParams, content io.Reader) (string, uint64, error) {
 	rbase := randomizePath(params.File) // first replace all {{random}} tokens
 	rpath := rbase
 
@@ -376,7 +461,7 @@ func createFile(mountPoint string, params NewFilesParams, content io.Reader) (st
 
 // append file to catalog
 // Returns generated catalog path (relative), length and error if any.
-func updateCatalog(mountPoint string, params NewFilesParams, delim *string, content io.Reader) (string, uint64, error) {
+func updateCatalog(mountPoint string, params PostFilesParams, delim *string, content io.Reader) (string, uint64, error) {
 	catalogPath := randomizePath(params.Catalog)
 	filePath := randomizePath(params.File)
 

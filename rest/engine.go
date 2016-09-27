@@ -39,6 +39,7 @@ import (
 	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 // get search backend with options
@@ -215,4 +216,15 @@ func (s *Server) getBackendOptions() map[string]interface{} {
 		opts[k] = v
 	}
 	return opts
+}
+
+// get mount point path from local search engine
+func (s *Server) getMountPoint(homeDir string) (string, error) {
+	engine, err := s.getLocalSearchEngine(homeDir)
+	if err != nil {
+		return "", err
+	}
+
+	opts := engine.Options()
+	return utils.AsString(opts["ryftone-mount"])
 }
