@@ -33,6 +33,7 @@ package rest
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -239,8 +240,24 @@ func (s *Server) splitToLocalAndRemote(services []*consul.CatalogService) (local
 
 // check if service is local
 func (s *Server) isLocalService(service *consul.CatalogService) bool {
-	if compareIP(service.Address) && service.ServicePort == s.ListenAddressParsed.Port {
-		return true
+	// service port must match
+	if service.ServicePort != s.ListenAddressParsed.Port {
+		return false
+	}
+
+	// get all interfaces
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.WithError(err).Warnf("failed to get interface addresses")
+		return false
+	}
+
+	// check each interface without mask
+	saddr := service.Address + "/"
+	for _, addr := range addrs {
+		if strings.HasPrefix(addr.String(), saddr) {
+			return true
+		}
 	}
 
 	return false
