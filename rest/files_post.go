@@ -74,6 +74,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get mount point"))
 	}
+	mountPoint = filepath.Join(mountPoint, homeDir)
 
 	var file io.Reader
 
@@ -108,7 +109,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		Infof("saving new data...")
 	status := http.StatusOK
 
-	if !params.Local {
+	if !params.Local && !s.LocalOnly {
 		files := []string{params.Catalog}
 		if len(params.Catalog) == 0 {
 			files[0] = params.File

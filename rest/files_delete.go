@@ -56,6 +56,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get mount point"))
 	}
+	mountPoint = filepath.Join(mountPoint, homeDir)
 
 	log.WithField("dirs", params.Dirs).
 		WithField("files", params.Files).
@@ -70,7 +71,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 	// list of files whose tags are matched.
 
 	result := make(map[string]interface{})
-	if !params.Local {
+	if !params.Local && !s.LocalOnly {
 		files := params.Dirs[:]
 		files = append(files, params.Files...)
 		files = append(files, params.Catalogs...)
