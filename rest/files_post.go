@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
 )
@@ -127,16 +127,15 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			Address string
 
 			Params PostFilesParams
-			buf    *bytes.Buffer
 			data   io.Reader
 
-			Result interface{}
+			Result map[string]interface{}
 			Error  error
 		}
 
 		// build list of nodes to call
 		nodes := make([]*Node, len(services))
-		bufs := make([]io.Writer, 0, len(nodes))
+		Ncopies := 0
 		for i, service := range services {
 			node := new(Node)
 			scheme := "http"
@@ -144,72 +143,173 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
 			} else {
 				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+				// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
 			}
 			node.IsLocal = s.isLocalService(service)
 			node.Name = service.Node
-			node.Params.Local = true
 
 			// check tags (no tags - all nodes)
 			if len(tags[0]) == 0 || hasSomeTag(service.ServiceTags, tags[0]) {
 				node.Params = params
-
-				node.buf = new(bytes.Buffer)
-				bufs = append(bufs, node.buf)
+				node.Params.Local = true
+				Ncopies += 1
 			}
 
 			nodes[i] = node
 		}
 
-		io.Copy(io.MultiWriter(bufs...), file)
+		minLen := []int64{}
+		allPath := []string{}
+		allCat := []string{}
 
-		// call each node in dedicated goroutine
-		var wg sync.WaitGroup
-		for _, node := range nodes {
-			if node.Params.isEmpty() {
-				continue // nothing to do
+		if Ncopies > 1 {
+			// save to temp file to get multiple copies
+			if len(catalog.DefaultTempDirectory) > 0 {
+				_ = os.MkdirAll(catalog.DefaultTempDirectory, 0755)
+			}
+			tmp, err := ioutil.TempFile(catalog.DefaultTempDirectory, filepath.Base(params.File))
+			if err != nil {
+				panic(fmt.Errorf("failed to create temp file: %s", err))
+			}
+			defer func() {
+				tmp.Close()
+				os.RemoveAll(tmp.Name())
+			}()
+
+			var w int64
+			if 0 < params.Length {
+				w, err = io.CopyN(tmp, file, params.Length)
+			} else {
+				w, err = io.Copy(tmp, file)
+			}
+			if err != nil {
+				panic(fmt.Errorf("failed to copy content to temp file: %s", err))
+			}
+			tmp.Seek(0, 0 /*io.SeekStart*/) // go to begin
+
+			// update node parameters
+			for _, node := range nodes {
+				if node.Params.isEmpty() {
+					continue // nothing to do
+				}
+
+				f, err := os.Open(tmp.Name())
+				if err != nil {
+					panic(fmt.Errorf("failed to open temp file: %s", err))
+				}
+				defer f.Close()
+				node.Params.Length = w // update length
+				node.data = f
 			}
 
-			wg.Add(1)
-			go func(node *Node) {
-				defer wg.Done()
+			// call each node in dedicated goroutine
+			var wg sync.WaitGroup
+			for _, node := range nodes {
+				if node.Params.isEmpty() {
+					continue // nothing to do
+				}
+
+				wg.Add(1)
+				go func(node *Node) {
+					defer wg.Done()
+					if node.IsLocal {
+						log.WithField("what", node.Params).Debugf("copying on local node")
+						_, node.Result, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, node.data)
+					} else {
+						log.WithField("what", node.Params).
+							WithField("node", node.Name).
+							WithField("addr", node.Address).
+							Debugf("copying on remote node")
+						node.Result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, node.data)
+					}
+				}(node)
+			}
+
+			// wait and report all results
+			wg.Wait()
+			for _, node := range nodes {
+				if node.Params.isEmpty() {
+					continue // nothing to do
+				}
+
+				if node.Error != nil {
+					result[node.Name] = map[string]interface{}{
+						"error": err.Error(),
+					}
+				} else {
+					result[node.Name] = node.Result
+				}
+
+				// combine results
+				if x, err := utils.AsUint64(node.Result["length"]); err == nil {
+					minLen = append(minLen, int64(x))
+				}
+				if x, err := utils.AsString(node.Result["path"]); err == nil {
+					allPath = append(allPath, x)
+				}
+				if x, err := utils.AsString(node.Result["catalog"]); err == nil {
+					allCat = append(allCat, x)
+				}
+			}
+		} else {
+			for _, node := range nodes {
+				if node.Params.isEmpty() {
+					continue // nothing to do
+				}
+
 				if node.IsLocal {
-					log.WithField("what", node.Params).Debugf("copying on local node")
-					//node.Result, node.Error =
-					s.postLocalFiles(mountPoint, node.Params, delim, node.data)
+					log.WithField("what", node.Params).Debugf("*copying on local node")
+					_, node.Result, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, file)
 				} else {
 					log.WithField("what", node.Params).
 						WithField("node", node.Name).
 						WithField("addr", node.Address).
-						Debugf("copying on remote node")
-					node.Result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, node.data)
+						Debugf("*copying on remote node")
+					node.Result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, file)
 				}
-			}(node)
+
+				if node.Error != nil {
+					result[node.Name] = map[string]interface{}{
+						"error": err.Error(),
+					}
+				} else {
+					result[node.Name] = node.Result
+				}
+
+				// combine results
+				if x, err := utils.AsUint64(node.Result["length"]); err == nil {
+					minLen = append(minLen, int64(x))
+				}
+				if x, err := utils.AsString(node.Result["path"]); err == nil {
+					allPath = append(allPath, x)
+				}
+				if x, err := utils.AsString(node.Result["catalog"]); err == nil {
+					allCat = append(allCat, x)
+				}
+				break // one node enough
+			}
 		}
 
-		// wait and report all results
-		wg.Wait()
-		for _, node := range nodes {
-			if node.Params.isEmpty() {
-				continue // nothing to do
-			}
-
-			if node.Error != nil {
-				result[node.Name] = map[string]interface{}{
-					"error": err.Error(),
-				}
-			} else {
-				result[node.Name] = node.Result
-			}
+		log.WithField("len", minLen).WithField("path", allPath).WithField("cat", allCat).Infof("many results")
+		result = map[string]interface{}{
+			"details": result,
+			"length":  findMinLength(minLen),
+		}
+		if x := getUniqueOrEmpty(allPath); len(x) > 0 {
+			result["path"] = x
+		}
+		if x := getUniqueOrEmpty(allCat); len(x) > 0 {
+			result["catalog"] = x
 		}
 	} else {
-		status, result = s.postLocalFiles(mountPoint, params, delim, file)
+		status, result, _ = s.postLocalFiles(mountPoint, params, delim, file)
 	}
 
 	ctx.JSON(status, result)
 }
 
 // post local nodes: files, dirs, catalogs
-func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, map[string]interface{}) {
+func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, map[string]interface{}, error) {
 	res := make(map[string]interface{})
 	status := http.StatusOK
 
@@ -224,6 +324,8 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			res["catalog"] = catalog
 			res["length"] = length // not total, just this part
 		}
+
+		return status, res, err
 	} else { // standalone file
 		path, length, err := createFile(mountPoint, params, file)
 
@@ -235,9 +337,9 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			res["path"] = path
 			res["length"] = length
 		}
-	}
 
-	return status, res
+		return status, res, err
+	}
 }
 
 // post remote nodes: files
@@ -435,7 +537,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 
 	defer out.Close()
 	if 0 <= params.Offset {
-		_, err = out.Seek(params.Offset, 0)
+		_, err = out.Seek(params.Offset, 0 /*io.SeekStart*/)
 		if err != nil {
 			return rpath, 0, err
 		}
@@ -484,7 +586,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 		if err != nil {
 			return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
 		}
-		tmp.Seek(0, 0) // go to begin
+		tmp.Seek(0, 0 /*io.SeekStart*/) // go to begin
 		content = tmp
 	}
 
@@ -517,7 +619,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	}
 	defer data.Close()
 
-	_, err = data.Seek(int64(data_pos), 0)
+	_, err = data.Seek(int64(data_pos), 0 /*io.SeekStart*/)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to seek data file: %s", err)
 	}
@@ -571,4 +673,38 @@ func hasSomeTag(tags []string, what []string) bool {
 	}
 
 	return false
+}
+
+// find minimum length
+func findMinLength(lens []int64) int64 {
+	if len(lens) == 0 {
+		return 0 // not found
+	}
+
+	res := lens[0]
+	for i := 1; i < len(lens); i++ {
+		if lens[i] < res {
+			res = lens[i]
+		}
+	}
+
+	return res
+}
+
+// find the unique string or empty
+func getUniqueOrEmpty(all []string) string {
+	unique := make(map[string]int)
+	for _, s := range all {
+		if len(s) > 0 {
+			unique[s] = 1
+		}
+	}
+
+	if len(unique) == 1 {
+		for k, _ := range unique {
+			return k // first key
+		}
+	}
+
+	return "" // not unique
 }

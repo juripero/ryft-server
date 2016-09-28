@@ -102,6 +102,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 					node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
 				} else {
 					node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+					// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
 				}
 				node.IsLocal = s.isLocalService(service)
 				node.Name = service.Node
