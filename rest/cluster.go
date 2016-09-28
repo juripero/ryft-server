@@ -319,6 +319,11 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 	// match files and wildcards
 	tags_map := make(map[string]int)
 	for _, f := range files {
+		// use relative path to compare, since tag keys cannot contain first '/'
+		if rel, err := filepath.Rel("/", f); err == nil {
+			f = rel
+		}
+
 		if found := wildmatch.IsSubsetOfAny(f, keys...); found >= 0 {
 			for _, tag := range tags[keys[found]] {
 				tags_map[tag] += 1
@@ -364,6 +369,12 @@ func findAllMatches(client *consul.Client, userTag string, files []string) ([][]
 	res := make([][]string, len(files))
 	for i, f := range files {
 		tags_map := make(map[string]int)
+
+		// use relative path to compare, since tag keys cannot contain first '/'
+		if rel, err := filepath.Rel("/", f); err == nil {
+			f = rel
+		}
+
 		if found := wildmatch.IsSubsetOfAny(f, keys...); found >= 0 {
 			for _, tag := range tags[keys[found]] {
 				tags_map[tag] += 1

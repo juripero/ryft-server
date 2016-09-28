@@ -120,6 +120,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 				err.Error(), "failed to map files to tags"))
 		}
+		log.WithField("tags", tags[0]).Debugf("related tags")
 
 		type Node struct {
 			IsLocal bool
@@ -290,7 +291,6 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			}
 		}
 
-		log.WithField("len", minLen).WithField("path", allPath).WithField("cat", allCat).Infof("many results")
 		result = map[string]interface{}{
 			"details": result,
 			"length":  findMinLength(minLen),

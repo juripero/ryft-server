@@ -95,6 +95,8 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 		// build list of nodes to call
 		nodes := make([]*Node, len(services))
 		for k, f := range files {
+			log.WithField("item", f).WithField("tags", tags[k]).Debugf("related tags")
+
 			for i, service := range services {
 				node := new(Node)
 				scheme := "http"
