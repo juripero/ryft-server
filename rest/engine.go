@@ -173,7 +173,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	case "ryftprim":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
-			opts["instance-name"] = fmt.Sprintf(".rest-%d", s.ListenAddressParsed.Port)
+			opts["instance-name"] = fmt.Sprintf(".rest-%d", s.listenAddress.Port)
 		}
 
 		// home-dir (override settings)

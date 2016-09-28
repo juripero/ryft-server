@@ -60,8 +60,8 @@ type Server struct {
 	DebugMode      bool                   `yaml:"debug-mode,omitempty"`
 	KeepResults    bool                   `yaml:"keep-results,omitempty"`
 
-	ListenAddress       string `yaml:"address,omitempty"`
-	ListenAddressParsed *net.TCPAddr
+	ListenAddress string `yaml:"address,omitempty"`
+	listenAddress *net.TCPAddr
 
 	HttpTimeout string `yaml:"http-timeout,omitempty"`
 
@@ -165,6 +165,15 @@ func (s *Server) ParseConfig(fileName string) error {
 	// assign other catalog options
 	catalog.DefaultDataDelimiter = s.Catalogs.DataDelimiter
 	catalog.DefaultTempDirectory = s.Catalogs.TempDirectory
+
+	return nil // OK
+}
+
+// apply configuration
+func (s *Server) ApplyConfig() (err error) {
+	if s.listenAddress, err = net.ResolveTCPAddr("tcp", s.ListenAddress); err != nil {
+		return fmt.Errorf("%q is not a valid TCP address: %s", s.ListenAddress, err)
+	}
 
 	return nil // OK
 }

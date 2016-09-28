@@ -32,7 +32,6 @@ package main
 
 import (
 	"mime"
-	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -143,9 +142,8 @@ func main() {
 		}
 	}
 
-	var err error
-	if server.ListenAddressParsed, err = net.ResolveTCPAddr("tcp", server.ListenAddress); err != nil {
-		kingpin.FatalUsage("%q is not a valid TCP address: %s", server.ListenAddress, err)
+	if err := server.ApplyConfig(); err != nil {
+		kingpin.FatalUsage("%s", err)
 	}
 
 	log.WithField("config", server).

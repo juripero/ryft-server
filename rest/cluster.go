@@ -241,7 +241,7 @@ func (s *Server) splitToLocalAndRemote(services []*consul.CatalogService) (local
 // check if service is local
 func (s *Server) isLocalService(service *consul.CatalogService) bool {
 	// service port must match
-	if service.ServicePort != s.ListenAddressParsed.Port {
+	if service.ServicePort != s.listenAddress.Port {
 		return false
 	}
 
