@@ -610,6 +610,9 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 		return "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
 	}
 
+	log.WithField("data_path", data_path).
+		WithField("data_pos", data_pos).
+		Debugf("writing data part with delim:%x", data_delim)
 	// TODO: in case of write error mark corresponding part as "bad"
 
 	// write file content

@@ -545,6 +545,7 @@ func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id i
 	if data_delim.Valid && pdelim != nil && data_delim.String != *pdelim {
 		return 0, "", 0, "", fmt.Errorf("delimiter cannot be changed (old:#%x, new:#%x)", data_delim.String, *pdelim)
 	}
+	delim = data_delim.String
 
 	return // OK
 }
