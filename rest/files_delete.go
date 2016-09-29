@@ -94,23 +94,26 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 
 		// build list of nodes to call
 		nodes := make([]*Node, len(services))
-		for k, f := range files {
-			log.WithField("item", f).WithField("tags", tags[k]).Debugf("related tags")
 
-			for i, service := range services {
-				node := new(Node)
-				scheme := "http"
-				if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-					node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
-				} else {
-					node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-					// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
+		for i, service := range services {
+			node := new(Node)
+			scheme := "http"
+			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
+				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+			} else {
+				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+				// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
+			}
+			node.IsLocal = s.isLocalService(service)
+			node.Name = service.Node
+			node.Params.Local = true
+
+			// check tags (no tags - all nodes)
+			for k, f := range files {
+				if i == 0 {
+					// print for the first service only
+					log.WithField("item", f).WithField("tags", tags[k]).Debugf("related tags")
 				}
-				node.IsLocal = s.isLocalService(service)
-				node.Name = service.Node
-				node.Params.Local = true
-
-				// check tags (no tags - all nodes)
 				if len(tags[k]) == 0 || hasSomeTag(service.ServiceTags, tags[k]) {
 					// based on 'k' index detect what the 'f' is: dir, file or catalog
 					if k < len(params.Dirs) {
@@ -121,9 +124,9 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 						node.Params.Catalogs = append(node.Params.Catalogs, f)
 					}
 				}
-
-				nodes[i] = node
 			}
+
+			nodes[i] = node
 		}
 
 		// call each node in dedicated goroutine
