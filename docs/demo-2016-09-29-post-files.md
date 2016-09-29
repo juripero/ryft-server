@@ -67,7 +67,7 @@ sudo ls -al /ryftone/test?
 
 The following command can be used to send the same data to each ryft-server instance:
 ```{.sh}
-curl --data "helloX" -H "Content-Type: application/octet-stream" -s "http://localhost:5002/files?file=test.txt" -u test:test | jq .
+curl --data "hello" -H "Content-Type: application/octet-stream" -s "http://localhost:5002/files?file=test.txt" -u test:test | jq .
 sudo ls -al /ryftone/test?
 ```
 
@@ -80,7 +80,7 @@ Content of each file should be the same.
 
 By default (if no offset provided) data are appended:
 ```{.sh}
-curl --data "XX  " -H "Content-Type: application/octet-stream" -s "http://localhost:5002/files?file=test.txt" -u test:test | jq .
+curl --data " world" -H "Content-Type: application/octet-stream" -s "http://localhost:5002/files?file=test.txt" -u test:test | jq .
 sudo cat /ryftone/test1/test.txt
 sudo cat /ryftone/test2/test.txt
 ```
@@ -89,7 +89,7 @@ sudo cat /ryftone/test2/test.txt
 
 It is possible to replace just a part of a file:
 ```{.sh}
-curl --data "ZZZ  " -H "Content-Type: application/octet-stream" -s "http://localhost:5002/files?file=test.txt&offset=5" -u test:test | jq .
+curl --data "Ryft!" -H "Content-Type: application/octet-stream" -s "http://localhost:5002/files?file=test.txt&offset=6" -u test:test | jq .
 sudo cat /ryftone/test1/test.txt
 sudo cat /ryftone/test2/test.txt
 ```
