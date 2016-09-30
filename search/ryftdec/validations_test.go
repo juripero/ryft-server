@@ -99,7 +99,7 @@ func TestDetectExtension(t *testing.T) {
 	}
 
 	for _, d := range data {
-		ext, err := detectExtension(d.fileNames, d.dataOut)
+		ext, err := detectExtension(d.fileNames, nil, d.dataOut)
 		if d.expectedErr {
 			assert.Error(t, err)
 		} else {

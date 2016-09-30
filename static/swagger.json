@@ -69,7 +69,7 @@
             "name": "format",
             "x-go-name": "Format",
             "description": "Input data format. Parameter is used with structured or RAW text search.",
-            "enum": ["raw", "xml", "json", "utf8"]
+            "enum": ["raw", "xml", "json", "utf8", "null"]
           },
           {
             "in": "query",
@@ -98,6 +98,13 @@
             "name": "index",
             "x-go-name": "Index",
             "description": "Name of index file to keep. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "x-go-name": "Delimiter",
+            "description": "The delimiter is used between found records in DATA file."
           },
           {
             "in": "query",
@@ -229,6 +236,13 @@
           },
           {
             "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "x-go-name": "Delimiter",
+            "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint8",
             "maximum": 4,
@@ -287,6 +301,111 @@
         "responses": {
           "200": {
             "description": "List of files and directories for node/cluster",
+            "schema": {
+              "$ref": "#/definitions/FilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload files",
+        "description": "Endpoint to upload files",
+        "operationId": "files",
+        "parameters": [
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The uploading filename. Use {{random}} for random names.",
+            "required": true,
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The catalog to append file to.",
+            "in": "query"
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part offset.",
+            "in": "query"
+          },
+          {
+            "name": "length",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part length.",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of files and directories deleted",
+            "schema": {
+              "$ref": "#/definitions/FilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Delete directories and files",
+        "description": "Endpoint to delete node's directories and files",
+        "operationId": "files",
+        "parameters": [
+          {
+            "name": "dir",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "The directory path to delete. Wildcards are supported.",
+            "in": "query"
+          },
+          {
+            "name": "file",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "The file path to delete. Wildcards are supported.",
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "The catalog path to delete. Wildcards are supported.",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of files and directories deleted",
             "schema": {
               "$ref": "#/definitions/FilesResponse"
             }

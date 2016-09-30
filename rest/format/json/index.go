@@ -28,28 +28,28 @@
  * ============
  */
 
-package xml
+package json
 
 import (
-	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
 
-// STATISTICS format specific data.
-// Is the same as RAW format statistics!
-type Statistics raw.Statistics
+// INDEX format specific data.
+// Is the same as RAW format index!
+type Index raw.Index
 
-// NewStat creates new format specific data.
-func NewStat() interface{} {
-	return new(Statistics)
+// NewIndex creates new format specific data.
+func NewIndex() interface{} {
+	return Index{}
 }
 
-// FromStat converts STATISTICS to format specific data.
-func FromStat(stat *search.Statistics) *Statistics {
-	return (*Statistics)(raw.FromStat(stat))
+// FromIndex converts INDEX to format specific data.
+func FromIndex(idx search.Index) Index {
+	return Index(raw.FromIndex(idx))
 }
 
-// ToStat converts format specific data to STATISTICS.
-func ToStat(stat *Statistics) *search.Statistics {
-	return raw.ToStat((*raw.Statistics)(stat))
+// ToIndex converts format specific data to INDEX.
+func ToIndex(idx Index) search.Index {
+	return raw.ToIndex(raw.Index(idx))
 }

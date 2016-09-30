@@ -44,6 +44,7 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftone"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
 // Prepare `ryftprim` command line arguments.
@@ -79,8 +80,9 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
 
-	// disable data separator
-	args = append(args, "-e", "")
+	// data separator
+	args = append(args, "-e", cfg.Delimiter)
+	task.Delimiter = cfg.Delimiter
 
 	// enable verbose mode to grab statistics
 	args = append(args, "-v")
@@ -120,6 +122,52 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		args = append(args, "-f", path)
 	}
 
+	// catalogs
+	if 0 < len(cfg.Catalogs) {
+		for _, mask := range cfg.Catalogs {
+			// relative -> absolute (mount point + home + ...)
+			matches, err := filepath.Glob(filepath.Join(engine.MountPoint, engine.HomeDir, mask))
+			if err != nil {
+				return fmt.Errorf("failed to glob catalog file: %s", err)
+			}
+
+			// iterate all matches
+			for _, catalogPath := range matches {
+				cat, err := catalog.OpenCatalog(catalogPath, true)
+				if err != nil {
+					return fmt.Errorf("failed to open catalog: %s", err)
+				}
+				defer cat.Close()
+
+				// data files (absolute path)
+				files, err := cat.GetDataFiles()
+				if err != nil {
+					return fmt.Errorf("failed to get catalog files: %s", err)
+				}
+
+				// unwind indexes
+				indexes, err := cat.GetSearchIndexFile()
+				if err != nil {
+					return fmt.Errorf("failed to get catalog indexes: %s", err)
+				}
+
+				// relative to mount point
+				for _, file := range files {
+					path, err := filepath.Rel(engine.MountPoint, file)
+					if err != nil {
+						path = file // "as is" in case of an error
+					}
+					args = append(args, "-f", path)
+				}
+
+				// update unwind index base
+				for path, f := range indexes {
+					cfg.SetUnwindIndexesBasedOn(path, f)
+				}
+			}
+		}
+	}
+
 	// INDEX results file
 	if len(task.IndexFileName) != 0 {
 		if len(cfg.KeepIndexAs) != 0 {
@@ -156,6 +204,10 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 	// limit number of records
 	task.Limit = uint64(cfg.Limit)
+
+	// unwind index feature
+	task.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
+	task.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
 
 	return nil // OK
 }
@@ -420,7 +472,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 			// task.log().WithField("line", string(bytes.TrimSpace(line))).
 			// 	Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
 
-			index, err := parseIndex(line)
+			index, err := search.ParseIndex(line)
 			if err != nil {
 				task.log().WithError(err).Warnf("failed to parse index from %q", bytes.TrimSpace(line))
 				res.ReportError(fmt.Errorf("failed to parse index: %s", err))
@@ -491,7 +543,19 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 	// try to process all INDEX records
 	r := bufio.NewReader(file)
+	offset := uint64(0)
 	for index := range task.indexChan {
+		if task.UnwindIndexesBasedOn != nil {
+			if f, ok := task.UnwindIndexesBasedOn[index.File]; ok && f != nil {
+				tmp := f.Unwind(index)
+				// task.log().Debugf("unwind %s => %s", index, tmp)
+				index = tmp
+			}
+		}
+		if task.SaveUpdatedIndexesTo != nil {
+			task.SaveUpdatedIndexesTo.AddIndex(index)
+		}
+
 		// trim mount point from file name! TODO: special option for this?
 		index.File = strings.TrimPrefix(index.File,
 			filepath.Join(engine.MountPoint, engine.HomeDir))
@@ -524,6 +588,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 		res.ReportRecord(rec)
+		offset += index.Length
 
 		if task.Limit > 0 && res.RecordsReported() >= task.Limit {
 			task.log().WithField("limit", task.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)
@@ -532,6 +597,35 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 			task.cancelIndex()
 
 			return // stop processing
+		}
+
+		// read and check delimiter
+		if len(task.Delimiter) > 0 {
+			tmp, err := task.readDataFile(r,
+				uint64(len(task.Delimiter)),
+				engine.ReadFilePollTimeout,
+				engine.ReadFilePollLimit)
+
+			if err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to read DATA delimiter", TAG)
+				res.ReportError(fmt.Errorf("failed to read DATA delimiter: %s", err))
+			}
+			if string(tmp) != task.Delimiter {
+				task.log().WithField("actual", tmp).WithField("expected", task.Delimiter).
+					Warnf("unexpected delimiter found at %d", offset)
+				tmp = nil // force to cancel futher processing
+			}
+
+			if err != nil || tmp == nil {
+				task.log().Debugf("[%s]: DATA processing cancelled", TAG)
+
+				// just in case, also stop INDEX processing
+				task.cancelIndex()
+
+				return // no sense to continue processing
+			}
+
+			offset += uint64(len(task.Delimiter))
 		}
 	}
 }

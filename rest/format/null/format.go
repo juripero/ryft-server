@@ -28,75 +28,64 @@
  * ============
  */
 
-package codec
+package null
 
 import (
-	"fmt"
-	"io"
-
-	"github.com/getryft/ryft-server/codec/json"
-	"github.com/getryft/ryft-server/codec/msgpack.v2"
+	"github.com/getryft/ryft-server/search"
 )
 
-const (
-	MIME_JSON     = json.MIME
-	MIME_XMSGPACK = msgpack.X_MIME
-	MIME_MSGPACK  = msgpack.MIME
-)
+// NULL format, ignores record data at all.
+type Format struct{}
 
-// Abstract Encoder interface.
-type Encoder interface {
-	EncodeRecord(rec interface{}) error
-	EncodeStat(stat interface{}) error
-	EncodeError(err error) error
-
-	io.Closer
+// New creates new NULL formatter.
+func New() (*Format, error) {
+	return new(Format), nil
 }
 
-// Abstract Decoder interface.
-type Decoder interface {
-	io.Closer
+// NewIndex creates new format specific data.
+func (*Format) NewIndex() interface{} {
+	return NewIndex()
 }
 
-// Get list of supported MIME types.
-func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
+// Convert INDEX to NULL format specific data.
+func (*Format) FromIndex(idx search.Index) interface{} {
+	return FromIndex(idx)
 }
 
-// Create new encoder instance by MIME type.
-func NewEncoder(w io.Writer, mime string, stream bool, spark bool) (Encoder, error) {
-	switch mime {
-	case MIME_JSON:
-		if spark {
-			return json.NewSparkEncoder(w)
-		} else if stream {
-			return json.NewStreamEncoder(w)
-		} else {
-			return json.NewSimpleEncoder(w)
-		}
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		if spark {
-			enc, err := msgpack.NewSimpleEncoder(w)
-			if err != nil {
-				return nil, err
-			}
-			enc.RecordsOnly = true // Spark format
-			return enc, err
-		} else if stream {
-			return msgpack.NewStreamEncoder(w)
-		} else {
-			return msgpack.NewSimpleEncoder(w)
-		}
-	default:
-		return nil, fmt.Errorf("%q is unsupported MIME type", mime)
-	}
+// Convert NULL format specific data to INDEX.
+// WARN: will panic if argument is not of null.Index type!
+func (*Format) ToIndex(idx interface{}) search.Index {
+	return ToIndex(idx.(Index))
 }
 
-// Create new decoder instance by MIME type.
-func NewDecoder(r io.Reader, mime string, stream bool) (Decoder, error) {
-	return nil, fmt.Errorf("%q not implemented yet", mime)
+// NewRecord creates new format specific data.
+func (*Format) NewRecord() interface{} {
+	return NewRecord()
+}
+
+// Convert RECORD to NULL format specific data.
+func (f *Format) FromRecord(rec *search.Record) interface{} {
+	return FromRecord(rec)
+}
+
+// Convert NULL format spcific data to RECORD.
+// WARN: will panic if argument is not of null.Record type!
+func (*Format) ToRecord(rec interface{}) *search.Record {
+	return ToRecord(rec.(*Record))
+}
+
+// NewStat creates new format specific data.
+func (*Format) NewStat() interface{} {
+	return NewStat()
+}
+
+// Convert STATISTICS to NULL format specific data.
+func (f *Format) FromStat(stat *search.Statistics) interface{} {
+	return FromStat(stat)
+}
+
+// Convert NULL format specific data to STATISTICS.
+// WARN: will panic if argument is not of null.Statistics type!
+func (f *Format) ToStat(stat interface{}) *search.Statistics {
+	return ToStat(stat.(*Statistics))
 }

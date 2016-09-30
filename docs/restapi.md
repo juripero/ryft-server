@@ -35,6 +35,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
+| `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
@@ -192,6 +193,9 @@ instead of `format=raw` - base-64 encoded raw bytes:
 }
 ```
 
+If data are not so important the `format=null` can be used.
+This format tells `ryft-server` to ignore all data and to keep indexes only.
+
 
 ### Search `cs` parameter
 
@@ -232,6 +236,15 @@ Using the second parameter `index=index.txt` keeps the search index file under `
 NOTE: According to Ryft API documentation, an index file should always have `.txt` extension!
 
 **WARNING:** Provided data or index files will be overriden!
+
+
+### Search `delimiter` parameter
+
+To customize output format the `delimiter=` parameter may be used. This optional
+string will be used to separate found records in the output file.
+
+By default there is no any delimiter. To use Windows newline
+just pass url-encoded `delimiter=%0D%0A`.
 
 
 ### Search `nodes` parameter
@@ -446,6 +459,7 @@ The list of supported query parameters are the following:
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
+| `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 
@@ -479,26 +493,144 @@ will report the following output:
 The GET `/files` endpoint is used to get Ryft box directory content.
 The name of all subdirectories and files are reported.
 
-Note, this endpoint is protected and user should provide valid credentials.
+The POST `/files` endpoint is used to upload a file to Ryft box.
+The catalog feature is supported to upload a bunch of small files.
+
+To delete any file, directory ot catalog the DELETE `/files` endpoint is used.
+
+Note, these endpoints are protected and user should provide valid credentials.
 See [authentication](./auth.md) for more details.
 
 
 ## Files query parameters
 
-The list of supported query parameters are the following:
+The list of supported query parameters for the GET endpoint are the following:
 
 | Parameter | Type    | Description |
 | --------- | ------- | ----------- |
-| `dir`     | string  | [The directory to get content of](#files-dir-parameter). |
+| `dir`     | string  | [The directory to get content of](#get-files-dir-parameter). |
+| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
+
+The list of supported query parameters for the POST standalone files are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `file`    | string  | [The filename to upload](#post-files-file-parameter). |
+| `offset`  | integer | [The optional position of uploaded chunk](#post-files-offset-parameter). |
+| `length`  | integer | [The optional length of uploaded chunk](#post-files-length-parameter). |
+| `local`   | boolean | [The optional local/cluster flag](#search-local-parameter). (NOT IMPLEMENTED YET) |
+
+The list of supported query parameters for the POST files to catalog:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `catalog` | string  | [The catalog name to upload to](#post-files-catalog-parameter). |
+| `delimiter`| string | [The data delimiter to use](#post-files-delimiter-parameter). |
+| `file`    | string  | [The filename to upload](#post-files-file-parameter). |
+| `offset`  | integer | [The position of uploaded chunk](#post-files-offset-parameter). |
+| `length`  | integer | [The length of uploaded chunk](#post-files-length-parameter). |
+| `local`   | boolean | [The local/cluster flag](#search-local-parameter). (NOT IMPLEMENTED YET) |
+
+The list of supported query parameters for the DELETE endpoint are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `dir`     | string  | [The directory to delete](#delete-files-parameters). |
+| `file`    | string  | [The standalone file to delete](#delete-files-parameters). |
+| `catalog` | string  | [The catalog to delete](#delete-files-parameters). |
 | `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
 
 
-### Files `dir` parameter
+### GET files `dir` parameter
 
 The directory to get content of. Root directory `dir=/` is used **by default**.
 
-The directory name should be relative to the Ryft volume.
-The `dir=/test` request will report content of `/ryftone/test` directory on the Ryft box.
+The directory name should be relative to the Ryft volume and user's home.
+The `dir=/foo` request will report content of `/ryftone/test/foo` directory on the Ryft box.
+
+
+### POST files content
+
+To upload a file the content should be provided.
+There are two supported `Content-Type` headers:
+
+- `application/octet-stream`
+- `multipart/form-data` - actual file content should be provided via `file` key.
+
+
+### POST files `catalog` parameter
+
+If `catalog` parameter is provided then file will be appended to that catalog
+file instead of standalone file uploading. This feature is used to upload a
+bunch of small files to a bigger catalog data file.
+
+Special keyword `{{random}}` can be used to generate unique catalog names.
+This keyword will be replaced with some unique hexadecimal string.
+For example, `catalog=foo-{{random}}.catalog` will be replaced to something like
+`foo-aabbccddeeff.catalog`. Anyway the actual catalog name will be reported in
+the response body.
+
+### POST files `delimiter` parameter
+
+Data delimiter is used in catalog files as a separator between different file
+parts. It is very important specially for RAW text files `delimiter=%0a`.
+Otherwise unexpected text matches can be found on file part boundaries.
+
+If no delimiter is provided the default value will be used.
+The default delimiter can be customized via ryft-server's
+[configuration file](./buildandrun.md#catalog-configuration).
+
+Once provided the delimiter cannot be changed for the same catalog.
+
+
+### POST files `file` parameter
+
+To upload a file the `file` parameter should be provided.
+It contains full path of the uploaded data content. For example, if `file=foo.txt`
+then the data will be saved under `/ryftone/test/foo.txt` (assuming user's
+home directory is `test`).
+
+Special keyword `{{random}}` can be used to generate unique filenames.
+This keyword will be replaced with some unique hexadecimal string.
+For example, `file=foo-{{random}}.txt` will be replaced to something like
+`foo-aabbccddeeff.txt`. Anyway the actual filename will be reported in
+the response body.
+
+
+### POST files `offset` parameter
+
+It's possible to upload just a part of file. If `offset` query parameter is
+present then the data will be saved using this offset as write position in
+destination file.
+
+Using this parameter it's possible to continue upload of failed data.
+Or just split file and upload it in chunks.
+
+
+### POST files `length` parameter
+
+This optional parameters is used to specify uploading data length in bytes.
+This parameter can help ryft server to avoid extra data copy. So if it's
+possible this parameter should be provided.
+
+
+### POST files
+
+To upload regular file the following parameters are used:`file`
+
+
+### POST files to catalog
+
+
+### DELETE files parameters
+
+It's possible to specify file, directory or catalog to delete.
+Multiple parameters can be used together.
+
+Also wildcards are supported. To delete all JSON files just pass `file=*.json`.
+
+All the names should be relative to the Ryft volume and user's home.
+The `file=/foo.txt` request will delete `/ryftone/test/foo.txt` on the Ryft box.
 
 
 ## Files example
@@ -525,6 +657,14 @@ will print the root `/ryftone` content:
   ]
 }
 ```
+
+The following request:
+
+```
+DELETE /files?dir=demo&file=*.pcrime&file=p*.txt&local=true
+```
+
+will delete specified nodes.
 
 
 # Version

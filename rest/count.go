@@ -1,11 +1,11 @@
-package main
+package rest
 
 import (
 	"net/http"
 	"net/url"
 
-	"github.com/getryft/ryft-server/codec"
-	format "github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/rest/codec"
+	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
 )
@@ -13,7 +13,9 @@ import (
 // CountParams is a parameters for matches count endpoint
 type CountParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
-	Files         []string `form:"files" json:"files" binding:"required"`
+	OldFiles      []string `form:"files" json:"files"`
+	Files         []string `form:"file" json:"file"`
+	Catalogs      []string `form:"catalog" json:"catalogs"`
 	Mode          string   `form:"mode" json:"mode"`
 	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
 	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
@@ -22,6 +24,7 @@ type CountParams struct {
 	Local         bool     `form:"local" json:"local"`
 	KeepDataAs    string   `form:"data" json:"data"`
 	KeepIndexAs   string   `form:"index" json:"index"`
+	Delimiter     string   `form:"delimiter" json:"delimiter"`
 }
 
 // CountResponse returnes matches for query
@@ -31,7 +34,7 @@ type CountResponse struct {
 }
 
 // Handle /count endpoint.
-func (s *Server) count(ctx *gin.Context) {
+func (s *Server) DoCount(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
@@ -42,6 +45,13 @@ func (s *Server) count(ctx *gin.Context) {
 	if err := ctx.Bind(&params); err != nil {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
+	}
+
+	// backward compatibility (old files name)
+	params.Files = append(params.Files, params.OldFiles...)
+	if len(params.Files) == 0 && len(params.Catalogs) == 0 {
+		panic(NewServerError(http.StatusBadRequest,
+			"no any file or catalog provided"))
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
@@ -56,7 +66,8 @@ func (s *Server) count(ctx *gin.Context) {
 
 	// get search engine
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
+	notesForTags := append(params.Files[:], params.Catalogs...)
+	engine, err := s.getSearchEngine(params.Local, notesForTags, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
@@ -71,6 +82,7 @@ func (s *Server) count(ctx *gin.Context) {
 		cfg.Query = q
 	}
 	cfg.AddFiles(params.Files) // TODO: unescape?
+	cfg.AddCatalogs(params.Catalogs)
 	cfg.Mode = params.Mode
 	cfg.Surrounding = uint(params.Surrounding)
 	cfg.Fuzziness = uint(params.Fuzziness)
@@ -78,6 +90,12 @@ func (s *Server) count(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+	if d, err := url.QueryUnescape(params.Delimiter); err != nil {
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
+			err.Error(), "failed to unescape delimiter"))
+	} else {
+		cfg.Delimiter = d
+	}
 
 	log.WithField("config", cfg).WithField("user", userName).
 		WithField("home", homeDir).WithField("cluster", userTag).

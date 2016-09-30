@@ -28,58 +28,47 @@
  * ============
  */
 
-package ryftdec
+package null
 
 import (
-	"fmt"
-
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
 )
 
-// Count starts asynchronous "/count" with RyftDEC engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	var err error
+// RECORD format specific data.
+type Record map[string]interface{}
 
-	// split cfg.Query into several expressions
-	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query, configToOpts(cfg))
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
-		return nil, fmt.Errorf("failed to decompose query: %s", err)
+const (
+	recFieldIndex = "_index"
+	recFieldError = "_error"
+	recFieldData  = "data"
+)
+
+// NewRecord creates new format specific data.
+func NewRecord() interface{} {
+	return new(Record)
+}
+
+// FromRecord converts RECORD to format specific data.
+func FromRecord(rec *search.Record) *Record {
+	if rec == nil {
+		return nil
 	}
 
-	// in simple cases when there is only one subquery
-	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		updateConfig(cfg, task.queries)
-		return engine.Backend.Count(cfg)
+	res := Record{
+		recFieldIndex: FromIndex(rec.Index),
 	}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.Catalogs, cfg.KeepDataAs)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
-		return nil, fmt.Errorf("failed to detect extension: %s", err)
+	return &res
+}
+
+// ToRecord converts format specific data to RECORD.
+func ToRecord(rec *Record) *search.Record {
+	if rec == nil {
+		return nil
 	}
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
-	mux := search.NewResult()
-	go func() {
-		// some futher cleanup
-		defer mux.Close()
-		defer mux.ReportDone()
-
-		_, stat, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Count, mux, true)
-		mux.Stat = stat
-		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
-			mux.ReportError(err)
-		}
-
-		// TODO: handle task cancellation!!!
-	}()
-
-	return mux, nil // OK for now
+	panic("NULL ToRecord is not implemented!")
+	//res := new(search.Record)
+	//res.Index = ToIndex(rec.Index)
+	//return res
 }

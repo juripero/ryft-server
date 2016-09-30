@@ -19,11 +19,14 @@ Search specific:
                      - regex_search (or rs)
                      - ipv4_search (or ipv4)
                      - ipv6_search (or ipv6)
--f|--file=<file>   Specifies an input filename.
+-f|--file=<path>   Specifies an input filename.
+-c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
 -n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use.
 -d|--fuzziness=<D> Specifies the fuzzy search distance.
 -w|--width=<W>     Specifies the surrounding width.
+-e|--delimiter=<E> Specifies the delimiter used between found records.
+                   For example pass Windows new line as -e $'\r\n'.
 -s|-q=<query>      Specifies the search/query expression to use.
   |--query=<query>
 -od|--data=<file>  Used to keep a data results file.
@@ -45,6 +48,7 @@ REST specific:
                      - json - decode JSON objects
                      - utf8 - for text search get utf-8 string
                               instead of base-64 encoded raw bytes
+                     - null|none - ignores all data
 --fields=<list>  Specifies comma-separated list of fields to return.
                  This parameter is useful with XML and JSON formats.
 --no-stats       Disable statistics output.
@@ -77,10 +81,12 @@ fail() {
 # default values
 MODE=
 FILES=
+CATALOGS=
 CASE_INSENS=
 NODES=
 FUZZINESS=
 SURROUNDING=
+DELIMITER=$'\r\n'
 QUERY=
 DATA=
 INDEX=
@@ -119,6 +125,14 @@ while [[ $# > 0 ]]; do
 		FILES="$FILES:$2"
 		shift 2
 		;;
+	-c=*|--catalog=*)
+		CATALOGS="$CATALOGS:${1#*=}"
+		shift
+		;;
+	-c|--catalog)
+		CATALOGS="$CATALOGS:$2"
+		shift 2
+		;;
 	-i)
 		CASE_INSENS="true"
 		shift
@@ -145,6 +159,14 @@ while [[ $# > 0 ]]; do
 		;;
 	-w|--width)
 		SURROUNDING="$2"
+		shift 2
+		;;
+	-e=*|--delimiter=*)
+		DELIMITER="${1#*=}"
+		shift
+		;;
+	-e|--delimiter)
+		DELIMITER="$2"
 		shift 2
 		;;
 	-s=*|-q=*|--query=*)
@@ -260,7 +282,7 @@ while [[ $# > 0 ]]; do
 done
 
 [[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
-[[ -z "$FILES" ]] && fail "no any file provided, run '$0 --help' for help"
+[[ -z "$FILES" && -z "$CATALOGS" ]] && fail "no any file or catalog provided, run '$0 --help' for help"
 
 # build the URL
 URL_DATA=(--data-urlencode "local=$LOCAL")
@@ -270,10 +292,15 @@ IFS=':' read -r -a files <<< "$FILES"
 for file in "${files[@]}"; do
 	[[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "files=$file")
 done
+IFS=':' read -r -a catalogs <<< "$CATALOGS"
+for catalog in "${catalogs[@]}"; do
+	[[ ! -z $catalog ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "catalog=$catalog")
+done
 [[ -z "$CASE_INSENS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=true") # inverted!
 [[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")
 [[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
+[[ ! -z "$DELIMITER" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "delimiter=$DELIMITER")
 [[ ! -z "$MODE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "mode=$MODE")
 [[ ! -z "$LIMIT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "limit=$LIMIT")
 [[ ! -z "$DATA" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "data=$DATA")

@@ -102,7 +102,10 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	q.Set("format", format)
 	q.Set("query", cfg.Query)
 	for _, file := range cfg.Files {
-		q.Add("files", file)
+		q.Add("files", file) // TODO: replace with "file", "files" will be deprecated
+	}
+	for _, catalog := range cfg.Catalogs {
+		q.Add("catalog", catalog)
 	}
 	if len(cfg.Mode) != 0 {
 		q.Set("mode", cfg.Mode)

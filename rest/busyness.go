@@ -28,28 +28,55 @@
  * ============
  */
 
-package xml
+package rest
 
 import (
-	"github.com/getryft/ryft-server/format/raw"
+	"sync/atomic"
+	"time"
+
 	"github.com/getryft/ryft-server/search"
 )
 
-// INDEX format specific data.
-// Is the same as RAW format index!
-type Index raw.Index
-
-// NewIndex creates new format specific data.
-func NewIndex() interface{} {
-	return Index{}
+// update busyness thread
+func (s *Server) StartUpdatingBusyness() {
+	s.busynessChanged = make(chan int32, 256)
+	go func(metric int32) {
+		var reported int32 = -1 // to force update metric ASAP
+		for {
+			select {
+			case metric = <-s.busynessChanged:
+				log.WithField("metric", metric).Debug("metric changed")
+				continue
+			case <-time.After(time.Second): // update latency
+				if metric != reported {
+					reported = metric
+					log.WithField("metric", metric).Debug("metric reporting...")
+					err := s.updateConsulMetric(int(metric))
+					if err != nil {
+						log.WithError(err).Warnf("failed to update consul metric")
+					}
+				}
+				// TODO: graceful shutdown
+			}
+		}
+	}(s.activeSearchCount)
 }
 
-// FromIndex converts INDEX to format specific data.
-func FromIndex(idx search.Index) Index {
-	return Index(raw.FromIndex(idx))
+// notify server a search is started
+func (s *Server) onSearchStarted(config *search.Config) {
+	s.onSearchChanged(config, +1)
 }
 
-// ToIndex converts format specific data to INDEX.
-func ToIndex(idx Index) search.Index {
-	return raw.ToIndex(raw.Index(idx))
+// notify server a search is started
+func (s *Server) onSearchStopped(config *search.Config) {
+	s.onSearchChanged(config, -1)
+}
+
+// notify server a search is changed
+func (s *Server) onSearchChanged(config *search.Config, delta int32) {
+	metric := atomic.AddInt32(&s.activeSearchCount, delta)
+	if s.busynessChanged != nil {
+		// notify to update metric
+		s.busynessChanged <- metric
+	}
 }

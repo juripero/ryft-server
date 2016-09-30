@@ -1,40 +1,39 @@
-package main
+package rest
 
 import (
 	"net/http"
 	"sort"
 
-	"github.com/getryft/ryft-server/codec"
+	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/gin-gonic/gin"
 )
 
-type FilesParams struct {
+// GetFileParams query parameters for GET /files
+type GetFilesParams struct {
 	Dir   string `form:"dir" json:"dir"`
 	Local bool   `form:"local" json:"local"`
 }
 
-func (s *Server) files(c *gin.Context) {
-	// recover from panics if any
-	defer RecoverFromPanic(c)
-
-	var err error
+// GET /files method
+func (s *Server) DoGetFiles(ctx *gin.Context) {
+	defer RecoverFromPanic(ctx)
 
 	// parse request parameters
-	params := FilesParams{}
-	if err = c.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+	params := GetFilesParams{}
+	if err := ctx.Bind(&params); err != nil {
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
 
 	// get search engine
-	userName, authToken, homeDir, userTag := s.parseAuthAndHome(c)
+	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	engine, err := s.getSearchEngine(params.Local, nil /*no files*/, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
 	}
 
-	accept := c.NegotiateFormat(codec.GetSupportedMimeTypes()...)
+	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
 	// default to JSON
 	if accept == "" {
 		accept = codec.MIME_JSON
@@ -64,5 +63,5 @@ func (s *Server) files(c *gin.Context) {
 		"files":   info.Files,
 		"folders": info.Dirs,
 	}
-	c.JSON(http.StatusOK, json)
+	ctx.JSON(http.StatusOK, json)
 }

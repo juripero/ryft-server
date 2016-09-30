@@ -28,58 +28,83 @@
  * ============
  */
 
-package ryftdec
+package catalog
 
 import (
-	"fmt"
-
-	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
+	"sync"
+	"time"
 )
 
-// Count starts asynchronous "/count" with RyftDEC engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	var err error
+// Cache contains list of cached catalogs
+type Cache struct {
+	DropTimeout time.Duration
 
-	// split cfg.Query into several expressions
-	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query, configToOpts(cfg))
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
-		return nil, fmt.Errorf("failed to decompose query: %s", err)
+	cached map[string]*Catalog // db path -> Catalog cache
+
+	sync.Mutex
+}
+
+// NewCache creates new (empty cache)
+func NewCache() *Cache {
+	cc := new(Cache)
+	cc.DropTimeout = DefaultCacheDropTimeout
+	cc.cached = make(map[string]*Catalog)
+	return cc
+}
+
+// Get gets existing catalog from cache.
+func (cc *Cache) Get(path string) *Catalog {
+	cc.Lock()
+	defer cc.Unlock()
+
+	return cc.get(path)
+}
+
+// Get gets existing catalog from cache (unsynchronized).
+func (cc *Cache) get(path string) *Catalog {
+	// try to get existing catalog
+	if cat, ok := cc.cached[path]; ok && cat != nil {
+		cat.cacheAddRef()
+		return cat
 	}
 
-	// in simple cases when there is only one subquery
-	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		updateConfig(cfg, task.queries)
-		return engine.Backend.Count(cfg)
+	return nil // not found
+}
+
+// Put saves catalog to cache.
+func (cc *Cache) Put(path string, cat *Catalog) {
+	cc.Lock()
+	defer cc.Unlock()
+
+	cc.put(path, cat)
+}
+
+// Put saves catalog to cache (unsynchronized).
+func (cc *Cache) put(path string, cat *Catalog) {
+	if cat.cache != nil {
+		panic("catalog is already used")
+	}
+	cat.CacheDropTimeout = cc.DropTimeout
+	cat.cache = cc
+
+	cc.cached[path] = cat
+}
+
+// Drop removes the catalog from cache.
+func (cc *Cache) Drop(path string) bool {
+	cc.Lock()
+	defer cc.Unlock()
+
+	return cc.drop(path)
+}
+
+// Drop removes the catalog from cache (unsynchronized).
+func (cc *Cache) drop(path string) bool {
+	// try to drop existing catalog
+	if cat, ok := cc.cached[path]; ok && cat != nil {
+		delete(cc.cached, path)
+		return true
 	}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.Catalogs, cfg.KeepDataAs)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
-		return nil, fmt.Errorf("failed to detect extension: %s", err)
-	}
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
-
-	mux := search.NewResult()
-	go func() {
-		// some futher cleanup
-		defer mux.Close()
-		defer mux.ReportDone()
-
-		_, stat, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Count, mux, true)
-		mux.Stat = stat
-		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
-			mux.ReportError(err)
-		}
-
-		// TODO: handle task cancellation!!!
-	}()
-
-	return mux, nil // OK for now
+	return false // does not exist
 }

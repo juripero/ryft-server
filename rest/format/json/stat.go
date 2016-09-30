@@ -28,58 +28,28 @@
  * ============
  */
 
-package ryftdec
+package json
 
 import (
-	"fmt"
-
+	"github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
 )
 
-// Count starts asynchronous "/count" with RyftDEC engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	var err error
+// STATISTICS format specific data.
+// Is the same as RAW format statistics!
+type Statistics raw.Statistics
 
-	// split cfg.Query into several expressions
-	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query, configToOpts(cfg))
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
-		return nil, fmt.Errorf("failed to decompose query: %s", err)
-	}
+// NewStat creates new format specific data.
+func NewStat() interface{} {
+	return new(Statistics)
+}
 
-	// in simple cases when there is only one subquery
-	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		updateConfig(cfg, task.queries)
-		return engine.Backend.Count(cfg)
-	}
+// FromStat converts STATISTICS to format specific data.
+func FromStat(stat *search.Statistics) *Statistics {
+	return (*Statistics)(raw.FromStat(stat))
+}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.Catalogs, cfg.KeepDataAs)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
-		return nil, fmt.Errorf("failed to detect extension: %s", err)
-	}
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
-
-	mux := search.NewResult()
-	go func() {
-		// some futher cleanup
-		defer mux.Close()
-		defer mux.ReportDone()
-
-		_, stat, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Count, mux, true)
-		mux.Stat = stat
-		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
-			mux.ReportError(err)
-		}
-
-		// TODO: handle task cancellation!!!
-	}()
-
-	return mux, nil // OK for now
+// ToStat converts format specific data to STATISTICS.
+func ToStat(stat *Statistics) *search.Statistics {
+	return raw.ToStat((*raw.Statistics)(stat))
 }

@@ -38,7 +38,8 @@ import (
 // Contains all query related parameters.
 type Config struct {
 	Query         string   // search criteria
-	Files         []string // input file set
+	Files         []string // input file set: regular files
+	Catalogs      []string // input file set: catalogs
 	Mode          string   // es, fhs, feds, ds, ts...
 	Surrounding   uint     // surrounding width
 	Fuzziness     uint     // fuzziness distance
@@ -47,8 +48,13 @@ type Config struct {
 	Limit         uint     // limit  the number of records
 
 	// if not empty keep the INDEX and/or DATA file
+	// delimiter is used between records in DATA file
 	KeepDataAs  string
 	KeepIndexAs string
+	Delimiter   string
+
+	UnwindIndexesBasedOn map[string]*IndexFile
+	SaveUpdatedIndexesTo *IndexFile
 }
 
 // NewEmptyConfig creates new empty search configuration.
@@ -75,8 +81,27 @@ func (cfg *Config) AddFiles(files []string) {
 	cfg.Files = append(cfg.Files, files...)
 }
 
+// AddCatalog adds one or more catalogs to the search configuration.
+func (cfg *Config) AddCatalog(catalogs ...string) {
+	cfg.AddCatalogs(catalogs)
+}
+
+// AddCatalogs adds one or more catalogs to the search configuration.
+func (cfg *Config) AddCatalogs(catalogs []string) {
+	cfg.Catalogs = append(cfg.Catalogs, catalogs...)
+}
+
+// Set "unwind indexes" base
+func (cfg *Config) SetUnwindIndexesBasedOn(path string, f *IndexFile) {
+	if cfg.UnwindIndexesBasedOn == nil {
+		cfg.UnwindIndexesBasedOn = map[string]*IndexFile{path: f}
+	} else {
+		cfg.UnwindIndexesBasedOn[path] = f
+	}
+}
+
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
-	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, surr:%d, fuzz:%d, case-sens:%t, nodes:%d, limit:%d}",
-		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes, cfg.Limit)
+	return fmt.Sprintf("Config{query:%s, files:%q, catalogs:%q, mode:%q, surr:%d, fuzz:%d, case-sens:%t, nodes:%d, limit:%d}",
+		cfg.Query, cfg.Files, cfg.Catalogs, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes, cfg.Limit)
 }

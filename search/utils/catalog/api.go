@@ -28,58 +28,76 @@
  * ============
  */
 
-package ryftdec
+package catalog
 
 import (
-	"fmt"
-
-	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
+	"errors"
+	"log"
+	"os"
 )
 
-// Count starts asynchronous "/count" with RyftDEC engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	var err error
+// global cache instance
+var globalCache = NewCache()
 
-	// split cfg.Query into several expressions
-	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query, configToOpts(cfg))
+// ErrNotCatalog is used to indicate the file is not a catalog meta-data file.
+var ErrNotCatalog = errors.New("not a catalog")
+
+// IsCatalog check if file is a catalog
+func IsCatalog(path string) bool {
+	if s, err := os.Stat(path); os.IsNotExist(err) {
+		return false // not exist
+	} else if s.Size() <= 0 {
+		return false // bad size
+	}
+
+	cat, err := OpenCatalog(path, true)
 	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
-		return nil, fmt.Errorf("failed to decompose query: %s", err)
+		return false
+	}
+	defer cat.Close()
+
+	if ok, err := cat.checkSchemeSync(); err != nil || !ok {
+		return false
 	}
 
-	// in simple cases when there is only one subquery
-	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
-		updateConfig(cfg, task.queries)
-		return engine.Backend.Count(cfg)
-	}
+	return true
+}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.Catalogs, cfg.KeepDataAs)
+// OpenCatalog opens catalog file.
+func OpenCatalog(path string, readOnly bool) (*Catalog, error) {
+	cat, cached, err := getCatalog(path)
 	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
-		return nil, fmt.Errorf("failed to detect extension: %s", err)
+		return nil, err
 	}
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
-	mux := search.NewResult()
-	go func() {
-		// some futher cleanup
-		defer mux.Close()
-		defer mux.ReportDone()
-
-		_, stat, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Count, mux, true)
-		mux.Stat = stat
-		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
-			mux.ReportError(err)
+	// update database scheme
+	if !cached && !readOnly {
+		log.Printf("updating catalog scheme: %s", path)
+		if err := cat.updateSchemeSync(); err != nil {
+			cat.Close()
+			return nil, err
 		}
+	}
 
-		// TODO: handle task cancellation!!!
-	}()
+	return cat, nil // OK
+}
 
-	return mux, nil // OK for now
+// get catalog (from cache or new)
+func getCatalog(path string) (*Catalog, bool, error) {
+	globalCache.Lock()
+	defer globalCache.Unlock()
+
+	// try to get existing catalog
+	if cat := globalCache.get(path); cat != nil {
+		return cat, true, nil // OK
+	}
+
+	// create new one and put to cache
+	cat, err := openCatalog(path)
+	if err == nil && cat != nil {
+		globalCache.put(path, cat)
+		cat.cacheAddRef()
+	}
+
+	return cat, false, err
 }

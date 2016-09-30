@@ -28,55 +28,28 @@
  * ============
  */
 
-package ryftone
+package null
 
 import (
-	"bytes"
-	"fmt"
-	"strconv"
-
+	"github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
 
-// ParseIndex parses Index record from custom line.
-func ParseIndex(buf []byte) (index search.Index, err error) {
-	sep := []byte(",")
-	fields := bytes.Split(bytes.TrimSpace(buf), sep)
-	n := len(fields)
-	if n < 4 {
-		return index, fmt.Errorf("invalid number of fields in '%s'", string(buf))
-	}
+// STATISTICS format specific data.
+// Is the same as RAW format statistics!
+type Statistics raw.Statistics
 
-	// NOTE: filename (first field) may contains ','
-	// so we have to combine some first fields
-	file := bytes.Join(fields[0:n-3], sep)
+// NewStat creates new format specific data.
+func NewStat() interface{} {
+	return new(Statistics)
+}
 
-	// Offset
-	var offset uint64
-	offset, err = strconv.ParseUint(string(fields[n-3]), 10, 64)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse offset: %s", err)
-	}
+// FromStat converts STATISTICS to format specific data.
+func FromStat(stat *search.Statistics) *Statistics {
+	return (*Statistics)(raw.FromStat(stat))
+}
 
-	// Length
-	var length uint64
-	length, err = strconv.ParseUint(string(fields[n-2]), 10, 16)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse length: %s", err)
-	}
-
-	// Fuzziness
-	var fuzz uint64
-	fuzz, err = strconv.ParseUint(string(fields[n-1]), 10, 8)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse fuzziness: %s", err)
-	}
-
-	// update index
-	index.File = string(file)
-	index.Offset = offset
-	index.Length = length
-	index.Fuzziness = uint8(fuzz)
-
-	return // OK
+// ToStat converts format specific data to STATISTICS.
+func ToStat(stat *Statistics) *search.Statistics {
+	return raw.ToStat((*raw.Statistics)(stat))
 }
