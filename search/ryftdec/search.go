@@ -90,6 +90,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return mux, nil // OK for now
 }
 
+// get backend options
+func (engine *Engine) getBackendOptions() (instanceName, homeDir, mountPoint string) {
+	opts := engine.Backend.Options()
+	instanceName, _ = utils.AsString(opts["instance-name"])
+	homeDir, _ = utils.AsString(opts["home-dir"])
+	mountPoint, _ = utils.AsString(opts["ryftone-mount"])
+	return
+}
+
 // Backend search function. Search() or Count()
 type SearchFunc func(cfg *search.Config) (*search.Result, error)
 
@@ -97,15 +106,15 @@ type SearchFunc func(cfg *search.Config) (*search.Result, error)
 // returns number of matches and corresponding statistics
 func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, searchFunc SearchFunc, mux *search.Result, isLast bool) (uint64, *search.Statistics, error) {
 	switch query.Type {
-	case QTYPE_SEARCH:
-	case QTYPE_DATE:
-	case QTYPE_TIME:
-	case QTYPE_NUMERIC:
-	case QTYPE_CURRENCY:
-	case QTYPE_REGEX:
-	case QTYPE_IPV4:
-	case QTYPE_IPV6:
-		// search later
+	case QTYPE_SEARCH,
+		QTYPE_DATE,
+		QTYPE_TIME,
+		QTYPE_NUMERIC,
+		QTYPE_CURRENCY,
+		QTYPE_REGEX,
+		QTYPE_IPV4,
+		QTYPE_IPV6:
+		break // search later
 
 	case QTYPE_AND:
 		//if query.Left == nil || query.Right == nil {
@@ -114,14 +123,17 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		}
 
 		task.subtaskId += 1
-		backendOptions := engine.Backend.Options()
-		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
-		backendHomeDir, _ := utils.AsString(backendOptions["home-dir"])
-		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
-		tempResult := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-and%s",
+		instanceName, homeDir, mountPoint := engine.getBackendOptions()
+		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-and-a%s",
 			task.Identifier, task.subtaskId, task.extension))
+		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
+			task.Identifier, task.subtaskId, ".txt"))
+		if !engine.KeepResultFiles {
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
+		}
 
-		task.log().WithField("temp", tempResult).
+		task.log().WithField("temp", dat1).
 			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
 		var stat1, stat2 *search.Statistics
 		var err1, err2 error
@@ -129,27 +141,30 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		// left: save results to temporary file
 		tempCfg := *cfg
-		tempCfg.KeepDataAs = tempResult
-		tempCfg.KeepIndexAs = ""
-		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && false)
+		tempCfg.KeepDataAs = dat1
+		tempCfg.KeepIndexAs = idx1
+		// !!! use /count here, to disable INDEX&DATA processing on intermediate results
+		// !!! otherwise (sometimes) Ryft hardware may be crashed on the second call
+		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg,
+			engine.Backend.Count, mux, isLast && false)
 		if err1 != nil {
 			return 0, nil, err1
 		}
 
 		if n1 > 0 { // no sense to run search on empty input
 			// right: read input from temporary file
-			tempCfg.Files = []string{tempResult}
+			tempCfg.Files = []string{dat1}
 			tempCfg.KeepDataAs = cfg.KeepDataAs
 			tempCfg.KeepIndexAs = cfg.KeepIndexAs
-			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
+			if !isLast { // intermediate result
+				// as for the first call - no sense to process INDEX&DATA
+				searchFunc = engine.Backend.Count
+			}
+			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg,
+				searchFunc, mux, isLast && true)
 			if err2 != nil {
 				return 0, nil, err2
 			}
-		}
-
-		if !engine.KeepResultFiles {
-			// remove temporary file TODO: defer!!!
-			_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResult))
 		}
 
 		// combined statistics
@@ -173,16 +188,25 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		}
 
 		task.subtaskId += 1
-		backendOptions := engine.Backend.Options()
-		backendInstance, _ := utils.AsString(backendOptions["instance-name"])
-		backendHomeDir, _ := utils.AsString(backendOptions["home-dir"])
-		backendMountPoint, _ := utils.AsString(backendOptions["ryftone-mount"])
-		tempResultA := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-a%s",
+		instanceName, homeDir, mountPoint := engine.getBackendOptions()
+		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-or-a%s",
 			task.Identifier, task.subtaskId, task.extension))
-		tempResultB := filepath.Join(backendInstance, fmt.Sprintf(".temp-%s-%d-or-b%s",
+		dat2 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-or-b%s",
 			task.Identifier, task.subtaskId, task.extension))
+		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-or-a%s",
+			task.Identifier, task.subtaskId, ".txt"))
+		idx2 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-or-b%s",
+			task.Identifier, task.subtaskId, ".txt"))
+		if len(cfg.KeepDataAs) != 0 && !engine.KeepResultFiles {
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat2))
+		}
+		if len(cfg.KeepIndexAs) != 0 && !engine.KeepResultFiles {
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
+			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx2))
+		}
 
-		task.log().WithField("temp", []string{tempResultA, tempResultB}).
+		task.log().WithField("temp", []string{dat1, dat2}).
 			Infof("[%s]/%d: running OR", TAG, task.subtaskId)
 		var stat1, stat2 *search.Statistics
 		var err1, err2 error
@@ -190,59 +214,51 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		// left: save results to temporary file "A"
 		tempCfg := *cfg
-		tempCfg.KeepDataAs = tempResultA
+		if len(cfg.KeepDataAs) != 0 {
+			tempCfg.KeepDataAs = dat1
+		}
+		if len(cfg.KeepIndexAs) != 0 {
+			tempCfg.KeepIndexAs = idx1
+		}
+		if !isLast { // intermediate result
+			// as for the AND call - no sense to process INDEX&DATA
+			searchFunc = engine.Backend.Count
+		}
 		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
 		if err1 != nil {
 			return 0, nil, err1
 		}
 
 		// right: save results to temporary file "B"
-		tempCfg.KeepDataAs = tempResultB
+		if len(cfg.KeepDataAs) != 0 {
+			tempCfg.KeepDataAs = dat2
+		}
+		if len(cfg.KeepIndexAs) != 0 {
+			tempCfg.KeepIndexAs = idx2
+		}
 		n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 		if err2 != nil {
 			return 0, nil, err2
 		}
 
-		// combine two temporary files into one
+		// combine two temporary DATA files into one
 		if len(cfg.KeepDataAs) != 0 {
-			// output file
-			f, err := os.Create(filepath.Join(backendMountPoint, backendHomeDir, cfg.KeepDataAs))
+			_, err := fileJoin(filepath.Join(mountPoint, homeDir, cfg.KeepDataAs),
+				filepath.Join(mountPoint, homeDir, dat1),
+				filepath.Join(mountPoint, homeDir, dat2))
 			if err != nil {
-				return 0, nil, fmt.Errorf("failed to create output file: %s", err)
-			}
-			defer f.Close()
-
-			// first input file
-			a, err := os.Open(filepath.Join(backendMountPoint, backendHomeDir, tempResultA))
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to open first input file: %s", err)
-			}
-			defer a.Close()
-
-			// second input file
-			b, err := os.Open(filepath.Join(backendMountPoint, backendHomeDir, tempResultB))
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to open second input file: %s", err)
-			}
-			defer b.Close()
-
-			// copy first file
-			_, err = io.Copy(f, a)
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to copy first file: %s", err)
-			}
-
-			// copy second file
-			_, err = io.Copy(f, b)
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to copy second file: %s", err)
+				return 0, nil, err
 			}
 		}
 
-		if !engine.KeepResultFiles {
-			// remove temporary files TODO: defer!!!
-			_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultA))
-			_ = os.RemoveAll(filepath.Join(backendMountPoint, backendHomeDir, tempResultB))
+		// combine two temporary INDEX files into one
+		if len(cfg.KeepIndexAs) != 0 {
+			_, err := fileJoin(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
+				filepath.Join(mountPoint, homeDir, idx1),
+				filepath.Join(mountPoint, homeDir, idx2))
+			if err != nil {
+				return 0, nil, err
+			}
 		}
 
 		// combined statistics
@@ -279,6 +295,44 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		return res.Stat.Matches, res.Stat, nil // OK
 	}
 	return 0, nil, nil // OK?
+}
+
+// join two files
+func fileJoin(result, first, second string) (uint64, error) {
+	// output file
+	f, err := os.Create(result)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create output file: %s", err)
+	}
+	defer f.Close()
+
+	// first input file
+	a, err := os.Open(first)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open first input file: %s", err)
+	}
+	defer a.Close()
+
+	// second input file
+	b, err := os.Open(second)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open second input file: %s", err)
+	}
+	defer b.Close()
+
+	// copy first file
+	na, err := io.Copy(f, a)
+	if err != nil {
+		return uint64(na), fmt.Errorf("failed to copy first file: %s", err)
+	}
+
+	// copy second file
+	nb, err := io.Copy(f, b)
+	if err != nil {
+		return uint64(na + nb), fmt.Errorf("failed to copy second file: %s", err)
+	}
+
+	return uint64(na + nb), nil // OK
 }
 
 // combine statistics

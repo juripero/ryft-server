@@ -303,7 +303,6 @@ func TestQueries(t *testing.T) {
   [IPv4]: (RECORD.ip CONTAINS IPV4(127.0.0.1 <= IP <= 127.255.255.255))
   [DATE]: (RECORD.date CONTAINS DATE("100301"))`)
 
-
-	testQueryTreet, `(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`,
-		`[IPv6]: (RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`
+	testQueryTree(t, `(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`,
+		`[IPv6]: (RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`)
 }

@@ -69,7 +69,7 @@ func (engine *Engine) String() string {
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{}
+	return engine.Backend.Options()
 }
 
 // SetLogLevel changes global module log level.

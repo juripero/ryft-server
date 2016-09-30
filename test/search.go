@@ -104,7 +104,7 @@ func newRyftHttp(log Logger) search.Engine {
 // create new ryftdec search engine
 func newRyftDec(log Logger, backend search.Engine) search.Engine {
 	name := "ryftdec"
-	engine, err := ryftdec.NewEngine(backend)
+	engine, err := ryftdec.NewEngine(backend, map[string]int{}, false)
 	if err != nil {
 		log("failed to get %q search engine: %s", name, err)
 		panic(err)
@@ -117,7 +117,7 @@ func newRyftDec(log Logger, backend search.Engine) search.Engine {
 
 // test decomposition
 func decomp0() {
-	root, _ := ryftdec.Decompose(`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`)
+	root, _ := ryftdec.Decompose(`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS DATE("100301"))) AND (RECORD.id CONTAINS TIME("200")) AND (RECORD.id CONTAINS DATE("300")) AND (RECORD.id CONTAINS DATE("400"))`, ryftdec.Options{})
 	printDecompTree(root, 0)
 }
 

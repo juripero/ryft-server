@@ -40,7 +40,7 @@ func (s *Server) count(ctx *gin.Context) {
 	// parse request parameters
 	params := CountParams{}
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
+		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
 

@@ -68,7 +68,7 @@
             "type": "string",
             "name": "format",
             "x-go-name": "Format",
-            "description": "Input data format. Parameter is used with structured search.",
+            "description": "Input data format. Parameter is used with structured or RAW text search.",
             "enum": ["raw", "xml", "json", "utf8"]
           },
           {
@@ -268,7 +268,7 @@
           "files"
         ],
         "summary": "List a directory content",
-        "description": "Endpoint to query mode/cluster file system structure",
+        "description": "Endpoint to query node/cluster file system structure",
         "operationId": "files",
         "parameters": [
           {
