@@ -36,6 +36,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftone"
@@ -142,6 +143,10 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		// left: save results to temporary file
 		tempCfg := *cfg
+		if strings.HasPrefix(strings.ToUpper(tempCfg.Query), "(RECORD") {
+			// no surrounding should be used for structured search
+			tempCfg.Surrounding = 0
+		}
 		tempCfg.KeepDataAs = dat1
 		tempCfg.KeepIndexAs = idx1
 		tempCfg.Delimiter = "\n\n" // TODO: get delimiter from configuration?
@@ -157,7 +162,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		if n1 > 0 { // no sense to run search on empty input
 			err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, idx1),
-				tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo)
+				tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
 			if err != nil {
 				return 0, nil, fmt.Errorf("failed to unwind first intermediate indexes: %s", err)
 			}
@@ -184,7 +189,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 			if !isLast && n2 > 0 && len(cfg.KeepIndexAs) > 0 && tempCfg.SaveUpdatedIndexesTo != nil {
 				err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
-					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo)
+					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
 				if err != nil {
 					return 0, nil, fmt.Errorf("failed to unwind second intermediate indexes: %s", err)
 				}
@@ -333,7 +338,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 }
 
 // parse INDEX file and update indexes
-func (task *Task) parseAndUnwindIndexes(indexPath string, basedOn map[string]*search.IndexFile, saveTo *search.IndexFile) error {
+func (task *Task) parseAndUnwindIndexes(indexPath string, basedOn map[string]*search.IndexFile, saveTo *search.IndexFile, width uint) error {
 	file, err := os.Open(indexPath)
 	if err != nil {
 		return fmt.Errorf("failed to open: %s", err)
@@ -354,7 +359,7 @@ func (task *Task) parseAndUnwindIndexes(indexPath string, basedOn map[string]*se
 
 			if basedOn != nil {
 				if f, ok := basedOn[index.File]; ok && f != nil {
-					tmp := f.Unwind(index)
+					tmp, _ := f.Unwind(index, width)
 					// task.log().Debugf("unwind %s => %s", index, tmp)
 					index = tmp
 				} else {

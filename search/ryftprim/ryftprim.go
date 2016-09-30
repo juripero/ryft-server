@@ -103,6 +103,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	}
 
 	// optional surrounding
+	task.Surrounding = cfg.Surrounding
 	if cfg.Surrounding > 0 {
 		args = append(args, "-w", fmt.Sprintf("%d", cfg.Surrounding))
 	}
@@ -540,20 +541,32 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 	// close at the end
 	defer file.Close()
+	modifiedRecords := 0
+	defer func() {
+		if modifiedRecords != 0 {
+			task.log().WithField("records", modifiedRecords).Warnf("some records are modified!")
+		}
+	}()
 
 	// try to process all INDEX records
 	r := bufio.NewReader(file)
 	offset := uint64(0)
 	for index := range task.indexChan {
+		dataLen := index.Length
+		shift := 0
 		if task.UnwindIndexesBasedOn != nil {
 			if f, ok := task.UnwindIndexesBasedOn[index.File]; ok && f != nil {
-				tmp := f.Unwind(index)
+				var tmp search.Index
+				tmp, shift = f.Unwind(index, task.Surrounding)
 				// task.log().Debugf("unwind %s => %s", index, tmp)
 				index = tmp
 			}
 		}
 		if task.SaveUpdatedIndexesTo != nil {
 			task.SaveUpdatedIndexesTo.AddIndex(index)
+		}
+		if shift != 0 || index.Length != dataLen {
+			modifiedRecords += 1
 		}
 
 		// trim mount point from file name! TODO: special option for this?
@@ -564,7 +577,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		rec.Index = index
 
 		// try to read data: if operation is cancelled `data` is nil
-		rec.Data, err = task.readDataFile(r, index.Length,
+		rec.Data, err = task.readDataFile(r, dataLen,
 			engine.ReadFilePollTimeout,
 			engine.ReadFilePollLimit)
 		if err != nil {
@@ -579,6 +592,8 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 			return // no sense to continue processing
 		}
+		// assertion: index.Length+shift <= dataLen
+		rec.Data = rec.Data[shift : shift+int(index.Length)]
 
 		if atomic.LoadInt32(&task.dataCancelled) != 0 {
 			task.log().Debugf("[%s]: DATA processing cancelled ***", TAG)
@@ -588,7 +603,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 		res.ReportRecord(rec)
-		offset += index.Length
+		offset += dataLen
 
 		if task.Limit > 0 && res.RecordsReported() >= task.Limit {
 			task.log().WithField("limit", task.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)

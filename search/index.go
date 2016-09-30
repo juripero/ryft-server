@@ -118,18 +118,48 @@ func (f *IndexFile) Find(offset uint64) int {
 }
 
 // Unwind unwinds the index
-func (f *IndexFile) Unwind(index Index) Index {
-	if n := f.Find(index.Offset); n < len(f.items) {
-		if base := f.items[n]; base.dataBeg <= index.Offset && index.Offset < base.dataEnd {
-			// tmp := index
-			index.Offset -= base.dataBeg
-			index.Offset += base.Offset
-			index.File = base.File
-			// index.Length += 0
-			// index.Fuzziness += 0
-			// fmt.Printf("unwinding (base:%s) %s=>%s\n", base, tmp, index)
+func (f *IndexFile) Unwind(index Index, width uint) (Index, int) {
+	var n, shift int // item index, data shift
+
+	// we should take into account surrounding width.
+	// in common case data are surrounded: [w]data[w]
+	// but at begin or end of file no surrounding
+	// or just a part of surrounding may be presented
+	if index.Offset == 0 {
+		// begin: [0..w]data[w]
+		dataEnd := index.Length - uint64(width+1)
+		n = f.Find(dataEnd)
+	} else {
+		// middle: [w]data[w]
+		// or end: [w]data[0..w]
+		dataBeg := index.Offset + uint64(width)
+		n = f.Find(dataBeg)
+	}
+
+	if n < len(f.items) {
+		base := f.items[n]
+		index.File = base.File
+
+		// found data [beg..end)
+		beg := index.Offset
+		end := index.Offset + index.Length
+		if base.dataBeg <= beg {
+			// data offset is within our base
+			// need to adjust just offset
+			index.Offset = base.Offset + (beg - base.dataBeg)
+		} else {
+			// data offset before our base
+			// need to truncate "begin" surrounding part
+			index.Offset = base.Offset
+			index.Length -= (base.dataBeg - beg)
+			shift = int(base.dataBeg - beg)
+		}
+		if end > base.dataEnd {
+			// end of data after our base
+			// need to truncate "end" surrounding part
+			index.Length -= (end - base.dataEnd)
 		}
 	}
 
-	return index
+	return index, shift
 }

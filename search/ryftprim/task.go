@@ -56,6 +56,7 @@ type Task struct {
 	KeepIndexFile bool
 	KeepDataFile  bool
 	Delimiter     string
+	Surrounding   uint
 
 	UnwindIndexesBasedOn map[string]*search.IndexFile
 	SaveUpdatedIndexesTo *search.IndexFile
