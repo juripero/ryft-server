@@ -598,7 +598,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	}
 
 	// open catalog
-	cat, err := catalog.OpenCatalog(filepath.Join(mountPoint, catalogPath), false)
+	cat, err := catalog.OpenCatalog(filepath.Join(mountPoint, catalogPath))
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to open catalog file: %s ", err)
 	}

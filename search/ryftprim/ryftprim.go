@@ -134,7 +134,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 
 			// iterate all matches
 			for _, catalogPath := range matches {
-				cat, err := catalog.OpenCatalog(catalogPath, true)
+				cat, err := catalog.OpenCatalogReadOnly(catalogPath)
 				if err != nil {
 					return fmt.Errorf("failed to open catalog: %s", err)
 				}

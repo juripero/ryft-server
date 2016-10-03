@@ -15,15 +15,15 @@ import (
 )
 
 // add file to catalog
-func testFileUpload(t *testing.T, id int, catalog string, filename string, length int64) (string, uint64) {
+func testFileUpload(t *testing.T, id int, catalog string, filename string, length int64) (string, int64) {
 	// open catalog
-	cf, err := OpenCatalog(catalog, false)
+	cf, err := OpenCatalog(catalog)
 	if assert.NoError(t, err, "run-id:%d", id) && assert.NotNil(t, cf, "run-id:%d", id) {
 		defer cf.Close()
 
 		// update catalog atomically
 		// TODO: check unknown length (length <= 0)!
-		data_path, data_pos, err := cf.AddFile(filename, 0, length)
+		data_path, data_pos, _, err := cf.AddFile(filename, 0, length, nil)
 		assert.NoError(t, err, "failed to add file to catalog %s run-id:%d", catalog, id)
 
 		return data_path, data_pos
@@ -71,7 +71,7 @@ func TestFileUpload(t *testing.T) {
 			atomic.AddUint64(&expected_len, uint64(length))
 
 			path, pos := testFileUpload(t, id, catalog, filename, length)
-			res_ch <- FileUploadResult{path, FileUploadPart{pos, uint64(length)}}
+			res_ch <- FileUploadResult{path, FileUploadPart{uint64(pos), uint64(length)}}
 		}(i)
 	}
 

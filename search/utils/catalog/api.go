@@ -50,7 +50,7 @@ func IsCatalog(path string) bool {
 		return false // bad size
 	}
 
-	cat, err := OpenCatalog(path, true)
+	cat, err := OpenCatalogReadOnly(path)
 	if err != nil {
 		return false
 	}
@@ -63,20 +63,48 @@ func IsCatalog(path string) bool {
 	return true
 }
 
-// OpenCatalog opens catalog file.
-func OpenCatalog(path string, readOnly bool) (*Catalog, error) {
+// OpenCatalog opens catalog file in write mode.
+func OpenCatalog(path string) (*Catalog, error) {
 	cat, cached, err := getCatalog(path)
 	if err != nil {
 		return nil, err
 	}
 
 	// update database scheme
-	if !cached && !readOnly {
+	if !cached {
 		log.Printf("updating catalog scheme: %s", path)
 		if err := cat.updateSchemeSync(); err != nil {
 			cat.Close()
 			return nil, err
 		}
+	}
+
+	return cat, nil // OK
+}
+
+// OpenCatalog opens catalog file in read-only mode.
+func OpenCatalogReadOnly(path string) (*Catalog, error) {
+	cat, _, err := getCatalog(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return cat, nil // OK
+}
+
+// OpenCatalog opens catalog file in write mode.
+func OpenCatalogNoCache(path string) (*Catalog, error) {
+	// create new catalog
+	cat, err := openCatalog(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// update database scheme
+	log.Printf("updating catalog scheme: %s", path)
+	if err := cat.updateSchemeSync(); err != nil {
+		cat.Close()
+		return nil, err
 	}
 
 	return cat, nil // OK

@@ -304,7 +304,7 @@ func deleteAllCatalogs(mountPoint string, items []string) map[string]error {
 			}
 
 			// get catalog
-			cat, err := catalog.OpenCatalog(catalogPath, true)
+			cat, err := catalog.OpenCatalogReadOnly(catalogPath)
 			if err != nil {
 				res[rel] = err
 				continue

@@ -46,7 +46,7 @@ import (
 // for the /search endpoint.
 type SearchParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
-	OldFiles      []string `form:"files" json:"files"`
+	OldFiles      []string `form:"files" json:"files"` // obsolete: will be deleted
 	Files         []string `form:"file" json:"file"`
 	Catalogs      []string `form:"catalog" json:"catalogs"`
 	Mode          string   `form:"mode" json:"mode"`
