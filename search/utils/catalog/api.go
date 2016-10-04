@@ -39,8 +39,8 @@ import (
 // global cache instance
 var globalCache = NewCache()
 
-// ErrNotCatalog is used to indicate the file is not a catalog meta-data file.
-var ErrNotCatalog = errors.New("not a catalog")
+// ErrNotACatalog is used to indicate the file is not a catalog meta-data file.
+var ErrNotACatalog = errors.New("not a catalog")
 
 // IsCatalog check if file is a catalog
 func IsCatalog(path string) bool {

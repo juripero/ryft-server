@@ -172,6 +172,15 @@ func (cat *Catalog) stopDropTimerSync() {
 }
 
 // Check database scheme (synchronized).
+func (cat *Catalog) CheckScheme() bool {
+	if ok, err := cat.checkSchemeSync(); err != nil || !ok {
+		return false
+	}
+
+	return true
+}
+
+// Check database scheme (synchronized).
 func (cat *Catalog) checkSchemeSync() (bool, error) {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()

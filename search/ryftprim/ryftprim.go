@@ -116,57 +116,87 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// search query
 	args = append(args, "-q", ryftone.PrepareQuery(cfg.Query))
 
-	// files
-	for _, file := range cfg.Files {
-		path := filepath.Join(engine.HomeDir, file)
-		path = engine.relativeToMountPoint(path)
-		args = append(args, "-f", path)
-	}
+	// files and catalogs combined
+	files := []string{}
+	files = append(files, cfg.Files...)
+	files = append(files, cfg.Catalogs...)
+	file_args := []string{} // with catalogs, after glob()
+	N_catalogs := 0
 
-	// catalogs
-	if 0 < len(cfg.Catalogs) {
-		for _, mask := range cfg.Catalogs {
-			// relative -> absolute (mount point + home + ...)
-			matches, err := filepath.Glob(filepath.Join(engine.MountPoint, engine.HomeDir, mask))
-			if err != nil {
-				return fmt.Errorf("failed to glob catalog file: %s", err)
+	// check it dynamically: catalog or regular file
+	for _, mask := range files {
+		// relative -> absolute (mount point + home + ...)
+		matches, err := filepath.Glob(filepath.Join(engine.MountPoint, engine.HomeDir, mask))
+		if err != nil {
+			return fmt.Errorf("failed to glob file mask %s: %s", mask, err)
+		}
+
+		// iterate all matches
+		for _, filePath := range matches {
+			if info, err := os.Stat(filePath); err != nil {
+				return fmt.Errorf("failed to stat file: %s", err)
+			} else if info.IsDir() {
+				task.log().WithField("path", filePath).Warnf("[%s]: is a directory, skipped", TAG)
+				continue
+			} else if info.Size() == 0 {
+				task.log().WithField("path", filePath).Warnf("[%s]: empty file, skipped", TAG)
+				continue
+			} else if strings.HasPrefix(info.Name(), ".") {
+				task.log().WithField("path", filePath).Debugf("[%s]: hidden file, skipped", TAG)
+				continue
 			}
 
-			// iterate all matches
-			for _, catalogPath := range matches {
-				cat, err := catalog.OpenCatalogReadOnly(catalogPath)
-				if err != nil {
-					return fmt.Errorf("failed to open catalog: %s", err)
-				}
-				defer cat.Close()
+			task.log().WithField("file", filePath).Debugf("checking catalog file...")
+			cat, err := catalog.OpenCatalogReadOnly(filePath)
+			if err != nil {
+				return fmt.Errorf("failed to open catalog: %s", err)
+			}
+			defer cat.Close()
+			if !cat.CheckScheme() /*!cat.IsCatalog()*/ {
+				// just a regular file, use it "as is"
+				task.log().WithField("file", filePath).Debugf(".. just a regular file")
+				file_args = append(file_args, "-f", engine.relativeToMountPointAbs(filePath))
 
-				// data files (absolute path)
-				files, err := cat.GetDataFiles()
-				if err != nil {
-					return fmt.Errorf("failed to get catalog files: %s", err)
-				}
+				continue // go to next match
+			}
 
-				// unwind indexes
-				indexes, err := cat.GetSearchIndexFile()
-				if err != nil {
-					return fmt.Errorf("failed to get catalog indexes: %s", err)
-				}
+			task.log().WithField("file", filePath).Debugf(".. is a catalog")
+			N_catalogs += 1
 
-				// relative to mount point
-				for _, file := range files {
-					path, err := filepath.Rel(engine.MountPoint, file)
-					if err != nil {
-						path = file // "as is" in case of an error
-					}
-					args = append(args, "-f", path)
-				}
+			// data files (absolute path)
+			files, err := cat.GetDataFiles()
+			if err != nil {
+				return fmt.Errorf("failed to get catalog files: %s", err)
+			}
 
-				// update unwind index base
-				for path, f := range indexes {
-					cfg.SetUnwindIndexesBasedOn(path, f)
-				}
+			// unwind indexes
+			indexes, err := cat.GetSearchIndexFile()
+			if err != nil {
+				return fmt.Errorf("failed to get catalog indexes: %s", err)
+			}
+
+			// relative to mount point
+			for _, file := range files {
+				file_args = append(file_args, "-f", engine.relativeToMountPointAbs(file))
+			}
+
+			// update unwind index base
+			for path, f := range indexes {
+				cfg.SetUnwindIndexesBasedOn(path, f)
 			}
 		}
+	}
+
+	if N_catalogs == 0 {
+		// no catalogs were found
+		// can use input "as is"
+		for _, file := range files {
+			path := filepath.Join(engine.HomeDir, file)
+			path = engine.relativeToMountPoint(path)
+			args = append(args, "-f", path)
+		}
+	} else {
+		args = append(args, file_args...)
 	}
 
 	// INDEX results file
@@ -648,7 +678,12 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 // make path relative to mountpoint
 func (engine *Engine) relativeToMountPoint(path string) string {
 	full := filepath.Join(engine.MountPoint, path) // full path
-	rel, err := filepath.Rel(engine.MountPoint, full)
+	return engine.relativeToMountPointAbs(full)
+}
+
+// make path relative to mountpoint (path is already absolute)
+func (engine *Engine) relativeToMountPointAbs(path string) string {
+	rel, err := filepath.Rel(engine.MountPoint, path)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to get relative path", TAG)
 		return path // "as is"
