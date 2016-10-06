@@ -254,12 +254,13 @@ func (cat *Catalog) updateScheme() error {
 
 // version1: create tables
 func (cat *Catalog) updateSchemeToVersion1(tx *sql.Tx) error {
-	SCRIPT := ` -- create tables
+	SCRIPT := `-- create tables
 CREATE TABLE IF NOT EXISTS data (
 	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	file STRING NOT NULL,         -- data filename, relative to catalog file
+	file STRING UNIQUE NOT NULL,  -- data filename, relative to catalog file
 	len INTEGER DEFAULT (0),      -- total data length, offset for the next file part
 	opt INTEGER DEFAULT (0),      -- TBD (busy/activity monitor)
+	s_w INTEGER DEFAULT (0),      -- surrounding width
 	delim BLOB                    -- delimiter, should be set once
 );
 CREATE TABLE IF NOT EXISTS parts (
@@ -269,7 +270,11 @@ CREATE TABLE IF NOT EXISTS parts (
 	len INTEGER NOT NULL,         -- part length, -1 if unknown yet
 	opt INTEGER DEFAULT (0),      -- TBD (busy/activity monitor, deleted, corrupted)
 	d_id INTEGER NOT NULL REFERENCES data (id) ON DELETE CASCADE,
-	d_pos INTEGER NOT NULL        -- position in data file
+	d_pos INTEGER NOT NULL,       -- position in data file
+
+	u_name STRING,                -- unwinded filename
+	u_pos INTEGER,                -- unwinded offset
+	u_len INTEGER                 -- unwinded length
 );
 
 -- create triggers
@@ -548,9 +553,9 @@ func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id i
 	}
 
 	// ensure delimiter is the same each time
-	if pdelim != nil {
-		fmt.Printf("delimiter check (old:#%x, new:#%x)\n", data_delim.String, pdelim)
-	}
+	//if pdelim != nil {
+	//	fmt.Printf("delimiter check (old:#%x, new:#%x)\n", data_delim.String, *pdelim)
+	//}
 	if data_delim.Valid && pdelim != nil && data_delim.String != *pdelim {
 		return 0, "", 0, "", fmt.Errorf("delimiter cannot be changed (old:#%x, new:#%x)", data_delim.String, *pdelim)
 	}
@@ -564,4 +569,24 @@ func (cat *Catalog) newDataFilePath() string {
 	_, file := filepath.Split(cat.path)
 	// make file hidden and randomize by unix timestamp
 	return fmt.Sprintf(".data-%016x-%s", time.Now().UnixNano(), file)
+}
+
+// clear all tables
+func (cat *Catalog) ClearAll() error {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.clearAll()
+}
+
+// clear all tables (unsync)
+func (cat *Catalog) clearAll() error {
+	_, err := cat.db.Exec(`DELETE FROM data`)
+	if err != nil {
+		return fmt.Errorf("failed to delete data: %s", err)
+	}
+
+	// all parts will be deleted by trigger
+
+	return nil // OK
 }

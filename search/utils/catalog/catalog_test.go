@@ -111,3 +111,91 @@ func TestFileUpload(t *testing.T) {
 
 	time.Sleep(20 * time.Second)
 }
+
+// check multi catalogs
+func TestUnwind(t *testing.T) {
+	catalog := "/tmp/catalog.tmp.db"
+	workcat := "/tmp/catalog.work.db"
+	os.RemoveAll(catalog)
+	os.RemoveAll(workcat)
+
+	var data_file string
+	cat, err := OpenCatalog(catalog)
+	if assert.NoError(t, err) && assert.NotNil(t, cat) {
+		defer cat.Close()
+		delim := "\n"
+
+		_, _, _, err = cat.AddFile("1.txt", 0, 17, &delim)
+		_, _, _, err = cat.AddFile("2.txt", 0, 17, &delim)
+		_, _, _, err = cat.AddFile("3.txt", 0, 17, &delim)
+		_, _, _, err = cat.AddFile("1.txt", 17, 17, &delim)
+		_, _, _, err = cat.AddFile("2.txt", 17, 17, &delim)
+		data_file, _, _, err = cat.AddFile("3.txt", 17, 17, &delim)
+		assert.NoError(t, err)
+	}
+
+	wcat, err := OpenCatalog(workcat)
+	if assert.NoError(t, err) && assert.NotNil(t, wcat) {
+		defer wcat.Close()
+
+		err = wcat.CopyFrom(cat)
+		assert.NoError(t, err, "failed to copy catalog")
+	}
+
+	// create first index file: find "hello,w=2"
+	idx1, err := os.Create("/tmp/index1.txt")
+	if assert.NoError(t, err) && assert.NotNil(t, idx1) {
+		idx1.WriteString(fmt.Sprintf("%s,4,9,0\n", data_file))
+		idx1.WriteString(fmt.Sprintf("%s,22,9,0\n", data_file))
+		idx1.WriteString(fmt.Sprintf("%s,40,9,0\n", data_file))
+		idx1.WriteString(fmt.Sprintf("%s,58,9,0\n", data_file))
+		idx1.WriteString(fmt.Sprintf("%s,76,9,0\n", data_file))
+		idx1.WriteString(fmt.Sprintf("%s,94,9,0\n", data_file))
+		idx1.WriteString(fmt.Sprintf("%s,4,9,0\n", "4.txt"))
+		idx1.WriteString(fmt.Sprintf("%s,5,9,0\n", "5.txt"))
+		idx1.Sync()
+		idx1.Close()
+
+		data_file = "/tmp/data-1.bin"
+		err = wcat.AddRyftResults(data_file, "/tmp/index1.txt", "\r\n", 2)
+		assert.NoError(t, err, "failed to add Ryft results")
+	}
+
+	// create second index file, find:"hello,w=0"
+	idx2, err := os.Create("/tmp/index2.txt")
+	if assert.NoError(t, err) && assert.NotNil(t, idx2) {
+		idx2.WriteString(fmt.Sprintf("%s,2,5,0\n", data_file))
+		idx2.WriteString(fmt.Sprintf("%s,13,5,0\n", data_file))
+		idx2.WriteString(fmt.Sprintf("%s,24,5,0\n", data_file))
+		idx2.WriteString(fmt.Sprintf("%s,35,5,0\n", data_file))
+		idx2.WriteString(fmt.Sprintf("%s,46,5,0\n", data_file))
+		idx2.WriteString(fmt.Sprintf("%s,57,5,0\n", data_file))
+		idx2.WriteString(fmt.Sprintf("%s,68,5,0\n", data_file))
+		idx2.WriteString(fmt.Sprintf("%s,79,5,0\n", data_file))
+		idx2.Sync()
+		idx2.Close()
+
+		data_file = "/tmp/data-2.bin"
+		err = wcat.AddRyftResults(data_file, "/tmp/index2.txt", "\n", 0)
+		assert.NoError(t, err, "failed to add Ryft results")
+	}
+
+	// create third index file, find:"ell,w=2"
+	idx3, err := os.Create("/tmp/index3.txt")
+	if assert.NoError(t, err) && assert.NotNil(t, idx3) {
+		idx3.WriteString(fmt.Sprintf("%s,0,6,1\n", data_file))
+		idx3.WriteString(fmt.Sprintf("%s,5,6,1\n", data_file))
+		idx3.WriteString(fmt.Sprintf("%s,11,6,1\n", data_file))
+		idx3.WriteString(fmt.Sprintf("%s,17,6,1\n", data_file))
+		idx3.WriteString(fmt.Sprintf("%s,23,6,1\n", data_file))
+		idx3.WriteString(fmt.Sprintf("%s,29,6,1\n", data_file))
+		idx3.WriteString(fmt.Sprintf("%s,35,6,1\n", data_file))
+		idx3.WriteString(fmt.Sprintf("%s,41,5,1\n", data_file))
+		idx3.Sync()
+		idx3.Close()
+
+		data_file = "/tmp/data-3.bin"
+		err = wcat.AddRyftResults(data_file, "/tmp/index3.txt", "\f", 2)
+		assert.NoError(t, err, "failed to add Ryft results")
+	}
+}

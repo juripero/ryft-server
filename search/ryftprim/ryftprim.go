@@ -161,6 +161,10 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 			}
 
 			task.log().WithField("file", filePath).Debugf(".. is a catalog")
+			if tc, ok := cfg.WorkCatalog.(*catalog.Catalog); ok && tc != nil {
+				// TODO: refactor this logic
+				tc.CopyFrom(cat)
+			}
 			N_catalogs += 1
 
 			// data files (absolute path)

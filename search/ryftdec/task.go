@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
 var (
@@ -51,6 +52,8 @@ type Task struct {
 	config    *search.Config
 	queries   *Node // root query
 	extension string
+
+	result *catalog.Catalog
 }
 
 // NewTask creates new task.

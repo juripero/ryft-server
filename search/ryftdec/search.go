@@ -41,6 +41,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
 // Search starts asynchronous "/search" with RyftDEC engine.
@@ -73,18 +74,68 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
+	instanceName, homeDir, mountPoint := engine.getBackendOptions()
+	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
+		task.Identifier, task.subtaskId, task.extension))
+	task.result, err = catalog.OpenCatalog(filepath.Join(mountPoint, homeDir, res1))
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to create res catalog", TAG)
+		return nil, fmt.Errorf("failed to create res catalog: %s", err)
+	}
+	err = task.result.ClearAll()
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to clear res catalog", TAG)
+		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
+	}
+	task.log().WithField("results", task.result.GetPath()).Infof("[%s]: temporary result catalog", TAG)
+
 	mux := search.NewResult()
+	keepDataAs := task.config.KeepDataAs
+	keepIndexAs := task.config.KeepIndexAs
+
 	go func() {
 		// some futher cleanup
 		defer mux.Close()
 		defer mux.ReportDone()
+		defer func() {
+			task.result.DropFromCache()
+			task.result.Close()
+			if !engine.KeepResultFiles {
+				os.RemoveAll(task.result.GetPath())
+			}
+		}()
 
-		_, stat, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Search, mux, true)
-		mux.Stat = stat
+		res, err := engine.search(task, task.queries, task.config,
+			engine.Backend.Search, mux, false /*isLast - to use /count*/)
+		mux.Stat = res.Stat
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
 			mux.ReportError(err)
+			return
+		}
+
+		if !engine.KeepResultFiles {
+			defer res.removeAll(mountPoint, homeDir)
+		}
+
+		// post-processing
+		task.log().WithField("data", res.Output).Infof("final results")
+		for _, out := range res.Output {
+			if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
+				filepath.Join(mountPoint, homeDir, out.IndexFile),
+				out.Delimiter, out.Width, 1 /*final*/); err != nil {
+				mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
+				return
+			}
+		}
+
+		err = engine.drainFinalResults(task, mux,
+			task.result, keepDataAs, keepIndexAs,
+			filepath.Join(mountPoint, homeDir))
+		if err != nil {
+			task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
+			mux.ReportError(err)
+			return
 		}
 
 		// TODO: handle task cancellation!!!
@@ -104,9 +155,54 @@ func (engine *Engine) getBackendOptions() (instanceName, homeDir, mountPoint str
 // Backend search function. Search() or Count()
 type SearchFunc func(cfg *search.Config) (*search.Result, error)
 
+// one Ryft call result
+type RyftCall struct {
+	DataFile  string
+	IndexFile string
+	Delimiter string
+	Width     uint
+}
+
+// intermediate search results
+type SearchResult struct {
+	Stat   *search.Statistics
+	Output []RyftCall // list of data/index files
+}
+
+// get number of matches
+func (res SearchResult) Matches() uint64 {
+	if res.Stat != nil {
+		return res.Stat.Matches
+	}
+
+	return 0 // no stat yet
+}
+
+// get list of data files
+func (res SearchResult) GetDataFiles() []string {
+	dat := make([]string, 0, len(res.Output))
+	for _, out := range res.Output {
+		dat = append(dat, out.DataFile)
+	}
+	return dat
+}
+
+// remove all data and index files
+func (res SearchResult) removeAll(mountPoint, homeDir string) {
+	for _, out := range res.Output {
+		os.RemoveAll(filepath.Join(mountPoint, homeDir, out.DataFile))
+		os.RemoveAll(filepath.Join(mountPoint, homeDir, out.IndexFile))
+	}
+}
+
 // process and wait all /search subtasks
 // returns number of matches and corresponding statistics
-func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, searchFunc SearchFunc, mux *search.Result, isLast bool) (uint64, *search.Statistics, error) {
+func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, searchFunc SearchFunc, mux *search.Result, isLast bool) (SearchResult, error) {
+	var result SearchResult
+
+	instanceName, homeDir, mountPoint := engine.getBackendOptions()
+	task.subtaskId += 1
+
 	switch query.Type {
 	case QTYPE_SEARCH,
 		QTYPE_DATE,
@@ -121,25 +217,12 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 	case QTYPE_AND:
 		//if query.Left == nil || query.Right == nil {
 		if len(query.SubNodes) != 2 {
-			return 0, nil, fmt.Errorf("invalid format for AND operator")
+			return result, fmt.Errorf("invalid format for AND operator")
 		}
 
-		task.subtaskId += 1
-		instanceName, homeDir, mountPoint := engine.getBackendOptions()
-		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-and-a%s",
-			task.Identifier, task.subtaskId, task.extension))
-		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-and-a%s",
-			task.Identifier, task.subtaskId, ".txt"))
-		if !engine.KeepResultFiles {
-			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
-			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
-		}
-
-		task.log().WithField("temp", dat1).
-			Infof("[%s]/%d: running AND", TAG, task.subtaskId)
-		var stat1, stat2 *search.Statistics
+		task.log().Infof("[%s]/%d: running AND", TAG, task.subtaskId)
+		var res1, res2 SearchResult
 		var err1, err2 error
-		var n1, n2 uint64
 
 		// left: save results to temporary file
 		tempCfg := *cfg
@@ -147,194 +230,167 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			// no surrounding should be used for structured search
 			tempCfg.Surrounding = 0
 		}
-		tempCfg.KeepDataAs = dat1
-		tempCfg.KeepIndexAs = idx1
-		tempCfg.Delimiter = "\n\n" // TODO: get delimiter from configuration?
-		tempCfg.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
-		tempCfg.SaveUpdatedIndexesTo = search.NewIndexFile(tempCfg.Delimiter)
+		tempCfg.Delimiter = catalog.DefaultDataDelimiter
+		//		tempCfg.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
+		//		tempCfg.SaveUpdatedIndexesTo = search.NewIndexFile(tempCfg.Delimiter)
+		tempCfg.WorkCatalog = task.result // to get data from input catalogs
 		// !!! use /count here, to disable INDEX&DATA processing on intermediate results
 		// !!! otherwise (sometimes) Ryft hardware may be crashed on the second call
-		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg,
+		res1, err1 = engine.search(task, query.SubNodes[0], &tempCfg,
 			engine.Backend.Count, mux, isLast && false)
 		if err1 != nil {
-			return 0, nil, err1
+			return result, err1
 		}
 
-		if n1 > 0 { // no sense to run search on empty input
-			err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, idx1),
-				tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
-			if err != nil {
-				return 0, nil, fmt.Errorf("failed to unwind first intermediate indexes: %s", err)
+		if res1.Matches() > 0 { // no sense to run search on empty input
+			//			err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, res1.IndexFiles[0]),
+			//				tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
+			//			if err != nil {
+			//				return result, fmt.Errorf("failed to unwind first intermediate indexes: %s", err)
+			//			}
+
+			defer res1.removeAll(mountPoint, homeDir)
+			for _, out := range res1.Output {
+				if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
+					filepath.Join(mountPoint, homeDir, out.IndexFile),
+					out.Delimiter, out.Width, 0 /*intermediate*/); err != nil {
+					return result, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
+				}
 			}
 
 			// right: read input from temporary file
-			tempCfg.Files = []string{dat1}
+			tempCfg.Files = res1.GetDataFiles()
 			tempCfg.Catalogs = nil
-			tempCfg.KeepDataAs = cfg.KeepDataAs
-			tempCfg.KeepIndexAs = cfg.KeepIndexAs
 			tempCfg.Delimiter = cfg.Delimiter
-			tempCfg.UnwindIndexesBasedOn = map[string]*search.IndexFile{
-				filepath.Join(mountPoint, homeDir, dat1): tempCfg.SaveUpdatedIndexesTo,
-			}
-			tempCfg.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
+			//			tempCfg.UnwindIndexesBasedOn = map[string]*search.IndexFile{
+			//				filepath.Join(mountPoint, homeDir, res1.DataFiles[0]): tempCfg.SaveUpdatedIndexesTo,
+			//			}
+			//			tempCfg.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
 			if !isLast { // intermediate result
 				// as for the first call - no sense to process INDEX&DATA
 				searchFunc = engine.Backend.Count
 			}
-			n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg,
+			res2, err2 = engine.search(task, query.SubNodes[1], &tempCfg,
 				searchFunc, mux, isLast && true)
 			if err2 != nil {
-				return 0, nil, err2
+				return result, err2
 			}
 
-			if !isLast && n2 > 0 && len(cfg.KeepIndexAs) > 0 && tempCfg.SaveUpdatedIndexesTo != nil {
-				err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
-					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
-				if err != nil {
-					return 0, nil, fmt.Errorf("failed to unwind second intermediate indexes: %s", err)
-				}
+			if !isLast && res2.Matches() > 0 && len(cfg.KeepIndexAs) > 0 && tempCfg.SaveUpdatedIndexesTo != nil {
+				//				err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
+				//					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
+				//				if err != nil {
+				//					return result, fmt.Errorf("failed to unwind second intermediate indexes: %s", err)
+				//				}
 			}
 
 			if isLast && len(cfg.KeepIndexAs) > 0 {
 				// TODO: save updated indexes back to text file!
 			}
+
+			// combined statistics
+			if res1.Stat != nil && res2.Stat != nil {
+				result.Stat = search.NewStat(res1.Stat.Host)
+				statCombine(result.Stat, res1.Stat)
+				statCombine(result.Stat, res2.Stat)
+				// keep the number of matches equal to the last stat
+				result.Stat.Matches = res2.Stat.Matches
+			}
+
+			result.Output = res2.Output
+			return result, nil // OK
 		}
 
-		// combined statistics
-		var stat *search.Statistics
-		if stat1 != nil && stat2 != nil {
-			stat = search.NewStat(stat1.Host)
-			statCombine(stat, stat1)
-			statCombine(stat, stat2)
-			// keep the number of matches equal to the last stat
-			stat.Matches = stat2.Matches
-		} else {
-			stat = stat1 // just use first one
-		}
-
-		return n2, stat, nil // OK
+		return res1, nil // OK
 
 	case QTYPE_OR:
 		//if query.Left == nil || query.Right == nil {
 		if len(query.SubNodes) != 2 {
-			return 0, nil, fmt.Errorf("invalid format for OR operator")
+			return result, fmt.Errorf("invalid format for OR operator")
 		}
 
-		task.subtaskId += 1
-		instanceName, homeDir, mountPoint := engine.getBackendOptions()
-		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-or-a%s",
-			task.Identifier, task.subtaskId, task.extension))
-		dat2 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d-or-b%s",
-			task.Identifier, task.subtaskId, task.extension))
-		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-or-a%s",
-			task.Identifier, task.subtaskId, ".txt"))
-		idx2 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d-or-b%s",
-			task.Identifier, task.subtaskId, ".txt"))
-		if len(cfg.KeepDataAs) != 0 && !engine.KeepResultFiles {
-			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat1))
-			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, dat2))
-		}
-		if len(cfg.KeepIndexAs) != 0 && !engine.KeepResultFiles {
-			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx1))
-			defer os.RemoveAll(filepath.Join(mountPoint, homeDir, idx2))
-		}
-
-		task.log().WithField("temp", []string{dat1, dat2}).
-			Infof("[%s]/%d: running OR", TAG, task.subtaskId)
-		var stat1, stat2 *search.Statistics
+		task.log().Infof("[%s]/%d: running OR", TAG, task.subtaskId)
+		var res1, res2 SearchResult
 		var err1, err2 error
-		var n1, n2 uint64
 
 		// left: save results to temporary file "A"
 		tempCfg := *cfg
-		if len(cfg.KeepDataAs) != 0 {
-			tempCfg.KeepDataAs = dat1
-		}
-		if len(cfg.KeepIndexAs) != 0 {
-			tempCfg.KeepIndexAs = idx1
-		}
 		// tempCfg.Delimiter
+		tempCfg.WorkCatalog = task.result // to get data from input catalogs
 		// tempCfg.UnwindIndexesBasedOn
 		// tempCfg.SaveUpdatedIndexesTo
 		if !isLast { // intermediate result
 			// as for the AND call - no sense to process INDEX&DATA
 			searchFunc = engine.Backend.Count
 		}
-		n1, stat1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
+		res1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
 		if err1 != nil {
-			return 0, nil, err1
+			return result, err1
 		}
 
 		// right: save results to temporary file "B"
-		if len(cfg.KeepDataAs) != 0 {
-			tempCfg.KeepDataAs = dat2
-		}
-		if len(cfg.KeepIndexAs) != 0 {
-			tempCfg.KeepIndexAs = idx2
-		}
 		// tempCfg.Delimiter
+		tempCfg.WorkCatalog = nil // data already parsed by first call
 		// tempCfg.UnwindIndexesBasedOn
 		// tempCfg.SaveUpdatedIndexesTo
-		n2, stat2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
+		res2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 		if err2 != nil {
-			return 0, nil, err2
-		}
-
-		// combine two temporary DATA files into one
-		if len(cfg.KeepDataAs) != 0 {
-			_, err := fileJoin(filepath.Join(mountPoint, homeDir, cfg.KeepDataAs),
-				filepath.Join(mountPoint, homeDir, dat1),
-				filepath.Join(mountPoint, homeDir, dat2))
-			if err != nil {
-				return 0, nil, err
-			}
-		}
-
-		// combine two temporary INDEX files into one
-		if len(cfg.KeepIndexAs) != 0 {
-			_, err := fileJoin(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
-				filepath.Join(mountPoint, homeDir, idx1),
-				filepath.Join(mountPoint, homeDir, idx2))
-			if err != nil {
-				return 0, nil, err
-			}
-			// TODO: save updated indexes back to text file!
+			return result, err2
 		}
 
 		// combined statistics
-		var stat *search.Statistics
-		if stat1 != nil && stat2 != nil {
-			stat = search.NewStat(stat1.Host)
-			statCombine(stat, stat1)
-			statCombine(stat, stat2)
+		if res1.Stat != nil && res2.Stat != nil {
+			result.Stat = search.NewStat(res1.Stat.Host)
+			statCombine(result.Stat, res1.Stat)
+			statCombine(result.Stat, res2.Stat)
 		}
 
-		return n1 + n2, stat, nil // OK
+		// combine two temporary DATA files into one
+		result.Output = append(result.Output, res1.Output...)
+		result.Output = append(result.Output, res2.Output...)
+		task.log().WithField("output-1", res1).WithField("output-2", res2).WithField("or-output", result).Infof("combined output")
+
+		return result, nil // OK
 
 	case QTYPE_XOR:
-		return 0, nil, fmt.Errorf("XOR is not implemented yet")
+		return result, fmt.Errorf("XOR is not implemented yet")
 
 	default:
-		return 0, nil, fmt.Errorf("%d is unknown query type", query.Type)
+		return result, fmt.Errorf("%d is unknown query type", query.Type)
 	}
 
 	updateConfig(cfg, query)
 	task.log().WithField("mode", cfg.Mode).
 		WithField("query", cfg.Query).
-		WithField("input", cfg.Files).
-		WithField("output", cfg.KeepDataAs).
+		WithField("files", cfg.Files).
+		WithField("catalogs", cfg.Catalogs).
 		Infof("[%s]/%d: running backend search", TAG, task.subtaskId)
+
+	dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d%s",
+		task.Identifier, task.subtaskId, task.extension))
+	idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d%s",
+		task.Identifier, task.subtaskId, ".txt"))
+
+	cfg.KeepDataAs = dat1
+	cfg.KeepIndexAs = idx1
+	result.Output = []RyftCall{
+		{
+			DataFile:  cfg.KeepDataAs,
+			IndexFile: cfg.KeepIndexAs,
+			Delimiter: cfg.Delimiter,
+			Width:     cfg.Surrounding,
+		},
+	}
 
 	res, err := searchFunc(cfg)
 	if err != nil {
-		return 0, nil, err
+		return result, err
 	}
 
 	task.drainResults(mux, res, isLast)
-	if res.Stat != nil {
-		return res.Stat.Matches, res.Stat, nil // OK
-	}
-	return 0, nil, nil // OK?
+	result.Stat = res.Stat
+	task.log().WithField("output", result).Infof("Ryft call result")
+	return result, nil // OK
 }
 
 // parse INDEX file and update indexes
@@ -456,4 +512,30 @@ func updateConfig(cfg *search.Config, node *Node) {
 	cfg.Fuzziness = node.Options.Dist
 	cfg.Surrounding = node.Options.Width
 	cfg.CaseSensitive = node.Options.Cs
+}
+
+// drain all result records from working catalog
+func (engine *Engine) drainFinalResults(task *Task, mux *search.Result, wcat *catalog.Catalog,
+	keepDataAs, keepIndexAs string, mountPointAndHomeDir string) error {
+	items, err := wcat.QueryAll(0x01, 0x01)
+	if err != nil {
+		return err
+	}
+
+	// handle all index items
+	for item := range items {
+		var rec search.Record
+		//rec.Data = // TODO: read data
+		// trim mount point from file name! TODO: special option for this?
+		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
+
+		rec.Index.File = item.File
+		rec.Index.Offset = item.Offset
+		rec.Index.Length = item.Length
+		rec.Index.Fuzziness = item.Fuzziness
+
+		mux.ReportRecord(&rec)
+	}
+
+	return nil // OK
 }

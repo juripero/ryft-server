@@ -64,18 +64,24 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	}
 	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
 
+	_, homeDir, mountPoint := engine.getBackendOptions()
+
 	mux := search.NewResult()
 	go func() {
 		// some futher cleanup
 		defer mux.Close()
 		defer mux.ReportDone()
 
-		_, stat, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Count, mux, true)
-		mux.Stat = stat
+		res, err := engine.search(task, task.queries, task.config,
+			engine.Backend.Count, mux, false)
+		mux.Stat = res.Stat
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
 			mux.ReportError(err)
+		}
+
+		if !engine.KeepResultFiles {
+			defer res.removeAll(mountPoint, homeDir)
 		}
 
 		// TODO: handle task cancellation!!!

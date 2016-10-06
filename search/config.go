@@ -55,6 +55,9 @@ type Config struct {
 
 	UnwindIndexesBasedOn map[string]*IndexFile
 	SaveUpdatedIndexesTo *IndexFile
+
+	// TODO: refactor this!!!
+	WorkCatalog interface{} // *catalog.Catalog
 }
 
 // NewEmptyConfig creates new empty search configuration.
