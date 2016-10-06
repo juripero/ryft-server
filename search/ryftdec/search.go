@@ -522,12 +522,42 @@ func (engine *Engine) drainFinalResults(task *Task, mux *search.Result, wcat *ca
 		return err
 	}
 
+	files := make(map[string]*os.File)
+
 	// handle all index items
 	for item := range items {
 		var rec search.Record
 		//rec.Data = // TODO: read data
 		// trim mount point from file name! TODO: special option for this?
 		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
+
+		f := files[item.DataFile]
+		if f == nil {
+			f, err = os.Open(item.DataFile)
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to open data file: %s", err))
+				// continue // go to next item
+			} else {
+				files[item.DataFile] = f // put to cache
+				defer f.Close()          // close later
+			}
+		}
+
+		if f != nil {
+			_, err = f.Seek(int64(item.DataPos+uint64(item.Shift)), 0 /*os.SeekBegin*/)
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
+			} else {
+				rec.Data = make([]byte, item.Length)
+				n, err := io.ReadFull(f, rec.Data)
+				if err != nil {
+					mux.ReportError(fmt.Errorf("failed to read data: %s", err))
+				}
+				if uint64(n) != item.Length {
+					mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Length))
+				}
+			}
+		}
 
 		rec.Index.File = item.File
 		rec.Index.Offset = item.Offset

@@ -234,20 +234,26 @@ type IndexItem struct {
 	Length    uint64
 	Shift     int
 	Fuzziness uint8
+
+	DataFile string
+	DataPos  uint64
 }
 
 // query all unwinded items
 func (cat *Catalog) QueryAll(opt uint32, optMask uint32) (chan IndexItem, error) {
 	// TODO: data file
 	rows, err := cat.db.Query(`
-SELECT DISTINCT
-	ifnull(u_name, name) AS name,
-	ifnull(u_pos, pos) AS pos,
-	ifnull(u_len, len) AS len,
-	ifnull(u_shift, 0) AS shift,
-	(opt >> 24)&255 AS fuzz  -- extract fuzziness back
-FROM parts
-WHERE ? == (opt&?)`, opt, optMask)
+SELECT
+	ifnull(p.u_name, p.name) AS x_name,
+	ifnull(p.u_pos, p.pos) AS x_pos,
+	ifnull(p.u_len, p.len) AS x_len,
+	ifnull(p.u_shift, 0) AS x_shift,
+	(p.opt >> 24)&255 AS x_fuzz,  -- extract fuzziness back
+	p.d_pos, d.file
+FROM parts AS p
+JOIN data AS d ON p.d_id == d.id
+WHERE ? == (p.opt&?)
+GROUP BY x_name,x_pos,x_len,x_fuzz;`, opt, optMask)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +266,8 @@ WHERE ? == (opt&?)`, opt, optMask)
 
 		for rows.Next() {
 			var item IndexItem
-			err := rows.Scan(&item.File, &item.Offset, &item.Length, &item.Shift, &item.Fuzziness)
+			err := rows.Scan(&item.File, &item.Offset, &item.Length,
+				&item.Shift, &item.Fuzziness, &item.DataPos, &item.DataFile)
 			if err != nil {
 				// TODO: report error
 				break
