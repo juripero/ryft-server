@@ -197,10 +197,10 @@ AND ? BETWEEN p.d_pos AND p.d_pos+p.len-1`, index.File, offset) // TODO: ORDER B
 
 			// insert new file part (data file will be updated by INSERT trigger!)
 			_, err = tx.Exec(`INSERT
-INTO main.parts(name,pos,len,opt,d_id,d_pos,u_name,u_pos,u_len)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, index.File, index.Offset, index.Length,
+INTO main.parts(name,pos,len,opt,d_id,d_pos,u_name,u_pos,u_len,u_shift)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, index.File, index.Offset, index.Length,
 				(uint32(index.Fuzziness)<<24)|opt, data_id, data_pos,
-				base_uname, base_upos, base_ulen)
+				base_uname, base_upos, base_ulen, shift)
 			if err != nil {
 				return fmt.Errorf("failed to insert file part: %s", err)
 			}
@@ -232,16 +232,19 @@ type IndexItem struct {
 	File      string
 	Offset    uint64
 	Length    uint64
+	Shift     int
 	Fuzziness uint8
 }
 
 // query all unwinded items
 func (cat *Catalog) QueryAll(opt uint32, optMask uint32) (chan IndexItem, error) {
 	// TODO: data file
-	rows, err := cat.db.Query(`SELECT DISTINCT
-	CASE WHEN u_name IS NULL THEN name ELSE u_name END AS name,
-	CASE WHEN u_pos IS NULL THEN pos ELSE u_pos END AS pos,
-	CASE WHEN u_len IS NULL THEN len ELSE u_len END AS len,
+	rows, err := cat.db.Query(`
+SELECT DISTINCT
+	ifnull(u_name, name) AS name,
+	ifnull(u_pos, pos) AS pos,
+	ifnull(u_len, len) AS len,
+	ifnull(u_shift, 0) AS shift,
 	(opt >> 24)&255 AS fuzz  -- extract fuzziness back
 FROM parts
 WHERE ? == (opt&?)`, opt, optMask)
@@ -257,7 +260,7 @@ WHERE ? == (opt&?)`, opt, optMask)
 
 		for rows.Next() {
 			var item IndexItem
-			err := rows.Scan(&item.File, &item.Offset, &item.Length, &item.Fuzziness)
+			err := rows.Scan(&item.File, &item.Offset, &item.Length, &item.Shift, &item.Fuzziness)
 			if err != nil {
 				// TODO: report error
 				break
