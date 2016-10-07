@@ -33,6 +33,7 @@ package rest
 import (
 	"fmt"
 	"net/http"
+	"runtime/debug"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -74,6 +75,8 @@ func RecoverFromPanic(c *gin.Context) {
 	}
 
 	if r := recover(); r != nil {
+		log.Debugf("stack trace:\n%s", debug.Stack())
+
 		if err, ok := r.(*ServerError); ok {
 			log.WithField("status", err.Status).WithError(err).Warnf("Panic recovered server error")
 
