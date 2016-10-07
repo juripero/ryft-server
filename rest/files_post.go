@@ -109,7 +109,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		Infof("saving new data...")
 	status := http.StatusOK
 
-	if !params.Local && !s.LocalOnly {
+	if !params.Local && !s.Config.LocalOnly {
 		files := []string{params.Catalog}
 		if len(params.Catalog) == 0 {
 			files[0] = params.File

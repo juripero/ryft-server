@@ -81,63 +81,63 @@ func main() {
 
 	config := &serverConfigValue{s: server}
 	kingpin.Flag("config", "Server configuration in YML format.").SetValue(config)
-	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&server.LocalOnly)
-	kingpin.Flag("keep", "Keep temporary search result files.").Short('k').BoolVar(&server.KeepResults)
-	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&server.DebugMode)
-	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&server.BusynessTolerance)
+	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&server.Config.LocalOnly)
+	kingpin.Flag("keep", "Keep temporary search result files.").Short('k').BoolVar(&server.Config.KeepResults)
+	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&server.Config.DebugMode)
+	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&server.Config.BusynessTolerance)
 
-	kingpin.Flag("address", "Address:port to listen on.").Short('l').Default(":8765").StringVar(&server.ListenAddress)
-	kingpin.Flag("tls", "Enable TLS/SSL.").Short('t').BoolVar(&server.TLS.Enabled)
-	kingpin.Flag("tls-cert", "Certificate file. Required for --tls enabled.").StringVar(&server.TLS.CertFile)
-	kingpin.Flag("tls-key", "Key-file. Required for --tls enabled.").StringVar(&server.TLS.KeyFile)
-	kingpin.Flag("tls-address", "HTTPS address:port to listen on.").Default(":8766").StringVar(&server.TLS.ListenAddress)
+	kingpin.Flag("address", "Address:port to listen on.").Short('l').Default(":8765").StringVar(&server.Config.ListenAddress)
+	kingpin.Flag("tls", "Enable TLS/SSL.").Short('t').BoolVar(&server.Config.TLS.Enabled)
+	kingpin.Flag("tls-cert", "Certificate file. Required for --tls enabled.").StringVar(&server.Config.TLS.CertFile)
+	kingpin.Flag("tls-key", "Key-file. Required for --tls enabled.").StringVar(&server.Config.TLS.KeyFile)
+	kingpin.Flag("tls-address", "HTTPS address:port to listen on.").Default(":8766").StringVar(&server.Config.TLS.ListenAddress)
 
-	kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Default("none").EnumVar(&server.AuthType, "none", "file", "ldap")
-	kingpin.Flag("users-file", "User credentials filename. Required for --auth=file.").ExistingFileVar(&server.AuthFile.UsersFile)
-	kingpin.Flag("jwt-alg", "JWT signing algorithm.").Default("HS256").StringVar(&server.AuthJwt.Algorithm)
-	kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").StringVar(&server.AuthJwt.Secret)
-	kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").StringVar(&server.AuthJwt.Lifetime)
+	kingpin.Flag("auth", "Authentication type: none, file, ldap.").Short('a').Default("none").EnumVar(&server.Config.AuthType, "none", "file", "ldap")
+	kingpin.Flag("users-file", "User credentials filename. Required for --auth=file.").ExistingFileVar(&server.Config.AuthFile.UsersFile)
+	kingpin.Flag("jwt-alg", "JWT signing algorithm.").Default("HS256").StringVar(&server.Config.AuthJwt.Algorithm)
+	kingpin.Flag("jwt-secret", "JWT secret. Required for --auth=file or --auth=ldap.").StringVar(&server.Config.AuthJwt.Secret)
+	kingpin.Flag("jwt-lifetime", "JWT token lifetime.").Default("1h").StringVar(&server.Config.AuthJwt.Lifetime)
 
-	kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").StringVar(&server.AuthLdap.ServerAddress)
-	kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").StringVar(&server.AuthLdap.BindUsername)
-	kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").StringVar(&server.AuthLdap.BindPassword)
-	kingpin.Flag("ldap-query", "LDAP user lookup query. Required for --auth=ldap.").Default("(&(uid=%s))").StringVar(&server.AuthLdap.QueryFormat)
-	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups. Required for --auth=ldap.").StringVar(&server.AuthLdap.BaseDN)
+	kingpin.Flag("ldap-server", "LDAP Server address:port. Required for --auth=ldap.").StringVar(&server.Config.AuthLdap.ServerAddress)
+	kingpin.Flag("ldap-user", "LDAP username for binding. Required for --auth=ldap.").StringVar(&server.Config.AuthLdap.BindUsername)
+	kingpin.Flag("ldap-pass", "LDAP password for binding. Required for --auth=ldap.").StringVar(&server.Config.AuthLdap.BindPassword)
+	kingpin.Flag("ldap-query", "LDAP user lookup query. Required for --auth=ldap.").Default("(&(uid=%s))").StringVar(&server.Config.AuthLdap.QueryFormat)
+	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups. Required for --auth=ldap.").StringVar(&server.Config.AuthLdap.BaseDN)
 
 	kingpin.Parse()
 
 	// check extra dependencies logic not handled by kingpin
-	switch strings.ToLower(server.AuthType) {
+	switch strings.ToLower(server.Config.AuthType) {
 	case "file":
 		switch {
-		case len(server.AuthFile.UsersFile) == 0:
+		case len(server.Config.AuthFile.UsersFile) == 0:
 			kingpin.FatalUsage("users-file is required for file authentication.")
-		case len(server.AuthJwt.Secret) == 0:
+		case len(server.Config.AuthJwt.Secret) == 0:
 			kingpin.FatalUsage("jwt-secret is required for any authentication.")
 		}
 
 	case "ldap":
 		switch {
-		case len(server.AuthLdap.ServerAddress) == 0:
+		case len(server.Config.AuthLdap.ServerAddress) == 0:
 			kingpin.FatalUsage("ldap-server is required for ldap authentication.")
-		case len(server.AuthLdap.BindUsername) == 0:
+		case len(server.Config.AuthLdap.BindUsername) == 0:
 			kingpin.FatalUsage("ldap-user is required for ldap authentication.")
-		case len(server.AuthLdap.BindPassword) == 0:
+		case len(server.Config.AuthLdap.BindPassword) == 0:
 			kingpin.FatalUsage("ldap-pass is required for ldap authentication.")
-		case len(server.AuthLdap.BaseDN) == 0:
+		case len(server.Config.AuthLdap.BaseDN) == 0:
 			kingpin.FatalUsage("ldap-basedn is required for ldap authentication.")
-		case len(server.AuthJwt.Secret) == 0:
+		case len(server.Config.AuthJwt.Secret) == 0:
 			kingpin.FatalUsage("jwt-secret is required for any authentication.")
 		}
 	}
 
-	if server.TLS.Enabled {
+	if server.Config.TLS.Enabled {
 		switch {
-		case len(server.TLS.ListenAddress) == 0:
+		case len(server.Config.TLS.ListenAddress) == 0:
 			kingpin.FatalUsage("tls-address option is required for TLS enabled")
-		case len(server.TLS.CertFile) == 0:
+		case len(server.Config.TLS.CertFile) == 0:
 			kingpin.FatalUsage("tls-cert option is required for TLS enabled")
-		case len(server.TLS.KeyFile) == 0:
+		case len(server.Config.TLS.KeyFile) == 0:
 			kingpin.FatalUsage("tls-key option is required for TLS enabled")
 		}
 	}
@@ -146,13 +146,13 @@ func main() {
 		kingpin.FatalUsage("%s", err)
 	}
 
-	log.WithField("config", server).
+	log.WithField("config", server.Config).
 		WithField("version", Version).
 		WithField("git-hash", GitHash).
 		Infof("starting server...")
 
 	// be quiet and efficient in production
-	if !server.DebugMode {
+	if !server.Config.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
 		rest.SetLogLevel(logrus.DebugLevel)
@@ -173,15 +173,15 @@ func main() {
 
 	// Enable authentication if configured
 	var auth_provider auth.Provider
-	switch strings.ToLower(server.AuthType) {
+	switch strings.ToLower(server.Config.AuthType) {
 	case "file":
-		file, err := auth.NewFile(server.AuthFile.UsersFile)
+		file, err := auth.NewFile(server.Config.AuthFile.UsersFile)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to read users file")
 		}
 		auth_provider = file
 	case "ldap":
-		ldap, err := auth.NewLDAP(server.AuthLdap)
+		ldap, err := auth.NewLDAP(server.Config.AuthLdap)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to init LDAP authentication")
 		}
@@ -189,21 +189,21 @@ func main() {
 	case "none", "":
 		break
 	default:
-		log.WithField("auth", server.AuthType).Fatalf("unknown authentication type")
+		log.WithField("auth", server.Config.AuthType).Fatalf("unknown authentication type")
 	}
 
 	// authentication enabled
 	if auth_provider != nil {
 		mw := auth.NewMiddleware(auth_provider, "")
-		secret, err := auth.ParseSecret(server.AuthJwt.Secret)
+		secret, err := auth.ParseSecret(server.Config.AuthJwt.Secret)
 		if err != nil {
 			log.WithError(err).Fatalf("Failed to parse JWT secret")
 		}
-		lifetime, err := time.ParseDuration(server.AuthJwt.Lifetime)
+		lifetime, err := time.ParseDuration(server.Config.AuthJwt.Lifetime)
 		if err != nil {
 			log.WithError(err).Fatalf("Failed to parse JWT lifetime")
 		}
-		mw.EnableJwt(secret, server.AuthJwt.Algorithm, lifetime)
+		mw.EnableJwt(secret, server.Config.AuthJwt.Algorithm, lifetime)
 		private.Use(mw.Authentication())
 		private.GET("/token/refresh", mw.RefreshHandler())
 		router.POST("/login", mw.LoginHandler())
@@ -239,28 +239,28 @@ func main() {
 		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
 	})
 
-	if !server.LocalOnly {
+	if !server.Config.LocalOnly {
 		server.StartUpdatingBusyness()
 	}
 
 	// start listening on HTTPS port
-	if server.TLS.Enabled {
-		https_ep := &http.Server{Addr: server.TLS.ListenAddress, Handler: router}
+	if server.Config.TLS.Enabled {
+		https_ep := &http.Server{Addr: server.Config.TLS.ListenAddress, Handler: router}
 		https_ep.ReadTimeout = server.GetHttpTimeout()
 		https_ep.WriteTimeout = server.GetHttpTimeout()
 
 		go func() {
-			if err := https_ep.ListenAndServeTLS(server.TLS.CertFile, server.TLS.KeyFile); err != nil {
-				log.WithError(err).WithField("port", server.TLS.ListenAddress).Fatalf("failed to listen HTTPS")
+			if err := https_ep.ListenAndServeTLS(server.Config.TLS.CertFile, server.Config.TLS.KeyFile); err != nil {
+				log.WithError(err).WithField("port", server.Config.TLS.ListenAddress).Fatalf("failed to listen HTTPS")
 			}
 		}()
 	}
 
 	// start listening on HTTP port
-	http_ep := &http.Server{Addr: server.ListenAddress, Handler: router}
+	http_ep := &http.Server{Addr: server.Config.ListenAddress, Handler: router}
 	http_ep.ReadTimeout = server.GetHttpTimeout()
 	http_ep.WriteTimeout = server.GetHttpTimeout()
 	if err := http_ep.ListenAndServe(); err != nil {
-		log.WithError(err).WithField("port", server.ListenAddress).Fatalf("failed to listen HTTP")
+		log.WithError(err).WithField("port", server.Config.ListenAddress).Fatalf("failed to listen HTTP")
 	}
 }

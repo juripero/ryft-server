@@ -44,7 +44,7 @@ import (
 
 // get search backend with options
 func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, homeDir, userTag string) (search.Engine, error) {
-	if !s.LocalOnly && !localOnly {
+	if !s.Config.LocalOnly && !localOnly {
 		return s.getClusterSearchEngine(files, authToken, homeDir, userTag)
 	}
 
@@ -129,7 +129,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 			"index-host": url,
 		}
 		// log level
-		if _, ok := opts["log-level"]; !ok && s.DebugMode {
+		if _, ok := opts["log-level"]; !ok && s.Config.DebugMode {
 			opts["log-level"] = "debug"
 		}
 
@@ -169,8 +169,8 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	opts := s.getBackendOptions()
 
 	// some auto-options
-	switch s.SearchBackend {
-	case "ryftprim":
+	switch s.Config.SearchBackend {
+	case "ryftprim", "ryftone":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
 			opts["instance-name"] = fmt.Sprintf(".rest-%d", s.listenAddress.Port)
@@ -183,7 +183,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 
 		// keep-files
 		if _, ok := opts["keep-files"]; !ok {
-			opts["keep-files"] = s.KeepResults
+			opts["keep-files"] = s.Config.KeepResults
 		}
 
 		// index-host
@@ -192,27 +192,27 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 		}
 
 		// log level
-		if _, ok := opts["log-level"]; !ok && s.DebugMode {
+		if _, ok := opts["log-level"]; !ok && s.Config.DebugMode {
 			opts["log-level"] = "debug"
 		}
 	}
 
-	backend, err := search.NewEngine(s.SearchBackend, opts)
+	backend, err := search.NewEngine(s.Config.SearchBackend, opts)
 	if err != nil {
 		return backend, err
 	}
 
 	// special query decomposer
-	if s.DebugMode {
+	if s.Config.DebugMode {
 		ryftdec.SetLogLevel("debug")
 	}
-	return ryftdec.NewEngine(backend, s.BooleansPerExpression, s.KeepResults)
+	return ryftdec.NewEngine(backend, s.Config.BooleansPerExpression, s.Config.KeepResults)
 }
 
 // deep copy of backend options
 func (s *Server) getBackendOptions() map[string]interface{} {
 	opts := make(map[string]interface{})
-	for k, v := range s.BackendOptions {
+	for k, v := range s.Config.BackendOptions {
 		opts[k] = v
 	}
 	return opts

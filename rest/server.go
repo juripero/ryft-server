@@ -52,8 +52,8 @@ var (
 	log = logrus.New()
 )
 
-// Server instance
-type Server struct {
+// ServerConfig server's configuration.
+type ServerConfig struct {
 	SearchBackend  string                 `yaml:"search-backend,omitempty"`
 	BackendOptions map[string]interface{} `yaml:"backend-options,omitempty"`
 	LocalOnly      bool                   `yaml:"local-only,omitempty"`
@@ -61,7 +61,6 @@ type Server struct {
 	KeepResults    bool                   `yaml:"keep-results,omitempty"`
 
 	ListenAddress string `yaml:"address,omitempty"`
-	listenAddress *net.TCPAddr
 
 	HttpTimeout string `yaml:"http-timeout,omitempty"`
 
@@ -88,12 +87,6 @@ type Server struct {
 
 	BusynessTolerance int `yaml:"busyness-tolerance,omitempty"`
 
-	// the number of active search requests on this node
-	// is used as a metric for "busyness"
-	// worker thread is started if "local mode" is disabled
-	activeSearchCount int32
-	busynessChanged   chan int32
-
 	BooleansPerExpression map[string]int `yaml:"booleans-per-expression"`
 
 	// catalogs related options
@@ -103,6 +96,19 @@ type Server struct {
 		DataDelimiter    string `yaml:"default-data-delim"`
 		TempDirectory    string `yaml:"temp-dir"`
 	} `yaml:"catalogs,omitempty"`
+}
+
+// Server instance
+type Server struct {
+	Config ServerConfig
+
+	listenAddress *net.TCPAddr
+
+	// the number of active search requests on this node
+	// is used as a metric for "busyness"
+	// worker thread is started if "local mode" is disabled
+	activeSearchCount int32
+	busynessChanged   chan int32
 
 	// consul client is cached here
 	consulClient interface{}
@@ -113,8 +119,8 @@ func NewServer() *Server {
 	s := new(Server)
 
 	// default configuration
-	s.SearchBackend = "ryftprim"
-	s.BackendOptions = map[string]interface{}{}
+	s.Config.SearchBackend = "ryftprim"
+	s.Config.BackendOptions = map[string]interface{}{}
 
 	return s // OK
 }
@@ -143,8 +149,8 @@ func (s *Server) ParseConfig(fileName string) error {
 	}
 
 	// validate catalog's maximum data file size
-	if len(s.Catalogs.MaxDataFileSize) > 0 {
-		if lim, err := utils.ParseDataSize(s.Catalogs.MaxDataFileSize); err != nil {
+	if len(s.Config.Catalogs.MaxDataFileSize) > 0 {
+		if lim, err := utils.ParseDataSize(s.Config.Catalogs.MaxDataFileSize); err != nil {
 			return fmt.Errorf("failed to parse catalog maximum data size: %s", err)
 		} else if lim == 0 {
 			return fmt.Errorf("catalog maximum data size cannot be zero")
@@ -154,8 +160,8 @@ func (s *Server) ParseConfig(fileName string) error {
 	}
 
 	// validate catalog's cache drop timeout
-	if len(s.Catalogs.CacheDropTimeout) > 0 {
-		if t, err := time.ParseDuration(s.Catalogs.CacheDropTimeout); err != nil {
+	if len(s.Config.Catalogs.CacheDropTimeout) > 0 {
+		if t, err := time.ParseDuration(s.Config.Catalogs.CacheDropTimeout); err != nil {
 			return fmt.Errorf("failed to parse catalog cache drop timeout: %s", err)
 		} else {
 			catalog.DefaultCacheDropTimeout = t
@@ -163,16 +169,16 @@ func (s *Server) ParseConfig(fileName string) error {
 	}
 
 	// assign other catalog options
-	catalog.DefaultDataDelimiter = s.Catalogs.DataDelimiter
-	catalog.DefaultTempDirectory = s.Catalogs.TempDirectory
+	catalog.DefaultDataDelimiter = s.Config.Catalogs.DataDelimiter
+	catalog.DefaultTempDirectory = s.Config.Catalogs.TempDirectory
 
 	return nil // OK
 }
 
 // apply configuration
 func (s *Server) ApplyConfig() (err error) {
-	if s.listenAddress, err = net.ResolveTCPAddr("tcp", s.ListenAddress); err != nil {
-		return fmt.Errorf("%q is not a valid TCP address: %s", s.ListenAddress, err)
+	if s.listenAddress, err = net.ResolveTCPAddr("tcp", s.Config.ListenAddress); err != nil {
+		return fmt.Errorf("%q is not a valid TCP address: %s", s.Config.ListenAddress, err)
 	}
 
 	return nil // OK
@@ -180,11 +186,11 @@ func (s *Server) ApplyConfig() (err error) {
 
 // get read/write http timeout
 func (s *Server) GetHttpTimeout() time.Duration {
-	if len(s.HttpTimeout) == 0 {
+	if len(s.Config.HttpTimeout) == 0 {
 		return 1 * time.Hour // default
 	}
 
-	d, err := time.ParseDuration(s.HttpTimeout)
+	d, err := time.ParseDuration(s.Config.HttpTimeout)
 	if err != nil {
 		panic(err)
 	}

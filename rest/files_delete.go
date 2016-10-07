@@ -71,7 +71,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 	// list of files whose tags are matched.
 
 	result := make(map[string]interface{})
-	if !params.Local && !s.LocalOnly && !params.isEmpty() {
+	if !params.Local && !s.Config.LocalOnly && !params.isEmpty() {
 		files := params.Dirs[:]
 		files = append(files, params.Files...)
 		files = append(files, params.Catalogs...)
