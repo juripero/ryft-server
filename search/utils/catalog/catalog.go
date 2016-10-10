@@ -33,7 +33,6 @@ package catalog
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -88,7 +87,7 @@ func openCatalog(path string) (*Catalog, error) {
 	cat.path = filepath.Clean(path)
 	cat.db = db
 
-	log.Printf("open new catalog: %s", path)
+	log.WithField("path", path).Debugf("[%s]: open new catalog", TAG)
 	return cat, nil // OK
 }
 
@@ -101,7 +100,7 @@ func (cat *Catalog) Close() error {
 
 	// close database
 	if db := cat.db; db != nil {
-		log.Printf("close catalog: %s", cat.path)
+		log.WithField("path", cat.path).Debugf("[%s]: close catalog: %s", TAG)
 		cat.db = nil
 		return db.Close()
 	}
@@ -151,7 +150,7 @@ func (cat *Catalog) startDropTimerSync(timeout time.Duration) {
 	} else {
 		cat.cacheDrop = time.AfterFunc(timeout, func() {
 			if cat.cache != nil {
-				log.Printf("dropping catalog by timer: %s", cat.path)
+				log.WithField("path", cat.path).Debugf("[%s]: dropping catalog by timer", TAG)
 				cat.cache.Drop(cat.path)
 				cat.cache = nil
 				cat.Close()

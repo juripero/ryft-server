@@ -38,7 +38,6 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/utils"
 )
 
 var (
@@ -67,18 +66,6 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 	err := engine.update(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse options: %s", err)
-	}
-
-	// update package log level
-	if v, ok := opts["log-level"]; ok {
-		s, err := utils.AsString(v)
-		if err != nil {
-			return nil, fmt.Errorf(`failed to convert "log-level" option: %s`, err)
-		}
-
-		if err := SetLogLevel(s); err != nil {
-			return nil, fmt.Errorf("failed to update log level: %s", err)
-		}
 	}
 
 	return engine, nil
@@ -154,8 +141,8 @@ func (engine *Engine) prepareFilesUrl(path string) *url.URL {
 	return u
 }
 
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
+// SetLogLevelString changes global module log level.
+func SetLogLevelString(level string) error {
 	ll, err := logrus.ParseLevel(level)
 	if err != nil {
 		return err
@@ -163,6 +150,11 @@ func SetLogLevel(level string) error {
 
 	log.Level = ll
 	return nil // OK
+}
+
+// SetLogLevel changes global module log level.
+func SetLogLevel(level logrus.Level) {
+	log.Level = level
 }
 
 // log returns task related logger.

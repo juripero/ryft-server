@@ -32,8 +32,16 @@ package catalog
 
 import (
 	"errors"
-	"log"
 	"os"
+
+	"github.com/Sirupsen/logrus"
+)
+
+var (
+	// logger instance
+	log = logrus.New()
+
+	TAG = "catalog"
 )
 
 // global cache instance
@@ -41,6 +49,11 @@ var globalCache = NewCache()
 
 // ErrNotACatalog is used to indicate the file is not a catalog meta-data file.
 var ErrNotACatalog = errors.New("not a catalog")
+
+// SetLogLevel changes global module log level.
+func SetLogLevel(level logrus.Level) {
+	log.Level = level
+}
 
 // IsCatalog check if file is a catalog
 func IsCatalog(path string) bool {
@@ -67,12 +80,13 @@ func IsCatalog(path string) bool {
 func OpenCatalog(path string) (*Catalog, error) {
 	cat, cached, err := getCatalog(path)
 	if err != nil {
+		log.WithError(err).Errorf("[%s]: failed to get catalog", TAG)
 		return nil, err
 	}
 
 	// update database scheme
 	if !cached {
-		log.Printf("updating catalog scheme: %s", path)
+		log.WithField("path", path).Debugf("[%s]: updating scheme...", TAG)
 		if err := cat.updateSchemeSync(); err != nil {
 			cat.Close()
 			return nil, err
@@ -101,7 +115,7 @@ func OpenCatalogNoCache(path string) (*Catalog, error) {
 	}
 
 	// update database scheme
-	log.Printf("updating catalog scheme: %s", path)
+	log.WithField("path", path).Debugf("[%s]: updating scheme...")
 	if err := cat.updateSchemeSync(); err != nil {
 		cat.Close()
 		return nil, err

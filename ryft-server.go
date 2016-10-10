@@ -84,6 +84,7 @@ func main() {
 	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&server.Config.LocalOnly)
 	kingpin.Flag("keep", "Keep temporary search result files.").Short('k').BoolVar(&server.Config.KeepResults)
 	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&server.Config.DebugMode)
+	kingpin.Flag("logging", "Fine-tuned logging levels.").StringVar(&server.Config.Logging)
 	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&server.Config.BusynessTolerance)
 
 	kingpin.Flag("address", "Address:port to listen on.").Short('l').Default(":8765").StringVar(&server.Config.ListenAddress)
@@ -143,13 +144,14 @@ func main() {
 	}
 
 	if err := server.Prepare(); err != nil {
-		log.WithError(err).Fatalf("failed to prepare server configuration")
+		log.WithError(err).Fatal("failed to prepare server configuration")
 	}
 
-	log.WithField("config", server.Config).
-		WithField("version", Version).
+	log.WithField("version", Version).
 		WithField("git-hash", GitHash).
 		Infof("starting server...")
+	log.WithField("config", server.Config).
+		Debugf("server configuration")
 
 	// be quiet and efficient in production
 	if !server.Config.DebugMode {
@@ -189,7 +191,7 @@ func main() {
 	case "none", "":
 		break
 	default:
-		log.WithField("auth", server.Config.AuthType).Fatalf("unknown authentication type")
+		log.WithField("auth", server.Config.AuthType).Fatal("unknown authentication type")
 	}
 
 	// authentication enabled
@@ -197,11 +199,11 @@ func main() {
 		mw := auth.NewMiddleware(auth_provider, "")
 		secret, err := auth.ParseSecret(server.Config.AuthJwt.Secret)
 		if err != nil {
-			log.WithError(err).Fatalf("Failed to parse JWT secret")
+			log.WithError(err).Fatal("Failed to parse JWT secret")
 		}
 		lifetime, err := time.ParseDuration(server.Config.AuthJwt.Lifetime)
 		if err != nil {
-			log.WithError(err).Fatalf("Failed to parse JWT lifetime")
+			log.WithError(err).Fatal("Failed to parse JWT lifetime")
 		}
 		mw.EnableJwt(secret, server.Config.AuthJwt.Algorithm, lifetime)
 		private.Use(mw.Authentication())
@@ -251,7 +253,7 @@ func main() {
 
 		go func() {
 			if err := https_ep.ListenAndServeTLS(server.Config.TLS.CertFile, server.Config.TLS.KeyFile); err != nil {
-				log.WithError(err).WithField("port", server.Config.TLS.ListenAddress).Fatalf("failed to listen HTTPS")
+				log.WithError(err).WithField("port", server.Config.TLS.ListenAddress).Fatal("failed to listen HTTPS")
 			}
 		}()
 	}
@@ -261,6 +263,6 @@ func main() {
 	http_ep.ReadTimeout = server.GetHttpTimeout()
 	http_ep.WriteTimeout = server.GetHttpTimeout()
 	if err := http_ep.ListenAndServe(); err != nil {
-		log.WithError(err).WithField("port", server.Config.ListenAddress).Fatalf("failed to listen HTTP")
+		log.WithError(err).WithField("port", server.Config.ListenAddress).Fatal("failed to listen HTTP")
 	}
 }

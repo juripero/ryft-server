@@ -70,7 +70,6 @@ func newRyftPrim(log Logger) search.Engine {
 		"open-poll":     "1s",
 		"read-poll":     "1s",
 		"read-limit":    5,
-		"log-level":     ryftprimLogLevel,
 	}
 
 	return newEngine(log, "ryftprim", opts)
@@ -84,7 +83,6 @@ func newRyftOne(log Logger) search.Engine {
 		"open-poll":     "1s",
 		"read-poll":     "1s",
 		"read-limit":    5,
-		"log-level":     ryftoneLogLevel,
 	}
 
 	return newEngine(log, "ryftone", opts)
@@ -95,7 +93,6 @@ func newRyftHttp(log Logger) search.Engine {
 	opts := map[string]interface{}{
 		"server-url": ryfthttpServerUrl,
 		"local-only": true,
-		"log-level":  ryfthttpLogLevel,
 	}
 
 	return newEngine(log, "ryfthttp", opts)

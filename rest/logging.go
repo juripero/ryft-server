@@ -28,88 +28,56 @@
  * ============
  */
 
-package ryftdec
+package rest
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/getryft/ryft-server/search/ryftdec"
+	"github.com/getryft/ryft-server/search/ryfthttp"
+	"github.com/getryft/ryft-server/search/ryftmux"
+	"github.com/getryft/ryft-server/search/ryftone"
+	"github.com/getryft/ryft-server/search/ryftprim"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 
 	"github.com/Sirupsen/logrus"
-
-	"github.com/getryft/ryft-server/search"
 )
 
 var (
-	// package logger instance
-	log = logrus.New()
-
-	TAG = "ryftdec"
+	// logger instances
+	log     = logrus.New()
+	pjobLog = logrus.New()
 )
 
-// RyftDEC engine uses abstract engine as backend.
-type Engine struct {
-	Backend               search.Engine
-	BooleansPerExpression map[string]int
-	KeepResultFiles       bool // false by default
-}
-
-// NewEngine creates new RyftDEC search engine.
-func NewEngine(backend search.Engine, booleansLimit map[string]int, keepResults bool) (*Engine, error) {
-	engine := new(Engine)
-	engine.Backend = backend
-	engine.BooleansPerExpression = booleansLimit
-	engine.KeepResultFiles = keepResults
-	return engine, nil
-}
-
-// String gets string representation of the engine.
-func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftDEC{backend:%s}", engine.Backend)
-	// TODO: other parameters?
-}
-
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	return engine.Backend.Options()
-}
-
-// SetLogLevelString changes global module log level.
-func SetLogLevelString(level string) error {
+// set logging level
+func setLoggingLevel(logger string, level string) error {
 	ll, err := logrus.ParseLevel(level)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse level: %s", err)
 	}
 
-	log.Level = ll
+	switch strings.ToLower(logger) {
+	case "core":
+		log.Level = ll
+	case "core/catalogs":
+		catalog.SetLogLevel(ll)
+	case "core/pending-jobs":
+		pjobLog.Level = ll
+		// TODO: more core loggers
+	case "search/ryftprim":
+		ryftprim.SetLogLevel(ll)
+	case "search/ryftone":
+		ryftone.SetLogLevel(ll)
+	case "search/ryfthttp":
+		ryfthttp.SetLogLevel(ll)
+	case "search/ryftmux":
+		ryftmux.SetLogLevel(ll)
+	case "search/ryftdec":
+		ryftdec.SetLogLevel(ll)
+	default:
+		return fmt.Errorf("'%s' is unknown logger name", logger)
+	}
+
 	return nil // OK
-}
-
-// SetLogLevel changes global module log level.
-func SetLogLevel(level logrus.Level) {
-	log.Level = level
-}
-
-// log returns task related logger.
-func (task *Task) log() *logrus.Entry {
-	return log.WithField("task", task.Identifier)
-}
-
-/*
-// factory creates RyftDEC engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
-	backend := parseOptions(opts)
-	engine, err := NewEngine(backend)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftDEC engine: %s", err)
-	}
-	return engine, nil
-}
-*/
-
-// package initialization
-func init() {
-	// should be created manually!
-	// search.RegisterEngine(TAG, factory)
-
-	// be silent by default
-	log.Level = logrus.WarnLevel
 }

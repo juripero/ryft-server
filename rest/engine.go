@@ -128,10 +128,6 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 			"skip-stat":  false,
 			"index-host": url,
 		}
-		// log level
-		if _, ok := opts["log-level"]; !ok && s.Config.DebugMode {
-			opts["log-level"] = "debug"
-		}
 
 		engine, err := search.NewEngine("ryfthttp", opts)
 		if err != nil {
@@ -190,11 +186,6 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 		if _, ok := opts["index-host"]; !ok {
 			opts["index-host"] = getHostName()
 		}
-
-		// log level
-		if _, ok := opts["log-level"]; !ok && s.Config.DebugMode {
-			opts["log-level"] = "debug"
-		}
 	}
 
 	backend, err := search.NewEngine(s.Config.SearchBackend, opts)
@@ -202,10 +193,6 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 		return backend, err
 	}
 
-	// special query decomposer
-	if s.Config.DebugMode {
-		ryftdec.SetLogLevel("debug")
-	}
 	return ryftdec.NewEngine(backend, s.Config.BooleansPerExpression, s.Config.KeepResults)
 }
 

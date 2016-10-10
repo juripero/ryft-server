@@ -49,11 +49,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var (
-	// logger instance
-	log = logrus.New()
-)
-
 // ServerConfig server's configuration.
 type ServerConfig struct {
 	SearchBackend  string                 `yaml:"search-backend,omitempty"`
@@ -61,6 +56,9 @@ type ServerConfig struct {
 	LocalOnly      bool                   `yaml:"local-only,omitempty"`
 	DebugMode      bool                   `yaml:"debug-mode,omitempty"`
 	KeepResults    bool                   `yaml:"keep-results,omitempty"`
+
+	Logging        string                       `yaml:"logging,omitempty"`
+	LoggingOptions map[string]map[string]string `yaml:"logging-options,omitempty"`
 
 	ListenAddress string `yaml:"address,omitempty"`
 
@@ -189,14 +187,27 @@ func (s *Server) Prepare() (err error) {
 		return fmt.Errorf("%q is not a valid TCP address: %s", s.Config.ListenAddress, err)
 	}
 
+	// settings
 	settingsDir, _ := filepath.Split(s.Config.SettingsPath)
 	_ = os.MkdirAll(settingsDir, 0755)
 	if s.settings, err = OpenSettings(s.Config.SettingsPath); err != nil {
 		return fmt.Errorf("failed to open settings: %s", err)
 	}
-	s.gotPendingJobs = make(chan int, 256)
 
+	// pending jobs
+	s.gotPendingJobs = make(chan int, 256)
 	go s.processPendingJobs()
+
+	// logging levels
+	if cfg, ok := s.Config.LoggingOptions[s.Config.Logging]; ok {
+		for key, val := range cfg {
+			if err := setLoggingLevel(key, val); err != nil {
+				return fmt.Errorf("failed to apply logging level for '%s': %s", key, err)
+			}
+		}
+	} else {
+		return fmt.Errorf("no valid logging options found for '%s'", s.Config.Logging)
+	}
 
 	return nil // OK
 }

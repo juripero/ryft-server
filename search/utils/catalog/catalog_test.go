@@ -3,7 +3,6 @@ package catalog
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"os"
 	"sort"
