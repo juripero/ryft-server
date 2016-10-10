@@ -35,6 +35,8 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/getryft/ryft-server/search/utils"
@@ -96,6 +98,8 @@ type ServerConfig struct {
 		DataDelimiter    string `yaml:"default-data-delim"`
 		TempDirectory    string `yaml:"temp-dir"`
 	} `yaml:"catalogs,omitempty"`
+
+	SettingsPath string `yaml:"settings-path,omitempty"`
 }
 
 // Server instance
@@ -112,6 +116,9 @@ type Server struct {
 
 	// consul client is cached here
 	consulClient interface{}
+
+	settings       *ServerSettings
+	gotPendingJobs chan int // signal new jobs added
 }
 
 // create new server instance
@@ -121,6 +128,7 @@ func NewServer() *Server {
 	// default configuration
 	s.Config.SearchBackend = "ryftprim"
 	s.Config.BackendOptions = map[string]interface{}{}
+	s.Config.SettingsPath = "/var/ryft/server.settings"
 
 	return s // OK
 }
@@ -176,10 +184,19 @@ func (s *Server) ParseConfig(fileName string) error {
 }
 
 // apply configuration
-func (s *Server) ApplyConfig() (err error) {
+func (s *Server) Prepare() (err error) {
 	if s.listenAddress, err = net.ResolveTCPAddr("tcp", s.Config.ListenAddress); err != nil {
 		return fmt.Errorf("%q is not a valid TCP address: %s", s.Config.ListenAddress, err)
 	}
+
+	settingsDir, _ := filepath.Split(s.Config.SettingsPath)
+	_ = os.MkdirAll(settingsDir, 0755)
+	if s.settings, err = OpenSettings(s.Config.SettingsPath); err != nil {
+		return fmt.Errorf("failed to open settings: %s", err)
+	}
+	s.gotPendingJobs = make(chan int, 256)
+
+	go s.processPendingJobs()
 
 	return nil // OK
 }
@@ -212,6 +229,92 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 	}
 
 	return
+}
+
+// add new pending job
+func (s *Server) addPendingJob(command, arguments string, when time.Time) {
+	log.WithField("cmd", command).WithField("args", arguments).WithField("when", when).Debugf("adding new pending job")
+	s.settings.AddJob(command, arguments, when)
+	s.gotPendingJobs <- 1 // notify processing goroutine about new job
+}
+
+// process pending jobs
+func (s *Server) processPendingJobs() {
+	// sleep a while...
+	time.Sleep(1 * time.Second)
+
+	for {
+		now := time.Now()
+
+		// get Job list to be done (1 second advance)
+		log.WithField("time", now).Debugf("get pending jobs")
+		jobs, err := s.settings.QueryAllJobs(now.Add(1 * time.Second))
+		if err != nil {
+			log.WithError(err).Warnf("failed to get pending jobs")
+			time.Sleep(10 * time.Second)
+		}
+
+		// do jobs
+		ids := []int64{}
+		for job := range jobs {
+			if s.doPendingJob(job) {
+				ids = append(ids, job.Id)
+			}
+		}
+
+		// delete completed jobs
+		if len(ids) > 0 {
+			log.WithField("jobs", ids).Debugf("mark jobs as completed")
+			if err = s.settings.DelJobs(ids); err != nil {
+				log.WithError(err).Warnf("failed to delete completed jobs")
+			}
+		}
+
+		next, err := s.settings.GetNextJobTime()
+		if err != nil {
+			log.WithError(err).Warnf("failed to get next job time")
+			next = now.Add(1 * time.Hour)
+		}
+		log.WithField("time", next).Debugf("next job time")
+
+		sleep := next.Sub(now)
+		if sleep < time.Second {
+			sleep = time.Second
+		}
+
+		log.WithField("sleep", sleep).Debugf("sleep a while before next processing")
+		select {
+		case <-time.After(sleep):
+			continue
+		case <-s.gotPendingJobs:
+			continue
+		}
+	}
+}
+
+// do pending job
+func (s *Server) doPendingJob(job SettingsJobItem) bool {
+	switch strings.ToLower(job.Cmd) {
+	case "delete-file":
+		res := deleteAll("/", []string{job.Args})
+		log.WithField("args", job.Args).
+			WithField("result", res).
+			Debugf("pending job: delete file")
+		return true
+
+	case "delete-catalog":
+		res := deleteAllCatalogs("/", []string{job.Args})
+		log.WithField("args", job.Args).
+			WithField("result", res).
+			Debugf("pending job: delete catalog")
+		return true
+	}
+
+	log.WithField("cmd", job.Cmd).
+		WithField("args", job.Args).
+		Warnf("unknown command, ignored")
+	// return false // will be processed later
+	return true // ignore job
 }
 
 // get local host name

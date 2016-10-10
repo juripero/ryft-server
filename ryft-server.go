@@ -142,8 +142,8 @@ func main() {
 		}
 	}
 
-	if err := server.ApplyConfig(); err != nil {
-		kingpin.FatalUsage("%s", err)
+	if err := server.Prepare(); err != nil {
+		log.WithError(err).Fatalf("failed to prepare server configuration")
 	}
 
 	log.WithField("config", server.Config).

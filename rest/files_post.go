@@ -27,7 +27,10 @@ type PostFilesParams struct {
 	File      string `form:"file" json:"file"`           // filename to save
 	Offset    int64  `form:"offset" json:"offset"`       // offset inside file, used to rewrite
 	Length    int64  `form:"length" json:"length"`       // data length
+	Lifetime  string `form:"lifetime" json:"lifetime"`   // optional file lifetime
 	Local     bool   `form:"local" json:"local"`
+
+	lifetime time.Duration
 }
 
 // is empty?
@@ -100,6 +103,13 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	default:
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			contentType, "unexpected content type"))
+	}
+
+	if len(params.Lifetime) > 0 {
+		if params.lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
+			panic(NewServerErrorWithDetails(http.StatusBadRequest,
+				err.Error(), "failed to parse lifetime"))
+		}
 	}
 
 	result := map[string]interface{}{}
@@ -321,6 +331,11 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			res["error"] = err.Error()
 			res["length"] = length
 		} else {
+			if params.lifetime > 0 {
+				s.addPendingJob("delete-catalog",
+					filepath.Join(mountPoint, catalog),
+					time.Now().Add(params.lifetime))
+			}
 			res["catalog"] = catalog
 			res["length"] = length // not total, just this part
 		}
@@ -334,6 +349,11 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			res["error"] = err.Error()
 			res["length"] = length
 		} else {
+			if params.lifetime > 0 {
+				s.addPendingJob("delete-file",
+					filepath.Join(mountPoint, path),
+					time.Now().Add(params.lifetime))
+			}
 			res["path"] = path
 			res["length"] = length
 		}
