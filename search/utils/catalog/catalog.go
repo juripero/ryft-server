@@ -569,7 +569,7 @@ func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id i
 func (cat *Catalog) newDataFilePath() string {
 	_, file := filepath.Split(cat.path)
 	// make file hidden and randomize by unix timestamp
-	return fmt.Sprintf(".data-%016x-%s", time.Now().UnixNano(), file)
+	return fmt.Sprintf(".%s.catalog%c.data-%016x-%s", file, filepath.Separator, time.Now().UnixNano(), file)
 }
 
 // clear all tables

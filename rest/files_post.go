@@ -387,6 +387,9 @@ func (s *Server) postRemoteFiles(address string, authToken string, params PostFi
 	if 0 <= params.Length {
 		q.Add("length", fmt.Sprintf("%d", params.Length))
 	}
+	if len(params.Lifetime) > 0 {
+		q.Add("lifetime", params.Lifetime)
+	}
 	u.RawQuery = q.Encode()
 	u.Path += "/files"
 
@@ -612,8 +615,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 
 	// create all parent directories
 	pdir := filepath.Join(mountPoint, filepath.Dir(catalogPath))
-	err := os.MkdirAll(pdir, 0755)
-	if err != nil {
+	if err := os.MkdirAll(pdir, 0755); err != nil {
 		return "", 0, fmt.Errorf("failed to create parent directories: %s", err)
 	}
 
@@ -634,6 +636,11 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 		WithField("data_pos", data_pos).
 		Debugf("writing data part with delim:%x", data_delim)
 	// TODO: in case of write error mark corresponding part as "bad"
+
+	data_dir, _ := filepath.Split(data_path)
+	if err := os.MkdirAll(data_dir, 0755); err != nil {
+		return "", 0, fmt.Errorf("failed to create parent directories: %s", err)
+	}
 
 	// write file content
 	data, err := os.OpenFile(data_path, os.O_WRONLY|os.O_CREATE, 0644)
