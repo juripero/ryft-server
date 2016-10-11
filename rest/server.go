@@ -142,8 +142,7 @@ func (s *Server) ParseConfig(fileName string) error {
 		return fmt.Errorf("failed to read configuration from %q: %s", fileName, err)
 	}
 
-	// TODO: parse ServerConfig dedicated structure
-	err = yaml.Unmarshal(buf, &s)
+	err = yaml.Unmarshal(buf, &s.Config)
 	if err != nil {
 		return fmt.Errorf("failed to parse configuration from %q: %s", fileName, err)
 	}
@@ -196,6 +195,9 @@ func (s *Server) Prepare() (err error) {
 	if len(s.Config.Logging) == 0 && s.Config.DebugMode {
 		if _, ok := s.Config.LoggingOptions["debug"]; !ok {
 			s.Config.Logging = "debug"
+			if s.Config.LoggingOptions == nil {
+				s.Config.LoggingOptions = make(map[string]map[string]string)
+			}
 			s.Config.LoggingOptions[s.Config.Logging] = map[string]string{
 				"core":              "debug",
 				"core/catalogs":     "debug",

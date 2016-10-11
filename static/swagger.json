@@ -29,9 +29,9 @@
             "items": {
               "type": "string"
             },
-            "name": "files",
-            "x-go-name": "Files",
-            "description": "Set of files to search.  The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
+            "name": "file",
+            "x-go-name": "File",
+            "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
             "collectionFormat": "multi",
             "required": true
           },
@@ -179,9 +179,9 @@
             "items": {
               "type": "string"
             },
-            "name": "files",
-            "x-go-name": "Files",
-            "description": "Set of files to search. Wildcards are supported, for example: *.txt",
+            "name": "file",
+            "x-go-name": "File",
+            "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
             "collectionFormat": "multi",
             "required": true
           },
@@ -335,6 +335,12 @@
             "in": "query"
           },
           {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "description": "The delimiter is used between file parts in catalog."
+          },
+          {
             "name": "offset",
             "type": "integer",
             "format": "int64",
@@ -347,6 +353,18 @@
             "format": "int64",
             "description": "The optional file part length.",
             "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "description": "The file or catalog lifetime, for example '2h'."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "description": "Perform action only on this cluster member. Default 'false'."
           }
         ],
         "responses": {
