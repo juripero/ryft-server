@@ -13,13 +13,14 @@ func testNewParser(data string) *Parser {
 }
 
 // test parser
-func testParserParse(t *testing.T, data string, parsed string) {
+func testParserParse(t *testing.T, structured bool, data string, parsed string) {
 	p := testNewParser(data)
 	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
 		res, err := p.ParseQuery()
 		assert.True(t, p.EOF(), "not fully parsed")
 		assert.NoError(t, err, "valid query expected (data:%s)", data)
 		assert.Equal(t, parsed, res.String(), "not expected (data:%s)", data)
+		assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
 	}
 }
 
@@ -32,6 +33,21 @@ func testParserBad(t *testing.T, data string, expectedError string) {
 			assert.Contains(t, err.Error(), expectedError, "unexpected error (data:%s)", data)
 		}
 	}
+}
+
+// test parser (should panic)
+func testParserEof(t *testing.T, data string) {
+	p := testNewParser(data)
+	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
+		_, err := p.ParseQuery()
+		assert.NoError(t, err, "valid query expected (data:%s)", data)
+		assert.False(t, p.EOF(), "fully parsed")
+	}
+}
+
+// test for EOF
+func TestParserEOF(t *testing.T) {
+	testParserEof(t, `"?" 123`)
 }
 
 // test for panics
@@ -99,247 +115,251 @@ func TestParserBad(t *testing.T) {
 
 // test for valid queries
 func TestParserParse(t *testing.T) {
-	testParserParse(t,
+	testParserParse(t, false,
 		`                   "?"  `,
 		`(RAW_TEXT CONTAINS "?")`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`                   "hello"  `,
 		`(RAW_TEXT CONTAINS "hello")`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`                   "he"??"o"  `,
 		`(RAW_TEXT CONTAINS "he"??"o")`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		` ( RAW_TEXT  CONTAINS  "?" ) `,
 		`P{(RAW_TEXT CONTAINS "?")}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		` ( RAW_TEXT CONTAINS ?)  `,
 		`P{(RAW_TEXT CONTAINS ?)}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`                    hello  `,
 		`(RAW_TEXT CONTAINS "hello")`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`                    123  `,
 		`(RAW_TEXT CONTAINS "123")`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`                    123.456  `,
 		`(RAW_TEXT CONTAINS "123.456")`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		` ( ( RAW_TEXT CONTAINS "hello " ) ) `,
 		`P{P{(RAW_TEXT CONTAINS "hello ")}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		` ( RECORD.Name.Actors.[].Name CONTAINS "Christian" ) `,
 		`P{(RECORD.Name.Actors.[].Name CONTAINS "Christian")}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS "FEDS")`,
 		`P{(RECORD.body CONTAINS "FEDS")}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FHS("test"))`,
 		`P{(RECORD.body CONTAINS "test")[es]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FHS("test", cs = true, dist = 10, WIDTH = 100))`,
 		`P{(RECORD.body CONTAINS "test")[fhs,d=10,w=100,cs=true]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FEDS("test", cs= FALSE ,  DIST =10, WIDTH=100))`,
 		`P{(RECORD.body CONTAINS "test")[feds,d=10,w=100]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FEDS("test", ,, DIST =0, WIDTH=10))`,
 		`P{(RECORD.body CONTAINS "test")[es,w=10]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
 		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY>02/28/12))[ds]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))`,
 		`P{(RAW_TEXT CONTAINS DATE(02/28/12<MM/DD/YY<01/19/15))[ds]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
 		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS>09:15:00))[ts]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
 		`P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.price CONTAINS NUMBER("450" < NUM < "600", ",", "."))`,
 		`P{(RECORD.price CONTAINS NUMBER("450"<NUM<"600",",","."))[ns]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.price CONTAINS NUMERIC("450" < NUM < "600", ",", "."))`,
 		`P{(RECORD.price CONTAINS NUMBER("450"<NUM<"600",",","."))[ns]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
 		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[ns]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
 		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS))[rs]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS REGEXP("\w+", CASELESS, D=5))`,
 		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS,D=5))[rs]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS IPV4(IP > "127.0.0.1"))`,
 		`P{(RECORD.body CONTAINS IPV4(IP>"127.0.0.1"))[ipv4]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS IPV6(IP > "10::1"))`,
 		`P{(RECORD.body CONTAINS IPV6(IP>"10::1"))[ipv6]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "100")`,
 		`P{(RAW_TEXT CONTAINS "100")}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`   ((RAW_TEXT CONTAINS "100"))`,
 		`P{P{(RAW_TEXT CONTAINS "100")}}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "DATE()")`,
 		`P{(RAW_TEXT CONTAINS "DATE()")}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "TIME()")`,
 		`P{(RAW_TEXT CONTAINS "TIME()")}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "NUMBER()")`,
 		`P{(RAW_TEXT CONTAINS "NUMBER()")}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "CURRENCY()")`,
 		`P{(RAW_TEXT CONTAINS "CURRENCY()")}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "REGEX()")`,
 		`P{(RAW_TEXT CONTAINS "REGEX()")}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`((RAW_TEXT CONTAINS "Some text0") OR (RAW_TEXT CONTAINS "Some text1") OR (RAW_TEXT CONTAINS "Some text2"))`,
 		`P{OR{P{(RAW_TEXT CONTAINS "Some text0")}, P{(RAW_TEXT CONTAINS "Some text1")}, P{(RAW_TEXT CONTAINS "Some text2")}}}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS "0") OR (RAW_TEXT CONTAINS "1") OR (RAW_TEXT CONTAINS "2")`,
 		`OR{P{(RAW_TEXT CONTAINS "0")}, P{(RAW_TEXT CONTAINS "1")}, P{(RAW_TEXT CONTAINS "2")}}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS "0") XOR (RAW_TEXT CONTAINS "1") XOR (RAW_TEXT CONTAINS "2")`,
 		`XOR{P{(RAW_TEXT CONTAINS "0")}, P{(RAW_TEXT CONTAINS "1")}, P{(RAW_TEXT CONTAINS "2")}}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS "0") AND (RAW_TEXT CONTAINS "1") AnD (RAW_TEXT CONTAINS "2")`,
 		`AND{P{(RAW_TEXT CONTAINS "0")}, P{(RAW_TEXT CONTAINS "1")}, P{(RAW_TEXT CONTAINS "2")}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(( record.city EQUALS "Rockville" ) AND ( record.state EQUALS "MD" ))`,
 		`P{AND{P{(record.city EQUALS "Rockville")}, P{(record.state EQUALS "MD")}}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(( ( record.city EQUALS "Rockville" ) OR ( record.city EQUALS "Gaithersburg" ) ) AND ( record.state EQUALS "MD" ))`,
 		`P{AND{P{OR{P{(record.city EQUALS "Rockville")}, P{(record.city EQUALS "Gaithersburg")}}}, P{(record.state EQUALS "MD")}}}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
 		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY>02/28/12))[ds]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))`,
 		`P{(RAW_TEXT CONTAINS DATE(02/28/12<MM/DD/YY<01/19/15))[ds]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
 		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS>09:15:00))[ts]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
 		`P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`((RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))  AND (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00)))`,
 		`P{AND{P{(RAW_TEXT CONTAINS DATE(02/28/12<MM/DD/YY<01/19/15))[ds]}, P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(RECORD.Name.Actors.[].Name CONTAINS "Christian")`,
 		`P{(RECORD.Name.Actors.[].Name CONTAINS "Christian")}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS = 11:59:00)))`,
 		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS=11:59:00))[ts]}}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS <= 11:59:00)))`,
 		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00))[ts]}}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00)))`,
 		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00))[ts]}}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00)))`,
 		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00))[ts]}}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
 		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00))[ts]}}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
 		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
 		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
+		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RAW_TEXT CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}, P{(RAW_TEXT CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
+
+	testParserParse(t, true,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
 		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[ns]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(RECORD.body CONTAINS FHS("test", cs=true, d=10, w=100))`,
 		`P{(RECORD.body CONTAINS "test")[fhs,d=10,w=100,cs=true]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test", CS=false, Width = 10, DIST = 	 100))`,
 		`P{(RECORD.body CONTAINS "test")[feds,d=100,w=10]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test",CS=false))`,
 		`P{(RECORD.body CONTAINS "test")[es]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test",dIst=10))`,
 		`P{(RECORD.body CONTAINS "test")[feds,d=10]}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test",widtH=100)) AND (RECORD.body CONTAINS FHS("test", CS=true))`,
 		`AND{P{(RECORD.body CONTAINS "test")[es,w=100]}, P{(RECORD.body CONTAINS "test")[es,cs=true]}}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(RECORD.body CONTAINS "FEDS")`,
 		`P{(RECORD.body CONTAINS "FEDS")}`)
 
-	testParserParse(t,
+	testParserParse(t, true,
 		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
 		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS))[rs]}`)
 
-	testParserParse(t,
+	testParserParse(t, false,
 		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
 		`P{AND{P{(RECORD.body CONTAINS "DATE()")}, P{(RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}}}`)
 }

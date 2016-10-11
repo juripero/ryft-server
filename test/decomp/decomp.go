@@ -72,6 +72,7 @@ func (o Options) String() string {
 
 // simple query (relational expression)
 type SimpleQuery struct {
+	Structured bool    // true for structured search (RECORD), false for RAW_TEXT
 	Expression string  // search expression
 	Options    Options // search options
 }
@@ -94,7 +95,7 @@ type Query struct {
 // String gets query as a string.
 func (q Query) String() string {
 	var buf bytes.Buffer
-	if q.Operator != "" {
+	if len(q.Operator) != 0 {
 		buf.WriteString(q.Operator)
 	}
 	if q.Simple != nil {
@@ -113,4 +114,20 @@ func (q Query) String() string {
 	}
 
 	return buf.String()
+}
+
+// IsStructured returns true for structured queries, false for RAW text
+func (q Query) IsStructured() bool {
+	if q.Simple != nil {
+		return q.Simple.Structured
+	}
+
+	// all arguments should be structured too
+	for _, arg := range q.Arguments {
+		if !arg.IsStructured() {
+			return false
+		}
+	}
+
+	return true
 }

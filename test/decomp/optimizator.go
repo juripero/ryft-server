@@ -25,6 +25,7 @@ func (o *Optimizator) Process(q Query) Query {
 				// combine two arguments into one
 				tmp := Query{boolOps: boolOps + 1}
 				tmp.Simple = &SimpleQuery{Options: a.Simple.Options}
+				tmp.Simple.Structured = a.Simple.Structured && b.Simple.Structured
 				tmp.Simple.Expression = fmt.Sprintf("%s %s %s", //"(%s %s %s)",
 					a.Simple.Expression,
 					q.Operator,

@@ -163,6 +163,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		input = lex.literal
 
 	case lex.IsRecord():
+		res.Structured = true
 		var buf bytes.Buffer
 		buf.WriteString(lex.literal)
 		for {
