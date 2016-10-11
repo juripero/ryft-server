@@ -42,13 +42,6 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-var (
-	// package logger instance
-	log = logrus.New()
-
-	TAG = "ryftone"
-)
-
 // RyftOne engine uses `ryftone` library as a backend.
 type Engine struct {
 	Instance   string // empty by default. might be some server instance name like ".server-1234"
@@ -127,22 +120,6 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	return info, nil // OK
 }
 
-// SetLogLevelString changes global module log level.
-func SetLogLevelString(level string) error {
-	ll, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
-	}
-
-	log.Level = ll
-	return nil // OK
-}
-
-// SetLogLevel changes global module log level.
-func SetLogLevel(level logrus.Level) {
-	log.Level = level
-}
-
 // log returns task related log entry.
 func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
@@ -162,5 +139,5 @@ func init() {
 	search.RegisterEngine(TAG, factory)
 
 	// be silent by default
-	log.Level = logrus.WarnLevel
+	// log.Level = logrus.WarnLevel
 }

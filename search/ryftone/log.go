@@ -28,54 +28,18 @@
  * ============
  */
 
-package ryftmux
+package ryftone
 
 import (
-	"fmt"
-
 	"github.com/Sirupsen/logrus"
-
-	"github.com/getryft/ryft-server/search"
 )
 
 var (
 	// package logger instance
 	log = logrus.New()
 
-	TAG = "ryftmux"
+	TAG = "ryftone"
 )
-
-// RyftMUX engine uses set of abstract engines as backends.
-type Engine struct {
-	Backends []search.Engine
-
-	IndexHost string // optional host in cluster mode
-}
-
-// NewEngine creates new RyftMUX search engine.
-func NewEngine(backends ...search.Engine) (*Engine, error) {
-	engine := new(Engine)
-	engine.Backends = backends
-	return engine, nil
-}
-
-// prepare task configuration
-func (engine *Engine) prepare(task *Task, cfg *search.Config) {
-	task.Limit = uint64(cfg.Limit)
-}
-
-// String gets string representation of the engine.
-func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
-	// TODO: other parameters?
-}
-
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
-	}
-}
 
 // SetLogLevelString changes global module log level.
 func SetLogLevelString(level string) error {
@@ -91,30 +55,4 @@ func SetLogLevelString(level string) error {
 // SetLogLevel changes global module log level.
 func SetLogLevel(level logrus.Level) {
 	log.Level = level
-}
-
-// log returns task related logger.
-func (task *Task) log() *logrus.Entry {
-	return log.WithField("task", task.Identifier)
-}
-
-/*
-// factory creates RyftMUX engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
-	backends := parseOptions(opts)
-	engine, err := NewEngine(backends)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create RyftMUX engine: %s", err)
-	}
-	return engine, nil
-}
-*/
-
-// package initialization
-func init() {
-	// should be created manually!
-	// search.RegisterEngine(TAG, factory)
-
-	// be silent by default
-	// log.Level = logrus.WarnLevel
 }

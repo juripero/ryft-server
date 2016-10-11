@@ -44,7 +44,6 @@ import (
 
 	"github.com/getryft/ryft-server/middleware/auth"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v2"
 )
@@ -131,11 +130,6 @@ func NewServer() *Server {
 	return s // OK
 }
 
-// set logging level
-func SetLogLevel(level logrus.Level) {
-	log.Level = level
-}
-
 // parse server configuration from YML file
 func (s *Server) ParseConfig(fileName string) error {
 	if len(fileName) == 0 {
@@ -198,15 +192,34 @@ func (s *Server) Prepare() (err error) {
 	s.gotPendingJobs = make(chan int, 256)
 	go s.processPendingJobs()
 
-	// logging levels
-	if cfg, ok := s.Config.LoggingOptions[s.Config.Logging]; ok {
-		for key, val := range cfg {
-			if err := setLoggingLevel(key, val); err != nil {
-				return fmt.Errorf("failed to apply logging level for '%s': %s", key, err)
+	// automatic debug mode
+	if len(s.Config.Logging) == 0 && s.Config.DebugMode {
+		if _, ok := s.Config.LoggingOptions["debug"]; !ok {
+			s.Config.Logging = "debug"
+			s.Config.LoggingOptions[s.Config.Logging] = map[string]string{
+				"core":              "debug",
+				"core/catalogs":     "debug",
+				"core/pending-jobs": "debug",
+				"search/ryftprim":   "debug",
+				"search/ryftone":    "debug",
+				"search/ryfthttp":   "debug",
+				"search/ryftmux":    "debug",
+				"search/ryftdec":    "debug",
 			}
 		}
-	} else {
-		return fmt.Errorf("no valid logging options found for '%s'", s.Config.Logging)
+	}
+
+	// logging levels
+	if len(s.Config.Logging) > 0 {
+		if cfg, ok := s.Config.LoggingOptions[s.Config.Logging]; ok {
+			for key, val := range cfg {
+				if err := setLoggingLevel(key, val); err != nil {
+					return fmt.Errorf("failed to apply logging level for '%s': %s", key, err)
+				}
+			}
+		} else {
+			return fmt.Errorf("no valid logging options found for '%s'", s.Config.Logging)
+		}
 	}
 
 	return nil // OK
@@ -244,29 +257,35 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 
 // add new pending job
 func (s *Server) addPendingJob(command, arguments string, when time.Time) {
-	log.WithField("cmd", command).WithField("args", arguments).WithField("when", when).Debugf("adding new pending job")
+	pjobLog.WithFields(map[string]interface{}{
+		"command":   command,
+		"arguments": arguments,
+		"when":      when,
+	}).Debugf("adding new pending job")
+
 	s.settings.AddJob(command, arguments, when)
 	s.gotPendingJobs <- 1 // notify processing goroutine about new job
+	// TODO: do not notify many times
 }
 
 // process pending jobs
 func (s *Server) processPendingJobs() {
-	// sleep a while...
+	// sleep a while before start
 	time.Sleep(1 * time.Second)
 
 	for {
 		now := time.Now()
 
-		// get Job list to be done (1 second advance)
-		log.WithField("time", now).Debugf("get pending jobs")
+		// get Job list to be done (1 second in advance)
+		pjobLog.WithField("time", now).Debug("get pending jobs")
 		jobs, err := s.settings.QueryAllJobs(now.Add(1 * time.Second))
 		if err != nil {
-			log.WithError(err).Warnf("failed to get pending jobs")
+			pjobLog.WithError(err).Warn("failed to get pending jobs")
 			time.Sleep(10 * time.Second)
 		}
 
 		// do jobs
-		ids := []int64{}
+		ids := []int64{} // completed
 		for job := range jobs {
 			if s.doPendingJob(job) {
 				ids = append(ids, job.Id)
@@ -275,25 +294,25 @@ func (s *Server) processPendingJobs() {
 
 		// delete completed jobs
 		if len(ids) > 0 {
-			log.WithField("jobs", ids).Debugf("mark jobs as completed")
+			pjobLog.WithField("jobs", ids).Debug("mark jobs as completed")
 			if err = s.settings.DelJobs(ids); err != nil {
-				log.WithError(err).Warnf("failed to delete completed jobs")
+				log.WithError(err).Warn("failed to delete completed jobs")
 			}
 		}
 
 		next, err := s.settings.GetNextJobTime()
 		if err != nil {
-			log.WithError(err).Warnf("failed to get next job time")
+			pjobLog.WithError(err).Warn("failed to get next job time")
 			next = now.Add(1 * time.Hour)
 		}
-		log.WithField("time", next).Debugf("next job time")
+		pjobLog.WithField("time", next).Debug("next job time")
 
 		sleep := next.Sub(now)
 		if sleep < time.Second {
 			sleep = time.Second
 		}
 
-		log.WithField("sleep", sleep).Debugf("sleep a while before next processing")
+		pjobLog.WithField("sleep", sleep).Debug("sleep a while before next step")
 		select {
 		case <-time.After(sleep):
 			continue
@@ -308,22 +327,25 @@ func (s *Server) doPendingJob(job SettingsJobItem) bool {
 	switch strings.ToLower(job.Cmd) {
 	case "delete-file":
 		res := deleteAll("/", []string{job.Args})
-		log.WithField("args", job.Args).
-			WithField("result", res).
-			Debugf("pending job: delete file")
+		pjobLog.WithFields(map[string]interface{}{
+			"file":   job.Args,
+			"result": res,
+		}).Debug("pending job: delete file")
 		return true
 
 	case "delete-catalog":
 		res := deleteAllCatalogs("/", []string{job.Args})
-		log.WithField("args", job.Args).
-			WithField("result", res).
-			Debugf("pending job: delete catalog")
+		pjobLog.WithFields(map[string]interface{}{
+			"catalog": job.Args,
+			"result":  res,
+		}).Debug("pending job: delete catalog")
 		return true
 	}
 
-	log.WithField("cmd", job.Cmd).
-		WithField("args", job.Args).
-		Warnf("unknown command, ignored")
+	pjobLog.WithFields(map[string]interface{}{
+		"command":   job.Cmd,
+		"arguments": job.Args,
+	}).Warn("unknown command, ignored")
 	// return false // will be processed later
 	return true // ignore job
 }

@@ -156,9 +156,6 @@ func main() {
 	// be quiet and efficient in production
 	if !server.Config.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
-	} else {
-		rest.SetLogLevel(logrus.DebugLevel)
-		log.Level = logrus.DebugLevel
 	}
 
 	// Create a rounter with default middleware: logger, recover

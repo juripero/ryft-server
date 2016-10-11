@@ -176,5 +176,5 @@ func init() {
 	search.RegisterEngine(TAG, factory)
 
 	// be silent by default
-	log.Level = logrus.WarnLevel
+	// log.Level = logrus.WarnLevel
 }

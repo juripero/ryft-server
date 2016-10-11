@@ -518,6 +518,7 @@ The list of supported query parameters for the POST standalone files are the fol
 | `file`    | string  | [The filename to upload](#post-files-file-parameter). |
 | `offset`  | integer | [The optional position of uploaded chunk](#post-files-offset-parameter). |
 | `length`  | integer | [The optional length of uploaded chunk](#post-files-length-parameter). |
+| `lifetime`| string  | [The optional lifetime of the uploaded file](#post-files-lifetime-parameter). |
 | `local`   | boolean | [The optional local/cluster flag](#search-local-parameter). (NOT IMPLEMENTED YET) |
 
 The list of supported query parameters for the POST files to catalog:
@@ -529,6 +530,7 @@ The list of supported query parameters for the POST files to catalog:
 | `file`    | string  | [The filename to upload](#post-files-file-parameter). |
 | `offset`  | integer | [The position of uploaded chunk](#post-files-offset-parameter). |
 | `length`  | integer | [The length of uploaded chunk](#post-files-length-parameter). |
+| `lifetime`| string  | [The optional lifetime of the uploaded file](#post-files-lifetime-parameter). |
 | `local`   | boolean | [The local/cluster flag](#search-local-parameter). (NOT IMPLEMENTED YET) |
 
 The list of supported query parameters for the DELETE endpoint are the following:
@@ -614,12 +616,17 @@ This parameter can help ryft server to avoid extra data copy. So if it's
 possible this parameter should be provided.
 
 
+### POST files `lifetime` parameter
+
+This optional parameters is used to specify lifetime of the uploading data.
+If this parameter is provided the file or catalog will be deleted after
+specified amount of time. For example if `lifetime=1h` is provided the file
+will be availeble during a hour and then will be removed.
+
+
 ### POST files
 
 To upload regular file the following parameters are used:`file`
-
-
-### POST files to catalog
 
 
 ### DELETE files parameters
