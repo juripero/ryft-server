@@ -31,7 +31,7 @@
             },
             "name": "files",
             "x-go-name": "Files",
-            "description": "Set of files to search. Wildcards are supported, for example: *.txt",
+            "description": "Set of files to search.  The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
             "collectionFormat": "multi",
             "required": true
           },
