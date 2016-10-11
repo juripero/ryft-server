@@ -26,7 +26,7 @@ The list of supported query parameters are the following (check detailed descrip
 | Parameter     | Type    | Description |
 | ------------- | ------- | ----------- |
 | `query`       | string  | **Required**. [The search expression](#search-query-parameter). |
-| `files`       | string  | **Required**. [The set of files to search](#search-files-parameter). |
+| `file`        | string  | **Required**. [The set of files to search](#search-file-parameter). |
 | `mode`        | string  | [The search mode](#search-mode-parameter). |
 | `surrounding` | uint16  | [The data surrounding width](#search-surrounding-parameter). |
 | `fuzziness`   | uint8   | [The fuzziness distance](#search-fuzziness-parameter). |
@@ -99,15 +99,20 @@ This advanced search query syntax overrides the following global parameters:
 If nothing provided the global options are used by default. Any option can be omitted: `(RAW_TEXT CONTAINS FHS("555")) AND (RAW_TEXT CONTAINS FEDS("777",CS=false))`.
 
 
-### Search `files` parameter
+### Search `file` parameter
 
 The second required parameter is the set of file to search.
 At least one file should be provided.
 
 Multiple files can be provided as:
 
-  - a list `files=1.txt&files=2.txt`
-  - a wildcard: `files=*txt`
+  - a list `file=1.txt&file=2.txt`
+  - a wildcard: `file=*txt`
+
+It's possible to provide catalog name as a `file` parameter. Ryft server
+automatically detects catalogs and does appropriate substitutions.
+
+Note, for backward compatibility the `files=` parameter is also supported.
 
 
 ### Search `mode` parameter
@@ -452,7 +457,7 @@ The list of supported query parameters are the following:
 | Parameter     | Type    | Description |
 | ------------- | ------- | ----------- |
 | `query`       | string  | **Required**. [The search expression](#search-query-parameter). |
-| `files`       | string  | **Required**. [The set of files to search](#search-files-parameter). |
+| `file`        | string  | **Required**. [The set of files to search](#search-file-parameter). |
 | `mode`        | string  | [The search mode](#search-mode-parameter). |
 | `surrounding` | uint16  | [The data surrounding width](#search-surrounding-parameter). |
 | `fuzziness`   | uint8   | [The fuzziness distance](#search-fuzziness-parameter). |
@@ -519,7 +524,7 @@ The list of supported query parameters for the POST standalone files are the fol
 | `offset`  | integer | [The optional position of uploaded chunk](#post-files-offset-parameter). |
 | `length`  | integer | [The optional length of uploaded chunk](#post-files-length-parameter). |
 | `lifetime`| string  | [The optional lifetime of the uploaded file](#post-files-lifetime-parameter). |
-| `local`   | boolean | [The optional local/cluster flag](#search-local-parameter). (NOT IMPLEMENTED YET) |
+| `local`   | boolean | [The optional local/cluster flag](#search-local-parameter). |
 
 The list of supported query parameters for the POST files to catalog:
 
@@ -531,7 +536,7 @@ The list of supported query parameters for the POST files to catalog:
 | `offset`  | integer | [The position of uploaded chunk](#post-files-offset-parameter). |
 | `length`  | integer | [The length of uploaded chunk](#post-files-length-parameter). |
 | `lifetime`| string  | [The optional lifetime of the uploaded file](#post-files-lifetime-parameter). |
-| `local`   | boolean | [The local/cluster flag](#search-local-parameter). (NOT IMPLEMENTED YET) |
+| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
 
 The list of supported query parameters for the DELETE endpoint are the following:
 
@@ -575,7 +580,7 @@ the response body.
 ### POST files `delimiter` parameter
 
 Data delimiter is used in catalog files as a separator between different file
-parts. It is very important specially for RAW text files `delimiter=%0a`.
+parts. It is very important specially for RAW text files to use something like `delimiter=%0a`.
 Otherwise unexpected text matches can be found on file part boundaries.
 
 If no delimiter is provided the default value will be used.
@@ -618,15 +623,10 @@ possible this parameter should be provided.
 
 ### POST files `lifetime` parameter
 
-This optional parameters is used to specify lifetime of the uploading data.
+This optional parameters is used to specify lifetime of the uploaded data.
 If this parameter is provided the file or catalog will be deleted after
 specified amount of time. For example if `lifetime=1h` is provided the file
-will be availeble during a hour and then will be removed.
-
-
-### POST files
-
-To upload regular file the following parameters are used:`file`
+will be availeble during a hour and then will be automatically removed.
 
 
 ### DELETE files parameters
@@ -637,7 +637,8 @@ Multiple parameters can be used together.
 Also wildcards are supported. To delete all JSON files just pass `file=*.json`.
 
 All the names should be relative to the Ryft volume and user's home.
-The `file=/foo.txt` request will delete `/ryftone/test/foo.txt` on the Ryft box.
+The `file=/foo.txt` request will delete `/ryftone/test/foo.txt` on the Ryft box
+(assuming user's home directory is *test*).
 
 
 ## Files example
