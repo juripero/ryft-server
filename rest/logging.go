@@ -47,7 +47,8 @@ import (
 var (
 	// logger instances
 	log     = logrus.New()
-	pjobLog = logrus.New()
+	pjobLog = logrus.New() // pending jobs
+	busyLog = logrus.New() // cluster business
 )
 
 // set logging level
@@ -64,6 +65,8 @@ func setLoggingLevel(logger string, level string) error {
 		catalog.SetLogLevel(ll)
 	case "core/pending-jobs":
 		pjobLog.Level = ll
+	case "core/busyness":
+		busyLog.Level = ll
 		// TODO: more core loggers
 	case "search/ryftprim":
 		ryftprim.SetLogLevel(ll)
@@ -80,4 +83,18 @@ func setLoggingLevel(logger string, level string) error {
 	}
 
 	return nil // OK
+}
+
+func makeDefaultLoggingOptions(level string) map[string]string {
+	return map[string]string{
+		"core":              level,
+		"core/catalogs":     level,
+		"core/pending-jobs": level,
+		"core/busyness":     level,
+		"search/ryftprim":   level,
+		"search/ryftone":    level,
+		"search/ryfthttp":   level,
+		"search/ryftmux":    level,
+		"search/ryftdec":    level,
+	}
 }

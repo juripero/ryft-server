@@ -45,18 +45,19 @@ func (s *Server) startUpdatingBusyness() {
 		for {
 			select {
 			case metric = <-s.busynessChanged:
-				log.WithField("metric", metric).Debug("metric changed")
+				busyLog.WithField("metric", metric).Debug("busyness metric changed")
 				continue
-			case <-time.After(time.Second): // update latency
+
+			case <-time.After(1 * time.Second): // update latency
 				if metric != reported {
 					reported = metric
-					log.WithField("metric", metric).Debug("metric reporting...")
-					err := s.updateConsulMetric(int(metric))
-					if err != nil {
-						log.WithError(err).Warnf("failed to update consul metric")
+					busyLog.WithField("metric", metric).Debug("busyness metric reporting...")
+					if err := s.updateConsulMetric(int(metric)); err != nil {
+						busyLog.WithError(err).Warn("failed to update consul's busyness metric")
 					}
 				}
-				// TODO: graceful shutdown
+
+				// TODO: graceful goroutine shutdown
 			}
 		}
 	}(s.activeSearchCount)

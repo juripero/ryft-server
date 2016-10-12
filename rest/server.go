@@ -99,12 +99,6 @@ type ServerConfig struct {
 	SettingsPath string `yaml:"settings-path,omitempty"`
 }
 
-// get configuration as a string
-func (config ServerConfig) String() string {
-	buf, _ := yaml.Marshal(config)
-	return string(buf)
-}
-
 // Server instance
 type Server struct {
 	Config ServerConfig
@@ -199,21 +193,14 @@ func (s *Server) Prepare() (err error) {
 
 	// automatic debug mode
 	if len(s.Config.Logging) == 0 && s.Config.DebugMode {
-		if _, ok := s.Config.LoggingOptions["debug"]; !ok {
-			s.Config.Logging = "debug"
+		s.Config.Logging = "debug"
+
+		// if no "debug" section, create it...
+		if _, ok := s.Config.LoggingOptions[s.Config.Logging]; !ok {
 			if s.Config.LoggingOptions == nil {
 				s.Config.LoggingOptions = make(map[string]map[string]string)
 			}
-			s.Config.LoggingOptions[s.Config.Logging] = map[string]string{
-				"core":              "debug",
-				"core/catalogs":     "debug",
-				"core/pending-jobs": "debug",
-				"search/ryftprim":   "debug",
-				"search/ryftone":    "debug",
-				"search/ryfthttp":   "debug",
-				"search/ryftmux":    "debug",
-				"search/ryftdec":    "debug",
-			}
+			s.Config.LoggingOptions[s.Config.Logging] = makeDefaultLoggingOptions("debug")
 		}
 	}
 
