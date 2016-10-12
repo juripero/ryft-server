@@ -38,7 +38,7 @@ import (
 )
 
 // update busyness thread
-func (s *Server) StartUpdatingBusyness() {
+func (s *Server) startUpdatingBusyness() {
 	s.busynessChanged = make(chan int32, 256)
 	go func(metric int32) {
 		var reported int32 = -1 // to force update metric ASAP

@@ -54,14 +54,15 @@ var (
 
 // customized via Makefile
 var (
-	Version string
-	GitHash string
+	Version = "development"
+	GitHash = "unknown"
 )
 
 // config file name kingpin.Value
+// parses server configuration on value set
 type serverConfigValue struct {
-	s *rest.Server
-	v string
+	s *rest.Server // server instance
+	v string       // configuration path
 }
 
 // set server's configuration file
@@ -75,14 +76,14 @@ func (f *serverConfigValue) String() string {
 	return f.v
 }
 
-// RyftAPI include search, index, count
+// main server's entry point
 func main() {
-	server := rest.NewServer()
+	server := rest.NewServer() // server instance
 
-	config := &serverConfigValue{s: server}
-	kingpin.Flag("config", "Server configuration in YML format.").SetValue(config)
+	// parse command line arguments
+	kingpin.Flag("config", "Server configuration in YML format.").SetValue(&serverConfigValue{s: server})
 	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&server.Config.LocalOnly)
-	kingpin.Flag("keep", "Keep temporary search result files.").Short('k').BoolVar(&server.Config.KeepResults)
+	kingpin.Flag("keep", "Keep temporary search result files (debug mode).").Short('k').BoolVar(&server.Config.KeepResults)
 	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&server.Config.DebugMode)
 	kingpin.Flag("logging", "Fine-tuned logging levels.").StringVar(&server.Config.Logging)
 	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&server.Config.BusynessTolerance)
@@ -143,22 +144,40 @@ func main() {
 		}
 	}
 
+	// prepare server to start
 	if err := server.Prepare(); err != nil {
 		log.WithError(err).Fatal("failed to prepare server configuration")
 	}
 
-	log.WithField("version", Version).
-		WithField("git-hash", GitHash).
-		Infof("starting server...")
-	log.WithField("config", server.Config).
-		Debugf("server configuration")
-
 	// be quiet and efficient in production
 	if !server.Config.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
+	} else {
+		log.Level = logrus.DebugLevel
 	}
 
-	// Create a rounter with default middleware: logger, recover
+	log.WithFields(map[string]interface{}{
+		"version":  Version,
+		"git-hash": GitHash,
+	}).Info("starting server...")
+	log.WithFields(map[string]interface{}{
+		"local-only":    server.Config.LocalOnly,
+		"logging":       server.Config.Logging,
+		"address":       server.Config.ListenAddress,
+		"settings-path": server.Config.SettingsPath,
+	}).Info("main configuration")
+	log.WithFields(map[string]interface{}{
+		"search-backend":          server.Config.SearchBackend,
+		"backend-options":         server.Config.BackendOptions,
+		"http-timeout":            server.Config.HttpTimeout,
+		"tls-enabled":             server.Config.TLS.Enabled,
+		"tls-address":             server.Config.TLS.ListenAddress,
+		"auth-type":               server.Config.AuthType,
+		"busyness-tolerance":      server.Config.BusynessTolerance,
+		"booleans-per-expression": server.Config.BooleansPerExpression,
+	}).Debug("other configuration")
+
+	// Create a router with default middleware: logger, recover
 	router := gin.Default()
 
 	// Allow CORS requests for * (all domains)
@@ -167,33 +186,47 @@ func main() {
 	// Enable GZip compression
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
-	// private endpoints
+	// private endpoints (protected by required authorization)
 	private := router.Group("")
 
 	// Enable authentication if configured
-	var auth_provider auth.Provider
+	var authProvider auth.Provider
 	switch strings.ToLower(server.Config.AuthType) {
 	case "file":
 		file, err := auth.NewFile(server.Config.AuthFile.UsersFile)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to read users file")
 		}
-		auth_provider = file
+		authProvider = file
+
+		log.WithFields(map[string]interface{}{
+			"file": server.Config.AuthFile.UsersFile,
+		}).Info("file-based authentication is used")
+
 	case "ldap":
 		ldap, err := auth.NewLDAP(server.Config.AuthLdap)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to init LDAP authentication")
 		}
-		auth_provider = ldap
+		authProvider = ldap
+
+		log.WithFields(map[string]interface{}{
+			"LDAP": server.Config.AuthLdap.ServerAddress,
+		}).Info("LDAP-based authentication is used")
+
 	case "none", "":
+		log.Info("authentication is disabled")
 		break
+
 	default:
-		log.WithField("auth", server.Config.AuthType).Fatal("unknown authentication type")
+		log.WithFields(map[string]interface{}{
+			"auth": server.Config.AuthType,
+		}).Fatal("unknown authentication type")
 	}
 
 	// authentication enabled
-	if auth_provider != nil {
-		mw := auth.NewMiddleware(auth_provider, "")
+	if authProvider != nil {
+		mw := auth.NewMiddleware(authProvider, "")
 		secret, err := auth.ParseSecret(server.Config.AuthJwt.Secret)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to parse JWT secret")
@@ -208,6 +241,7 @@ func main() {
 		router.POST("/login", mw.LoginHandler())
 	}
 
+	// /version API endpoint
 	router.GET("/version", func(ctx *gin.Context) {
 		info := map[string]interface{}{
 			"version":  Version,
@@ -216,6 +250,7 @@ func main() {
 		ctx.JSON(http.StatusOK, info)
 	})
 
+	// main API endpoints
 	private.GET("/search", server.DoSearch)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
@@ -223,43 +258,41 @@ func main() {
 	private.DELETE("/files", server.DoDeleteFiles)
 	private.POST("/files", server.DoPostFiles)
 
-	// static asset
+	// static assets
 	for _, asset := range AssetNames() {
 		data := MustAsset(asset)
-		ct := mime.TypeByExtension(filepath.Ext(asset))
-		router.GET("/"+asset, func(c *gin.Context) {
-			c.Data(http.StatusOK, ct, data)
+		mime := mime.TypeByExtension(filepath.Ext(asset))
+		router.GET("/"+asset, func(ctx *gin.Context) {
+			ctx.Data(http.StatusOK, mime, data)
 		})
 	}
 
-	// index
-	idxHTML := MustAsset("index.html")
-	router.GET("/", func(c *gin.Context) {
-		c.Data(http.StatusOK, http.DetectContentType(idxHTML), idxHTML)
+	// index page
+	indexPage := MustAsset("index.html")
+	router.GET("/", func(ctx *gin.Context) {
+		ctx.Data(http.StatusOK, http.DetectContentType(indexPage), indexPage)
 	})
 
-	if !server.Config.LocalOnly {
-		server.StartUpdatingBusyness()
-	}
-
 	// start listening on HTTPS port
-	if server.Config.TLS.Enabled {
-		https_ep := &http.Server{Addr: server.Config.TLS.ListenAddress, Handler: router}
-		https_ep.ReadTimeout = server.GetHttpTimeout()
-		https_ep.WriteTimeout = server.GetHttpTimeout()
+	if tls := server.Config.TLS; tls.Enabled {
+		ep := &http.Server{Addr: tls.ListenAddress, Handler: router}
+		ep.ReadTimeout = server.GetHttpTimeout()
+		ep.WriteTimeout = server.GetHttpTimeout()
 
 		go func() {
-			if err := https_ep.ListenAndServeTLS(server.Config.TLS.CertFile, server.Config.TLS.KeyFile); err != nil {
-				log.WithError(err).WithField("port", server.Config.TLS.ListenAddress).Fatal("failed to listen HTTPS")
+			if err := ep.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
+				log.WithError(err).WithField("addr", tls.ListenAddress).Fatal("failed to listen HTTPS")
 			}
 		}()
 	}
 
 	// start listening on HTTP port
-	http_ep := &http.Server{Addr: server.Config.ListenAddress, Handler: router}
-	http_ep.ReadTimeout = server.GetHttpTimeout()
-	http_ep.WriteTimeout = server.GetHttpTimeout()
-	if err := http_ep.ListenAndServe(); err != nil {
-		log.WithError(err).WithField("port", server.Config.ListenAddress).Fatal("failed to listen HTTP")
+	if addr := server.Config.ListenAddress; len(addr) != 0 {
+		ep := &http.Server{Addr: addr, Handler: router}
+		ep.ReadTimeout = server.GetHttpTimeout()
+		ep.WriteTimeout = server.GetHttpTimeout()
+		if err := ep.ListenAndServe(); err != nil {
+			log.WithError(err).WithField("addr", addr).Fatal("failed to listen HTTP")
+		}
 	}
 }

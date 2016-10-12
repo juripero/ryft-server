@@ -99,6 +99,12 @@ type ServerConfig struct {
 	SettingsPath string `yaml:"settings-path,omitempty"`
 }
 
+// get configuration as a string
+func (config ServerConfig) String() string {
+	buf, _ := yaml.Marshal(config)
+	return string(buf)
+}
+
 // Server instance
 type Server struct {
 	Config ServerConfig
@@ -222,6 +228,11 @@ func (s *Server) Prepare() (err error) {
 		} else {
 			return fmt.Errorf("no valid logging options found for '%s'", s.Config.Logging)
 		}
+	}
+
+	// business update
+	if !s.Config.LocalOnly {
+		s.startUpdatingBusyness()
 	}
 
 	return nil // OK
