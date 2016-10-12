@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
 	cmd STRING NOT NULL,  -- command to execute
 	args STRING,          -- command arguments
-	whenToRun STRING,     -- datetime when to execute command
+	whenToRun STRING,     -- datetime when to execute command, UTC
 	CONSTRAINT cmd_args UNIQUE (cmd,args)
 );
 
@@ -221,12 +221,7 @@ PRAGMA user_version = 2;`
 // AddJob adds a new or update existing job.
 func (ss *ServerSettings) AddJob(cmd, args string, when time.Time) error {
 	// TODO: several attempts if DB is locked
-	err := ss.addJobSync(cmd, args, when)
-	if err != nil {
-		return err
-	}
-
-	return nil // OK
+	return ss.addJobSync(cmd, args, when)
 }
 
 // adds job (synchronized).
@@ -263,26 +258,21 @@ VALUES (?,?,?)`, cmd, args, when.UTC().Format(jobTimeFormat))
 }
 
 // DelJob removes existing jobs.
-func (ss *ServerSettings) DelJobs(ids []int64) error {
+func (ss *ServerSettings) DeleteJobs(ids []int64) error {
 	// TODO: several attempts if DB is locked
-	err := ss.delJobsSync(ids)
-	if err != nil {
-		return err
-	}
-
-	return nil // OK
+	return ss.deleteJobsSync(ids)
 }
 
 // removes jobs (synchronized).
-func (ss *ServerSettings) delJobsSync(ids []int64) error {
+func (ss *ServerSettings) deleteJobsSync(ids []int64) error {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
 
-	return ss.delJobs(ids)
+	return ss.deleteJobs(ids)
 }
 
 // removes jobs (unsynchronized).
-func (ss *ServerSettings) delJobs(ids []int64) error {
+func (ss *ServerSettings) deleteJobs(ids []int64) error {
 	if len(ids) == 0 {
 		return nil // nothing to delete
 	}

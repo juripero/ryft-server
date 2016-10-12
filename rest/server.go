@@ -36,7 +36,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/getryft/ryft-server/search/utils"
@@ -153,8 +152,9 @@ type Server struct {
 	// consul client is cached here
 	consulClient interface{}
 
-	settings       *ServerSettings
-	gotPendingJobs chan int // signal new jobs added
+	settings    *ServerSettings
+	gotJobsChan chan int // signal new jobs added
+	// newJobsCount int32    // atomic
 }
 
 // NewServer creates new server instance
@@ -224,10 +224,6 @@ func (s *Server) Prepare() (err error) {
 		return fmt.Errorf("failed to open settings: %s", err)
 	}
 
-	// pending jobs
-	s.gotPendingJobs = make(chan int, 256)
-	go s.processPendingJobs()
-
 	// automatic debug mode
 	if len(s.Config.Logging) == 0 && s.Config.DebugMode {
 		s.Config.Logging = "debug"
@@ -254,10 +250,13 @@ func (s *Server) Prepare() (err error) {
 		}
 	}
 
-	// business update
+	// busyness update
 	if !s.Config.LocalOnly {
 		s.startUpdatingBusyness()
 	}
+
+	// pending jobs
+	s.startJobsProcessing()
 
 	return nil // OK
 }
@@ -276,101 +275,6 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 	}
 
 	return
-}
-
-// add new pending job
-func (s *Server) addPendingJob(command, arguments string, when time.Time) {
-	pjobLog.WithFields(map[string]interface{}{
-		"command":   command,
-		"arguments": arguments,
-		"when":      when,
-	}).Debugf("adding new pending job")
-
-	s.settings.AddJob(command, arguments, when)
-	s.gotPendingJobs <- 1 // notify processing goroutine about new job
-	// TODO: do not notify many times
-}
-
-// process pending jobs
-func (s *Server) processPendingJobs() {
-	// sleep a while before start
-	time.Sleep(1 * time.Second)
-
-	for {
-		now := time.Now()
-
-		// get Job list to be done (1 second in advance)
-		pjobLog.WithField("time", now).Debug("get pending jobs")
-		jobs, err := s.settings.QueryAllJobs(now.Add(1 * time.Second))
-		if err != nil {
-			pjobLog.WithError(err).Warn("failed to get pending jobs")
-			time.Sleep(10 * time.Second)
-		}
-
-		// do jobs
-		ids := []int64{} // completed
-		for job := range jobs {
-			if s.doPendingJob(job) {
-				ids = append(ids, job.Id)
-			}
-		}
-
-		// delete completed jobs
-		if len(ids) > 0 {
-			pjobLog.WithField("jobs", ids).Debug("mark jobs as completed")
-			if err = s.settings.DelJobs(ids); err != nil {
-				log.WithError(err).Warn("failed to delete completed jobs")
-			}
-		}
-
-		next, err := s.settings.GetNextJobTime()
-		if err != nil {
-			pjobLog.WithError(err).Warn("failed to get next job time")
-			next = now.Add(1 * time.Hour)
-		}
-		pjobLog.WithField("time", next).Debug("next job time")
-
-		sleep := next.Sub(now)
-		if sleep < time.Second {
-			sleep = time.Second
-		}
-
-		pjobLog.WithField("sleep", sleep).Debug("sleep a while before next step")
-		select {
-		case <-time.After(sleep):
-			continue
-		case <-s.gotPendingJobs:
-			continue
-		}
-	}
-}
-
-// do pending job
-func (s *Server) doPendingJob(job SettingsJobItem) bool {
-	switch strings.ToLower(job.Cmd) {
-	case "delete-file":
-		res := deleteAll("/", []string{job.Args})
-		pjobLog.WithFields(map[string]interface{}{
-			"file":   job.Args,
-			"result": res,
-		}).Debug("pending job: delete file")
-		return true
-
-	case "delete-catalog":
-		res := deleteAllCatalogs("/", []string{job.Args})
-		pjobLog.WithFields(map[string]interface{}{
-			"catalog": job.Args,
-			"result":  res,
-		}).Debug("pending job: delete catalog")
-		return true
-	}
-
-	pjobLog.WithFields(map[string]interface{}{
-		"command":   job.Cmd,
-		"arguments": job.Args,
-	}).Warn("unknown command, ignored")
-	// return false // will be processed later
-	return true // ignore job
 }
 
 // get local host name

@@ -50,15 +50,15 @@ func (s *Server) startUpdatingBusyness() {
 		for {
 			select {
 			case metric = <-s.busynessChanged:
-				busyLog.WithField("metric", metric).Debug("busyness metric changed")
+				busyLog.WithField("metric", metric).Debugf("[%s]: metric changed", BUSY)
 				continue
 
 			case <-time.After(s.Config.Busyness.UpdateLatency):
 				if metric != reported {
 					reported = metric
-					busyLog.WithField("metric", metric).Debug("busyness metric reporting...")
+					busyLog.WithField("metric", metric).Debugf("[%s]: metric reporting...", BUSY)
 					if err := s.updateConsulMetric(int(metric)); err != nil {
-						busyLog.WithError(err).Warn("failed to update consul's busyness metric")
+						busyLog.WithError(err).Warnf("[%s]: failed to update metric", BUSY)
 					}
 				}
 

@@ -332,7 +332,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			res["length"] = length
 		} else {
 			if params.lifetime > 0 {
-				s.addPendingJob("delete-catalog",
+				s.addJob("delete-catalog",
 					filepath.Join(mountPoint, catalog),
 					time.Now().Add(params.lifetime))
 			}
@@ -350,7 +350,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			res["length"] = length
 		} else {
 			if params.lifetime > 0 {
-				s.addPendingJob("delete-file",
+				s.addJob("delete-file",
 					filepath.Join(mountPoint, path),
 					time.Now().Add(params.lifetime))
 			}

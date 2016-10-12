@@ -44,11 +44,18 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// logger instances
 var (
-	// logger instances
 	log     = logrus.New()
-	pjobLog = logrus.New() // pending jobs
-	busyLog = logrus.New() // cluster business
+	jobsLog = logrus.New() // pending jobs
+	busyLog = logrus.New() // cluster busyness
+)
+
+// log prefixes
+const (
+	CORE = "core"
+	JOBS = "jobs"
+	BUSY = "busyness"
 )
 
 // set logging level
@@ -64,7 +71,7 @@ func setLoggingLevel(logger string, level string) error {
 	case "core/catalogs":
 		catalog.SetLogLevel(ll)
 	case "core/pending-jobs":
-		pjobLog.Level = ll
+		jobsLog.Level = ll
 	case "core/busyness":
 		busyLog.Level = ll
 		// TODO: more core loggers
