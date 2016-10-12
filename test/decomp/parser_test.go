@@ -36,7 +36,7 @@ func testParserBad(t *testing.T, data string, expectedError string) {
 }
 
 // test parser (should panic)
-func testParserEof(t *testing.T, data string) {
+func testParserEOF(t *testing.T, data string) {
 	p := testNewParser(data)
 	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
 		_, err := p.ParseQuery()
@@ -47,7 +47,7 @@ func testParserEof(t *testing.T, data string) {
 
 // test for EOF
 func TestParserEOF(t *testing.T) {
-	testParserEof(t, `"?" 123`)
+	testParserEOF(t, `"?" 123`)
 }
 
 // test for panics
@@ -165,15 +165,15 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FHS("test", cs = true, dist = 10, WIDTH = 100))`,
-		`P{(RECORD.body CONTAINS "test")[fhs,d=10,w=100,cs=true]}`)
+		`P{(RECORD.body CONTAINS "test")[fhs,d=10,cs=true]}`) // no width for structured search!
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FEDS("test", cs= FALSE ,  DIST =10, WIDTH=100))`,
-		`P{(RECORD.body CONTAINS "test")[feds,d=10,w=100]}`)
+		`P{(RECORD.body CONTAINS "test")[feds,d=10]}`) // no width for structured search!
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FEDS("test", ,, DIST =0, WIDTH=10))`,
-		`P{(RECORD.body CONTAINS "test")[es,w=10]}`)
+		`P{(RECORD.body CONTAINS "test")[es]}`) // no width for structured search!
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
@@ -333,11 +333,11 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FHS("test", cs=true, d=10, w=100))`,
-		`P{(RECORD.body CONTAINS "test")[fhs,d=10,w=100,cs=true]}`)
+		`P{(RECORD.body CONTAINS "test")[fhs,d=10,cs=true]}`) // no width for structured search!
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test", CS=false, Width = 10, DIST = 	 100))`,
-		`P{(RECORD.body CONTAINS "test")[feds,d=100,w=10]}`)
+		`P{(RECORD.body CONTAINS "test")[feds,d=100]}`) // no width for structured search!
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test",CS=false))`,
@@ -349,7 +349,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test",widtH=100)) AND (RECORD.body CONTAINS FHS("test", CS=true))`,
-		`AND{P{(RECORD.body CONTAINS "test")[es,w=100]}, P{(RECORD.body CONTAINS "test")[es,cs=true]}}`)
+		`AND{P{(RECORD.body CONTAINS "test")[es]}, P{(RECORD.body CONTAINS "test")[es,cs=true]}}`)
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS "FEDS")`,

@@ -289,6 +289,12 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		}
 	}
 
+	if res.Structured {
+		// no surrounding width should be used
+		// for structured search!
+		res.Options.Width = 0
+	}
+
 	res.Expression = fmt.Sprintf("(%s %s %s)", input, operator, expression)
 	return res // done
 }

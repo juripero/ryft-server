@@ -76,15 +76,15 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS FHS("test", cs = true, dist = 10, WIDTH = 100))`,
-		`(RECORD.body CONTAINS "test")[fhs,d=10,w=100,cs=true]`)
+		`(RECORD.body CONTAINS "test")[fhs,d=10,cs=true]`) // no width for structured search!
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS FEDS("test", cs= FALSE ,  DIST =10, WIDTH=100))`,
-		`(RECORD.body CONTAINS "test")[feds,d=10,w=100]`)
+		`(RECORD.body CONTAINS "test")[feds,d=10]`) // no width for structured search!
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS FEDS("test", ,, DIST =0, WIDTH=10))`,
-		`(RECORD.body CONTAINS "test")[es,w=10]`)
+		`(RECORD.body CONTAINS "test")[es]`) // no width for structured search!
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
@@ -308,7 +308,7 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS FHS("test"))AND(RECORD.id CONTAINS FEDS("123", CS=true, D=1, W=2)))`,
-		`AND{(RECORD.id CONTAINS "test")[es], (RECORD.id CONTAINS "123")[feds,d=1,w=2,cs=true]}`)
+		`AND{(RECORD.id CONTAINS "test")[es], (RECORD.id CONTAINS "123")[feds,d=1,cs=true]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS FHS("test"))AND(RECORD.id CONTAINS FEDS("123", D=2, CS=true)) OR (RECORD.id CONTAINS DATE("200301")))`,
@@ -316,7 +316,7 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, false,
 		`(RECORD.body CONTAINS FEDS("test",cs=false,d=10,w=100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
-		`AND{(RECORD.body CONTAINS "test")[feds,d=10,w=100], OR{(RAW_TEXT CONTAINS "text")[es], (RECORD.id CONTAINS DATE("200301"))[ds]}}`)
+		`AND{(RECORD.body CONTAINS "test")[feds,d=10], OR{(RAW_TEXT CONTAINS "text")[es], (RECORD.id CONTAINS DATE("200301"))[ds]}}`)
 
 	testOptimizatorProcess(t, o, false,
 		`((RAW_TEXT CONTAINS REGEX("\w+", CASELESS)) OR (RECORD.id CONTAINS DATE("200301")))`,

@@ -14,32 +14,32 @@ type Options struct {
 	Cs    bool   // Case sensitivity flag
 }
 
-// is the same options?
-func (a Options) IsTheSame(b Options) bool {
+// IsTheSame checks the options are the same.
+func (o Options) IsTheSame(p Options) bool {
 	// search mode
-	if a.Mode != b.Mode {
+	if o.Mode != p.Mode {
 		return false
 	}
 
 	// fuzziness distance
-	if a.Dist != b.Dist {
+	if o.Dist != p.Dist {
 		return false
 	}
 
 	// surrounding width
-	if a.Width != b.Width {
+	if o.Width != p.Width {
 		return false
 	}
 
 	// case sensitivity
-	if a.Cs != b.Cs {
+	if o.Cs != p.Cs {
 		return false
 	}
 
 	return true // equal
 }
 
-// options as string
+// String gets options as string
 func (o Options) String() string {
 	var args []string
 
@@ -70,20 +70,20 @@ func (o Options) String() string {
 	return "" // no options
 }
 
-// simple query (relational expression)
+// SimpleQuery contains one query (relational expression)
 type SimpleQuery struct {
 	Structured bool    // true for structured search (RECORD), false for RAW_TEXT
 	Expression string  // search expression
 	Options    Options // search options
 }
 
-// simple query as string
+// String gets simple query as string
 func (s SimpleQuery) String() string {
 	return fmt.Sprintf("%s%s",
 		s.Expression, s.Options)
 }
 
-// complex query
+// Query contains complex query with boolean operators
 type Query struct {
 	Operator  string
 	Simple    *SimpleQuery
