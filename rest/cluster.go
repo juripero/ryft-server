@@ -48,18 +48,33 @@ import (
 )
 
 // handle /cluster/members endpoint: information about cluster's nodes
-func (s *Server) DoClusterMembers(c *gin.Context) {
+func (server *Server) DoClusterMembers(ctx *gin.Context) {
 	// recover from panics if any
-	defer RecoverFromPanic(c)
+	defer RecoverFromPanic(ctx)
 
-	info, _, err := s.getConsulInfo("", nil) // no user tag, no files
-
+	services, _, err := server.getConsulInfo("", nil) // no user tag, no files
 	if err != nil {
 		panic(NewServerError(http.StatusInternalServerError, err.Error()))
-	} else {
-		log.WithField("info", info).Debug("consul information")
-		c.JSON(http.StatusOK, info)
 	}
+
+	// convert services (only subset of fields)
+	info := make([]map[string]interface{}, len(services))
+	for i, s := range services {
+		info[i] = map[string]interface{}{
+			"node": s.Node,
+			"tags": s.ServiceTags,
+			"address": func() string {
+				if s.ServicePort != 0 {
+					return fmt.Sprintf("%s:%d", s.ServiceAddress, s.ServicePort)
+				}
+				return s.ServiceAddress
+			}(),
+		}
+	}
+
+	log.WithField("info", info).Info("consul information")
+	ctx.JSON(http.StatusOK, info)
+
 }
 
 // get consul client
