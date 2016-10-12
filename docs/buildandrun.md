@@ -148,6 +148,42 @@ Just pass `--local-only` command line argument:
 There is also no any load balancing enabled in local mode.
 
 
+## Logging
+
+There is special parameter in configuration file `logging` and related section
+`logging-options`. The `logging-options` contains a sets of logging configurations.
+Actually `logging` is a key in that set.
+
+```{.yaml}
+logging: debug
+logging-options:
+  custom:
+    core: debug
+    core/catalogs: debug
+    core/pending-jobs: debug
+  debug:
+    core: debug
+    core/catalogs: debug
+    core/pending-jobs: debug
+    core/busyness: debug
+    search/ryftprim: debug
+    search/ryftone: debug
+    search/ryfthttp: debug
+    search/ryftmux: debug
+    search/ryftdec: debug
+  release:
+    core: info
+```
+
+Changing the `logging` option it is possible to quickly change the full logging
+configuration. There is special command line argument `--logging` which also
+could be used to change logging configuration.
+
+The logging configuration itself consists of logger names and corresponding
+logging levels. By default all loggers have "info" level. It is very easy to
+create any logging configuration with fine-tunes logging levels.
+
+
 ## Keeping search results
 
 `ryft-server` uses dedicated instance directory on `/ryftone` volume to keep temporary files.
