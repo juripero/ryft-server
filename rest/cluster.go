@@ -129,7 +129,7 @@ func (s *Server) getConsulInfo(userTag string, files []string) (services []*cons
 	if err != nil {
 		return services, tags, fmt.Errorf("failed to get node metrics: %s", err)
 	}
-	services = s.rearrangeServices(services, metrics, s.Config.BusynessTolerance)
+	services = s.rearrangeServices(services, metrics, s.Config.Busyness.Tolerance)
 	log.WithField("metrics", metrics).Debugf("cluster node metrics")
 
 	return services, tags, err

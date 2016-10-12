@@ -48,6 +48,39 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// TimeDuration is a wrapper on time.Duration to support YAML marshaling
+type TimeDuration struct {
+	val *time.Duration
+}
+
+// Bind binds the wrapper and any value
+func NewTimeDuration(val *time.Duration) TimeDuration {
+	return TimeDuration{val: val}
+}
+
+// UnmarshalYAML unmarshals time duration from string
+func (td *TimeDuration) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	// get as string first
+	var s string
+	if err := unmarshal(&s); err != nil {
+		return err
+	}
+
+	// parse
+	if d, err := time.ParseDuration(s); err != nil {
+		return err
+	} else {
+		*td.val = d
+	}
+
+	return nil // OK
+}
+
+// MarshalYAML marshals time duration to string
+func (td *TimeDuration) MarshalYAML() (interface{}, error) {
+	return td.val.String(), nil
+}
+
 // ServerConfig server's configuration.
 type ServerConfig struct {
 	SearchBackend  string                 `yaml:"search-backend,omitempty"`
@@ -61,7 +94,8 @@ type ServerConfig struct {
 
 	ListenAddress string `yaml:"address,omitempty"`
 
-	HttpTimeout string `yaml:"http-timeout,omitempty"`
+	HttpTimeout_ TimeDuration  `yaml:"http-timeout,omitempty"`
+	HttpTimeout  time.Duration `yaml:"-"`
 
 	TLS struct {
 		Enabled       bool   `yaml:"enabled,omitempty"`
@@ -84,16 +118,21 @@ type ServerConfig struct {
 		Lifetime  string `yaml:"lifetime,omitempty"`
 	} `yaml:"auth-jwt,omitempty"`
 
-	BusynessTolerance int `yaml:"busyness-tolerance,omitempty"`
+	Busyness struct {
+		Tolerance      int           `yaml:"tolerance,omitempty"`
+		UpdateLatency_ TimeDuration  `yaml:"update-latency,omitempty"`
+		UpdateLatency  time.Duration `yaml:"-"`
+	} `yaml:"busyness,omitempty"`
 
 	BooleansPerExpression map[string]int `yaml:"booleans-per-expression"`
 
 	// catalogs related options
 	Catalogs struct {
-		MaxDataFileSize  string `yaml:"max-data-file-size"`
-		CacheDropTimeout string `yaml:"cache-drop-timeout"`
-		DataDelimiter    string `yaml:"default-data-delim"`
-		TempDirectory    string `yaml:"temp-dir"`
+		MaxDataFileSize   string        `yaml:"max-data-file-size"`
+		CacheDropTimeout_ TimeDuration  `yaml:"cache-drop-timeout"`
+		CacheDropTimeout  time.Duration `yaml:"-"`
+		DataDelimiter     string        `yaml:"default-data-delim"`
+		TempDirectory     string        `yaml:"temp-dir"`
 	} `yaml:"catalogs,omitempty"`
 
 	SettingsPath string `yaml:"settings-path,omitempty"`
@@ -118,19 +157,25 @@ type Server struct {
 	gotPendingJobs chan int // signal new jobs added
 }
 
-// create new server instance
+// NewServer creates new server instance
 func NewServer() *Server {
 	s := new(Server)
 
 	// default configuration
 	s.Config.SearchBackend = "ryftprim"
 	s.Config.BackendOptions = map[string]interface{}{}
+	s.Config.Busyness.UpdateLatency = 1 * time.Second
+	s.Config.Busyness.UpdateLatency_ = NewTimeDuration(&s.Config.Busyness.UpdateLatency)
+	s.Config.HttpTimeout = 1 * time.Hour
+	s.Config.HttpTimeout_ = NewTimeDuration(&s.Config.HttpTimeout)
+	s.Config.Catalogs.CacheDropTimeout = 10 * time.Second
+	s.Config.Catalogs.CacheDropTimeout_ = NewTimeDuration(&s.Config.Catalogs.CacheDropTimeout)
 	s.Config.SettingsPath = "/var/ryft/server.settings"
 
 	return s // OK
 }
 
-// parse server configuration from YML file
+// ParseConfig parses server configuration from YML file
 func (s *Server) ParseConfig(fileName string) error {
 	if len(fileName) == 0 {
 		return nil // OK
@@ -158,23 +203,15 @@ func (s *Server) ParseConfig(fileName string) error {
 		}
 	}
 
-	// validate catalog's cache drop timeout
-	if len(s.Config.Catalogs.CacheDropTimeout) > 0 {
-		if t, err := time.ParseDuration(s.Config.Catalogs.CacheDropTimeout); err != nil {
-			return fmt.Errorf("failed to parse catalog cache drop timeout: %s", err)
-		} else {
-			catalog.DefaultCacheDropTimeout = t
-		}
-	}
-
-	// assign other catalog options
+	// assign catalog options
+	catalog.DefaultCacheDropTimeout = s.Config.Catalogs.CacheDropTimeout
 	catalog.DefaultDataDelimiter = s.Config.Catalogs.DataDelimiter
 	catalog.DefaultTempDirectory = s.Config.Catalogs.TempDirectory
 
 	return nil // OK
 }
 
-// apply configuration
+// Prepare applies configuration
 func (s *Server) Prepare() (err error) {
 	if s.listenAddress, err = net.ResolveTCPAddr("tcp", s.Config.ListenAddress); err != nil {
 		return fmt.Errorf("%q is not a valid TCP address: %s", s.Config.ListenAddress, err)
@@ -223,20 +260,6 @@ func (s *Server) Prepare() (err error) {
 	}
 
 	return nil // OK
-}
-
-// get read/write http timeout
-func (s *Server) GetHttpTimeout() time.Duration {
-	if len(s.Config.HttpTimeout) == 0 {
-		return 1 * time.Hour // default
-	}
-
-	d, err := time.ParseDuration(s.Config.HttpTimeout)
-	if err != nil {
-		panic(err)
-	}
-
-	return d
 }
 
 // parse authentication token and home directory from context

@@ -40,15 +40,20 @@ import (
 // update busyness thread
 func (s *Server) startUpdatingBusyness() {
 	s.busynessChanged = make(chan int32, 256)
+
+	// TODO: sleep a while before start?
+
+	// dedicated goroutine to monitor and update metric
 	go func(metric int32) {
 		var reported int32 = -1 // to force update metric ASAP
+
 		for {
 			select {
 			case metric = <-s.busynessChanged:
 				busyLog.WithField("metric", metric).Debug("busyness metric changed")
 				continue
 
-			case <-time.After(1 * time.Second): // update latency
+			case <-time.After(s.Config.Busyness.UpdateLatency):
 				if metric != reported {
 					reported = metric
 					busyLog.WithField("metric", metric).Debug("busyness metric reporting...")

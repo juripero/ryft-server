@@ -86,7 +86,7 @@ func main() {
 	kingpin.Flag("keep", "Keep temporary search result files (debug mode).").Short('k').BoolVar(&server.Config.KeepResults)
 	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&server.Config.DebugMode)
 	kingpin.Flag("logging", "Fine-tuned logging levels.").StringVar(&server.Config.Logging)
-	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&server.Config.BusynessTolerance)
+	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&server.Config.Busyness.Tolerance)
 
 	kingpin.Flag("address", "Address:port to listen on.").Short('l').Default(":8765").StringVar(&server.Config.ListenAddress)
 	kingpin.Flag("tls", "Enable TLS/SSL.").Short('t').BoolVar(&server.Config.TLS.Enabled)
@@ -173,7 +173,7 @@ func main() {
 		"tls-enabled":             server.Config.TLS.Enabled,
 		"tls-address":             server.Config.TLS.ListenAddress,
 		"auth-type":               server.Config.AuthType,
-		"busyness-tolerance":      server.Config.BusynessTolerance,
+		"busyness-tolerance":      server.Config.Busyness.Tolerance,
 		"booleans-per-expression": server.Config.BooleansPerExpression,
 	}).Debug("other configuration")
 
@@ -276,8 +276,8 @@ func main() {
 	// start listening on HTTPS port
 	if tls := server.Config.TLS; tls.Enabled {
 		ep := &http.Server{Addr: tls.ListenAddress, Handler: router}
-		ep.ReadTimeout = server.GetHttpTimeout()
-		ep.WriteTimeout = server.GetHttpTimeout()
+		ep.ReadTimeout = server.Config.HttpTimeout
+		ep.WriteTimeout = server.Config.HttpTimeout
 
 		go func() {
 			if err := ep.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
@@ -289,8 +289,8 @@ func main() {
 	// start listening on HTTP port
 	if addr := server.Config.ListenAddress; len(addr) != 0 {
 		ep := &http.Server{Addr: addr, Handler: router}
-		ep.ReadTimeout = server.GetHttpTimeout()
-		ep.WriteTimeout = server.GetHttpTimeout()
+		ep.ReadTimeout = server.Config.HttpTimeout
+		ep.WriteTimeout = server.Config.HttpTimeout
 		if err := ep.ListenAndServe(); err != nil {
 			log.WithError(err).WithField("addr", addr).Fatal("failed to listen HTTP")
 		}
