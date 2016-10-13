@@ -38,7 +38,6 @@ import (
 	"net/url"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/demon-xxi/wildmatch"
@@ -72,15 +71,15 @@ func (server *Server) DoClusterMembers(ctx *gin.Context) {
 		}
 	}
 
-	log.WithField("info", info).Info("consul information")
+	log.WithField("info", info).Info("cluster information")
 	ctx.JSON(http.StatusOK, info)
 
 }
 
 // get consul client
-func (s *Server) getConsulClient() (*consul.Client, error) {
-	if s.consulClient != nil {
-		return s.consulClient.(*consul.Client), nil // cached
+func (server *Server) getConsulClient() (*consul.Client, error) {
+	if server.consulClient != nil {
+		return server.consulClient.(*consul.Client), nil // cached
 	}
 
 	// create new client
@@ -92,8 +91,8 @@ func (s *Server) getConsulClient() (*consul.Client, error) {
 		return nil, err
 	}
 
-	s.consulClient = client // put to cache
-	return client, nil      // OK
+	server.consulClient = client // put to cache
+	return client, nil           // OK
 }
 
 // GetConsulInfo gets the list of ryft services
@@ -140,7 +139,7 @@ func (s *Server) getConsulInfo(userTag string, files []string) (services []*cons
 	}
 
 	// arrange services based on node metrics
-	metrics, err := getNodeMetrics(client)
+	metrics, err := s.getMetricsForAllNodes()
 	if err != nil {
 		return services, tags, fmt.Errorf("failed to get node metrics: %s", err)
 	}
@@ -193,49 +192,6 @@ func (s *Server) rearrangeServices(services []*consul.CatalogService, metrics ma
 	}
 
 	return services
-}
-
-// updateConsulMetric updates the node metric in the cluster
-func (s *Server) updateConsulMetric(metric int) error {
-	client, err := s.getConsulClient()
-	if err != nil {
-		return fmt.Errorf("failed to get consul client: %s", err)
-	}
-
-	name, err := client.Agent().NodeName()
-	if err != nil {
-		return fmt.Errorf("failed to get node name: %s", err)
-	}
-
-	pair := new(consul.KVPair)
-	pair.Key = filepath.Join("busyness", name)
-	pair.Value = []byte(fmt.Sprintf("%d", metric))
-	_, err = client.KV().Put(pair, nil)
-	if err != nil {
-		return fmt.Errorf("failed to update node metric: %s", err)
-	}
-
-	return nil // OK
-}
-
-// get metric for all nodes
-func getNodeMetrics(client *consul.Client) (map[string]int, error) {
-	// get all wildcards (keys) and tags
-	prefix := "busyness/"
-	pairs, _, err := client.KV().List(prefix, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get metrics from KV: %s", err)
-	}
-
-	metrics := map[string]int{}
-	for _, kvp := range pairs {
-		key, _ := url.QueryUnescape(kvp.Key)
-		node := strings.TrimPrefix(key, prefix)
-		metric, _ := strconv.ParseInt(string(kvp.Value), 10, 32)
-		metrics[node] = int(metric)
-	}
-
-	return metrics, nil
 }
 
 // splits services to local and remote set

@@ -31,15 +31,21 @@
 package rest
 
 import (
+	"fmt"
+	"net/url"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	consul "github.com/hashicorp/consul/api"
 )
 
 // update busyness thread
-func (s *Server) startUpdatingBusyness() {
-	s.busynessChanged = make(chan int32, 256)
+func (server *Server) startUpdatingBusyness() {
+	server.busynessChanged = make(chan int32, 256)
 
 	// TODO: sleep a while before start?
 
@@ -49,15 +55,15 @@ func (s *Server) startUpdatingBusyness() {
 
 		for {
 			select {
-			case metric = <-s.busynessChanged:
+			case metric = <-server.busynessChanged:
 				busyLog.WithField("metric", metric).Debugf("[%s]: metric changed", BUSY)
 				continue
 
-			case <-time.After(s.Config.Busyness.UpdateLatency):
+			case <-time.After(server.Config.Busyness.UpdateLatency):
 				if metric != reported {
 					reported = metric
 					busyLog.WithField("metric", metric).Debugf("[%s]: metric reporting...", BUSY)
-					if err := s.updateConsulMetric(int(metric)); err != nil {
+					if err := server.updateNodeMetric(int(metric)); err != nil {
 						busyLog.WithError(err).Warnf("[%s]: failed to update metric", BUSY)
 					}
 				}
@@ -65,24 +71,72 @@ func (s *Server) startUpdatingBusyness() {
 				// TODO: graceful goroutine shutdown
 			}
 		}
-	}(s.activeSearchCount)
+	}(server.activeSearchCount)
 }
 
 // notify server a search is started
-func (s *Server) onSearchStarted(config *search.Config) {
-	s.onSearchChanged(config, +1)
+func (server *Server) onSearchStarted(config *search.Config) {
+	server.onSearchChanged(config, +1)
 }
 
 // notify server a search is started
-func (s *Server) onSearchStopped(config *search.Config) {
-	s.onSearchChanged(config, -1)
+func (server *Server) onSearchStopped(config *search.Config) {
+	server.onSearchChanged(config, -1)
 }
 
 // notify server a search is changed
-func (s *Server) onSearchChanged(config *search.Config, delta int32) {
-	metric := atomic.AddInt32(&s.activeSearchCount, delta)
-	if s.busynessChanged != nil {
+func (server *Server) onSearchChanged(config *search.Config, delta int32) {
+	metric := atomic.AddInt32(&server.activeSearchCount, delta)
+	if server.busynessChanged != nil {
 		// notify to update metric
-		s.busynessChanged <- metric
+		server.busynessChanged <- metric
 	}
+}
+
+// update the node metric in the cluster
+func (server *Server) updateNodeMetric(metric int) error {
+	client, err := server.getConsulClient()
+	if err != nil {
+		return fmt.Errorf("failed to get consul client: %s", err)
+	}
+
+	name, err := client.Agent().NodeName()
+	if err != nil {
+		return fmt.Errorf("failed to get node name: %s", err)
+	}
+
+	pair := new(consul.KVPair)
+	pair.Key = filepath.Join("busyness", name)
+	pair.Value = []byte(fmt.Sprintf("%d", metric))
+	_, err = client.KV().Put(pair, nil)
+	if err != nil {
+		return fmt.Errorf("failed to update node metric: %s", err)
+	}
+
+	return nil // OK
+}
+
+// get metric for all nodes
+func (server *Server) getMetricsForAllNodes() (map[string]int, error) {
+	client, err := server.getConsulClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get consul client: %s", err)
+	}
+
+	// get all wildcards (keys) and tags
+	prefix := "busyness/"
+	pairs, _, err := client.KV().List(prefix, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metrics from KV: %s", err)
+	}
+
+	metrics := map[string]int{}
+	for _, kvp := range pairs {
+		key, _ := url.QueryUnescape(kvp.Key)
+		node := strings.TrimPrefix(key, prefix)
+		metric, _ := strconv.ParseInt(string(kvp.Value), 10, 32)
+		metrics[node] = int(metric)
+	}
+
+	return metrics, nil // OK
 }
