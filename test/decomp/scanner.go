@@ -63,7 +63,7 @@ func (s *Scanner) isDigit(r rune) bool {
 func (s *Scanner) Scan() Lexeme {
 	switch r := s.read(); {
 	case r == eof:
-		return NewLexeme(EOF, "")
+		return NewLexeme(EOF)
 
 	case s.isSpace(r): // whitespaces
 		s.unread()
@@ -83,31 +83,31 @@ func (s *Scanner) Scan() Lexeme {
 
 	case r == '=': // ==, =
 		if r1 := s.read(); r1 == '=' {
-			return NewLexemeR(DEQ, r, r1)
+			return NewLexeme(DEQ, r, r1)
 		}
 		s.unread()
-		return NewLexemeR(EQ, r)
+		return NewLexeme(EQ, r)
 
 	case r == '!': // !=, !
 		if r1 := s.read(); r1 == '=' {
-			return NewLexemeR(NEQ, r, r1)
+			return NewLexeme(NEQ, r, r1)
 		}
 		s.unread()
-		return NewLexemeR(NOT, r)
+		return NewLexeme(NOT, r)
 
 	case r == '<': // <=, <
 		if r1 := s.read(); r1 == '=' {
-			return NewLexemeR(LEQ, r, r1)
+			return NewLexeme(LEQ, r, r1)
 		}
 		s.unread()
-		return NewLexemeR(LS, r)
+		return NewLexeme(LS, r)
 
 	case r == '>': // >=, >
 		if r1 := s.read(); r1 == '=' {
-			return NewLexemeR(GEQ, r, r1)
+			return NewLexeme(GEQ, r, r1)
 		}
 		s.unread()
-		return NewLexemeR(GT, r)
+		return NewLexeme(GT, r)
 
 	case r == '+': // +, +number
 		if r1 := s.read(); r1 == '.' || s.isDigit(r1) {
@@ -115,7 +115,7 @@ func (s *Scanner) Scan() Lexeme {
 			return s.scanNumber(false, r) // pass '+'
 		}
 		s.unread()
-		return NewLexemeR(PLUS, r)
+		return NewLexeme(PLUS, r)
 
 	case r == '-': // -, -number
 		if r1 := s.read(); r1 == '.' || s.isDigit(r1) {
@@ -123,16 +123,16 @@ func (s *Scanner) Scan() Lexeme {
 			return s.scanNumber(false, r) // pass '-'
 		}
 		s.unread()
-		return NewLexemeR(MINUS, r)
+		return NewLexeme(MINUS, r)
 
 	case r == '?':
-		return NewLexemeR(WCARD, r)
+		return NewLexeme(WCARD, r)
 
 	case r == '/':
-		return NewLexemeR(SLASH, r)
+		return NewLexeme(SLASH, r)
 
 	case r == ',':
-		return NewLexemeR(COMMA, r)
+		return NewLexeme(COMMA, r)
 
 	case r == '.':
 		if r1 := s.read(); s.isDigit(r1) {
@@ -140,34 +140,34 @@ func (s *Scanner) Scan() Lexeme {
 			return s.scanNumber(true, r) // pass '.'
 		}
 		s.unread()
-		return NewLexemeR(PERIOD, r)
+		return NewLexeme(PERIOD, r)
 
 	case r == ':':
-		return NewLexemeR(COLON, r)
+		return NewLexeme(COLON, r)
 
 	case r == ';':
-		return NewLexemeR(SEMICOLON, r)
+		return NewLexeme(SEMICOLON, r)
 
 	case r == '(':
-		return NewLexemeR(LPAREN, r)
+		return NewLexeme(LPAREN, r)
 
 	case r == ')':
-		return NewLexemeR(RPAREN, r)
+		return NewLexeme(RPAREN, r)
 
 	case r == '[':
-		return NewLexemeR(LBRACK, r)
+		return NewLexeme(LBRACK, r)
 
 	case r == ']':
-		return NewLexemeR(RBRACK, r)
+		return NewLexeme(RBRACK, r)
 
 	case r == '{':
-		return NewLexemeR(LBRACE, r)
+		return NewLexeme(LBRACE, r)
 
 	case r == '}':
-		return NewLexemeR(RBRACE, r)
+		return NewLexeme(RBRACE, r)
 
 	default: // unknown rune
-		return NewLexemeR(ILLEGAL, r)
+		return NewLexeme(ILLEGAL, r)
 	}
 }
 
@@ -188,7 +188,7 @@ func (s *Scanner) scanSpace() Lexeme {
 		}
 	}
 
-	return NewLexeme(WS, buf.String())
+	return NewLexemeStr(WS, buf.String())
 }
 
 // scanIdent consumes the current rune and all contiguous ident runes.
@@ -208,7 +208,7 @@ func (s *Scanner) scanIdent() Lexeme {
 		}
 	}
 
-	return NewLexeme(IDENT, buf.String())
+	return NewLexemeStr(IDENT, buf.String())
 }
 
 // scanString consumes a contiguous string of non-quote characters.
@@ -223,7 +223,7 @@ func (s *Scanner) scanString() Lexeme {
 		switch r := s.read(); r {
 		case ending:
 			buf.WriteRune(ending) // keep quote in the result buffer!
-			return NewLexeme(STRING, buf.String())
+			return NewLexemeStr(STRING, buf.String())
 
 		case eof:
 			panic(fmt.Errorf("no string ending found"))
@@ -323,7 +323,7 @@ func (s *Scanner) scanNumber(isDecimal bool, prefix ...rune) Lexeme {
 	}
 
 	if isDecimal {
-		return NewLexeme(FLOAT, buf.String())
+		return NewLexemeStr(FLOAT, buf.String())
 	}
-	return NewLexeme(INT, buf.String())
+	return NewLexemeStr(INT, buf.String())
 }

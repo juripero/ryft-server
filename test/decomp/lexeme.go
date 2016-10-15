@@ -10,13 +10,13 @@ type Lexeme struct {
 	literal string // literal
 }
 
-// NewLexeme creates new lexeme.
-func NewLexeme(tok Token, lit string) Lexeme {
+// NewLexemeStr creates new lexeme.
+func NewLexemeStr(tok Token, lit string) Lexeme {
 	return Lexeme{token: tok, literal: lit}
 }
 
-// NewLexemeR creates new lexeme from runes.
-func NewLexemeR(tok Token, r0 ...rune) Lexeme {
+// NewLexeme creates new lexeme from runes.
+func NewLexeme(tok Token, r0 ...rune) Lexeme {
 	return Lexeme{token: tok, literal: string(r0)}
 }
 
