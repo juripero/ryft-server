@@ -13,7 +13,7 @@ func testNewOptimizator(limits map[string]int) *Optimizator {
 
 // test optimizator
 func testOptimizatorProcess(t *testing.T, o *Optimizator, structured bool, data string, optimized string) {
-	p := testNewParser(data)
+	p := NewParserString(data)
 	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
 		res, err := p.ParseQuery()
 		assert.NoError(t, err, "valid query (data:%s)", data)

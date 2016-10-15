@@ -20,6 +20,22 @@ func NewParser(r io.Reader) *Parser {
 	return &Parser{scanner: NewScanner(r)}
 }
 
+// NewParserString gets a new Parser instance from string.
+func NewParserString(data string) *Parser {
+	return NewParser(bytes.NewBufferString(data))
+}
+
+// ParseQuery parses a query from input string.
+func ParseQuery(query string) (res Query, err error) {
+	p := NewParserString(query)
+	res, err = p.ParseQuery()
+	if err == nil && !p.EOF() {
+		// check all data parsed, no more queries expected
+		err = fmt.Errorf("not fully parsed, no EOF found")
+	}
+	return
+}
+
 // scan returns the next token from the underlying scanner.
 // If a token has been unscanned then read that instead.
 func (p *Parser) scan() Lexeme {
@@ -52,7 +68,7 @@ func (p *Parser) scanIgnoreSpace() Lexeme {
 
 // EOF checks if no more data to parse
 func (p *Parser) EOF() bool {
-	if lex := p.scan(); lex.token == EOF {
+	if lex := p.scanIgnoreSpace(); lex.token == EOF {
 		return true
 	} else {
 		p.unscan(lex)

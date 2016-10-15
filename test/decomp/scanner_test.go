@@ -1,20 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// make new scanner on string
-func testNewScanner(data string) *Scanner {
-	return NewScanner(bytes.NewBufferString(data))
-}
-
 // test lexeme scan
 func testScannerScan(t *testing.T, data string, token Token) {
-	s := testNewScanner(data)
+	s := NewScannerString(data)
 	if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
 		lex := s.Scan()
 		assert.Equal(t, token, lex.token, "unexpected token (data:%s)", data)
@@ -25,7 +19,7 @@ func testScannerScan(t *testing.T, data string, token Token) {
 
 // test lexeme scan (multiple)
 func testScannerScan2(t *testing.T, data string, tokens ...Token) {
-	s := testNewScanner(data)
+	s := NewScannerString(data)
 	if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
 		for _, token := range tokens {
 			lex := s.Scan()
@@ -37,7 +31,7 @@ func testScannerScan2(t *testing.T, data string, tokens ...Token) {
 
 // test lexeme scan (should panic)
 func testScannerScanBad(t *testing.T, data string, expectedError string) {
-	s := testNewScanner(data)
+	s := NewScannerString(data)
 	if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
 		defer func() {
 			if r := recover(); r != nil {

@@ -22,6 +22,11 @@ func NewScanner(r io.Reader) *Scanner {
 	return s
 }
 
+// NewScannerString gets a new Scanner instance from string.
+func NewScannerString(data string) *Scanner {
+	return NewScanner(bytes.NewBufferString(data))
+}
+
 // reads the next rune.
 // returns the `eof` if an error occurs.
 func (s *Scanner) read() rune {

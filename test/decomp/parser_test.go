@@ -1,57 +1,31 @@
 package main
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// make new parser on string
-func testNewParser(data string) *Parser {
-	return NewParser(bytes.NewBufferString(data))
-}
-
 // test parser
 func testParserParse(t *testing.T, structured bool, data string, parsed string) {
-	p := testNewParser(data)
-	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
-		res, err := p.ParseQuery()
-		assert.True(t, p.EOF(), "not fully parsed")
-		assert.NoError(t, err, "valid query expected (data:%s)", data)
-		assert.Equal(t, parsed, res.String(), "not expected (data:%s)", data)
-		assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
-	}
+	res, err := ParseQuery(data)
+	assert.NoError(t, err, "valid query expected (data:%s)", data)
+	assert.Equal(t, parsed, res.String(), "not expected (data:%s)", data)
+	assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
 }
 
 // test parser (should panic)
 func testParserBad(t *testing.T, data string, expectedError string) {
-	p := testNewParser(data)
-	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
-		_, err := p.ParseQuery()
-		if assert.Error(t, err, "error expected (data:%s)", data) {
-			assert.Contains(t, err.Error(), expectedError, "unexpected error (data:%s)", data)
-		}
+	_, err := ParseQuery(data)
+	if assert.Error(t, err, "error expected (data:%s)", data) {
+		assert.Contains(t, err.Error(), expectedError, "unexpected error (data:%s)", data)
 	}
-}
-
-// test parser (should panic)
-func testParserEOF(t *testing.T, data string) {
-	p := testNewParser(data)
-	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
-		_, err := p.ParseQuery()
-		assert.NoError(t, err, "valid query expected (data:%s)", data)
-		assert.False(t, p.EOF(), "fully parsed")
-	}
-}
-
-// test for EOF
-func TestParserEOF(t *testing.T) {
-	testParserEOF(t, `"?" 123`)
 }
 
 // test for panics
 func TestParserBad(t *testing.T) {
+	testParserBad(t, `"?" 123`, "no EOF found")
+
 	testParserBad(t, "", "expected RAW_TEXT or RECORD")
 	testParserBad(t, " ", "expected RAW_TEXT or RECORD")
 	testParserBad(t, "   ", "expected RAW_TEXT or RECORD")
