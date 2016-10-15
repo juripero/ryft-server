@@ -206,9 +206,11 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
 		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS))[rs]}`)
-
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS REGEXP("\w+", CASELESS, D=5))`,
+		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS,D=5))[rs]}`)
+	testParserParse(t, true,
+		`  (RECORD.body CONTAINS REG_EXP("\w+", CASELESS, D=5))`,
 		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS,D=5))[rs]}`)
 
 	testParserParse(t, true,
