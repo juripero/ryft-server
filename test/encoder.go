@@ -6,10 +6,10 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/getryft/ryft-server/codec"
-	"github.com/getryft/ryft-server/codec/json"
-	"github.com/getryft/ryft-server/codec/msgpack.v2"
-	"github.com/getryft/ryft-server/format/raw"
+	"github.com/getryft/ryft-server/rest/codec"
+	"github.com/getryft/ryft-server/rest/codec/json"
+	"github.com/getryft/ryft-server/rest/codec/msgpack.v2"
+	"github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
 

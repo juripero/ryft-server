@@ -6,8 +6,8 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 
-	json_codec "github.com/getryft/ryft-server/codec/json"
-	msgpack_codec "github.com/getryft/ryft-server/codec/msgpack.v2"
+	json_codec "github.com/getryft/ryft-server/rest/codec/json"
+	msgpack_codec "github.com/getryft/ryft-server/rest/codec/msgpack.v2"
 
 	raw_format "github.com/getryft/ryft-server/format/raw"
 )

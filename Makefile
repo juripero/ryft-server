@@ -30,7 +30,7 @@ $(ASSETS): $(GOBINDATA)
 
 .PHONY: update
 update:
-	go get -d -u -v ./...
+	go get -d -u -t -v ./...
 
 .PHONY: build
 build:
