@@ -43,7 +43,10 @@ import (
 
 // Copy another catalog
 func (cat *Catalog) CopyFrom(base *Catalog) error {
-	fmt.Printf("copying %s to %s\n", base.path, cat.path)
+	log.WithFields(map[string]interface{}{
+		"from": base.path,
+		"to":   cat.path,
+	}).Debugf("[%s]: copying", TAG)
 
 	_, err := cat.db.Exec(`ATTACH DATABASE ? AS base`, base.path)
 	if err != nil {
@@ -61,8 +64,6 @@ func (cat *Catalog) CopyFrom(base *Catalog) error {
 	if !base.UseAbsoluteDataPath {
 		basePrefix, _ = filepath.Split(base.path)
 	}
-
-	fmt.Printf("base prefix: %q\n", basePrefix)
 
 	// copy data items
 	_, err = tx.Exec(`INSERT
@@ -93,7 +94,12 @@ JOIN base.data AS bd, main.data AS md ON d_id = bd.id AND ?||bd.file IS md.file`
 
 // AddRyftResults adds ryft DATA and INDEX files into catalog
 func (cat *Catalog) AddRyftResults(dataPath, indexPath string, delimiter string, surroundingWidth uint, opt uint32) error {
-	fmt.Printf("adding ryft result data:%s index:%s width:%d\n", dataPath, indexPath, surroundingWidth)
+	log.WithFields(map[string]interface{}{
+		"data":  dataPath,
+		"index": indexPath,
+		"delim": delimiter,
+		"width": surroundingWidth,
+	}).Infof("[%s]: adding ryft result", TAG)
 
 	file, err := os.Open(indexPath)
 	if err != nil {
@@ -120,7 +126,6 @@ VALUES(?,0,?,?)`, dataPath, delimiter, surroundingWidth)
 	}
 
 	// try to read all index records
-	fmt.Printf("data_file:%s\n", dataPath)
 	for r := bufio.NewReader(file); ; {
 		// read line by line
 		line, err := r.ReadBytes('\n')
@@ -130,7 +135,7 @@ VALUES(?,0,?,?)`, dataPath, delimiter, surroundingWidth)
 				return fmt.Errorf("failed to parse index: %s", err)
 			}
 
-			fmt.Printf("inserting index: %s\n", index)
+			// log.WithField("index", index).Debugf("[%s]: inserting index...", TAG) // DEBUG
 
 			// find base reference
 			var offset uint64
@@ -160,9 +165,8 @@ AND ? BETWEEN p.d_pos AND p.d_pos+p.len-1`, index.File, offset) // TODO: ORDER B
 					return fmt.Errorf("failed to find base part: %s", err)
 				}
 				// no base, use defaults
-				fmt.Printf("  no base found, use defaults\n")
+				// log.Debugf("[%s]: ... no base found, use defaults", TAG) // DEBUG
 			} else {
-				fmt.Printf("  base found: %s#%d/%d at %d  ", base_name.String, base_pos.Int64, base_len.Int64, base_dpos.Int64)
 				if !base_uname.Valid /*&& !base_upos.Valid && !base_ulen.Valid*/ {
 					base_uname = base_name
 					base_upos = base_pos
@@ -192,7 +196,12 @@ AND ? BETWEEN p.d_pos AND p.d_pos+p.len-1`, index.File, offset) // TODO: ORDER B
 					base_ulen.Int64 -= (end - baseEnd)
 				}
 
-				fmt.Printf("  => %s#%d/%d shift:%d\n", base_uname.String, base_upos.Int64, base_ulen.Int64, shift)
+				/* log.WithFields(map[string]interface{}{
+					"file": base_name.String,
+					"pos":  base_pos.Int64,
+					"len":  base_len.Int64,
+					"at":   base_dpos.Int64,
+				}).Debugf("[%s]: ... base found %s#%d/%d shift:%d", TAG, base_uname.String, base_upos.Int64, base_ulen.Int64, shift) */
 			}
 
 			// insert new file part (data file will be updated by INSERT trigger!)
