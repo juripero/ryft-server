@@ -121,7 +121,7 @@ func ParseDataSize(x interface{}) (uint64, error) {
 	}
 
 	s = strings.TrimSpace(s)
-	if strings.ContainsAny(s, ".,e") {
+	if strings.ContainsAny(s, ".,einfa") {
 		// value is float, parse as float64 ("inf" is parsed as +Inf)
 		r, err := strconv.ParseFloat(s, 64)
 		if err != nil {
@@ -133,6 +133,7 @@ func ParseDataSize(x interface{}) (uint64, error) {
 			return 0, nil // report as zero!
 		}
 
+		// TODO: check out of range
 		return uint64(r * float64(scale)), nil // OK
 	}
 
@@ -142,5 +143,6 @@ func ParseDataSize(x interface{}) (uint64, error) {
 		return 0, err
 	}
 
+	// TODO: check out of range
 	return r * scale, nil // OK
 }

@@ -40,10 +40,10 @@ import (
 func AsString(opt interface{}) (string, error) {
 	switch v := opt.(type) {
 	// TODO: other types to string?
-	case string:
-		return v, nil
 	case nil:
 		return "", nil
+	case string:
+		return v, nil
 	}
 
 	return "", fmt.Errorf("%v is not a string", opt)
@@ -54,12 +54,12 @@ func AsString(opt interface{}) (string, error) {
 func AsDuration(opt interface{}) (time.Duration, error) {
 	switch v := opt.(type) {
 	// TODO: other types to duration?
+	case nil:
+		return time.Duration(0), nil
 	case string:
 		return time.ParseDuration(v)
 	case time.Duration:
 		return v, nil
-	case nil:
-		return time.Duration(0), nil
 	}
 
 	return time.Duration(0), fmt.Errorf("%v is not a time duration", opt)
@@ -69,6 +69,8 @@ func AsDuration(opt interface{}) (time.Duration, error) {
 func AsUint64(opt interface{}) (uint64, error) {
 	switch v := opt.(type) {
 	// TODO: other types to uint64?
+	case nil:
+		return 0, nil
 	case uint:
 		return uint64(v), nil
 	case int:
@@ -77,12 +79,24 @@ func AsUint64(opt interface{}) (uint64, error) {
 		return v, nil
 	case int64:
 		return uint64(v), nil
+	case uint32:
+		return uint64(v), nil
+	case int32:
+		return uint64(v), nil
+	case uint16:
+		return uint64(v), nil
+	case int16:
+		return uint64(v), nil
+	case uint8:
+		return uint64(v), nil
+	case int8:
+		return uint64(v), nil
 	case float64:
+		return uint64(v), nil
+	case float32:
 		return uint64(v), nil
 	case string:
 		return strconv.ParseUint(v, 10, 64)
-	case nil:
-		return 0, nil
 	}
 
 	return 0, fmt.Errorf("%v is not an uint64", opt)
@@ -92,10 +106,12 @@ func AsUint64(opt interface{}) (uint64, error) {
 func AsBool(opt interface{}) (bool, error) {
 	switch v := opt.(type) {
 	// TODO: other types to bool?
-	case bool:
-		return v, nil
 	case nil:
 		return false, nil
+	case bool:
+		return v, nil
+	case string:
+		return strconv.ParseBool(v)
 	}
 
 	return false, fmt.Errorf("%v is not a bool", opt)
