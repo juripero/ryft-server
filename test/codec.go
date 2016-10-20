@@ -9,7 +9,7 @@ import (
 	json_codec "github.com/getryft/ryft-server/rest/codec/json"
 	msgpack_codec "github.com/getryft/ryft-server/rest/codec/msgpack.v2"
 
-	raw_format "github.com/getryft/ryft-server/format/raw"
+	raw_format "github.com/getryft/ryft-server/rest/format/raw"
 )
 
 // test JSON simple codec

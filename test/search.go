@@ -108,7 +108,7 @@ func newRyftDec(log Logger, backend search.Engine) search.Engine {
 	}
 	// log("%q: actual options: %+v", name, engine.Options())
 
-	ryftdec.SetLogLevel(ryftdecLogLevel)
+	ryftdec.SetLogLevelString(ryftdecLogLevel)
 	return engine
 }
 
@@ -135,7 +135,7 @@ func newRyftMux(log Logger, backends ...search.Engine) search.Engine {
 	}
 	// log("%q: actual options: %+v", name, engine.Options())
 
-	ryftmux.SetLogLevel(ryftmuxLogLevel)
+	ryftmux.SetLogLevelString(ryftmuxLogLevel)
 	return engine
 }
 

@@ -13,8 +13,8 @@ import (
 	_ "github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/ryftprim"
 
-	raw_format "github.com/getryft/ryft-server/format/raw"
-	xml_format "github.com/getryft/ryft-server/format/xml"
+	raw_format "github.com/getryft/ryft-server/rest/format/raw"
+	xml_format "github.com/getryft/ryft-server/rest/format/xml"
 )
 
 var (
