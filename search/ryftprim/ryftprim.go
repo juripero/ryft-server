@@ -141,26 +141,26 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 			} else if info.Size() == 0 {
 				task.log().WithField("path", filePath).Warnf("[%s]: empty file, skipped", TAG)
 				continue
-			} else if strings.HasPrefix(info.Name(), ".") {
+			} /*else if strings.HasPrefix(info.Name(), ".") {
 				task.log().WithField("path", filePath).Debugf("[%s]: hidden file, skipped", TAG)
 				continue
-			}
+			}*/
 
 			task.log().WithField("file", filePath).Debugf("checking catalog file...")
 			cat, err := catalog.OpenCatalogReadOnly(filePath)
 			if err != nil {
+				if err == catalog.ErrNotACatalog {
+					// just a regular file, use it "as is"
+					task.log().WithField("file", filePath).Debugf("... just a regular file")
+					file_args = append(file_args, "-f", engine.relativeToMountPointAbs(filePath))
+
+					continue // go to next match
+				}
 				return fmt.Errorf("failed to open catalog: %s", err)
 			}
 			defer cat.Close()
-			if !cat.CheckScheme() /*!cat.IsCatalog()*/ {
-				// just a regular file, use it "as is"
-				task.log().WithField("file", filePath).Debugf(".. just a regular file")
-				file_args = append(file_args, "-f", engine.relativeToMountPointAbs(filePath))
 
-				continue // go to next match
-			}
-
-			task.log().WithField("file", filePath).Debugf(".. is a catalog")
+			task.log().WithField("file", filePath).Debugf("... is a catalog")
 			if tc, ok := cfg.WorkCatalog.(*catalog.Catalog); ok && tc != nil {
 				// TODO: refactor this logic
 				tc.CopyFrom(cat)
