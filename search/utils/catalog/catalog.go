@@ -100,7 +100,7 @@ func (cat *Catalog) Close() error {
 
 	// close database
 	if db := cat.db; db != nil {
-		log.WithField("path", cat.path).Debugf("[%s]: close catalog: %s", TAG)
+		log.WithField("path", cat.path).Debugf("[%s]: close catalog", TAG)
 		cat.db = nil
 		return db.Close()
 	}

@@ -251,11 +251,13 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			//			}
 
 			defer res1.removeAll(mountPoint, homeDir)
-			for _, out := range res1.Output {
-				if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
-					filepath.Join(mountPoint, homeDir, out.IndexFile),
-					out.Delimiter, out.Width, 0 /*intermediate*/); err != nil {
-					return result, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
+			if task.result != nil { // might be nil for /count operation
+				for _, out := range res1.Output {
+					if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
+						filepath.Join(mountPoint, homeDir, out.IndexFile),
+						out.Delimiter, out.Width, 0 /*intermediate*/); err != nil {
+						return result, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
+					}
 				}
 			}
 

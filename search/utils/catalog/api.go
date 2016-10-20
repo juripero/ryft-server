@@ -32,7 +32,9 @@ package catalog
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -78,7 +80,7 @@ func IsCatalog(path string) bool {
 
 // OpenCatalog opens catalog file in write mode.
 func OpenCatalog(path string) (*Catalog, error) {
-	cat, cached, err := getCatalog(path)
+	cat, cached, err := getCatalog(path, false)
 	if err != nil {
 		log.WithError(err).Errorf("[%s]: failed to get catalog", TAG)
 		return nil, err
@@ -98,7 +100,7 @@ func OpenCatalog(path string) (*Catalog, error) {
 
 // OpenCatalog opens catalog file in read-only mode.
 func OpenCatalogReadOnly(path string) (*Catalog, error) {
-	cat, _, err := getCatalog(path)
+	cat, _, err := getCatalog(path, true)
 	if err != nil {
 		return nil, err
 	}
@@ -125,13 +127,24 @@ func OpenCatalogNoCache(path string) (*Catalog, error) {
 }
 
 // get catalog (from cache or new)
-func getCatalog(path string) (*Catalog, bool, error) {
+func getCatalog(path string, readOnly bool) (*Catalog, bool, error) {
 	globalCache.Lock()
 	defer globalCache.Unlock()
 
 	// try to get existing catalog
 	if cat := globalCache.get(path); cat != nil {
 		return cat, true, nil // OK
+	}
+
+	if readOnly {
+		// quick check by looking at data directory
+		// take a look at Catalog.newDataFilePath() function!
+		base, file := filepath.Split(path)
+		dataDir := filepath.Join(base, fmt.Sprintf(".%s.catalog", file))
+
+		if info, err := os.Stat(dataDir); os.IsNotExist(err) || !info.IsDir() {
+			return nil, false, ErrNotACatalog
+		}
 	}
 
 	// create new one and put to cache
