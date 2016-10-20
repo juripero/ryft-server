@@ -34,10 +34,11 @@ import (
 	"fmt"
 )
 
-// Statistics is search processing statistics.
+// Stat is search processing statistics.
 // Contains set of search statistics such as total processed bytes
 // and processing duration.
-type Statistics struct {
+// Might be merged.
+type Stat struct {
 	Matches    uint64 // total records matched
 	TotalBytes uint64 // total input bytes processed
 
@@ -47,43 +48,82 @@ type Statistics struct {
 	FabricDuration uint64  // fabric processing duration, milliseconds
 	FabricDataRate float64 // MB/sec, TotalBytes/FabricDuration
 
-	// merge details - all statistics grouped by hostname
-	Details []*Statistics
-	Host    string // optional host address (used in cluster mode)
+	Details []*Stat // all statistics merged (cluster mode or query decomposition)
+	Host    string  // optional host address (used in cluster mode)
 }
 
 // NewStat creates empty statistics.
-func NewStat(host string) *Statistics {
-	stat := new(Statistics)
+func NewStat(host string) *Stat {
+	stat := new(Stat)
 	stat.Host = host
 	return stat
 }
 
 // String gets string representation of statistics.
-func (s Statistics) String() string {
-	return fmt.Sprintf("Stat{%d matches on %d byte(s) in %d ms (fabric: %d ms), details:%d}",
-		s.Matches, s.TotalBytes, s.Duration, s.FabricDuration, len(s.Details))
+func (stat Stat) String() string {
+	return fmt.Sprintf("Stat{%d matches on %d bytes in %d ms (fabric: %d ms), details:%s, host:%q}",
+		stat.Matches, stat.TotalBytes, stat.Duration, stat.FabricDuration, stat.Details, stat.Host)
 }
 
 // Merge merges statistics from another node.
-func (s *Statistics) Merge(a *Statistics) {
-	s.Matches += a.Matches
-	s.TotalBytes += a.TotalBytes
+// Uses maximum as duration and fabric duration.
+// Uses sum of data rates.
+func (stat *Stat) Merge(other *Stat) {
+	if other == nil {
+		return // nothing to do
+	}
+
+	stat.Matches += other.Matches
+	stat.TotalBytes += other.TotalBytes
 
 	// s.Duration += a.Duration
-	if s.Duration < a.Duration {
-		s.Duration = a.Duration
+	if stat.Duration < other.Duration {
+		stat.Duration = other.Duration
 	}
 
 	// s.FabricDuration += a.FabricDuration
-	if s.FabricDuration < a.FabricDuration {
-		s.FabricDuration = a.FabricDuration
+	if stat.FabricDuration < other.FabricDuration {
+		stat.FabricDuration = other.FabricDuration
 	}
 
 	// just sum all data rates
-	s.FabricDataRate += a.FabricDataRate
-	s.DataRate += a.DataRate
+	stat.FabricDataRate += other.FabricDataRate
+	stat.DataRate += other.DataRate
 
 	// save details
-	s.Details = append(s.Details, a)
+	stat.Details = append(stat.Details, other)
+}
+
+// Combine combines statistics from another Ryft call.
+// Uses sum of durations and fabric durations.
+// Data rates are updated.
+func (stat *Stat) Combine(other *Stat) {
+	if other == nil {
+		return // nothing to do
+	}
+
+	stat.Matches += other.Matches
+	stat.TotalBytes += other.TotalBytes
+
+	stat.Duration += other.Duration
+	stat.FabricDuration += other.FabricDuration
+
+	// update data rates (including TotalBytes/0=+Inf protection)
+	if stat.FabricDuration > 0 {
+		mb := float64(stat.TotalBytes) / 1024 / 1024
+		sec := float64(stat.FabricDuration) / 1000
+		stat.FabricDataRate = mb / sec
+	} else {
+		stat.FabricDataRate = 0.0
+	}
+	if stat.Duration > 0 {
+		mb := float64(stat.TotalBytes) / 1024 / 1024
+		sec := float64(stat.Duration) / 1000
+		stat.DataRate = mb / sec
+	} else {
+		stat.DataRate = 0.0
+	}
+
+	// save details
+	stat.Details = append(stat.Details, other)
 }

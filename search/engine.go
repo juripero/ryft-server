@@ -54,16 +54,15 @@ type Engine interface {
 // To get list of supported options see corresponding search engine.
 func NewEngine(name string, opts map[string]interface{}) (engine Engine, err error) {
 	// get appropriate factory
-	f, ok := factories[name]
-	if !ok {
-		return nil, fmt.Errorf("%q is unknown search engine", name)
+	if f, ok := factories[name]; ok && f != nil {
+		if opts == nil {
+			// no options by default
+			opts = map[string]interface{}{}
+		}
+
+		// create engine using factory
+		return f(opts)
 	}
 
-	if opts == nil {
-		// no options by default
-		opts = map[string]interface{}{}
-	}
-
-	// create engine using factory
-	return f(opts)
+	return nil, fmt.Errorf("%q is unknown search engine", name)
 }
