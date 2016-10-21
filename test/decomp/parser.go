@@ -242,6 +242,11 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	// search expression
 	if len(expression) == 0 {
 		switch lex := p.scanIgnoreSpace(); {
+		case lex.IsES(): // +options
+			expression, res.Options = p.parseSearchExpr(p.baseOpts)
+			res.Options.Mode = "es"
+			res.Options.Dist = 0 // no dist for exact search!
+
 		case lex.IsFHS(): // +options
 			expression, res.Options = p.parseSearchExpr(p.baseOpts)
 			if res.Options.Dist == 0 {

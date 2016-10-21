@@ -134,6 +134,22 @@ func TestParserParse(t *testing.T) {
 		`P{(RECORD.body CONTAINS "FEDS")}`)
 
 	testParserParse(t, true,
+		`  (RECORD.body CONTAINS ES("test"))`,
+		`P{(RECORD.body CONTAINS "test")[es]}`)
+
+	testParserParse(t, false,
+		`  (RAW_TEXT CONTAINS ES("test",w=5))`,
+		`P{(RAW_TEXT CONTAINS "test")[es,w=5]}`)
+
+	testParserParse(t, true,
+		`  (RECORD.body CONTAINS ES("test",cs=true))`,
+		`P{(RECORD.body CONTAINS "test")[es,cs=true]}`)
+
+	testParserParse(t, true,
+		`  (RECORD.body CONTAINS ES("test",d=5))`, // ignored
+		`P{(RECORD.body CONTAINS "test")[es]}`)
+
+	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FHS("test"))`,
 		`P{(RECORD.body CONTAINS "test")[es]}`)
 

@@ -8,7 +8,7 @@ import (
 
 // Options contains search options
 type Options struct {
-	Mode  string // Search mode: fhs, feds, date, time, etc.
+	Mode  string // Search mode: es, fhs, feds, date, time, etc.
 	Dist  uint   // Fuzziness distance
 	Width uint   // Surrounding width
 	Cs    bool   // Case sensitivity flag

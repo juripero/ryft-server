@@ -70,6 +70,11 @@ func (lex Lexeme) IsNotEquals() bool {
 	return lex.token == IDENT && strings.EqualFold(lex.literal, "NOT_EQUALS")
 }
 
+// IsES checks "ES" search type.
+func (lex Lexeme) IsES() bool {
+	return lex.token == IDENT && (strings.EqualFold(lex.literal, "ES") || strings.EqualFold(lex.literal, "EXACT"))
+}
+
 // IsFHS checks "FHS" search type.
 func (lex Lexeme) IsFHS() bool {
 	return lex.token == IDENT && (strings.EqualFold(lex.literal, "FHS") || strings.EqualFold(lex.literal, "HAMMING"))

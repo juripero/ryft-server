@@ -34,6 +34,8 @@ func TestLexemeIs(t *testing.T) {
 	assert.True(t, NewLexemeStr(IDENT, "EQUALS").IsEquals())
 	assert.True(t, NewLexemeStr(IDENT, "NOT_EQUALS").IsNotEquals())
 
+	assert.True(t, NewLexemeStr(IDENT, "es").IsES())
+	assert.True(t, NewLexemeStr(IDENT, "exact").IsES())
 	assert.True(t, NewLexemeStr(IDENT, "FHS").IsFHS())
 	assert.True(t, NewLexemeStr(IDENT, "HAMMING").IsFHS())
 	assert.True(t, NewLexemeStr(IDENT, "FEDS").IsFEDS())
