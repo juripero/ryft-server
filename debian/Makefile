@@ -25,6 +25,7 @@ package: control
 	cp "../ryft-users.yaml" "${DESTDIR}/etc/ryft-users.yaml"
 	echo "/etc/ryft-server.conf" > "${DESTDIR}/DEBIAN/conffiles"
 	echo "/etc/ryft-users.yaml" >> "${DESTDIR}/DEBIAN/conffiles"
+	rm "${DESTDIR}/var/log/ryft/.keep"
 	rm "${DESTDIR}/var/ryft/.keep"
 	dpkg --build "${DESTDIR}"
 	mv -f "${DESTDIR}.deb" "${DEBNAME}"

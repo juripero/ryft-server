@@ -453,10 +453,10 @@ sudo dpkg -r ryft-server
 
 ## Log file
 
-You can find log file of the `ryft-server-d` service that called `ryft-server-d-start.log` inside home directory of `ryftuser`.
+You can find log file of the `ryft-server-d` service at `/var/log/ryft/server.log`.
 
 To view logs in real-time:
 
 ```{.sh}
-tail -f ~/ryft-server-d-start.log
+tail -f /var/log/ryft/server.log
 ```
