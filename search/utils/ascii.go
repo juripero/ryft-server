@@ -43,7 +43,7 @@ func DumpAsString(v interface{}) string {
 		if isAsciiPrintable(b) {
 			return string(b)
 		}
-		return "hex:" + hex.EncodeToString(b)
+		return "0x" + hex.EncodeToString(b)
 	}
 	return fmt.Sprintf("%v", v)
 }

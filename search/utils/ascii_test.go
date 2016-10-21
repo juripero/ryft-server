@@ -17,6 +17,6 @@ func TestDumpAsString(t *testing.T) {
 	testDumpAsString(t, "", "")
 	testDumpAsString(t, nil, "<nil>")
 	testDumpAsString(t, []byte("hello"), "hello")
-	testDumpAsString(t, []byte("\n\r\f"), "hex:0a0d0c")
-	testDumpAsString(t, []byte("привет"), "hex:d0bfd180d0b8d0b2d0b5d182") // hello in russian, utf-8
+	testDumpAsString(t, []byte("\n\r\f"), "0x0a0d0c")
+	testDumpAsString(t, []byte("привет"), "0xd0bfd180d0b8d0b2d0b5d182") // hello in russian, utf-8
 }
