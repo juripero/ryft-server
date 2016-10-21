@@ -492,7 +492,7 @@ func (cat *Catalog) getSearchIndexFile() (map[string]*search.IndexFile, error) {
 	rows, err := cat.db.Query(`SELECT
 parts.name,parts.pos,parts.len,data.file,parts.d_pos FROM parts
 JOIN data ON parts.d_id = data.id
-ORDER BY parts.pos`)
+ORDER BY parts.d_pos`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parts: %s", err)
 	}
