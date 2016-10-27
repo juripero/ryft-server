@@ -1,0 +1,97 @@
+#!/usr/bin/python
+
+#
+# Usage: ryft_rdf -l <rdf#>"
+# list files associated with an rdf#
+#
+
+import sys,getopt
+import sqlite3
+
+db='/var/lib/ryftone/.rhfs.db'
+conn = sqlite3.connect(db)
+
+#Query= SELECT * from DirectoryTable
+#ColumnNames= ['dir_id', 'parentdir_id', 'name', 'mode', 'uid', 'gid', 'size', 'ctime', 'atime', 'mtime']
+def getDirPath( connection, dir_id ):
+    #print "enter getDirPath ", dir_id
+    pathList = []
+    done = 0
+    while (done == 0):
+      #print "loop getDirPath ", dir_id
+      query="select * from DirectoryTable where dir_id = ?"
+      cur = connection.cursor()
+      cur.execute(query, (dir_id,))
+      rows = cur.fetchall()
+      names = list(map(lambda x: x[0], cur.description))
+      #print "ColumnNames=", names
+      returnValue=""
+      for row in rows:
+        #print row
+        dir_id = row[0]
+        pathList.append(row[2])
+        if (dir_id == 1):
+          done = 1
+        dir_id = row[1];
+    for row in reversed(pathList):
+      if (row == "/"):
+        returnValue = "/ryftone"
+      else:
+        returnValue = returnValue + "/" + row
+
+    #print "leaving getDirPath ", returnValue
+    return returnValue
+
+#Query= SELECT * from FileTable
+#ColumnNames= ['file_id', 'dir_id', 'rdf_id', 'max_chunk_size', 'name', 'mode', 'uid', 'gid', 'size', 'ctime', 'atime', 'mtime', 'otime']
+def getFileListByRDF( connection, rdf_id ):
+    fileList = []
+    query="select * from FileTable where rdf_id = ?"
+    cur = connection.cursor()
+    cur.execute(query, (rdf_id,))
+    rows = cur.fetchall()
+    names = list(map(lambda x: x[0], cur.description))
+    #print "ColumnNames=", names
+    for row in rows:
+        #print row[4]
+        fileList.append(getDirPath(connection, row[1]) + "/" + row[4]);
+    return fileList
+
+
+rdf_id = 0
+
+i=1
+errorMessage="Usage: ryft_rdf -l <rdf#>"
+while ((i < len(sys.argv)) and (i==1 or len(errorMessage)==0)) :
+	# assume parameter is invalid
+	errorMessage="Invalid argument for " + sys.argv[i]
+	
+	# check single position parameters
+	o=sys.argv[i].lower()
+	#print "looping o=", o, ", i=", i, ", len(sys.argv)=", len(sys.argv), ", errorMessage=", errorMessage;
+
+	if (i+1 < len(sys.argv)) :
+
+		# check two position parameters
+		i=i+1
+		a=sys.argv[i]
+    		if o == '-l' or o == '-l' :
+                        #print "-l match found"
+		        i=i+1
+		        rdf_id = a
+			errorMessage=""
+                #else :
+                        #print "-l match NOT found"
+
+        else :
+                i=i+1
+
+if (len(errorMessage) == 0) :
+    #print "rdf_id=", rdf_id
+    #RyftONELoggingLevel=getRyftONELoggingLevel(conn)
+    #print RyftONELoggingLevel
+    FileListByRDF=getFileListByRDF(conn, rdf_id)
+    for row in FileListByRDF:
+      print row;
+else :
+    print errorMessage
