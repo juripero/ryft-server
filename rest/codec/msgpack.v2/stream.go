@@ -44,8 +44,11 @@ type StreamEncoder struct {
 	encoder *backend.Encoder
 }
 
+// Tag type
+type Tag uint8
+
 const (
-	TAG_EOF uint8 = iota
+	TAG_EOF Tag = iota
 	TAG_REC
 	TAG_ERR
 	TAG_STAT
@@ -60,8 +63,12 @@ func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 
 // Write a RECORD
 func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
+	if rec == nil {
+		return nil // nothing to do
+	}
+
 	// write tag
-	err := enc.encoder.EncodeUint8(TAG_REC)
+	err := enc.encoder.Encode(TAG_REC)
 	if err != nil {
 		return err
 	}
@@ -77,8 +84,12 @@ func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
 
 // Write a STATISTICS
 func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
+	if stat == nil {
+		return nil // nothing to do
+	}
+
 	// write tag
-	err := enc.encoder.EncodeUint8(TAG_STAT)
+	err := enc.encoder.Encode(TAG_STAT)
 	if err != nil {
 		return err
 	}
@@ -94,8 +105,12 @@ func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
 
 // Write an ERROR
 func (enc *StreamEncoder) EncodeError(err_ error) error {
+	if err_ == nil {
+		return nil // nothing to do
+	}
+
 	// write tag
-	err := enc.encoder.EncodeUint8(TAG_ERR)
+	err := enc.encoder.Encode(TAG_ERR)
 	if err != nil {
 		return err
 	}
@@ -112,7 +127,7 @@ func (enc *StreamEncoder) EncodeError(err_ error) error {
 // End writing, close stream.
 func (enc *StreamEncoder) Close() error {
 	// write tag
-	err := enc.encoder.EncodeUint8(TAG_EOF)
+	err := enc.encoder.Encode(TAG_EOF)
 	if err != nil {
 		return err
 	}
@@ -133,8 +148,9 @@ func NewStreamDecoder(r io.Reader) (*StreamDecoder, error) {
 }
 
 // NextTag decodes next tag from the stream.
-func (dec *StreamDecoder) NextTag() (uint8, error) {
-	return dec.decoder.DecodeUint8()
+func (dec *StreamDecoder) NextTag() (Tag, error) {
+	t, err := dec.decoder.DecodeUint8()
+	return Tag(t), err
 }
 
 // Next decodes next item from the stream.

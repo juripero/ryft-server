@@ -9,8 +9,9 @@ import (
 // test bad engine
 func TestEngineBad(t *testing.T) {
 	_, err := NewEngine("bad-engine-name", nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "is unknown search engine")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "is unknown search engine")
+	}
 }
 
 // test register factory

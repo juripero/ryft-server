@@ -1,4 +1,6 @@
-package json
+package msgpack
+
+// TODO: synchronize these tests with v2
 
 import (
 	"bytes"
@@ -9,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// test stream JSON encoder
+// test stream encoder
 func testStreamEncoder(t *testing.T, populate func(enc *StreamEncoder), expected string) {
 	buf := &bytes.Buffer{}
 	enc, err := NewStreamEncoder(buf)
@@ -19,25 +21,11 @@ func testStreamEncoder(t *testing.T, populate func(enc *StreamEncoder), expected
 		err = enc.Close()
 		assert.NoError(t, err)
 
-		vals := []interface{}{}
-		dec := json.NewDecoder(bytes.NewReader(buf.Bytes()))
-		for {
-			var val interface{}
-			err := dec.Decode(&val)
-			if err != nil {
-				break
-			}
-
-			vals = append(vals, val)
-		}
-
-		sbuf, err := json.Marshal(vals)
-		assert.NoError(t, err)
-		assert.JSONEq(t, expected, string(sbuf))
+		assert.EqualValues(t, expected, buf.String())
 	}
 }
 
-// test stream JSON encoder (bad case)
+// test stream encoder (bad case)
 func testStreamEncoderBad(t *testing.T, populate func(enc *StreamEncoder) error, limit int, expectedError string) {
 	buf := &bytes.Buffer{}
 	lim := newLimitedWriter(buf, limit)
@@ -55,38 +43,38 @@ func testStreamEncoderBad(t *testing.T, populate func(enc *StreamEncoder) error,
 	}
 }
 
-// Test stream JSON encoder
+// Test stream encoder
 func TestStreamEncoder(t *testing.T) {
 	// empty
 	testStreamEncoder(t, func(enc *StreamEncoder) {
 		// do nothing
-	}, `["end"]`)
+	}, "\x00")
 
 	// one error
 	testStreamEncoder(t, func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeError(nil)) // ignored
 		assert.NoError(t, enc.EncodeError(fmt.Errorf("err1")))
-	}, `["err", "err1", "end"]`)
+	}, "\x02\xa4err1\x00")
 
 	// a few errors
 	testStreamEncoder(t, func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeError(fmt.Errorf("err1")))
 		assert.NoError(t, enc.EncodeError(fmt.Errorf("err2")))
 		assert.NoError(t, enc.EncodeError(fmt.Errorf("err3")))
-	}, `["err", "err1", "err", "err2", "err", "err3", "end"]`)
+	}, "\x02\xa4err1\x02\xa4err2\x02\xa4err3\x00")
 
 	// one record
 	testStreamEncoder(t, func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeRecord(nil)) // ignored
 		assert.NoError(t, enc.EncodeRecord("rec1"))
-	}, `["rec", "rec1", "end"]`)
+	}, "\x01\xa4rec1\x00")
 
 	// a few records
 	testStreamEncoder(t, func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeRecord("rec1"))
 		assert.NoError(t, enc.EncodeRecord("rec2"))
 		assert.NoError(t, enc.EncodeRecord("rec3"))
-	}, `["rec", "rec1", "rec", "rec2", "rec", "rec3", "end"]`)
+	}, "\x01\xa4rec1\x01\xa4rec2\x01\xa4rec3\x00")
 
 	// a few records and error
 	testStreamEncoder(t, func(enc *StreamEncoder) {
@@ -94,13 +82,13 @@ func TestStreamEncoder(t *testing.T) {
 		assert.NoError(t, enc.EncodeRecord("rec1"))
 		assert.NoError(t, enc.EncodeRecord("rec2"))
 		assert.NoError(t, enc.EncodeRecord("rec3"))
-	}, `["err", "err1", "rec", "rec1", "rec", "rec2", "rec", "rec3", "end"]`)
+	}, "\x02\xa4err1\x01\xa4rec1\x01\xa4rec2\x01\xa4rec3\x00")
 
 	// stat
 	testStreamEncoder(t, func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeStat(nil)) // ignored
 		assert.NoError(t, enc.EncodeStat(555))
-	}, `["stat", 555, "end"]`)
+	}, "\x03\xcd\x02+\x00")
 
 	// bad cases
 	testStreamEncoderBad(t, func(enc *StreamEncoder) error {
@@ -108,40 +96,40 @@ func TestStreamEncoder(t *testing.T) {
 			return err
 		}
 		return nil
-	}, 4, "EOF") // EncodeRecord (tag)
+	}, 0, "EOF") // EncodeRecord (tag)
 	testStreamEncoderBad(t, func(enc *StreamEncoder) error {
 		if err := enc.EncodeRecord("rec1"); err != nil {
 			return err
 		}
 		return nil
-	}, 8, "EOF") // EncodeRecord (record itself)
+	}, 4, "EOF") // EncodeRecord (record itself)
 	testStreamEncoderBad(t, func(enc *StreamEncoder) error {
 		if err := enc.EncodeStat("stat1"); err != nil {
 			return err
 		}
 		return nil
-	}, 4, "EOF") // EncodeStat (tag)
+	}, 0, "EOF") // EncodeStat (tag)
 	testStreamEncoderBad(t, func(enc *StreamEncoder) error {
 		if err := enc.EncodeStat("stat1"); err != nil {
 			return err
 		}
 		return nil
-	}, 8, "EOF") // EncodeStat (record itself)
+	}, 4, "EOF") // EncodeStat (record itself)
 	testStreamEncoderBad(t, func(enc *StreamEncoder) error {
 		if err := enc.EncodeError(fmt.Errorf("err1")); err != nil {
 			return err
 		}
 		return nil
-	}, 4, "EOF") // EncodeStat (tag)
+	}, 0, "EOF") // EncodeStat (tag)
 	testStreamEncoderBad(t, func(enc *StreamEncoder) error {
 		if err := enc.EncodeError(fmt.Errorf("err1")); err != nil {
 			return err
 		}
 		return nil
-	}, 8, "EOF") // EncodeStat (record itself)
+	}, 4, "EOF") // EncodeStat (record itself)
 	testStreamEncoderBad(t, func(enc *StreamEncoder) error {
 		return nil
-	}, 2, "EOF") // Close
+	}, 0, "EOF") // Close
 }
 
 // test stream JSON decoder
@@ -163,7 +151,13 @@ func testStreamDecoder(t *testing.T, data string, expected string) {
 			var val interface{}
 			err = dec.Next(&val)
 			assert.NoError(t, err)
-			vals = append(vals, val)
+			switch v := val.(type) {
+			case []byte:
+				vals = append(vals, string(v))
+			default:
+				vals = append(vals, val)
+
+			}
 		}
 
 		sbuf, err := json.Marshal(vals)
@@ -178,7 +172,7 @@ func testStreamDecoderBad(t *testing.T, data string, expectedError string) {
 	if assert.NoError(t, err) {
 		assert.NotNil(t, dec)
 
-		var tag string
+		var tag Tag
 		for {
 			tag, err = dec.NextTag()
 			if err == nil {
@@ -200,56 +194,43 @@ func testStreamDecoderBad(t *testing.T, data string, expectedError string) {
 	}
 }
 
-// Test stream JSON decoder
+// Test stream decoder
 func TestStreamDecoder(t *testing.T) {
 	// empty
 	testStreamDecoder(t,
-		`"end"`,
-		`["end"]`)
+		"\x00",
+		`[0]`)
 
 	// one error
 	testStreamDecoder(t,
-		`"err" "err1"
-		 "end"`,
-		`["err", "err1", "end"]`)
+		"\x02\xa4err1\x00",
+		`[2, "err1", 0]`)
 
 	// a few errors
 	testStreamDecoder(t,
-		`"err" "err1"
-		"err" "err2"
-		"err" "err3"
-		"end"`,
-		`["err", "err1", "err", "err2", "err", "err3", "end"]`)
+		"\x02\xa4err1\x02\xa4err2\x02\xa4err3\x00",
+		`[2, "err1", 2, "err2", 2, "err3", 0]`)
 
 	// one record
 	testStreamDecoder(t,
-		`"rec" "rec1"
-		"end"`,
-		`["rec", "rec1", "end"]`)
+		"\x01\xa4rec1\x00",
+		`[1, "rec1", 0]`)
 
 	// a few records
 	testStreamDecoder(t,
-		`"rec" "rec1"
-		"rec" "rec2"
-		"rec" "rec3"
-		"end"`,
-		`["rec", "rec1", "rec", "rec2", "rec", "rec3", "end"]`)
+		"\x01\xa4rec1\x01\xa4rec2\x01\xa4rec3\x00",
+		`[1, "rec1", 1, "rec2", 1, "rec3", 0]`)
 
 	// a few records and error
 	testStreamDecoder(t,
-		`"err" "err1"
-		"rec" "rec1"
-		"rec" "rec2"
-		"rec" "rec3"
-		"end"`,
-		`["err", "err1", "rec", "rec1", "rec", "rec2", "rec", "rec3", "end"]`)
+		"\x02\xa4err1\x01\xa4rec1\x01\xa4rec2\x01\xa4rec3\x00",
+		`[2, "err1", 1, "rec1", 1, "rec2", 1, "rec3", 0]`)
 
 	// stat
 	testStreamDecoder(t,
-		`"stat" 555
-		"end"`,
-		`["stat", 555, "end"]`)
+		"\x03\xcd\x02+\x00",
+		`[3, 555, 0]`)
 
 	// bad cases
-	testStreamDecoderBad(t, `"en`, "EOF")
+	testStreamDecoderBad(t, "", "EOF")
 }
