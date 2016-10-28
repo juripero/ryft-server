@@ -312,27 +312,20 @@ func deleteAllCatalogs(mountPoint string, items []string) map[string]error {
 			defer func() {
 				cat.DropFromCache()
 				cat.Close() // it's ok to close later at function exit
-				res[rel] = os.RemoveAll(catalogPath)
 			}()
 
 			// get data files
-			files, err := cat.GetDataFiles()
+			dataDir := cat.GetDataDir()
+
+			// delete data directory
+			err = os.RemoveAll(dataDir)
 			if err != nil {
 				res[rel] = err
 				continue
 			}
 
-			// make relative path
-			for i, f := range files {
-				if rf, err := filepath.Rel(mountPoint, f); err == nil {
-					files[i] = rf
-				}
-			}
-
-			// delete all data files
-			for name, err := range deleteAll(mountPoint, files) {
-				res[name] = err
-			}
+			// delete catalog's meta-data
+			res[rel] = os.RemoveAll(catalogPath)
 		}
 	}
 

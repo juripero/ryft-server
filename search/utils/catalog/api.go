@@ -32,9 +32,7 @@ package catalog
 
 import (
 	"errors"
-	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -138,10 +136,7 @@ func getCatalog(path string, readOnly bool) (*Catalog, bool, error) {
 
 	if readOnly {
 		// quick check by looking at data directory
-		// take a look at Catalog.newDataFilePath() function!
-		base, file := filepath.Split(path)
-		dataDir := filepath.Join(base, fmt.Sprintf(".%s.catalog", file))
-
+		dataDir := getDataDir(path)
 		if info, err := os.Stat(dataDir); os.IsNotExist(err) || !info.IsDir() {
 			return nil, false, ErrNotACatalog
 		}
