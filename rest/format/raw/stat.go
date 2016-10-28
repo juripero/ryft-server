@@ -34,63 +34,20 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// TODO: use type Statistics search.Statistics to avoid memory allocations
-
 // STATISTICS format specific data.
-type Statistics struct {
-	Matches    uint64 `json:"matches" msgpack:"matches"`
-	TotalBytes uint64 `json:"totalBytes" msgpack:"totalBytes"`
-
-	Duration uint64  `json:"duration" msgpack:"duration"`
-	DataRate float64 `json:"dataRate" msgpack:"dataRate"`
-
-	FabricDuration uint64  `json:"fabricDuration" msgpack:"fabricDuration"`
-	FabricDataRate float64 `json:"fabricDataRate" msgpack:"fabricDataRate"`
-
-	Host    string        `json:"host,omitempty" msgpack:"host,omitempty"`
-	Details []*Statistics `json:"details,omitempty" msgpack:"details,omitempty"`
-}
+type Stat search.Stat
 
 // NewStat creates new format specific data.
 func NewStat() interface{} {
-	return new(Statistics)
+	return (*Stat)(search.NewStat(""))
 }
 
 // FromStat converts STATISTICS to format specific data.
-func FromStat(stat *search.Statistics) *Statistics {
-	if stat == nil {
-		return nil
-	}
-
-	res := new(Statistics)
-	res.Matches = stat.Matches
-	res.TotalBytes = stat.TotalBytes
-	res.Duration = stat.Duration
-	res.DataRate = stat.DataRate
-	res.FabricDuration = stat.FabricDuration
-	res.FabricDataRate = stat.FabricDataRate
-	res.Host = stat.Host
-	for _, s := range stat.Details {
-		res.Details = append(res.Details, FromStat(s))
-	}
-	return res
+func FromStat(stat *search.Stat) *Stat {
+	return (*Stat)(stat)
 }
 
 // ToStat converts format specific data to STATISTICS.
-func ToStat(stat *Statistics) *search.Statistics {
-	if stat == nil {
-		return nil
-	}
-
-	res := search.NewStat(stat.Host)
-	res.Matches = stat.Matches
-	res.TotalBytes = stat.TotalBytes
-	res.Duration = stat.Duration
-	res.DataRate = stat.DataRate
-	res.FabricDuration = stat.FabricDuration
-	res.FabricDataRate = stat.FabricDataRate
-	for _, s := range stat.Details {
-		res.Details = append(res.Details, ToStat(s))
-	}
-	return res
+func ToStat(stat *Stat) *search.Stat {
+	return (*search.Stat)(stat)
 }

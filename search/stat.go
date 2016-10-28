@@ -39,17 +39,17 @@ import (
 // and processing duration.
 // Might be merged.
 type Stat struct {
-	Matches    uint64 // total records matched
-	TotalBytes uint64 // total input bytes processed
+	Matches    uint64 `json:"matches" msgpack:"matches"`       // total records matched
+	TotalBytes uint64 `json:"totalBytes" msgpack:"totalBytes"` // total input bytes processed
 
-	Duration uint64  // processing duration, milliseconds
-	DataRate float64 // MB/sec, TotalBytes/Duration
+	Duration uint64  `json:"duration" msgpack:"duration"` // processing duration, milliseconds
+	DataRate float64 `json:"dataRate" msgpack:"dataRate"` // MB/sec, TotalBytes/Duration
 
-	FabricDuration uint64  // fabric processing duration, milliseconds
-	FabricDataRate float64 // MB/sec, TotalBytes/FabricDuration
+	FabricDuration uint64  `json:"fabricDuration" msgpack:"fabricDuration"` // fabric processing duration, milliseconds
+	FabricDataRate float64 `json:"fabricDataRate" msgpack:"fabricDataRate"` // MB/sec, TotalBytes/FabricDuration
 
-	Details []*Stat // all statistics merged (cluster mode or query decomposition)
-	Host    string  // optional host address (used in cluster mode)
+	Details []*Stat `json:"details,omitempty" msgpack:"details,omitempty"` // all statistics merged (cluster mode or query decomposition)
+	Host    string  `json:"host,omitempty" msgpack:"host,omitempty"`       // optional host address (used in cluster mode)
 }
 
 // NewStat creates empty statistics.

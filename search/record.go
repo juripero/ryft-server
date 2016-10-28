@@ -46,10 +46,8 @@ var recPool = &sync.Pool{
 
 // Record is INDEX and DATA combined.
 type Record struct {
-	Index *Index
-	Data  []byte
-
-	// pool *sync.Pool
+	Index *Index `json:"_index,omitempty" msgpack:"_index,omitempty"` // relatedmeta-data
+	Data  []byte `json:"data,omitempty" msgpack:"data,omitempty"`     // base-64 encoded in general case
 }
 
 // NewRecord creates a new Record object.

@@ -44,11 +44,11 @@ var idxPool = &sync.Pool{
 
 // Index is INDEX meta-data.
 type Index struct {
-	File      string // filename
-	Offset    uint64 // data offset
-	Length    uint64 // length of data
-	Fuzziness uint8  // fuzziness distance
-	Host      string // optional host address (used in cluster mode)
+	File      string `json:"file" msgpack:"file"`                     // filename
+	Offset    uint64 `json:"offset" msgpack:"offset"`                 // data offset
+	Length    uint64 `json:"length" msgpack:"length"`                 // length of data
+	Fuzziness uint8  `json:"fuzziness" msgpack:"fuzziness"`           // fuzziness distance
+	Host      string `json:"host,omitempty" msgpack:"host,omitempty"` // optional host address (used in cluster mode)
 }
 
 // NewIndex creates a new Index object.

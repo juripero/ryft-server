@@ -26,3 +26,5 @@ func TestIndexSimple(t *testing.T) {
 	assert.Empty(t, idx.File)
 	assert.Empty(t, idx.Host)
 }
+
+// TODO: test index pool in many goroutines

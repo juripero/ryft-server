@@ -18,3 +18,5 @@ func TestRecordSimple(t *testing.T) {
 	assert.Nil(t, rec.Index)
 	assert.Nil(t, rec.Data)
 }
+
+// TODO: test record pool in many goroutines
