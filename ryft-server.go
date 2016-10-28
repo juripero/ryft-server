@@ -177,8 +177,20 @@ func main() {
 		"booleans-per-expression": server.Config.BooleansPerExpression,
 	}).Debug("other configuration")
 
-	// Create a router with default middleware: logger, recover
-	router := gin.Default()
+	// Create a router
+	router := gin.New()
+
+	// /version API endpoint (without logging!)
+	router.GET("/version", func(ctx *gin.Context) {
+		info := map[string]interface{}{
+			"version":  Version,
+			"git-hash": GitHash,
+		}
+		ctx.JSON(http.StatusOK, info)
+	})
+
+	// default middleware: logger, recover
+	router.Use(gin.Logger(), gin.Recovery())
 
 	// Allow CORS requests for * (all domains)
 	router.Use(cors.Cors("*"))
@@ -240,15 +252,6 @@ func main() {
 		private.GET("/token/refresh", mw.RefreshHandler())
 		router.POST("/login", mw.LoginHandler())
 	}
-
-	// /version API endpoint
-	router.GET("/version", func(ctx *gin.Context) {
-		info := map[string]interface{}{
-			"version":  Version,
-			"git-hash": GitHash,
-		}
-		ctx.JSON(http.StatusOK, info)
-	})
 
 	// main API endpoints
 	private.GET("/search", server.DoSearch)
