@@ -44,6 +44,38 @@ install: $(ASSETS)
 debian: install
 	make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
 
+
+.PHONY: test_cover test-cover test
+test_cover: test-cover
+test-cover:
+	@go test -tags "${GO_TAGS}" -cover ./search/ || true
+# go test -tags "${GO_TAGS}" -cover ./search/ryftdec/ || true
+# go test -tags "${GO_TAGS}" -cover ./search/ryfthttp/ || true
+# go test -tags "${GO_TAGS}" -cover ./search/ryftmux/ || true
+# go test -tags "${GO_TAGS}" -cover ./search/ryftone/ || true
+# go test -tags "${GO_TAGS}" -cover ./search/ryftprim/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/ || true
+# go test -tags "${GO_TAGS}" -cover ./search/utils/catalog/ || true
+
+# go test -tags "${GO_TAGS}" -cover ./rest/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/codec/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/codec/json/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/codec/msgpack.v1/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/codec/msgpack.v2/ || true
+# go test -tags "${GO_TAGS}" -cover ./rest/format/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/format/raw/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/format/null/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/format/utf8/ || true
+# go test -tags "${GO_TAGS}" -cover ./rest/format/json/ || true
+# go test -tags "${GO_TAGS}" -cover ./rest/format/xml/ || true
+
+	@go test -tags "${GO_TAGS}" -cover ./middleware/auth/ || true
+	@go test -tags "${GO_TAGS}" -cover ./middleware/cors/ || true
+	@go test -tags "${GO_TAGS}" -cover ./middleware/gzip/ || true
+
+test:
+	go test -v ./...
+
 clean:
 	rm -f $(ASSETS)
 	rm -f $(BINARIES)
