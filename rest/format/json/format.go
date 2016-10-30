@@ -60,14 +60,14 @@ func (*Format) NewIndex() interface{} {
 }
 
 // Convert INDEX to JSON format specific data.
-func (*Format) FromIndex(idx search.Index) interface{} {
-	return FromIndex(idx)
+func (*Format) FromIndex(index *search.Index) interface{} {
+	return FromIndex(index)
 }
 
 // Convert JSON format specific data to INDEX.
 // WARN: will panic if argument is not of json.Index type!
-func (*Format) ToIndex(idx interface{}) search.Index {
-	return ToIndex(idx.(Index))
+func (*Format) ToIndex(index interface{}) *search.Index {
+	return ToIndex(index.(*Index))
 }
 
 // NewRecord creates new format specific data.
@@ -91,21 +91,22 @@ func (*Format) NewStat() interface{} {
 	return NewStat()
 }
 
-// Convert STATISTICS to JSON format specific data.
-func (f *Format) FromStat(stat *search.Statistics) interface{} {
+// Convert STAT to JSON format specific data.
+func (f *Format) FromStat(stat *search.Stat) interface{} {
 	return FromStat(stat)
 }
 
-// Convert JSON format specific data to STATISTICS.
-// WARN: will panic if argument is not of json.Statistics type!
-func (f *Format) ToStat(stat interface{}) *search.Statistics {
-	return ToStat(stat.(*Statistics))
+// Convert JSON format specific data to STAT.
+// WARN: will panic if argument is not of json.Stat type!
+func (f *Format) ToStat(stat interface{}) *search.Stat {
+	return ToStat(stat.(*Stat))
 }
 
 // AddFields adds coma separated fields
 func (f *Format) AddFields(fields string) {
 	ss := strings.Split(fields, ",")
 	for _, s := range ss {
+		// s := strings.TrimSpace(s)
 		if len(s) != 0 {
 			f.Fields = append(f.Fields, s)
 		}

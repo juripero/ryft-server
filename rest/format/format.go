@@ -55,16 +55,16 @@ const (
 // NewXXX() methods are used to decode data from stream.
 type Format interface {
 	NewIndex() interface{}
-	FromIndex(search.Index) interface{}
-	ToIndex(interface{}) search.Index
+	FromIndex(*search.Index) interface{}
+	ToIndex(interface{}) *search.Index
 
 	NewRecord() interface{}
 	FromRecord(*search.Record) interface{}
 	ToRecord(interface{}) *search.Record
 
 	NewStat() interface{}
-	FromStat(*search.Statistics) interface{}
-	ToStat(interface{}) *search.Statistics
+	FromStat(*search.Stat) interface{}
+	ToStat(interface{}) *search.Stat
 }
 
 // New creates new formatter instance.
@@ -74,7 +74,7 @@ func New(format string, opts map[string]interface{}) (Format, error) {
 	case JSON:
 		return json.New(opts)
 	case UTF8, "utf-8":
-		return utf8.New(opts)
+		return utf8.New()
 	case NULL, "none":
 		return null.New()
 	case RAW:

@@ -31,25 +31,23 @@
 package xml
 
 import (
-	"github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
 
 // INDEX format specific data.
-// Is the same as RAW format index!
-type Index raw.Index
+type Index search.Index
 
 // NewIndex creates new format specific data.
 func NewIndex() interface{} {
-	return Index{}
+	return (*Index)(search.NewIndex("", 0, 0))
 }
 
 // FromIndex converts INDEX to format specific data.
-func FromIndex(idx search.Index) Index {
-	return Index(raw.FromIndex(idx))
+func FromIndex(index *search.Index) *Index {
+	return (*Index)(index)
 }
 
 // ToIndex converts format specific data to INDEX.
-func ToIndex(idx Index) search.Index {
-	return raw.ToIndex(raw.Index(idx))
+func ToIndex(index *Index) *search.Index {
+	return (*search.Index)(index)
 }

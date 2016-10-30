@@ -66,30 +66,31 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 
 	res := Record{}
 	// res.RawData = rec.Data
-
-	// try to parse raw data as JSON...
-	err := json.Unmarshal(rec.Data, &res)
-	if err == nil {
-		// field filtration: if fields is empty all fields are used in result
-		// othewise only requested fields are copied (missing fields are ignored)
-		if len(fields) > 0 {
-			filtered := Record{}
-
-			// do filtration by fields
-			for _, field := range fields {
-				// missing fields are ignored!
-				if v, ok := res[field]; ok {
-					filtered[field] = v
-				}
-			}
-
-			res = filtered
-		}
-	} else {
-		res[recFieldError] = fmt.Sprintf("failed to parse JSON data: %s", err) // res.Error =
-	}
-
 	res[recFieldIndex] = FromIndex(rec.Index) // res.Index =
+
+	if len(rec.Data) != 0 {
+		// try to parse raw data as JSON...
+		err := json.Unmarshal(rec.Data, &res)
+		if err == nil {
+			// field filtration: if fields is empty all fields are used in result
+			// othewise only requested fields are copied (missing fields are ignored)
+			if len(fields) > 0 {
+				filtered := Record{}
+
+				// do filtration by fields
+				for _, field := range fields {
+					// missing fields are ignored!
+					if v, ok := res[field]; ok {
+						filtered[field] = v
+					}
+				}
+
+				res = filtered
+			}
+		} else {
+			res[recFieldError] = fmt.Sprintf("failed to parse JSON data: %s", err) // res.Error =
+		}
+	}
 
 	return &res
 }
