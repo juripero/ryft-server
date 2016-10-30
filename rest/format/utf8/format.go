@@ -38,7 +38,7 @@ import (
 type Format struct{}
 
 // New creates new UTF8 formatter.
-func New(opts map[string]interface{}) (*Format, error) {
+func New() (*Format, error) {
 	return new(Format), nil
 }
 
@@ -48,14 +48,14 @@ func (*Format) NewIndex() interface{} {
 }
 
 // Convert INDEX to UTF8 format specific data.
-func (*Format) FromIndex(idx search.Index) interface{} {
-	return FromIndex(idx)
+func (*Format) FromIndex(index *search.Index) interface{} {
+	return FromIndex(index)
 }
 
 // Convert UTF8 format specific data to INDEX.
 // WARN: will panic if argument is not of utf8.Index type!
-func (*Format) ToIndex(idx interface{}) search.Index {
-	return ToIndex(idx.(Index))
+func (*Format) ToIndex(index interface{}) *search.Index {
+	return ToIndex(index.(*Index))
 }
 
 // NewRecord creates new format specific data.
@@ -79,13 +79,13 @@ func (*Format) NewStat() interface{} {
 	return NewStat()
 }
 
-// Convert STATISTICS to UTF8 format specific data.
-func (f *Format) FromStat(stat *search.Statistics) interface{} {
+// Convert STAT to UTF8 format specific data.
+func (f *Format) FromStat(stat *search.Stat) interface{} {
 	return FromStat(stat)
 }
 
-// Convert UTF8 format specific data to STATISTICS.
+// Convert UTF8 format specific data to STAT.
 // WARN: will panic if argument is not of utf8.Statistics type!
-func (f *Format) ToStat(stat interface{}) *search.Statistics {
-	return ToStat(stat.(*Statistics))
+func (f *Format) ToStat(stat interface{}) *search.Stat {
+	return ToStat(stat.(*Stat))
 }

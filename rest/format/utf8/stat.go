@@ -31,25 +31,23 @@
 package utf8
 
 import (
-	"github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
 
 // STATISTICS format specific data.
-// Is the same as RAW format statistics!
-type Statistics raw.Statistics
+type Stat search.Stat
 
 // NewStat creates new format specific data.
 func NewStat() interface{} {
-	return new(Statistics)
+	return (*Stat)(search.NewStat(""))
 }
 
 // FromStat converts STATISTICS to format specific data.
-func FromStat(stat *search.Statistics) *Statistics {
-	return (*Statistics)(raw.FromStat(stat))
+func FromStat(stat *search.Stat) *Stat {
+	return (*Stat)(stat)
 }
 
 // ToStat converts format specific data to STATISTICS.
-func ToStat(stat *Statistics) *search.Statistics {
-	return raw.ToStat((*raw.Statistics)(stat))
+func ToStat(stat *Stat) *search.Stat {
+	return (*search.Stat)(stat)
 }

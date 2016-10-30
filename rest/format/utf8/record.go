@@ -31,6 +31,8 @@
 package utf8
 
 import (
+	// "unicode/utf8"
+
 	"github.com/getryft/ryft-server/search"
 )
 
@@ -45,7 +47,7 @@ const (
 
 // NewRecord creates new format specific data.
 func NewRecord() interface{} {
-	return new(Record)
+	return &Record{}
 }
 
 // FromRecord converts RECORD to format specific data.
@@ -59,6 +61,7 @@ func FromRecord(rec *search.Record) *Record {
 
 	// try to parse raw data as utf-8 string...
 	res[recFieldData] = string(rec.Data)
+	//if !utf8.Valid()
 	//if err == nil {
 	//} else {
 	//	res[recFieldError] = fmt.Sprintf("failed to parse UTF-8 data: %s", err) // res.Error =
@@ -75,9 +78,6 @@ func ToRecord(rec *Record) *search.Record {
 		return nil
 	}
 
-	panic("UTF-8 ToRecord is not implemented!")
-	//res := new(search.Record)
-	//res.Index = ToIndex(rec.Index)
-	//res.Data = rec.RawData
-	//return res
+	return search.NewRecord((*rec)[recFieldIndex].(*search.Index),
+		[]byte((*rec)[recFieldData].(string)))
 }
