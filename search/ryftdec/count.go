@@ -65,7 +65,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)
 	}
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
+	task.log().Infof("[%s]: starting: %s as %s", TAG, cfg.Query, dumpTree(task.queries, 0))
 
 	_, homeDir, mountPoint := engine.getBackendOptions()
 

@@ -229,3 +229,53 @@ func isSearchQuery(expression string) bool {
 func isOperator(token string) bool {
 	return containsString(delimiters, " "+token+" ")
 }
+
+// gets query type string representation.
+func dumpType(q QueryType, opts Options) string {
+	switch q {
+	case QTYPE_SEARCH:
+		if len(opts.Mode) > 0 || opts.Dist > 0 || opts.Width > 0 || opts.Cs {
+			return fmt.Sprintf("%s-%d/%d-%t", opts.Mode, opts.Dist, opts.Width, opts.Cs)
+		}
+		return "    " // general search (es, fhs, feds)
+	case QTYPE_DATE:
+		return "DATE"
+	case QTYPE_TIME:
+		return "TIME"
+	case QTYPE_NUMERIC:
+		return " NUM"
+	case QTYPE_CURRENCY:
+		return "CURR"
+	case QTYPE_REGEX:
+		return "  RE"
+	case QTYPE_IPV4:
+		return "IPv4"
+	case QTYPE_IPV6:
+		return "IPv6"
+	case QTYPE_AND:
+		return " AND"
+	case QTYPE_OR:
+		return "  OR"
+	case QTYPE_XOR:
+		return " XOR"
+	}
+
+	return "????" // unknown
+}
+
+// dump query tree as a string
+func dumpTree(root *Node, deep int) string {
+	s := fmt.Sprintf("%s[%s]:",
+		strings.Repeat("  ", deep),
+		dumpType(root.Type, root.Options))
+
+	if root.Type.IsSearch() {
+		s += " " + root.Expression
+	}
+
+	for _, subnode := range root.SubNodes {
+		s += "\n" + dumpTree(subnode, deep+1)
+	}
+
+	return s
+}

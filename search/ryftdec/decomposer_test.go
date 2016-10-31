@@ -1,8 +1,6 @@
 package ryftdec
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,56 +19,6 @@ func decomposerOptions() Options {
 		"ipv4": 1,
 		"ipv6": 1,
 	}}
-}
-
-// gets query type string representation.
-func dumpType(q QueryType, opts Options) string {
-	switch q {
-	case QTYPE_SEARCH:
-		if len(opts.Mode) > 0 || opts.Dist > 0 || opts.Width > 0 || opts.Cs {
-			return fmt.Sprintf("%s-%d/%d-%t", opts.Mode, opts.Dist, opts.Width, opts.Cs)
-		}
-		return "    " // general search (es, fhs, feds)
-	case QTYPE_DATE:
-		return "DATE"
-	case QTYPE_TIME:
-		return "TIME"
-	case QTYPE_NUMERIC:
-		return " NUM"
-	case QTYPE_CURRENCY:
-		return "CURR"
-	case QTYPE_REGEX:
-		return "  RE"
-	case QTYPE_IPV4:
-		return "IPv4"
-	case QTYPE_IPV6:
-		return "IPv6"
-	case QTYPE_AND:
-		return " AND"
-	case QTYPE_OR:
-		return "  OR"
-	case QTYPE_XOR:
-		return " XOR"
-	}
-
-	return "????" // unknown
-}
-
-// dump query tree as a string
-func dumpTree(root *Node, deep int) string {
-	s := fmt.Sprintf("%s[%s]:",
-		strings.Repeat("  ", deep),
-		dumpType(root.Type, root.Options))
-
-	if root.Type.IsSearch() {
-		s += " " + root.Expression
-	}
-
-	for _, subnode := range root.SubNodes {
-		s += "\n" + dumpTree(subnode, deep+1)
-	}
-
-	return s
 }
 
 // decompose the query and check it
@@ -305,4 +253,12 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`,
 		`[IPv6]: (RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`)
+	testQueryTree(t, `((RECORD.doc.text_entry CONTAINS FEDS("To", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("be", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("or", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("not", DIST=1)) AND(RECORD.doc.text_entry CONTAINS FEDS("to", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("tht",DIST=1)))`,
+		`[ AND]:
+  [feds-0/0-false]: (RECORD.doc.text_entry CONTAINS "To") AND (RECORD.doc.text_entry CONTAINS "be") AND (RECORD.doc.text_entry CONTAINS "or")
+  [ AND]:
+    [feds-1/0-false]: (RECORD.doc.text_entry CONTAINS "not")
+    [ AND]:
+      [feds-0/0-false]: (RECORD.doc.text_entry CONTAINS "to")
+      [feds-1/0-false]: (RECORD.doc.text_entry CONTAINS "tht")`)
 }

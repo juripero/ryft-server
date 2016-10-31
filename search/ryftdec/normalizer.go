@@ -89,7 +89,8 @@ func appendNode(srcParentNode, dstNode *Node) {
 	dstNode.Expression = dstNode.Expression + " " + dstNode.Parent.Expression + " " + srcNode.Expression
 	srcParentNode.Expression = otherNode.Expression
 	srcParentNode.Type = otherNode.Type
-	srcParentNode.SubNodes = srcParentNode.SubNodes[0:0]
+	srcParentNode.SubNodes = otherNode.SubNodes
+	srcParentNode.Options = otherNode.Options
 }
 
 func splitNodes(dstNode, parentNode *Node) (*Node, *Node) {
