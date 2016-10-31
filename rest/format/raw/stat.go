@@ -34,20 +34,21 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// STATISTICS format specific data.
+// Stat is format specific data for STAT.
+// the same as search.Stat
 type Stat search.Stat
 
 // NewStat creates new format specific data.
-func NewStat() interface{} {
-	return (*Stat)(search.NewStat(""))
+func NewStat() *Stat {
+	return FromStat(search.NewStat(""))
 }
 
-// FromStat converts STATISTICS to format specific data.
+// FromStat converts STAT to format specific data.
 func FromStat(stat *search.Stat) *Stat {
 	return (*Stat)(stat)
 }
 
-// ToStat converts format specific data to STATISTICS.
+// ToStat converts format specific data to STAT.
 func ToStat(stat *Stat) *search.Stat {
 	return (*search.Stat)(stat)
 }

@@ -21,7 +21,7 @@ func testIndexMarshal(t *testing.T, val interface{}, expected string) {
 	buf, err := json.Marshal(val)
 	assert.NoError(t, err)
 
-	assert.JSONEq(t, string(buf), expected)
+	assert.JSONEq(t, expected, string(buf))
 }
 
 // test INDEX

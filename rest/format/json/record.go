@@ -66,7 +66,6 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 
 	res := Record{}
 	// res.RawData = rec.Data
-	res[recFieldIndex] = FromIndex(rec.Index) // res.Index =
 
 	if len(rec.Data) != 0 {
 		// try to parse raw data as JSON...
@@ -91,6 +90,8 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 			res[recFieldError] = fmt.Sprintf("failed to parse JSON data: %s", err) // res.Error =
 		}
 	}
+
+	res[recFieldIndex] = FromIndex(rec.Index) // res.Index =
 
 	return &res
 }

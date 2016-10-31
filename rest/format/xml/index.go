@@ -34,12 +34,13 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// INDEX format specific data.
+// Index is format specific data for INDEX.
+// the same as search.Index
 type Index search.Index
 
 // NewIndex creates new format specific data.
-func NewIndex() interface{} {
-	return (*Index)(search.NewIndex("", 0, 0))
+func NewIndex() *Index {
+	return FromIndex(search.NewIndex("", 0, 0))
 }
 
 // FromIndex converts INDEX to format specific data.
