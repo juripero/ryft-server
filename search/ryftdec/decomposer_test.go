@@ -122,14 +122,10 @@ func TestQueries(t *testing.T) {
 		`[DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301"))  AND   (RECORD.id CONTAINS DATE("200301")))`,
-		`[ AND]:
-  [DATE]: (RECORD.id CONTAINS DATE("1003"))
-  [DATE]: (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301"))`)
+		`[DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301"))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS DATE("1003"))   AND   (RECORD.id CONTAINS DATE("100301"))  OR   (RECORD.id CONTAINS DATE("200301")))`,
-		`[  OR]:
-  [DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))
-  [DATE]: (RECORD.id CONTAINS DATE("200301"))`)
+		`[DATE]: (RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301")) OR (RECORD.id CONTAINS DATE("200301"))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS "1003")   AND   (RECORD.id CONTAINS DATE("100301"))  AND   (RECORD.id CONTAINS DATE("200301")))`,
 		`[ AND]:
@@ -196,10 +192,10 @@ func TestQueries(t *testing.T) {
 		`[CURR]: (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test", CS=true, DIST=0, WIDTH=0))   AND   (RECORD.id CONTAINS FHS("123", CS=true, DIST=0, WIDTH=0)))`,
-		`[es-0/0-false]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
+		`[fhs-0/0-true]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   (RECORD.id CONTAINS FHS("123")))`,
-		`[es-0/0-false]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
+		`[fhs-0/0-false]: (RECORD.id CONTAINS "test") AND (RECORD.id CONTAINS "123")`)
 
 	testQueryTree(t, `((RECORD.id CONTAINS FHS("test"))   AND   ((RECORD.id CONTAINS FEDS("123")) AND (RECORD.id CONTAINS DATE("200301"))))`,
 		`[ AND]:
@@ -222,9 +218,7 @@ func TestQueries(t *testing.T) {
     [ NUM]: (RECORD.plon CONTAINS NUMBER( "-73.99046244906013" < NUM < "-73.98519014882514", ",", "." ))`)
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS DATE("200301")) AND ((RAW_TEXT CONTAINS DATE("78676")) AND (RAW_TEXT CONTAINS DATE("213")))`,
-		`[ AND]:
-  [DATE]: (RAW_TEXT CONTAINS DATE("200301"))
-  [DATE]: (RAW_TEXT CONTAINS DATE("78676")) AND (RAW_TEXT CONTAINS DATE("213"))`)
+		`[DATE]: (RAW_TEXT CONTAINS DATE("200301")) AND (RAW_TEXT CONTAINS DATE("78676")) AND (RAW_TEXT CONTAINS DATE("213"))`)
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS NUMBER(1)) AND (RAW_TEXT CONTAINS NUMBER(2))`,
 		`[ AND]:
@@ -242,7 +236,7 @@ func TestQueries(t *testing.T) {
   [  RE]: (RAW_TEXT CONTAINS REGEX(2))`)
 
 	testQueryTree(t, `(RAW_TEXT CONTAINS FHS("1")) AND (RAW_TEXT CONTAINS FHS("2"))`,
-		`[es-0/0-false]: (RAW_TEXT CONTAINS "1") AND (RAW_TEXT CONTAINS "2")`)
+		`[fhs-0/0-false]: (RAW_TEXT CONTAINS "1") AND (RAW_TEXT CONTAINS "2")`)
 
 	testQueryTree(t, `(RECORD.ip CONTAINS IPV4(127.0.0.1 <= IP <= 127.255.255.255)) AND (RECORD.ip CONTAINS IPV4(192.168.0.1 < IP))`,
 		`[IPv4]: (RECORD.ip CONTAINS IPV4(127.0.0.1 <= IP <= 127.255.255.255)) AND (RECORD.ip CONTAINS IPV4(192.168.0.1 < IP))`)
@@ -261,4 +255,7 @@ func TestQueries(t *testing.T) {
     [ AND]:
       [feds-0/0-false]: (RECORD.doc.text_entry CONTAINS "to")
       [feds-1/0-false]: (RECORD.doc.text_entry CONTAINS "tht")`)
+
+	testQueryTree(t, `((RECORD.doc.text_entry CONTAINS FHS("To", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("be", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("or", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("not", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("to", DIST=1)))`,
+		`[fhs-1/0-false]: (RECORD.doc.text_entry CONTAINS "To") AND (RECORD.doc.text_entry CONTAINS "be") AND (RECORD.doc.text_entry CONTAINS "or") AND (RECORD.doc.text_entry CONTAINS "not") AND (RECORD.doc.text_entry CONTAINS "to")`)
 }

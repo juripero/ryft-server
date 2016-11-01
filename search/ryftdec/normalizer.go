@@ -31,7 +31,6 @@
 package ryftdec
 
 import (
-	_ "fmt"
 	"strings"
 )
 
@@ -47,6 +46,7 @@ func sameLevelNormalization(node *Node, booleansLimit map[string]int) {
 		subnodesType := node.SubNodes[0].Type
 		node.Expression = node.SubNodes[0].Expression + " " + node.Expression + " " + node.SubNodes[1].Expression
 		node.Type = subnodesType
+		node.Options = node.SubNodes[0].Options
 		node.SubNodes = node.SubNodes[0:0]
 
 		// Parent node changed, try to normalize it too
