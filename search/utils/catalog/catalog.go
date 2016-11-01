@@ -417,6 +417,7 @@ VALUES (?,?,?,?,?)`, filename, offset, length, data_id, data_pos)
 }
 
 // get data directory
+// return absollute path!
 func getDataDir(path string) string {
 	// take a look at Catalog.newDataFilePath() function!
 	base, file := filepath.Split(path)
@@ -579,9 +580,18 @@ func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id i
 
 // generate new data file path
 func (cat *Catalog) newDataFilePath() string {
-	_, file := filepath.Split(cat.path)
+	dir, file := filepath.Split(cat.path)
 	// make file hidden and randomize by unix timestamp
-	return filepath.Join(cat.GetDataDir(), fmt.Sprintf(".data-%016x-%s", time.Now().UnixNano(), file))
+	absPath := filepath.Join(cat.GetDataDir(), fmt.Sprintf(".data-%016x-%s", time.Now().UnixNano(), file))
+
+	if path, err := filepath.Rel(dir, absPath); err == nil {
+		log.Info("catalog:%s, data:%s", cat.path, path)
+		return path
+	} else {
+		log.Warnf("abs:%s, err:%s", absPath, err)
+	}
+
+	return absPath // fallback
 }
 
 // clear all tables
