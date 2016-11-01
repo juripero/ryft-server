@@ -118,7 +118,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	// create working directory
 	work_dir := filepath.Join(engine.MountPoint, engine.HomeDir, engine.Instance)
 	// TODO: option to clear working dir before start?
-	err = os.MkdirAll(work_dir, os.ModeDir)
+	err = os.MkdirAll(work_dir, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create working directory: %s", err)
 	}
