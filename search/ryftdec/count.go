@@ -32,9 +32,12 @@ package ryftdec
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftone"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
 // Count starts asynchronous "/count" with RyftDEC engine.
@@ -67,13 +70,37 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	}
 	task.log().Infof("[%s]: starting: %s as %s", TAG, cfg.Query, dumpTree(task.queries, 0))
 
-	_, homeDir, mountPoint := engine.getBackendOptions()
+	instanceName, homeDir, mountPoint := engine.getBackendOptions()
+	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
+		task.Identifier, task.subtaskId, task.extension))
+	task.result, err = catalog.OpenCatalog(filepath.Join(mountPoint, homeDir, res1))
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to create res catalog", TAG)
+		return nil, fmt.Errorf("failed to create res catalog: %s", err)
+	}
+	err = task.result.ClearAll()
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to clear res catalog", TAG)
+		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
+	}
+	task.log().WithField("results", task.result.GetPath()).Infof("[%s]: temporary result catalog", TAG)
 
 	mux := search.NewResult()
+	keepDataAs := task.config.KeepDataAs
+	keepIndexAs := task.config.KeepIndexAs
+	delimiter := task.config.Delimiter
+
 	go func() {
 		// some futher cleanup
 		defer mux.Close()
 		defer mux.ReportDone()
+		defer func() {
+			task.result.DropFromCache()
+			task.result.Close()
+			if !engine.KeepResultFiles {
+				os.RemoveAll(task.result.GetPath())
+			}
+		}()
 
 		res, err := engine.search(task, task.queries, task.config,
 			engine.Backend.Count, mux, false)
@@ -81,10 +108,33 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
 			mux.ReportError(err)
+			return
 		}
 
 		if !engine.KeepResultFiles {
 			defer res.removeAll(mountPoint, homeDir)
+		}
+
+		// post-processing (if DATA or INDEX file is requested)
+		if len(keepDataAs) > 0 || len(keepIndexAs) > 0 {
+			task.log().WithField("data", res.Output).Infof("final results")
+			for _, out := range res.Output {
+				if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
+					filepath.Join(mountPoint, homeDir, out.IndexFile),
+					out.Delimiter, out.Width, 1 /*final*/); err != nil {
+					mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
+					return
+				}
+			}
+
+			err = engine.drainFinalResults(task, mux,
+				task.result, keepDataAs, keepIndexAs, delimiter,
+				filepath.Join(mountPoint, homeDir))
+			if err != nil {
+				task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
+				mux.ReportError(err)
+				return
+			}
 		}
 
 		// TODO: handle task cancellation!!!

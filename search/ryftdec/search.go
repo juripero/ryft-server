@@ -141,6 +141,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		// TODO: handle task cancellation!!!
 	}()
+
 	return mux, nil // OK for now
 }
 
