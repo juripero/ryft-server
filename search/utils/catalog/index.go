@@ -37,6 +37,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/getryft/ryft-server/search"
 )
@@ -125,6 +126,12 @@ VALUES(?,0,?,?)`, dataPath, delimiter, surroundingWidth)
 		return fmt.Errorf("failed to get new data file id: %s", err)
 	}
 
+	// create temporary table to put indexes to...
+	tmpName := fmt.Sprintf("temp.parts_%x", time.Now().UnixNano())
+	if _, err := tx.Exec(fmt.Sprintf(`CREATE TABLE %s AS SELECT * FROM main.parts WHERE 0`, tmpName)); err != nil {
+		return fmt.Errorf("failed to create temp table: %s", err)
+	}
+
 	// try to read all index records
 	for r := bufio.NewReader(file); ; {
 		// read line by line
@@ -205,9 +212,9 @@ AND ? BETWEEN p.d_pos AND p.d_pos+p.len-1`, index.File, offset) // TODO: ORDER B
 			}
 
 			// insert new file part (data file will be updated by INSERT trigger!)
-			_, err = tx.Exec(`INSERT
-INTO main.parts(name,pos,len,opt,d_id,d_pos,u_name,u_pos,u_len,u_shift)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, index.File, index.Offset, index.Length,
+			_, err = tx.Exec(fmt.Sprintf(`INSERT
+INTO %s(name,pos,len,opt,d_id,d_pos,u_name,u_pos,u_len,u_shift)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, tmpName), index.File, index.Offset, index.Length,
 				(uint32(index.Fuzziness)<<24)|opt, data_id, data_pos,
 				base_uname, base_upos, base_ulen, shift)
 			if err != nil {
@@ -227,6 +234,16 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, index.File, index.Offset, index.Length,
 		}
 
 		// TODO: do we need stop/cancel here?
+	}
+
+	// copy indexes from temporary table
+	if _, err := tx.Exec(fmt.Sprintf(`INSERT INTO main.parts SELECT * FROM %s;`, tmpName)); err != nil {
+		return fmt.Errorf("failed to copy temp table: %s", err)
+	}
+
+	// drop temporary table
+	if _, err := tx.Exec(fmt.Sprintf(`DROP TABLE %s;`, tmpName)); err != nil {
+		return fmt.Errorf("failed to drop temp table: %s", err)
 	}
 
 	// commit transaction
