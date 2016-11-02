@@ -521,7 +521,7 @@ func updateConfig(cfg *search.Config, node *Node) {
 // drain all result records from working catalog
 func (engine *Engine) drainFinalResults(task *Task, mux *search.Result, wcat *catalog.Catalog,
 	keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string) error {
-	items, err := wcat.QueryAll(0x01, 0x01)
+	items, err := wcat.QueryAll(0x01, 0x01, task.config.Limit)
 	if err != nil {
 		return err
 	}
@@ -625,18 +625,6 @@ func (engine *Engine) drainFinalResults(task *Task, mux *search.Result, wcat *ca
 		rec.Index.Fuzziness = item.Fuzziness
 
 		mux.ReportRecord(&rec)
-		if task.config.Limit > 0 && mux.RecordsReported() >= uint64(task.config.Limit) {
-			task.log().WithField("limit", task.config.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)
-			break // stop processing
-		}
-	}
-
-	ignored := 0
-	for _ = range items {
-		ignored += 1
-	}
-	if ignored != 0 {
-		task.log().WithField("ignored", ignored).Debugf("[%s]: some items are ignored", TAG)
 	}
 
 	return nil // OK

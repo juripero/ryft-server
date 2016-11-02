@@ -249,9 +249,8 @@ type IndexItem struct {
 }
 
 // query all unwinded items
-func (cat *Catalog) QueryAll(opt uint32, optMask uint32) (chan IndexItem, error) {
-	// TODO: data file
-	rows, err := cat.db.Query(`
+func (cat *Catalog) QueryAll(opt uint32, optMask uint32, limit uint) (chan IndexItem, error) {
+	query := `
 SELECT
 	ifnull(p.u_name, p.name) AS x_name,
 	ifnull(p.u_pos, p.pos) AS x_pos,
@@ -262,7 +261,14 @@ SELECT
 FROM parts AS p
 JOIN data AS d ON p.d_id == d.id
 WHERE ? == (p.opt&?)
-GROUP BY x_name,x_pos,x_len,x_fuzz;`, opt, optMask)
+GROUP BY x_name,x_pos,x_len,x_fuzz
+`
+	if limit != 0 {
+		query += fmt.Sprintf("LIMIT %d\n", limit)
+	}
+
+	// TODO: data file
+	rows, err := cat.db.Query(query, opt, optMask)
 	if err != nil {
 		return nil, err
 	}
