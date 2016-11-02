@@ -161,7 +161,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 
 			if node.Error != nil {
 				result[node.Name] = map[string]interface{}{
-					"error": err.Error(),
+					"error": node.Error.Error(),
 				}
 			} else {
 				result[node.Name] = node.Result
