@@ -28,6 +28,7 @@ package: control
 	rm "${DESTDIR}/var/log/ryft/.keep"
 	rm "${DESTDIR}/var/ryft/.keep"
 	echo "Installed-Size: $$(du -b -s ${DESTDIR} | awk '{print $$1}')" >> "${CONTROLFILE}"
+# chown -R ryftuser.ryftuser "${DESTDIR}"
 	dpkg --build "${DESTDIR}"
 	mv -f "${DESTDIR}.deb" "${DEBNAME}"
 	rm -rf "${DESTDIR}"

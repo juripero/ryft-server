@@ -6,19 +6,31 @@ NAME=ryft-server-d
 target_uid=ryftuser
 target_gid=ryftuser
 function fixUIDGID {
-        if [[ `ls -al $1|awk '{print \$3}'` != $target_uid ]]
-        then
-                chown $target_uid $1
-        fi
-        if [[ `ls -al $1|awk '{print \$4}'` != $target_gid ]]
-        then
-                chown :$target_gid $1
-        fi
+	if [[ `ls -ald $1|awk '{print \$3}'` != $target_uid ]]
+	then
+		chown $target_uid $1
+	fi
+	if [[ `ls -ald $1|awk '{print \$4}'` != $target_gid ]]
+	then
+		chown :$target_gid $1
+	fi
 }
+
+# executables
 fixUIDGID /usr/bin/ryft_ps
+fixUIDGID /usr/bin/ryft_rdf
 fixUIDGID /usr/bin/ryft_status
 fixUIDGID /usr/bin/ryft-server
+fixUIDGID /usr/bin/ryftrest
+
+# configurations
 fixUIDGID /etc/init/ryft-server-d.conf
+fixUIDGID /etc/ryft-server.conf
+fixUIDGID /etc/ryft-users.yaml
+
+# other
+fixUIDGID /var/log/ryft
+fixUIDGID /var/ryft
 
 echo $NAME starting...
 service $NAME start
