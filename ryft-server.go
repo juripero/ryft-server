@@ -261,6 +261,11 @@ func main() {
 	private.DELETE("/files", server.DoDeleteFiles)
 	private.POST("/files", server.DoPostFiles)
 
+	// debug API endpoints
+	if server.Config.DebugMode {
+		router.GET("/debug/stack", server.DoDebugStack)
+	}
+
 	// static assets
 	for _, asset := range AssetNames() {
 		data := MustAsset(asset)
