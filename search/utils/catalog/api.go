@@ -55,6 +55,11 @@ func SetLogLevel(level logrus.Level) {
 	log.Level = level
 }
 
+// GetLogLevel gets global module log level.
+func GetLogLevel() logrus.Level {
+	return log.Level
+}
+
 // IsCatalog check if file is a catalog
 func IsCatalog(path string) bool {
 	if s, err := os.Stat(path); os.IsNotExist(err) {

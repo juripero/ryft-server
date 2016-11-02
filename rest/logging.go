@@ -32,6 +32,7 @@ package rest
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/getryft/ryft-server/search/ryftdec"
@@ -42,6 +43,7 @@ import (
 	"github.com/getryft/ryft-server/search/utils/catalog"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/gin-gonic/gin"
 )
 
 // logger instances
@@ -57,6 +59,37 @@ const (
 	JOBS = "jobs"
 	BUSY = "busyness"
 )
+
+// handle /logging/level endpoint: change logger's level
+func (server *Server) DoLoggingLevel(ctx *gin.Context) {
+	// try to set levels from query
+	for key, vals := range ctx.Request.URL.Query() {
+		for _, level := range vals { // usually one item
+			if err := setLoggingLevel(key, level); err != nil {
+				ctx.IndentedJSON(http.StatusBadRequest,
+					map[string]interface{}{"error": err.Error()})
+				return
+			}
+		}
+	}
+
+	// print current levels
+	info := map[string]interface{}{
+		"core":              log.Level.String(),
+		"core/catalogs":     catalog.GetLogLevel().String(),
+		"core/pending-jobs": jobsLog.Level.String(),
+		"core/busyness":     busyLog.Level.String(),
+		"search/ryftprim":   ryftprim.GetLogLevel().String(),
+		"search/ryftone":    ryftone.GetLogLevel().String(),
+		"search/ryfthttp":   ryfthttp.GetLogLevel().String(),
+		"search/ryftmux":    ryftmux.GetLogLevel().String(),
+		"search/ryftdec":    ryftdec.GetLogLevel().String(),
+
+		// TODO: more core loggers, see setLoggingLevel() function
+	}
+
+	ctx.IndentedJSON(http.StatusOK, info)
+}
 
 // set logging level
 func setLoggingLevel(logger string, level string) error {

@@ -157,6 +157,11 @@ func SetLogLevel(level logrus.Level) {
 	log.Level = level
 }
 
+// GetLogLevel gets global module log level.
+func GetLogLevel() logrus.Level {
+	return log.Level
+}
+
 // log returns task related logger.
 func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)

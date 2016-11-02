@@ -56,3 +56,8 @@ func SetLogLevelString(level string) error {
 func SetLogLevel(level logrus.Level) {
 	log.Level = level
 }
+
+// GetLogLevel gets global module log level.
+func GetLogLevel() logrus.Level {
+	return log.Level
+}

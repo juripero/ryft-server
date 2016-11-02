@@ -264,6 +264,8 @@ func main() {
 	// debug API endpoints
 	if server.Config.DebugMode {
 		router.GET("/debug/stack", server.DoDebugStack)
+		router.GET("/logging/level", server.DoLoggingLevel)
+		router.POST("/logging/level", server.DoLoggingLevel)
 	}
 
 	// static assets
