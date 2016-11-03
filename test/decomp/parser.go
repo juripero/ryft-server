@@ -17,7 +17,12 @@ type Parser struct {
 
 // NewParser returns a new instance of Parser.
 func NewParser(r io.Reader) *Parser {
-	return &Parser{scanner: NewScanner(r)}
+	p := &Parser{scanner: NewScanner(r)}
+
+	// default options
+	p.baseOpts.Case = true
+
+	return p
 }
 
 // NewParserString gets a new Parser instance from string.
@@ -168,7 +173,8 @@ func (p *Parser) parseQuery3() Query {
 // parse simple query (relational expression)
 func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	res := new(SimpleQuery)
-	// res.Mode = "" // mode is global
+	res.Options = p.baseOpts // by default
+
 	var input string
 	var operator string
 	var expression string

@@ -143,7 +143,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS ES("test",cs=true))`,
-		`P{(RECORD.body CONTAINS "test")[es,cs=true]}`)
+		`P{(RECORD.body CONTAINS "test")[es]}`)
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS ES("test",d=5))`, // ignored
@@ -155,11 +155,11 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FHS("test", cs = true, dist = 10, WIDTH = 100))`,
-		`P{(RECORD.body CONTAINS "test")[fhs,d=10,cs=true]}`) // no width for structured search!
+		`P{(RECORD.body CONTAINS "test")[fhs,d=10]}`) // no width for structured search!
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FEDS("test", cs= FALSE ,  DIST =10, WIDTH=100))`,
-		`P{(RECORD.body CONTAINS "test")[feds,d=10]}`) // no width for structured search!
+		`P{(RECORD.body CONTAINS "test")[feds,d=10,!cs]}`) // no width for structured search!
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS FEDS("test", ,, DIST =0, WIDTH=10))`,
@@ -325,15 +325,15 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FHS("test", cs=true, d=10, w=100))`,
-		`P{(RECORD.body CONTAINS "test")[fhs,d=10,cs=true]}`) // no width for structured search!
+		`P{(RECORD.body CONTAINS "test")[fhs,d=10]}`) // no width for structured search!
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test", CS=false, Width = 10, DIST = 	 100))`,
-		`P{(RECORD.body CONTAINS "test")[feds,d=100]}`) // no width for structured search!
+		`P{(RECORD.body CONTAINS "test")[feds,d=100,!cs]}`) // no width for structured search!
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test",CS=false))`,
-		`P{(RECORD.body CONTAINS "test")[es]}`)
+		`P{(RECORD.body CONTAINS "test")[es,!cs]}`)
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test",dIst=10))`,
@@ -341,7 +341,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FEDS("test",widtH=100)) AND (RECORD.body CONTAINS FHS("test", CS=true))`,
-		`AND{P{(RECORD.body CONTAINS "test")[es]}, P{(RECORD.body CONTAINS "test")[es,cs=true]}}`)
+		`AND{P{(RECORD.body CONTAINS "test")[es]}, P{(RECORD.body CONTAINS "test")[es]}}`)
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS "FEDS")`,

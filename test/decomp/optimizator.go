@@ -52,9 +52,7 @@ func (o *Optimizator) Process(q Query) Query {
 
 // check if two queries have the same type and options
 func (o *Optimizator) isTheSameType(a Query, b Query) bool {
-	aa := a.Simple
-	bb := b.Simple
-	if aa != nil && bb != nil {
+	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
 		return aa.Options.IsTheSame(bb.Options)
 	}
 
@@ -63,12 +61,9 @@ func (o *Optimizator) isTheSameType(a Query, b Query) bool {
 
 // get the bool operations limit
 func (o *Optimizator) getLimit(a Query, b Query) int {
-	if a.Simple != nil && b.Simple != nil {
-		modea := a.Simple.Options.Mode
-		modeb := b.Simple.Options.Mode
-
-		if modea == modeb {
-			return o.getModeLimit(modea)
+	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
+		if aa.Options.Mode == bb.Options.Mode {
+			return o.getModeLimit(aa.Options.Mode)
 		}
 	}
 
@@ -78,7 +73,7 @@ func (o *Optimizator) getLimit(a Query, b Query) int {
 // get the bool operations limit
 func (o *Optimizator) getModeLimit(mode string) int {
 	if len(mode) == 0 {
-		mode = "fhs" // "fhs" by default
+		mode = "es" // "es" by default
 	}
 
 	return o.OperatorLimits[mode]

@@ -98,22 +98,22 @@ func (o Options) String() string {
 
 	// surrounding: entire line
 	if o.Line {
-		args = append(args, fmt.Sprintf("line=%t", o.Line))
+		args = append(args, "line")
 	}
 
 	// case sensitivity
-	if o.Case {
-		args = append(args, fmt.Sprintf("cs=%t", o.Case))
+	if !o.Case {
+		args = append(args, "!cs")
 	}
 
 	// reduce duplicates
 	if o.Reduce {
-		args = append(args, fmt.Sprintf("reduce=%t", o.Reduce))
+		args = append(args, "reduce")
 	}
 
 	// octal flag
 	if o.Octal {
-		args = append(args, fmt.Sprintf("octal=%t", o.Octal))
+		args = append(args, "octal")
 	}
 
 	// currency symbol
@@ -128,7 +128,7 @@ func (o Options) String() string {
 
 	// decimal point
 	if len(o.DecimalPoint) != 0 {
-		args = append(args, fmt.Sprintf("pt=%q", o.DigitSeparator))
+		args = append(args, fmt.Sprintf("dot=%q", o.DecimalPoint))
 	}
 
 	if len(args) != 0 {

@@ -76,11 +76,11 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS FHS("test", cs = true, dist = 10, WIDTH = 100))`,
-		`(RECORD.body CONTAINS "test")[fhs,d=10,cs=true]`) // no width for structured search!
+		`(RECORD.body CONTAINS "test")[fhs,d=10]`) // no width for structured search!
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS FEDS("test", cs= FALSE ,  DIST =10, WIDTH=100))`,
-		`(RECORD.body CONTAINS "test")[feds,d=10]`) // no width for structured search!
+		`(RECORD.body CONTAINS "test")[feds,d=10,!cs]`) // no width for structured search!
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS FEDS("test", ,, DIST =0, WIDTH=10))`,
@@ -180,7 +180,7 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2,CS=true)) AND (RAW_TEXT CONTAINS FHS("200",DIST=1,WIDTH=2,CASE_SENSITIVE=true))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2,cs=true]`)
+		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS FHS("100",D=1)) AND (RAW_TEXT CONTAINS FHS("200",D=2))`,
@@ -191,8 +191,8 @@ func TestOptimizatorProcess(t *testing.T) {
 		`AND{(RAW_TEXT CONTAINS "100")[fhs,d=1,w=2], (RAW_TEXT CONTAINS "200")[fhs,d=1,w=3]}`)
 
 	testOptimizatorProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2,CS=true)) AND (RAW_TEXT CONTAINS FHS("200",D=1,W=2))`,
-		`AND{(RAW_TEXT CONTAINS "100")[fhs,d=1,w=2,cs=true], (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2]}`)
+		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2,CS=false)) AND (RAW_TEXT CONTAINS FHS("200",D=1,W=2))`,
+		`AND{(RAW_TEXT CONTAINS "100")[fhs,d=1,w=2,!cs], (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2]}`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`,
@@ -308,15 +308,15 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS FHS("test"))AND(RECORD.id CONTAINS FEDS("123", CS=true, D=1, W=2)))`,
-		`AND{(RECORD.id CONTAINS "test")[es], (RECORD.id CONTAINS "123")[feds,d=1,cs=true]}`)
+		`AND{(RECORD.id CONTAINS "test")[es], (RECORD.id CONTAINS "123")[feds,d=1]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS FHS("test"))AND(RECORD.id CONTAINS FEDS("123", D=2, CS=true)) OR (RECORD.id CONTAINS DATE("200301")))`,
-		`OR{AND{(RECORD.id CONTAINS "test")[es], (RECORD.id CONTAINS "123")[feds,d=2,cs=true]}, (RECORD.id CONTAINS DATE("200301"))[ds]}`)
+		`OR{AND{(RECORD.id CONTAINS "test")[es], (RECORD.id CONTAINS "123")[feds,d=2]}, (RECORD.id CONTAINS DATE("200301"))[ds]}`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RECORD.body CONTAINS FEDS("test",cs=false,d=10,w=100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE("200301")))`,
-		`AND{(RECORD.body CONTAINS "test")[feds,d=10], OR{(RAW_TEXT CONTAINS "text")[es], (RECORD.id CONTAINS DATE("200301"))[ds]}}`)
+		`AND{(RECORD.body CONTAINS "test")[feds,d=10,!cs], OR{(RAW_TEXT CONTAINS "text")[es], (RECORD.id CONTAINS DATE("200301"))[ds]}}`)
 
 	testOptimizatorProcess(t, o, false,
 		`((RAW_TEXT CONTAINS REGEX("\w+", CASELESS)) OR (RECORD.id CONTAINS DATE("200301")))`,
@@ -344,7 +344,7 @@ func TestOptimizatorLimits(t *testing.T) {
 	o := testNewOptimizator(limits)
 
 	assert.Equal(t, 0, o.getModeLimit("---"), "invalid mode")
-	assert.Equal(t, limits["fhs"], o.getModeLimit(""), "default to FHS")
+	assert.Equal(t, limits["es"], o.getModeLimit(""), "default to ES")
 	for k, v := range limits {
 		assert.Equal(t, v, o.getModeLimit(k))
 	}
