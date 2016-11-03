@@ -247,6 +247,9 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`,
 		`[IPv6]: (RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`)
+}
+
+func TestBugfix(t *testing.T) {
 	testQueryTree(t, `((RECORD.doc.text_entry CONTAINS FEDS("To", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("be", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("or", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("not", DIST=1)) AND(RECORD.doc.text_entry CONTAINS FEDS("to", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("tht",DIST=1)))`,
 		`[ AND]:
   [feds-0/0-false]: (RECORD.doc.text_entry CONTAINS "To") AND (RECORD.doc.text_entry CONTAINS "be") AND (RECORD.doc.text_entry CONTAINS "or")
@@ -258,4 +261,9 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `((RECORD.doc.text_entry CONTAINS FHS("To", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("be", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("or", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("not", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("to", DIST=1)))`,
 		`[fhs-1/0-false]: (RECORD.doc.text_entry CONTAINS "To") AND (RECORD.doc.text_entry CONTAINS "be") AND (RECORD.doc.text_entry CONTAINS "or") AND (RECORD.doc.text_entry CONTAINS "not") AND (RECORD.doc.text_entry CONTAINS "to")`)
+
+	testQueryTree(t, `((RECORD.doc.doc.text_entry CONTAINS FEDS("To", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("be", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("or", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("not", DIST=1)))`,
+		`[ AND]:
+  [feds-0/0-false]: (RECORD.doc.doc.text_entry CONTAINS "To") AND (RECORD.doc.doc.text_entry CONTAINS "be") AND (RECORD.doc.doc.text_entry CONTAINS "or")
+  [feds-1/0-false]: (RECORD.doc.doc.text_entry CONTAINS "not")`)
 }

@@ -32,6 +32,7 @@ package ryftdec
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/getryft/ryft-server/search"
@@ -66,6 +67,8 @@ func configToOpts(config *search.Config) Options {
 func Decompose(originalQuery string, baseOpts Options) (node *Node, err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			log.Debugf("stack trace:\n%s", debug.Stack())
+
 			var ok bool
 			err, ok = r.(error)
 			if !ok {
