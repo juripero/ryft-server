@@ -78,3 +78,27 @@ func TestLexemeIs(t *testing.T) {
 	assert.True(t, NewLexemeStr(IDENT, "IPv6").IsIPv6())
 	assert.False(t, NewLexemeStr(INT, "IPv6").IsIPv6())
 }
+
+// test lexem unquote
+func TestLexemeUnquote(t *testing.T) {
+	// does nothing for non-STRING
+	assert.Equal(t, `hello`, NewLexemeStr(IDENT, `hello`).Unquoted())
+	assert.Equal(t, `"hello"`, NewLexemeStr(IDENT, `"hello"`).Unquoted())
+
+	// removes from STRING
+	assert.Equal(t, `hello`, NewLexemeStr(STRING, `hello`).Unquoted())
+	assert.Equal(t, `hello`, NewLexemeStr(STRING, `"hello"`).Unquoted())
+	assert.Equal(t, `hello`, NewLexemeStr(STRING, `'hello'`).Unquoted())
+	assert.Equal(t, `"hello"`, NewLexemeStr(STRING, `""hello""`).Unquoted())
+	assert.Equal(t, `"hello"`, NewLexemeStr(STRING, `'"hello"'`).Unquoted())
+	assert.Equal(t, `'hello'`, NewLexemeStr(STRING, `''hello''`).Unquoted())
+	assert.Equal(t, `'hello'`, NewLexemeStr(STRING, `"'hello'"`).Unquoted())
+
+	// as is
+	assert.Equal(t, `'`, NewLexemeStr(STRING, `'`).Unquoted())
+	assert.Equal(t, `"`, NewLexemeStr(STRING, `"`).Unquoted())
+	assert.Equal(t, ``, NewLexemeStr(STRING, `''`).Unquoted())
+	assert.Equal(t, ``, NewLexemeStr(STRING, `""`).Unquoted())
+	assert.Equal(t, `'"`, NewLexemeStr(STRING, `'"`).Unquoted())
+	assert.Equal(t, `"'`, NewLexemeStr(STRING, `"'`).Unquoted())
+}

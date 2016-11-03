@@ -25,6 +25,20 @@ func (lex Lexeme) String() string {
 	return lex.literal
 }
 
+// Unquoted get unquoted string.
+func (lex Lexeme) Unquoted() string {
+	if lex.token == STRING {
+		if n := len(lex.literal); n > 1 {
+			if (lex.literal[0] == '"' && lex.literal[n-1] == '"') ||
+				(lex.literal[0] == '\'' && lex.literal[n-1] == '\'') {
+				return lex.literal[1 : n-1]
+			}
+		}
+	}
+
+	return lex.literal // "as is"
+}
+
 // IsAnd checks is "AND" operator.
 func (lex Lexeme) IsAnd() bool {
 	if lex.token != IDENT {
