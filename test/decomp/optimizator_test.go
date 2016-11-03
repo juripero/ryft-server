@@ -104,7 +104,7 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[ns]`)
+		`(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[cs]`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
@@ -252,11 +252,11 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.date CONTAINS CURRENCY("00" < NUM < "11")) OR (RECORD.date CONTAINS CURRENCY("11" > NUM > "22"))`,
-		`OR{(RECORD.date CONTAINS CURRENCY("00"<NUM<"11"))[ns], (RECORD.date CONTAINS CURRENCY("11">NUM>"22"))[ns]}`)
+		`OR{(RECORD.date CONTAINS CURRENCY("00"<NUM<"11"))[cs], (RECORD.date CONTAINS CURRENCY("11">NUM>"22"))[cs]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[ns]`)
+		`(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[cs]`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE("00/00/0000"))`,

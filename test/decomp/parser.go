@@ -245,7 +245,12 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		case lex.IsES(): // +options
 			expression, res.Options = p.parseSearchExpr(p.baseOpts)
 			res.Options.Mode = "es"
-			res.Options.Dist = 0 // no dist for exact search!
+			res.Options.Dist = 0 // no these options for exact search!
+			res.Options.Reduce = false
+			res.Options.Octal = false
+			res.Options.CurrencySymbol = ""
+			res.Options.DigitSeparator = ""
+			res.Options.DecimalPoint = ""
 
 		case lex.IsFHS(): // +options
 			expression, res.Options = p.parseSearchExpr(p.baseOpts)
@@ -254,6 +259,11 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			} else {
 				res.Options.Mode = "fhs"
 			}
+			res.Options.Reduce = false // no these options for FHS!
+			res.Options.Octal = false
+			res.Options.CurrencySymbol = ""
+			res.Options.DigitSeparator = ""
+			res.Options.DecimalPoint = ""
 
 		case lex.IsFEDS(): // +options
 			expression, res.Options = p.parseSearchExpr(p.baseOpts)
@@ -262,14 +272,30 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			} else {
 				res.Options.Mode = "feds"
 			}
+			res.Options.Octal = false // no these options for FEDS!
+			res.Options.CurrencySymbol = ""
+			res.Options.DigitSeparator = ""
+			res.Options.DecimalPoint = ""
 
 		case lex.IsDate(): // "as is"
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ds"
+			res.Options.Dist = 0 // no these options for DATE search!
+			res.Options.Reduce = false
+			res.Options.Octal = false
+			res.Options.CurrencySymbol = ""
+			res.Options.DigitSeparator = ""
+			res.Options.DecimalPoint = ""
 
 		case lex.IsTime(): // "as is"
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ts"
+			res.Options.Dist = 0 // no these options for TIME search!
+			res.Options.Reduce = false
+			res.Options.Octal = false
+			res.Options.CurrencySymbol = ""
+			res.Options.DigitSeparator = ""
+			res.Options.DecimalPoint = ""
 
 		case lex.IsNumber(): // "as is"
 			// handle aliases NUMERIC -> NUMBER
@@ -278,12 +304,20 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			}
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ns"
+			res.Options.Dist = 0 // no these options for NUMBER search!
+			res.Options.Reduce = false
+			res.Options.Octal = false
+			res.Options.CurrencySymbol = ""
 
 		case lex.IsCurrency(): // "as is"
 			expression = p.parseParenExpr(lex)
-			res.Options.Mode = "ns" // (!) as numeric search!
+			res.Options.Mode = "cs"
+			res.Options.Dist = 0 // no these options for CURRENCY search!
+			res.Options.Reduce = false
+			res.Options.Octal = false
 
 		case lex.IsRegex(): // "as is"
+			// TODO: not supported!!!
 			// handle aliases REGEXP -> REGEX
 			if !strings.EqualFold(lex.literal, "REGEX") {
 				lex.literal = "REGEX"
@@ -294,10 +328,21 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		case lex.IsIPv4(): // "as is"
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ipv4"
+			res.Options.Dist = 0 // no these options for IPv4 search!
+			res.Options.Reduce = false
+			res.Options.CurrencySymbol = ""
+			res.Options.DigitSeparator = ""
+			res.Options.DecimalPoint = ""
 
 		case lex.IsIPv6(): // "as is"
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ipv6"
+			res.Options.Dist = 0 // no these options for IPv6 search!
+			res.Options.Reduce = false
+			res.Options.Octal = false
+			res.Options.CurrencySymbol = ""
+			res.Options.DigitSeparator = ""
+			res.Options.DecimalPoint = ""
 
 		// consume all continous strings and wildcards
 		case lex.token == STRING,

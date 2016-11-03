@@ -191,7 +191,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`  (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[ns]}`)
+		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[cs]}`)
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
@@ -321,7 +321,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[ns]}`)
+		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[cs]}`)
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FHS("test", cs=true, d=10, w=100))`,
