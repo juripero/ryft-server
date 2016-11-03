@@ -30,6 +30,10 @@ func (o *Optimizator) Process(q Query) Query {
 					a.Simple.Expression,
 					q.Operator,
 					b.Simple.Expression)
+				tmp.Simple.GenericExpr = fmt.Sprintf("%s %s %s", //"(%s %s %s)",
+					a.Simple.GenericExpr,
+					q.Operator,
+					b.Simple.GenericExpr)
 				a = tmp // next iteration
 			} else {
 				args = append(args, a) // leave it "as is"

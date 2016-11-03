@@ -370,8 +370,8 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	}
 
 	res.Expression = fmt.Sprintf("(%s %s %s)", input, operator, expression)
-	// TODO generic expression fmt.Sprintf("(%s %s %s)", input, operator,
-	//    p.genericExpression(expression, res.Options))
+	res.GenericExpr = fmt.Sprintf("(%s %s %s)", input, operator,
+		p.genericExpression(expression, res.Options))
 	return res // done
 }
 
@@ -380,16 +380,62 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 	switch opts.Mode {
 	// exact search
 	case "es", "":
-		if opts.Line {
-			return fmt.Sprintf(`EXACT(%s, LINE="%t", CASE="%t")`, expression, opts.Line, opts.Case)
+		args := []string{expression}
+
+		if opts.Line { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
 		} else if opts.Width != 0 {
-			return fmt.Sprintf(`EXACT(%s, WIDTH="%d", CASE="%t")`, expression, opts.Width, opts.Case)
-		} else {
-			return fmt.Sprintf(`EXACT(%s, CASE="%t")`, expression, opts.Case)
+			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
+		if !opts.Case { // TRUE by default
+			args = append(args, fmt.Sprintf(`CASE="%t"`, opts.Case))
+		}
+
+		return fmt.Sprintf("EXACT(%s)", strings.Join(args, ", "))
+
 	case "fhs":
+		args := []string{expression}
+
+		if opts.Dist != 0 {
+			args = append(args, fmt.Sprintf(`DISTANCE="%d"`, opts.Dist))
+		}
+
+		if opts.Line { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
+		} else if opts.Width != 0 {
+			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
+		}
+
+		if !opts.Case { // TRUE by default
+			args = append(args, fmt.Sprintf(`CASE="%t"`, opts.Case))
+		}
+
+		return fmt.Sprintf("HAMMING(%s)", strings.Join(args, ", "))
+
 	case "feds":
+		args := []string{expression}
+
+		if opts.Dist != 0 {
+			args = append(args, fmt.Sprintf(`DISTANCE="%d"`, opts.Dist))
+		}
+
+		if opts.Line { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
+		} else if opts.Width != 0 {
+			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
+		}
+
+		if !opts.Case { // TRUE by default
+			args = append(args, fmt.Sprintf(`CASE="%t"`, opts.Case))
+		}
+
+		if opts.Reduce { // FALSE by default
+			args = append(args, fmt.Sprintf(`REDUCE="%t"`, opts.Reduce))
+		}
+
+		return fmt.Sprintf("EDIT_DISTANCE(%s)", strings.Join(args, ", "))
+
 	case "ds":
 	case "ts":
 	case "ns":
@@ -527,6 +573,7 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 
 			// case sensitivity flag
 			case strings.EqualFold(lex.literal, "CASE_SENSITIVE"),
+				strings.EqualFold(lex.literal, "CASE"),
 				strings.EqualFold(lex.literal, "CS"):
 				if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.Case = p.parseBoolVal()
@@ -622,9 +669,7 @@ func (p *Parser) parseStringExpr(start Lexeme) string {
 // parse string value
 func (p *Parser) parseStringVal() string {
 	if val := p.scanIgnoreSpace(); val.token == STRING {
-		// remove quotes at begin and end
-		quote := `"`
-		return strings.TrimLeft(strings.TrimRight(val.literal, quote), quote)
+		return val.Unquoted()
 	} else if val.token == IDENT || val.token == INT || val.token == FLOAT {
 		return val.literal // as is
 	} else {
@@ -635,11 +680,12 @@ func (p *Parser) parseStringVal() string {
 
 // parse integer value
 func (p *Parser) parseIntVal(min, max int64) int64 {
-	if val := p.scanIgnoreSpace(); val.token == INT {
-		i, err := strconv.ParseInt(val.literal, 10, 64)
+	if val := p.scanIgnoreSpace(); val.token == INT || val.token == STRING {
+		i, err := strconv.ParseInt(strings.TrimSpace(val.Unquoted()), 10, 64)
 		if err != nil {
 			p.unscan(val)
-			panic(fmt.Errorf("failed to parse integer from %q: %s", val, err))
+			// ParseInt() error already contains input string reference
+			panic(fmt.Errorf("failed to parse integer: %s", err))
 		}
 
 		if i < min || max < i {
@@ -656,10 +702,12 @@ func (p *Parser) parseIntVal(min, max int64) int64 {
 
 // parse boolean value
 func (p *Parser) parseBoolVal() bool {
-	if val := p.scanIgnoreSpace(); val.token == INT || val.token == IDENT {
-		b, err := strconv.ParseBool(val.literal)
+	if val := p.scanIgnoreSpace(); val.token == INT || val.token == IDENT || val.token == STRING {
+		b, err := strconv.ParseBool(strings.TrimSpace(val.Unquoted()))
 		if err != nil {
-			panic(fmt.Errorf("failed to parse boolean from %q: %s", val, err))
+			p.unscan(val)
+			// ParseBool() error already contains input string reference
+			panic(fmt.Errorf("failed to parse boolean: %s", err))
 		}
 		return b // OK
 	} else {

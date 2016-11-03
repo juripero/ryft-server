@@ -14,6 +14,14 @@ func testParserParse(t *testing.T, structured bool, data string, parsed string) 
 	assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
 }
 
+// test parser (generic)
+func testParserParseG(t *testing.T, structured bool, data string, parsed string) {
+	res, err := ParseQuery(data)
+	assert.NoError(t, err, "valid query expected (data:%s)", data)
+	assert.Equal(t, parsed, res.GenericString(), "not expected (data:%s)", data)
+	assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
+}
+
 // test parser (should panic)
 func testParserBad(t *testing.T, data string, expectedError string) {
 	_, err := ParseQuery(data)
@@ -58,33 +66,13 @@ func TestParserBad(t *testing.T) {
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE (123`, "no expression ending found")
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE (123()`, "no expression ending found")
 
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS("test", CS=tru))`, "failed to parse boolean from")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", CS="f"))`, "found instead of boolean value")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", CS=,))`, "found instead of boolean value")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", CS no))`, "found instead of =")
-
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS("test", W=tru))`, "found instead of integer value")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", W="f"))`, "found instead of integer value")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", W=,))`, "found instead of integer value")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", W=100000))`, "is out of range")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", W=1000000000000000000000000000000000))`, "failed to parse integer from")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", WIDTH=-1))`, "is out of range")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", W no))`, "found instead of =")
-
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS("test", D=tru))`, "found instead of integer value")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", D="f"))`, "found instead of integer value")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", D=,))`, "found instead of integer value")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", D=100000))`, "is out of range")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", DIST=-1))`, "is out of range")
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", D no))`, "found instead of =")
-
-	testParserBad(t, `(RAW_TEXT NOT_EQUALS FHS("test", NO=100))`, "unknown argument")
-
 	testParserBad(t, `(RECORD. EQUALS "123")`, "no field name found for RECORD")
 	testParserBad(t, `(RECORD.[  EQUALS "123")`, "no closing ] found")
 	testParserBad(t, `(RECORDZ  EQUALS "123")`, "found instead of closing )")
 	testParserBad(t, `(RECORD CONTAINZ "123")`, "expected CONTAINS or EQUALS")
 	testParserBad(t, `(RECORD CONTAINS UNKNOWN("123"))`, "is unexpected expression")
+
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", NO=100))`, "unknown argument")
 }
 
 // test for valid queries
@@ -354,4 +342,283 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t, false,
 		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
 		`P{AND{P{(RECORD.body CONTAINS "DATE()")[es]}, P{(RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}}}`)
+}
+
+// test for DISTANCE options parsing (generic queries)
+func TestParserParseDistance(t *testing.T) {
+	// aliases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", FUZZINESS_DISTANCE=2))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", FUZZINESS=2))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", DISTANCE=2))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", DIST=2))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D = 2))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
+
+	// integer values
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D = 3))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="3"))[fhs,d=3]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D = " 2 "))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=tru))`, "found instead of integer value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=1.23))`, "found instead of integer value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=,))`, "found instead of integer value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=100000))`, "is out of range")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=65536))`, "is out of range")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=-1))`, "is out of range")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=""))`, "failed to parse integer")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D no))`, "found instead of =")
+}
+
+// test for WIDTH options parsing (generic queries)
+func TestParserParseWidth(t *testing.T) {
+	// aliases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", SURROUNDING_WIDTH=2))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="2"))[es,w=2]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", SURROUNDING=2))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="2"))[es,w=2]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", WIDTH=2))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="2"))[es,w=2]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", w=2))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="2"))[es,w=2]}`)
+
+	// integer values
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", W = 3))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3"))[es,w=3]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", W = " 3 "))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3"))[es,w=3]}`)
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=tru))`, "found instead of integer value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=1.23))`, "found instead of integer value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=,))`, "found instead of integer value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=100000))`, "is out of range")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=65536))`, "is out of range")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=-1))`, "is out of range")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=""))`, "failed to parse integer")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W no))`, "found instead of =")
+}
+
+// test for LINE options parsing (generic queries)
+func TestParserParseLine(t *testing.T) {
+	// aliases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", LINE=true))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", L=true))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+
+	// boolean values
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", L = true))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", L = "true"))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", L = " T "))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", L = T))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", L = 1))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", L=tru))`, "failed to parse boolean")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", L=1.23))`, "found instead of boolean value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", L=,))`, "found instead of boolean value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", L no))`, "found instead of =")
+}
+
+// test for CASE options parsing (generic queries)
+func TestParserParseCase(t *testing.T) {
+	// aliases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CASE_SENSITIVE=true))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CASE=false))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CS=false))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+
+	// boolean values
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CS = false))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CS = "false"))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CS = " F "))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CS = f))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CS = 0))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS=tru))`, "failed to parse boolean")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS=1.23))`, "found instead of boolean value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS=,))`, "found instead of boolean value")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS no))`, "found instead of =")
+}
+
+// test for REDUCE options parsing (generic queries)
+func TestParserParseReduce(t *testing.T) {
+	// aliases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, REDUCE=true))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R=true))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+
+	// boolean values
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R = true))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R = "true"))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R = " T "))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R = T))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R = 1))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R=tru))`, "failed to parse boolean")
+	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R=1.23))`, "found instead of boolean value")
+	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R=,))`, "found instead of boolean value")
+	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R no))`, "found instead of =")
+}
+
+// test for OCTAL options parsing (generic queries)
+func TestParserParseOctal(t *testing.T) {
+	// TODO: OCTAL tests
+}
+
+// test for SYMBOL options parsing (generic queries)
+func TestParserParseSymbol(t *testing.T) {
+	// TODO: SYMBOL tests
+}
+
+// test for SEPARATOR options parsing (generic queries)
+func TestParserParseSeparator(t *testing.T) {
+	// TODO: SEPARATOR tests
+}
+
+// test for DECIMAL options parsing (generic queries)
+func TestParserParseDecimal(t *testing.T) {
+	// TODO: DECIMAL tests
+}
+
+// test for EXACT (generic queries)
+func TestParserParseEXACT(t *testing.T) {
+	// EXACT search (simple cases)
+	testParserParseG(t, false,
+		`"hello"`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	testParserParseG(t, false,
+		`""?`,
+		`(RAW_TEXT CONTAINS EXACT(""?))[es]`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS "hello")`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+
+	// EXACT search (raw and structured)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello"))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS ES("hello"))`,
+		`P{(RECORD.body CONTAINS EXACT("hello"))[es]}`)
+
+	// EXACT search (CS)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS ES("hello", CS=false))`,
+		`P{(RECORD.body CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS ES("hello", CS="false"))`,
+		`P{(RECORD.body CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS ES("hello", CS="F"))`,
+		`P{(RECORD.body CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS ES("hello", CS="0"))`,
+		`P{(RECORD.body CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS ES("hello", CS=0))`,
+		`P{(RECORD.body CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+
+	// EXACT search (WIDTH)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS ES("hello", WIDTH=0))`,
+		`P{(RECORD.body CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS ES("hello", WIDTH=1))`,
+		`P{(RECORD.body CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", WIDTH=1))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="1"))[es,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", WIDTH="2"))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="2"))[es,w=2]}`)
+
+	// EXACT search (LINE & WIDTH - last option has priority)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", WIDTH="2", LINE=true))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", LINE=true, WIDTH=3))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3"))[es,w=3]}`)
+
+	// EXACT search (ignored options)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", DIST=2))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", REDUCE=true))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", OCTAL=true))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", SYMBOL="$"))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", SEPARATOR=" "))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", DECIMAL="."))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
 }
