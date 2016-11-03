@@ -314,6 +314,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		// no surrounding width should be used
 		// for structured search!
 		res.Options.Width = 0
+		res.Options.Line = false
 	}
 
 	res.Expression = fmt.Sprintf("(%s %s %s)", input, operator, expression)
@@ -422,6 +423,18 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 				strings.EqualFold(lex.literal, "W"):
 				if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.Width = uint(p.parseIntVal(0, 64*1024))
+					opts.Line = false // mutual exclusive
+				} else {
+					p.unscan(eq)
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
+			// surrounding: entire line
+			case strings.EqualFold(lex.literal, "LINE"),
+				strings.EqualFold(lex.literal, "L"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					opts.Line = p.parseBoolVal()
+					opts.Width = 0 // mutual exclusive
 				} else {
 					p.unscan(eq)
 					panic(fmt.Errorf("%q found instead of =", eq))
@@ -431,7 +444,27 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 			case strings.EqualFold(lex.literal, "CASE_SENSITIVE"),
 				strings.EqualFold(lex.literal, "CS"):
 				if eq := p.scanIgnoreSpace(); eq.token == EQ {
-					opts.Cs = p.parseBoolVal()
+					opts.Case = p.parseBoolVal()
+				} else {
+					p.unscan(eq)
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
+			// reduce duplicates flag
+			case strings.EqualFold(lex.literal, "REDUCE"),
+				strings.EqualFold(lex.literal, "R"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					opts.Reduce = p.parseBoolVal()
+				} else {
+					p.unscan(eq)
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
+			// octal flag
+			case strings.EqualFold(lex.literal, "OCTAL"),
+				strings.EqualFold(lex.literal, "OCT"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					opts.Octal = p.parseBoolVal()
 				} else {
 					p.unscan(eq)
 					panic(fmt.Errorf("%q found instead of =", eq))

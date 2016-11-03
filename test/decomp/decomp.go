@@ -8,10 +8,16 @@ import (
 
 // Options contains search options
 type Options struct {
-	Mode  string // Search mode: es, fhs, feds, date, time, etc.
-	Dist  uint   // Fuzziness distance
-	Width uint   // Surrounding width
-	Cs    bool   // Case sensitivity flag
+	Mode   string // Search mode: es, fhs, feds, date, time, etc.
+	Dist   uint   // Fuzziness distance (FHS, FEDS)
+	Width  uint   // Surrounding width
+	Line   bool   // Surrounding: entire line. If `true` Width is ignored.
+	Case   bool   // Case sensitivity flag (ES, FHS, FEDS)
+	Reduce bool   // Reduce duplicates flag (FEDS)
+	Octal  bool   // Octal format flag (IPv4)
+	// Symbol string
+	// Separator string
+	// Decimal string
 }
 
 // IsTheSame checks the options are the same.
@@ -31,8 +37,23 @@ func (o Options) IsTheSame(p Options) bool {
 		return false
 	}
 
+	// surrounding: entire line
+	if o.Line != p.Line {
+		return false
+	}
+
 	// case sensitivity
-	if o.Cs != p.Cs {
+	if o.Case != p.Case {
+		return false
+	}
+
+	// reduce flag
+	if o.Reduce != p.Reduce {
+		return false
+	}
+
+	// octal flag
+	if o.Octal != p.Octal {
 		return false
 	}
 
@@ -58,9 +79,24 @@ func (o Options) String() string {
 		args = append(args, fmt.Sprintf("w=%d", o.Width))
 	}
 
+	// surrounding: entire line
+	if o.Line {
+		args = append(args, fmt.Sprintf("line=%t", o.Line))
+	}
+
 	// case sensitivity
-	if o.Cs {
-		args = append(args, fmt.Sprintf("cs=%t", o.Cs))
+	if o.Case {
+		args = append(args, fmt.Sprintf("cs=%t", o.Case))
+	}
+
+	// reduce duplicates
+	if o.Reduce {
+		args = append(args, fmt.Sprintf("reduce=%t", o.Reduce))
+	}
+
+	// octal
+	if o.Octal {
+		args = append(args, fmt.Sprintf("octal=%t", o.Octal))
 	}
 
 	if len(args) != 0 {
