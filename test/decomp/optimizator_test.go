@@ -60,19 +60,19 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, false,
 		`                   "?"`,
-		`(RAW_TEXT CONTAINS "?")`)
+		`(RAW_TEXT CONTAINS "?")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`                   "hello"`,
-		`(RAW_TEXT CONTAINS "hello")`)
+		`(RAW_TEXT CONTAINS "hello")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`                 "he" ? ? "o"`,
-		`(RAW_TEXT CONTAINS "he"??"o")`)
+		`(RAW_TEXT CONTAINS "he"??"o")[es]`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS "FEDS")`,
-		`(RECORD.body CONTAINS "FEDS")`)
+		`(RECORD.body CONTAINS "FEDS")[es]`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.body CONTAINS FHS("test", cs = true, dist = 10, WIDTH = 100))`,
@@ -112,47 +112,47 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "100")`,
-		`(RAW_TEXT CONTAINS "100")`)
+		`(RAW_TEXT CONTAINS "100")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`((RAW_TEXT CONTAINS "100"))`,
-		`(RAW_TEXT CONTAINS "100")`)
+		`(RAW_TEXT CONTAINS "100")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "DATE()")`,
-		`(RAW_TEXT CONTAINS "DATE()")`)
+		`(RAW_TEXT CONTAINS "DATE()")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "TIME()")`,
-		`(RAW_TEXT CONTAINS "TIME()")`)
+		`(RAW_TEXT CONTAINS "TIME()")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "NUMBER()")`,
-		`(RAW_TEXT CONTAINS "NUMBER()")`)
+		`(RAW_TEXT CONTAINS "NUMBER()")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "CURRENCY()")`,
-		`(RAW_TEXT CONTAINS "CURRENCY()")`)
+		`(RAW_TEXT CONTAINS "CURRENCY()")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "REGEX()")`,
-		`(RAW_TEXT CONTAINS "REGEX()")`)
+		`(RAW_TEXT CONTAINS "REGEX()")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
+		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "100") AND ((RAW_TEXT CONTAINS "200"))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
+		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`((RAW_TEXT CONTAINS "100")) AND (RAW_TEXT CONTAINS "200")`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
+		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`((RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200"))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`)
+		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RECORD.body CONTAINS FHS("100")) AND (RAW_TEXT CONTAINS FHS("200"))`,
@@ -196,19 +196,19 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
+		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "100") OR ((RAW_TEXT CONTAINS "200"))`,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
+		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`((RAW_TEXT CONTAINS "100")) OR (RAW_TEXT CONTAINS "200")`,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
+		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")[es]`)
 
 	testOptimizatorProcess(t, o, false,
 		`((RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200"))`,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`)
+		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")[es]`)
 
 	//		testOptimizatorProcess(t, o,false,
 	//			`((RAW_TEXT CONTAINS "100")) OR ((RAW_TEXT CONTAINS "200"))`,
@@ -260,39 +260,39 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE("00/00/0000"))`,
-		`AND{(RECORD.id CONTAINS "1003"), (RECORD.date CONTAINS DATE("00/00/0000"))[ds]}`)
+		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE("00/00/0000"))[ds]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.id CONTAINS "1003")OR(RECORD.date CONTAINS TIME("00:00:00"))`,
-		`OR{(RECORD.id CONTAINS "1003"), (RECORD.date CONTAINS TIME("00:00:00"))[ts]}`)
+		`OR{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS TIME("00:00:00"))[ts]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE("00/00/0000"))AND(RECORD.date CONTAINS TIME("00:00:00"))`,
-		`AND{(RECORD.id CONTAINS "1003"), (RECORD.date CONTAINS DATE("00/00/0000"))[ds], (RECORD.date CONTAINS TIME("00:00:00"))[ts]}`)
+		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE("00/00/0000"))[ds], (RECORD.date CONTAINS TIME("00:00:00"))[ts]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE("00/00/0000"))OR(RECORD.date CONTAINS TIME("00:00:00"))`,
-		`OR{AND{(RECORD.id CONTAINS "1003"), (RECORD.date CONTAINS DATE("00/00/0000"))[ds]}, (RECORD.date CONTAINS TIME("00:00:00"))[ts]}`)
+		`OR{AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE("00/00/0000"))[ds]}, (RECORD.date CONTAINS TIME("00:00:00"))[ts]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE("100301")))`,
-		`AND{(RECORD.id CONTAINS "1003"), (RECORD.date CONTAINS DATE("100301"))[ds]}`)
+		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE("100301"))[ds]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE("100301")) OR (RECORD.id CONTAINS "2003"))`,
-		`OR{AND{(RECORD.id CONTAINS "1003"), (RECORD.date CONTAINS DATE("100301"))[ds]}, (RECORD.id CONTAINS "2003")}`)
+		`OR{AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE("100301"))[ds]}, (RECORD.id CONTAINS "2003")[es]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS "1003")AND(RECORD.id CONTAINS DATE("100301"))AND(RECORD.id CONTAINS DATE("200301")))`,
-		`AND{(RECORD.id CONTAINS "1003"), (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301"))[ds]}`)
+		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.id CONTAINS DATE("100301")) AND (RECORD.id CONTAINS DATE("200301"))[ds]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`(((RECORD.id CONTAINS "1003")AND(RECORD.id CONTAINS DATE("100301")))AND(RECORD.id CONTAINS DATE("200301")))`,
-		`AND{AND{(RECORD.id CONTAINS "1003"), (RECORD.id CONTAINS DATE("100301"))[ds]}, (RECORD.id CONTAINS DATE("200301"))[ds]}`)
+		`AND{AND{(RECORD.id CONTAINS "1003")[es], (RECORD.id CONTAINS DATE("100301"))[ds]}, (RECORD.id CONTAINS DATE("200301"))[ds]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS DATE("1003"))AND(RECORD.id CONTAINS DATE("100301"))OR(RECORD.id CONTAINS "200301"))`,
-		`OR{(RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))[ds], (RECORD.id CONTAINS "200301")}`)
+		`OR{(RECORD.id CONTAINS DATE("1003")) AND (RECORD.id CONTAINS DATE("100301"))[ds], (RECORD.id CONTAINS "200301")[es]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS TIME("1003")) AND (RECORD.id CONTAINS TIME("100301")) AND (RECORD.id CONTAINS DATE("200301")) AND (RECORD.id CONTAINS DATE("20030102")))`,
@@ -300,7 +300,7 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS NUMBER(NUM < 7))`,
-		`AND{(RECORD.id CONTAINS "1003"), (RECORD.date CONTAINS NUMBER(NUM<7))[ns]}`)
+		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS NUMBER(NUM<7))[ns]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
@@ -358,29 +358,29 @@ func TestOptimizatorLimits(t *testing.T) {
 func TestOptimizatorLimits2(t *testing.T) {
 	testOptimizatorLimits(t, 0, false,
 		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A"), (RAW_TEXT CONTAINS "B"), (RAW_TEXT CONTAINS "C"), (RAW_TEXT CONTAINS "D"), (RAW_TEXT CONTAINS "E"), (RAW_TEXT CONTAINS "F")}`)
+		`AND{(RAW_TEXT CONTAINS "A")[es], (RAW_TEXT CONTAINS "B")[es], (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D")[es], (RAW_TEXT CONTAINS "E")[es], (RAW_TEXT CONTAINS "F")[es]}`)
 
 	testOptimizatorLimits(t, 1, false,
 		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B"), (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D"), (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")}`)
+		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B")[es], (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D")[es], (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
 
 	testOptimizatorLimits(t, 2, false,
 		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C"), (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")}`)
+		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
 
 	testOptimizatorLimits(t, 3, false,
 		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D"), (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")}`)
+		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D")[es], (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
 
 	testOptimizatorLimits(t, 0, false,
 		`(RAW_TEXT CONTAINS "A") AND ((RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")) AND ((RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")) AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A"), AND{(RAW_TEXT CONTAINS "B"), (RAW_TEXT CONTAINS "C")}, AND{(RAW_TEXT CONTAINS "D"), (RAW_TEXT CONTAINS "E")}, (RAW_TEXT CONTAINS "F")}`)
+		`AND{(RAW_TEXT CONTAINS "A")[es], AND{(RAW_TEXT CONTAINS "B")[es], (RAW_TEXT CONTAINS "C")[es]}, AND{(RAW_TEXT CONTAINS "D")[es], (RAW_TEXT CONTAINS "E")[es]}, (RAW_TEXT CONTAINS "F")[es]}`)
 
 	testOptimizatorLimits(t, 1, false,
 		`(RAW_TEXT CONTAINS "A") AND ((RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")) AND ((RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")) AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A"), (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C"), (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E"), (RAW_TEXT CONTAINS "F")}`)
+		`AND{(RAW_TEXT CONTAINS "A")[es], (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")[es], (RAW_TEXT CONTAINS "F")[es]}`)
 
 	testOptimizatorLimits(t, 2, false,
 		`(RAW_TEXT CONTAINS "A") AND ((RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")) AND ((RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")) AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C"), (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")}`)
+		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
 }

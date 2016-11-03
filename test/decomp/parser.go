@@ -20,6 +20,7 @@ func NewParser(r io.Reader) *Parser {
 	p := &Parser{scanner: NewScanner(r)}
 
 	// default options
+	p.baseOpts.Mode = "es"
 	p.baseOpts.Case = true
 
 	return p
@@ -372,6 +373,37 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	// TODO generic expression fmt.Sprintf("(%s %s %s)", input, operator,
 	//    p.genericExpression(expression, res.Options))
 	return res // done
+}
+
+// get generic expression (search-type based)
+func (p *Parser) genericExpression(expression string, opts Options) string {
+	switch opts.Mode {
+	// exact search
+	case "es", "":
+		if opts.Line {
+			return fmt.Sprintf(`EXACT(%s, LINE="%t", CASE="%t")`, expression, opts.Line, opts.Case)
+		} else if opts.Width != 0 {
+			return fmt.Sprintf(`EXACT(%s, WIDTH="%d", CASE="%t")`, expression, opts.Width, opts.Case)
+		} else {
+			return fmt.Sprintf(`EXACT(%s, CASE="%t")`, expression, opts.Case)
+		}
+
+	case "fhs":
+	case "feds":
+	case "ds":
+	case "ts":
+	case "ns":
+	case "cs":
+	case "rs":
+	case "ipv4":
+	case "ipv6":
+		break
+
+	default:
+		panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
+	}
+
+	return expression // leave it "as is"
 }
 
 // parse expression in parentheses
