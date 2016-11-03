@@ -8,16 +8,18 @@ import (
 
 // Options contains search options
 type Options struct {
-	Mode   string // Search mode: es, fhs, feds, date, time, etc.
-	Dist   uint   // Fuzziness distance (FHS, FEDS)
-	Width  uint   // Surrounding width
-	Line   bool   // Surrounding: entire line. If `true` Width is ignored.
-	Case   bool   // Case sensitivity flag (ES, FHS, FEDS)
-	Reduce bool   // Reduce duplicates flag (FEDS)
-	Octal  bool   // Octal format flag (IPv4)
-	// Symbol string
-	// Separator string
-	// Decimal string
+	Mode  string // Search mode: es, fhs, feds, date, time, etc.
+	Dist  uint   // Fuzziness distance (FHS, FEDS)
+	Width uint   // Surrounding width
+	Line  bool   // Surrounding: entire line. If `true` Width is ignored.
+	Case  bool   // Case sensitivity flag (ES, FHS, FEDS)
+
+	Reduce bool // Reduce duplicates flag (FEDS)
+	Octal  bool // Octal format flag (IPv4)
+
+	CurrencySymbol string // Monetary currency symbol, for example "$" (CURRENCY)
+	DigitSeparator string // Digits separator, for example "," (CURRENCY, NUMBER)
+	DecimalPoint   string // Decimal point marker, for example "." (CURRENCY, NUMBER)
 }
 
 // IsTheSame checks the options are the same.
@@ -54,6 +56,21 @@ func (o Options) IsTheSame(p Options) bool {
 
 	// octal flag
 	if o.Octal != p.Octal {
+		return false
+	}
+
+	// currency symbol
+	if o.CurrencySymbol != p.CurrencySymbol {
+		return false
+	}
+
+	// digit separator
+	if o.DigitSeparator != p.DigitSeparator {
+		return false
+	}
+
+	// decimal point
+	if o.DecimalPoint != p.DecimalPoint {
 		return false
 	}
 
@@ -94,9 +111,24 @@ func (o Options) String() string {
 		args = append(args, fmt.Sprintf("reduce=%t", o.Reduce))
 	}
 
-	// octal
+	// octal flag
 	if o.Octal {
 		args = append(args, fmt.Sprintf("octal=%t", o.Octal))
+	}
+
+	// currency symbol
+	if len(o.CurrencySymbol) != 0 {
+		args = append(args, fmt.Sprintf("sym=%q", o.CurrencySymbol))
+	}
+
+	// digit separator
+	if len(o.DigitSeparator) != 0 {
+		args = append(args, fmt.Sprintf("sep=%q", o.DigitSeparator))
+	}
+
+	// decimal point
+	if len(o.DecimalPoint) != 0 {
+		args = append(args, fmt.Sprintf("pt=%q", o.DigitSeparator))
 	}
 
 	if len(args) != 0 {

@@ -318,6 +318,8 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	}
 
 	res.Expression = fmt.Sprintf("(%s %s %s)", input, operator, expression)
+	// TODO generic expression fmt.Sprintf("(%s %s %s)", input, operator,
+	//    p.genericExpression(expression, res.Options))
 	return res // done
 }
 
@@ -353,7 +355,7 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 	return buf.String()
 }
 
-// parse FHS or FEDS expression in parentheses and options
+// parse generic search expression in parentheses and options
 func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	var res string
 
@@ -410,7 +412,7 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 				strings.EqualFold(lex.literal, "DIST"),
 				strings.EqualFold(lex.literal, "D"):
 				if eq := p.scanIgnoreSpace(); eq.token == EQ {
-					opts.Dist = uint(p.parseIntVal(0, 64*1024))
+					opts.Dist = uint(p.parseIntVal(0, 64*1024-1))
 				} else {
 					p.unscan(eq)
 					panic(fmt.Errorf("%q found instead of =", eq))
@@ -422,7 +424,7 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 				strings.EqualFold(lex.literal, "WIDTH"),
 				strings.EqualFold(lex.literal, "W"):
 				if eq := p.scanIgnoreSpace(); eq.token == EQ {
-					opts.Width = uint(p.parseIntVal(0, 64*1024))
+					opts.Width = uint(p.parseIntVal(0, 64*1024-1))
 					opts.Line = false // mutual exclusive
 				} else {
 					p.unscan(eq)
@@ -470,6 +472,37 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 					panic(fmt.Errorf("%q found instead of =", eq))
 				}
 
+			// currency symbol
+			case strings.EqualFold(lex.literal, "SYMBOL"),
+				strings.EqualFold(lex.literal, "SYMB"),
+				strings.EqualFold(lex.literal, "SYM"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					opts.CurrencySymbol = p.parseStringVal()
+				} else {
+					p.unscan(eq)
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
+			// digit separator
+			case strings.EqualFold(lex.literal, "SEPARATOR"),
+				strings.EqualFold(lex.literal, "SEP"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					opts.DigitSeparator = p.parseStringVal()
+				} else {
+					p.unscan(eq)
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
+			// decimal point
+			case strings.EqualFold(lex.literal, "DECIMAL"),
+				strings.EqualFold(lex.literal, "DEC"):
+				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+					opts.DecimalPoint = p.parseStringVal()
+				} else {
+					p.unscan(eq)
+					panic(fmt.Errorf("%q found instead of =", eq))
+				}
+
 			default:
 				p.unscan(lex)
 				panic(fmt.Errorf("unknown argument %q found", lex))
@@ -485,7 +518,7 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 	return opts
 }
 
-// parse string expression
+// parse string expression (multiple strings or wildcards)
 func (p *Parser) parseStringExpr(start Lexeme) string {
 	var buf bytes.Buffer
 	buf.WriteString(start.literal)
@@ -501,6 +534,20 @@ func (p *Parser) parseStringExpr(start Lexeme) string {
 	}
 
 	return buf.String()
+}
+
+// parse string value
+func (p *Parser) parseStringVal() string {
+	if val := p.scanIgnoreSpace(); val.token == STRING {
+		// remove quotes at begin and end
+		quote := `"`
+		return strings.TrimLeft(strings.TrimRight(val.literal, quote), quote)
+	} else if val.token == IDENT || val.token == INT || val.token == FLOAT {
+		return val.literal // as is
+	} else {
+		p.unscan(val)
+		panic(fmt.Errorf("%q found instead of string value", val))
+	}
 }
 
 // parse integer value
