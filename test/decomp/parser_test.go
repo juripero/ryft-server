@@ -363,6 +363,11 @@ func TestParserParseDistance(t *testing.T) {
 		`(RAW_TEXT CONTAINS FHS("hello", D = 2))`,
 		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
 
+	// last one has priority
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=0, D=1, D=2))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
+
 	// integer values
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS FHS("hello", D = 3))`,
@@ -398,6 +403,11 @@ func TestParserParseWidth(t *testing.T) {
 		`(RAW_TEXT CONTAINS ES("hello", w=2))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="2"))[es,w=2]}`)
 
+	// the last one has priority
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", w=0, w=1, w=2))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="2"))[es,w=2]}`)
+
 	// integer values
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS ES("hello", W = 3))`,
@@ -425,6 +435,11 @@ func TestParserParseLine(t *testing.T) {
 		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS ES("hello", L=true))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+
+	// the last one has priority
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", L=false, L=true))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
 
 	// boolean values
@@ -464,6 +479,11 @@ func TestParserParseCase(t *testing.T) {
 		`(RAW_TEXT CONTAINS ES("hello", CS=false))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
 
+	// the last one has priority
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CS=true, CS=false))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+
 	// boolean values
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS ES("hello", CS = false))`,
@@ -496,6 +516,11 @@ func TestParserParseReduce(t *testing.T) {
 		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R=true))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+
+	// the last one has priority
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R=false, R=true))`,
 		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
 
 	// boolean values
@@ -543,8 +568,8 @@ func TestParserParseDecimal(t *testing.T) {
 }
 
 // test for EXACT (generic queries)
-func TestParserParseEXACT(t *testing.T) {
-	// EXACT search (simple cases)
+func TestParserParseES(t *testing.T) {
+	// simple cases
 	testParserParseG(t, false,
 		`"hello"`,
 		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
@@ -555,7 +580,7 @@ func TestParserParseEXACT(t *testing.T) {
 		`(RAW_TEXT CONTAINS "hello")`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
 
-	// EXACT search (raw and structured)
+	// raw and structured
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS ES("hello"))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
@@ -563,7 +588,7 @@ func TestParserParseEXACT(t *testing.T) {
 		`(RECORD.body CONTAINS ES("hello"))`,
 		`P{(RECORD.body CONTAINS EXACT("hello"))[es]}`)
 
-	// EXACT search (CS)
+	// CS
 	testParserParseG(t, true,
 		`(RECORD.body CONTAINS ES("hello", CS=false))`,
 		`P{(RECORD.body CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
@@ -580,12 +605,12 @@ func TestParserParseEXACT(t *testing.T) {
 		`(RECORD.body CONTAINS ES("hello", CS=0))`,
 		`P{(RECORD.body CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
 
-	// EXACT search (WIDTH)
+	// WIDTH
 	testParserParseG(t, true,
 		`(RECORD.body CONTAINS ES("hello", WIDTH=0))`,
 		`P{(RECORD.body CONTAINS EXACT("hello"))[es]}`)
 	testParserParseG(t, true,
-		`(RECORD.body CONTAINS ES("hello", WIDTH=1))`,
+		`(RECORD.body CONTAINS ES("hello", WIDTH=1))`, // ignored on records
 		`P{(RECORD.body CONTAINS EXACT("hello"))[es]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS ES("hello", WIDTH=1))`,
@@ -594,7 +619,7 @@ func TestParserParseEXACT(t *testing.T) {
 		`(RAW_TEXT CONTAINS ES("hello", WIDTH="2"))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="2"))[es,w=2]}`)
 
-	// EXACT search (LINE & WIDTH - last option has priority)
+	// LINE & WIDTH - last option has priority
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS ES("hello", WIDTH="2", LINE=true))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
@@ -602,7 +627,7 @@ func TestParserParseEXACT(t *testing.T) {
 		`(RAW_TEXT CONTAINS ES("hello", LINE=true, WIDTH=3))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3"))[es,w=3]}`)
 
-	// EXACT search (ignored options)
+	// ignored options
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS ES("hello", DIST=2))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
@@ -621,4 +646,187 @@ func TestParserParseEXACT(t *testing.T) {
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS ES("hello", DECIMAL="."))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+}
+
+// test for HAMMING (generic queries)
+func TestParserParseFHS(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=0))`, // if distance is zero -> exact
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+
+	// raw and structured
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1))`,
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+
+	// CS
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1, CS=false))`,
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1", CASE="false"))[fhs,d=1,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1, CS="false"))`,
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1", CASE="false"))[fhs,d=1,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1, CS="F"))`,
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1", CASE="false"))[fhs,d=1,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1, CS="0"))`,
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1", CASE="false"))[fhs,d=1,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1, CS=0))`,
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1", CASE="false"))[fhs,d=1,!cs]}`)
+
+	// WIDTH
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1, W=0))`,
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1, W=1))`, // ignored on records
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, W=1))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1", WIDTH="1"))[fhs,d=1,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, W="2"))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2]}`)
+
+	// LINE & WIDTH - last option has priority
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, W="2", LINE=true))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1", LINE="true"))[fhs,d=1,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, LINE=true, WIDTH=3))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1", WIDTH="3"))[fhs,d=1,w=3]}`)
+
+	// DISTANCE
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FHS("hello", D=1))`,
+		`P{(RECORD.body CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D="2"))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
+
+	// ignored options
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, REDUCE=true))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, OCTAL=true))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, SYMBOL="$"))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, SEPARATOR=" "))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", D=1, DECIMAL="."))`,
+		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]}`)
+}
+
+// test for EDIT_DISTANCE (generic queries)
+func TestParserParseFEDS(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=0))`, // if distance is zero -> exact
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+
+	// raw and structured
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1))`,
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+
+	// CS
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1, CS=false))`,
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", CASE="false"))[feds,d=1,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1, CS="false"))`,
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", CASE="false"))[feds,d=1,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1, CS="F"))`,
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", CASE="false"))[feds,d=1,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1, CS="0"))`,
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", CASE="false"))[feds,d=1,!cs]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1, CS=0))`,
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", CASE="false"))[feds,d=1,!cs]}`)
+
+	// WIDTH
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1, W=0))`,
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1, W=1))`, // ignored on records
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, W=1))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", WIDTH="1"))[feds,d=1,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, W="2"))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", WIDTH="2"))[feds,d=1,w=2]}`)
+
+	// LINE & WIDTH - last option has priority
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, W="2", LINE=true))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", LINE="true"))[feds,d=1,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, LINE=true, WIDTH=3))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", WIDTH="3"))[feds,d=1,w=3]}`)
+
+	// DISTANCE
+	testParserParseG(t, true,
+		`(RECORD.body CONTAINS FEDS("hello", D=1))`,
+		`P{(RECORD.body CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D="2"))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="2"))[feds,d=2]}`)
+
+	// REDUCE
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, REDUCE=true))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, REDUCE="true"))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, REDUCE=1))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, REDUCE="1"))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, REDUCE=T))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, REDUCE="TRUE"))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+
+	// ignored options
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, OCTAL=true))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, SYMBOL="$"))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, SEPARATOR=" "))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, DECIMAL="."))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
 }
