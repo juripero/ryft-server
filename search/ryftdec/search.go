@@ -77,7 +77,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	instanceName, homeDir, mountPoint := engine.getBackendOptions()
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
-	task.result, err = catalog.OpenCatalog(filepath.Join(mountPoint, homeDir, res1))
+	task.result, err = NewCatalogPostProcessing(filepath.Join(mountPoint, homeDir, res1))
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to create res catalog", TAG)
 		return nil, fmt.Errorf("failed to create res catalog: %s", err)
@@ -87,7 +87,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to clear res catalog", TAG)
 		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
 	}
-	task.log().WithField("results", task.result.GetPath()).Infof("[%s]: temporary result catalog", TAG)
+	task.log().WithField("results", res1).Infof("[%s]: temporary result catalog", TAG)
 
 	mux := search.NewResult()
 	keepDataAs := task.config.KeepDataAs
@@ -98,13 +98,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// some futher cleanup
 		defer mux.Close()
 		defer mux.ReportDone()
-		defer func() {
-			task.result.DropFromCache()
-			task.result.Close()
-			if !engine.KeepResultFiles {
-				os.RemoveAll(task.result.GetPath())
-			}
-		}()
+		defer task.result.Drop(engine.KeepResultFiles)
 
 		res, err := engine.search(task, task.queries, task.config,
 			engine.Backend.Search, mux, false /*isLast - to use /count*/)
@@ -130,8 +124,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			}
 		}
 
-		err = engine.drainFinalResults(task, mux,
-			task.result, keepDataAs, keepIndexAs, delimiter,
+		err = task.result.DrainFinalResults(task, mux,
+			keepDataAs, keepIndexAs, delimiter,
 			filepath.Join(mountPoint, homeDir))
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
@@ -516,116 +510,4 @@ func updateConfig(cfg *search.Config, node *Node) {
 	cfg.Fuzziness = node.Options.Dist
 	cfg.Surrounding = node.Options.Width
 	cfg.CaseSensitive = node.Options.Cs
-}
-
-// drain all result records from working catalog
-func (engine *Engine) drainFinalResults(task *Task, mux *search.Result, wcat *catalog.Catalog,
-	keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string) error {
-	items, err := wcat.QueryAll(0x01, 0x01, task.config.Limit)
-	if err != nil {
-		return err
-	}
-
-	var datFile *os.File
-	if len(keepDataAs) > 0 {
-		datFile, err = os.Create(filepath.Join(mountPointAndHomeDir, keepDataAs))
-		if err != nil {
-			return fmt.Errorf("failed to create DATA file: %s", err)
-		}
-		defer datFile.Close()
-	}
-
-	var idxFile *os.File
-	if len(keepIndexAs) > 0 {
-		idxFile, err = os.Create(filepath.Join(mountPointAndHomeDir, keepIndexAs))
-		if err != nil {
-			return fmt.Errorf("failed to create INDEX file: %s", err)
-		}
-		defer idxFile.Close()
-	}
-
-	files := make(map[string]*os.File)
-
-	// handle all index items
-	for item := range items {
-		var rec search.Record
-		//rec.Data = // TODO: read data
-		// trim mount point from file name! TODO: special option for this?
-		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
-
-		f := files[item.DataFile]
-		if f == nil {
-			f, err = os.Open(item.DataFile)
-			if err != nil {
-				mux.ReportError(fmt.Errorf("failed to open data file: %s", err))
-				// continue // go to next item
-			} else {
-				files[item.DataFile] = f // put to cache
-				defer f.Close()          // close later
-			}
-		}
-
-		var data []byte
-		if f != nil {
-			_, err = f.Seek(int64(item.DataPos+uint64(item.Shift)), 0 /*os.SeekBegin*/)
-			if err != nil {
-				mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
-			} else {
-				rec.Data = make([]byte, item.Length)
-				n, err := io.ReadFull(f, rec.Data)
-				if err != nil {
-					mux.ReportError(fmt.Errorf("failed to read data: %s", err))
-				} else if uint64(n) != item.Length {
-					mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Length))
-				} else {
-					data = rec.Data
-				}
-			}
-		}
-
-		// output DATA file
-		if datFile != nil {
-			if data == nil {
-				// fill by zeros
-				task.log().Warnf("[%s]: no data, report zeros", TAG)
-				data = make([]byte, int(item.Length))
-			}
-
-			n, err := datFile.Write(data)
-			if err != nil {
-				mux.ReportError(fmt.Errorf("failed to write DATA file: %s", err))
-				// file is corrupted, any sense to continue?
-			} else if n != len(data) {
-				mux.ReportError(fmt.Errorf("not all DATA are written: %d of %d", n, len(data)))
-				// file is corrupted, any sense to continue?
-			} else if len(delimiter) > 0 {
-				n, err = datFile.WriteString(delimiter)
-				if err != nil {
-					mux.ReportError(fmt.Errorf("failed to write delimiter DATA: %s", err))
-					// file is corrupted, any sense to continue?
-				} else if n != len(delimiter) {
-					mux.ReportError(fmt.Errorf("not all delimiter DATA are written: %d of %d", n, len(delimiter)))
-					// file is corrupted, any sense to continue?
-				}
-			}
-		}
-
-		// output INDEX file
-		if idxFile != nil {
-			_, err = idxFile.WriteString(fmt.Sprintf("%s,%d,%d,%d\n", item.File, item.Offset, item.Length, item.Fuzziness))
-			if err != nil {
-				mux.ReportError(fmt.Errorf("failed to write INDEX: %s", err))
-				// file is corrupted, any sense to continue?
-			}
-		}
-
-		rec.Index.File = item.File
-		rec.Index.Offset = item.Offset
-		rec.Index.Length = item.Length
-		rec.Index.Fuzziness = item.Fuzziness
-
-		mux.ReportRecord(&rec)
-	}
-
-	return nil // OK
 }

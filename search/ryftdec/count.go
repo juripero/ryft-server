@@ -32,12 +32,10 @@ package ryftdec
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftone"
-	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
 // Count starts asynchronous "/count" with RyftDEC engine.
@@ -73,7 +71,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	instanceName, homeDir, mountPoint := engine.getBackendOptions()
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
-	task.result, err = catalog.OpenCatalog(filepath.Join(mountPoint, homeDir, res1))
+	task.result, err = NewCatalogPostProcessing(filepath.Join(mountPoint, homeDir, res1))
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to create res catalog", TAG)
 		return nil, fmt.Errorf("failed to create res catalog: %s", err)
@@ -83,7 +81,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to clear res catalog", TAG)
 		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
 	}
-	task.log().WithField("results", task.result.GetPath()).Infof("[%s]: temporary result catalog", TAG)
+	task.log().WithField("results", res1).Infof("[%s]: temporary result catalog", TAG)
 
 	mux := search.NewResult()
 	keepDataAs := task.config.KeepDataAs
@@ -94,13 +92,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		// some futher cleanup
 		defer mux.Close()
 		defer mux.ReportDone()
-		defer func() {
-			task.result.DropFromCache()
-			task.result.Close()
-			if !engine.KeepResultFiles {
-				os.RemoveAll(task.result.GetPath())
-			}
-		}()
+		defer task.result.Drop(engine.KeepResultFiles)
 
 		res, err := engine.search(task, task.queries, task.config,
 			engine.Backend.Count, mux, false)
@@ -127,8 +119,8 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 				}
 			}
 
-			err = engine.drainFinalResults(task, mux,
-				task.result, keepDataAs, keepIndexAs, delimiter,
+			err = task.result.DrainFinalResults(task, mux,
+				keepDataAs, keepIndexAs, delimiter,
 				filepath.Join(mountPoint, homeDir))
 			if err != nil {
 				task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)

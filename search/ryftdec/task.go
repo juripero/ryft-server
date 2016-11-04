@@ -32,6 +32,10 @@ package ryftdec
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -53,7 +57,7 @@ type Task struct {
 	queries   *Node // root query
 	extension string
 
-	result *catalog.Catalog
+	result PostProcessing
 }
 
 // NewTask creates new task.
@@ -131,4 +135,164 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 			return // done!
 		}
 	}
+}
+
+type PostProcessing interface {
+	ClearAll() error // prepare work - clear all data
+	Drop(keep bool)  // finish work
+
+	AddRyftResults(dataPath, indexPath string,
+		delimiter string, width uint, opt uint32) error
+
+	DrainFinalResults(task *Task, mux *search.Result,
+		keepDataAs, keepIndexAs, delimiter string,
+		mountPointAndHomeDir string) error
+}
+
+type CatalogPostProcessing struct {
+	cat *catalog.Catalog
+}
+
+// create catalog-based post-processing tool
+func NewCatalogPostProcessing(path string) (PostProcessing, error) {
+	cat, err := catalog.OpenCatalog(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CatalogPostProcessing{cat: cat}, nil // OK
+}
+
+// clear all results
+func (cpp *CatalogPostProcessing) ClearAll() error {
+	return cpp.cat.ClearAll()
+}
+
+// Drop
+func (cpp *CatalogPostProcessing) Drop(keep bool) {
+	cpp.cat.DropFromCache()
+	cpp.cat.Close()
+	if !keep {
+		os.RemoveAll(cpp.cat.GetPath())
+	}
+}
+
+// add Ryft results
+func (cpp *CatalogPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width uint, opt uint32) error {
+	return cpp.cat.AddRyftResults(dataPath, indexPath, delimiter, width, opt)
+}
+
+// drain final results
+func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string) error {
+	wcat := cpp.cat
+	items, err := wcat.QueryAll(0x01, 0x01, task.config.Limit)
+	if err != nil {
+		return err
+	}
+
+	var datFile *os.File
+	if len(keepDataAs) > 0 {
+		datFile, err = os.Create(filepath.Join(mountPointAndHomeDir, keepDataAs))
+		if err != nil {
+			return fmt.Errorf("failed to create DATA file: %s", err)
+		}
+		defer datFile.Close()
+	}
+
+	var idxFile *os.File
+	if len(keepIndexAs) > 0 {
+		idxFile, err = os.Create(filepath.Join(mountPointAndHomeDir, keepIndexAs))
+		if err != nil {
+			return fmt.Errorf("failed to create INDEX file: %s", err)
+		}
+		defer idxFile.Close()
+	}
+
+	files := make(map[string]*os.File)
+
+	// handle all index items
+	for item := range items {
+		var rec search.Record
+		//rec.Data = // TODO: read data
+		// trim mount point from file name! TODO: special option for this?
+		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
+
+		f := files[item.DataFile]
+		if f == nil {
+			f, err = os.Open(item.DataFile)
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to open data file: %s", err))
+				// continue // go to next item
+			} else {
+				files[item.DataFile] = f // put to cache
+				defer f.Close()          // close later
+			}
+		}
+
+		var data []byte
+		if f != nil {
+			_, err = f.Seek(int64(item.DataPos+uint64(item.Shift)), 0 /*os.SeekBegin*/)
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
+			} else {
+				rec.Data = make([]byte, item.Length)
+				n, err := io.ReadFull(f, rec.Data)
+				if err != nil {
+					mux.ReportError(fmt.Errorf("failed to read data: %s", err))
+				} else if uint64(n) != item.Length {
+					mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Length))
+				} else {
+					data = rec.Data
+				}
+			}
+		}
+
+		// output DATA file
+		if datFile != nil {
+			if data == nil {
+				// fill by zeros
+				task.log().Warnf("[%s]: no data, report zeros", TAG)
+				data = make([]byte, int(item.Length))
+			}
+
+			n, err := datFile.Write(data)
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to write DATA file: %s", err))
+				// file is corrupted, any sense to continue?
+			} else if n != len(data) {
+				mux.ReportError(fmt.Errorf("not all DATA are written: %d of %d", n, len(data)))
+				// file is corrupted, any sense to continue?
+			} else if len(delimiter) > 0 {
+				n, err = datFile.WriteString(delimiter)
+				if err != nil {
+					mux.ReportError(fmt.Errorf("failed to write delimiter DATA: %s", err))
+					// file is corrupted, any sense to continue?
+				} else if n != len(delimiter) {
+					mux.ReportError(fmt.Errorf("not all delimiter DATA are written: %d of %d", n, len(delimiter)))
+					// file is corrupted, any sense to continue?
+				}
+			}
+		}
+
+		// output INDEX file
+		if idxFile != nil {
+			_, err = idxFile.WriteString(fmt.Sprintf("%s,%d,%d,%d\n", item.File, item.Offset, item.Length, item.Fuzziness))
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to write INDEX: %s", err))
+				// file is corrupted, any sense to continue?
+			}
+		}
+
+		rec.Index.File = item.File
+		rec.Index.Offset = item.Offset
+		rec.Index.Length = item.Length
+		rec.Index.Fuzziness = item.Fuzziness
+
+		mux.ReportRecord(&rec)
+	}
+
+	return nil // OK
+}
+
+type InMemoryPostProcessing struct {
 }
