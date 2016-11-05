@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -510,6 +511,35 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 	return buf.String()
 }
 
+// parse expression in parentheses
+func (p *Parser) parseUntilCommaOrRParen() string {
+	var buf bytes.Buffer
+
+ForLoop:
+	// read all lexem until ")" or ","
+	for deep := 1; deep > 0; {
+		lex := p.scan()
+		switch lex.token {
+		case RPAREN:
+			deep--
+			if deep == 0 {
+				p.unscan(lex)
+				break ForLoop
+			}
+		case LPAREN:
+			deep++
+		case COMMA:
+			p.unscan(lex)
+			break ForLoop
+		case EOF:
+			panic(fmt.Errorf("no expression ending found"))
+		}
+		buf.WriteString(lex.literal)
+	}
+
+	return buf.String()
+}
+
 // parse generic search expression in parentheses and options (ES, FHS, FEDS)
 func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	var res string
@@ -575,8 +605,6 @@ ValueA <  DateFormat <= ValueB
 ValueA <= DateFormat <  ValueB
 */
 func (p *Parser) parseDateExpr(opts Options) (string, Options) {
-	var res string
-
 	// left paren first
 	switch beg := p.scanIgnoreSpace(); beg.token {
 	case LPAREN:
@@ -586,24 +614,9 @@ func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 		panic(fmt.Errorf("%q found instead of (", beg))
 	}
 
-	// read expression
-	switch lex := p.scanIgnoreSpace(); lex.token {
-	case IDENT: // DataFormat op ValueB
-		p.unscan(lex)
-		res = p.parseDateExpr1()
-
-	case INT: // ValueA op DataFormat op ValueB
-		p.unscan(lex)
-		res = p.parseDateExpr2()
-
-	case STRING: // "ValueA" op DataFormat op "ValueB"
-		p.unscan(lex)
-		res = p.parseDateExprS()
-
-	default:
-		p.unscan(lex)
-		panic(fmt.Errorf("no valid data expression found"))
-	}
+	// parse and pre-process expression
+	expr := p.parseUntilCommaOrRParen()
+	res := p.checkDataExpr(expr)
 
 	// read options
 	switch lex := p.scanIgnoreSpace(); lex.token {
@@ -625,241 +638,36 @@ func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 	return res, opts
 }
 
-// parse DataFormat op ValueB
-func (p *Parser) parseDateExpr1() string {
-	// parse format
-	format, sep := p.parseDateToken()
-	if err := p.checkDateFormat(format); err != nil {
-		panic(fmt.Errorf("no valid data format found: %s", err))
+// check and pre-process DATA expression
+func (p *Parser) checkDataExpr(expr string) string {
+	// . for any single character
+	// \d+ for one or more digital
+	const FORMATS = `YYYY.MM.DD|YY.MM.DD|DD.MM.YYYY|DD.MM.YY|MM.DD.YYYY|MM.DD.YY`
+	const VALUE = `\d+.\d+.\d+`
+
+	// \s* for zero or more spaces
+	// \"? for zero or one quote
+	const FORMAT2 = `^\s*(` + FORMATS + `)\s*\"?(<|<=|>|>=|=|==|!=)\s*(` + VALUE + `)\"?\s*$`
+	const FORMAT3 = `^\s*\"?(` + VALUE + `)\"?\s*(<|<=|>|>=)\s*(` + FORMATS + `)\s*\"?(<|<=|>|>=)\s*(` + VALUE + `)\"?\s*$`
+
+	var op1, op2 string
+	var a, f, b string
+
+	if m := regexp.MustCompile(FORMAT3).FindStringSubmatch(expr); len(m) == 1+5 {
+		a, op1, f, op2, b = m[1], m[2], m[3], m[4], m[5] // ValueA op DataFormat op ValueB
+	} else if m = regexp.MustCompile(FORMAT2).FindStringSubmatch(expr); len(m) == 1+3 {
+		f, op2, b = m[1], m[2], m[3] // DataFormat op ValueB
+	} else {
+		panic(fmt.Errorf(`"%s" is unknown DATE expression`, expr))
 	}
 
-	// parse operator
-	op := p.scanIgnoreSpace()
-	switch op.token {
-	case EQ, NEQ, LS, LEQ, GT, GEQ:
-		break // ok
-	case DEQ: // auto-replace '==' -> '='
-		op = NewLexeme(EQ, '=')
-	default:
-		p.unscan(op)
-		panic(fmt.Errorf("%q found instead of operator", op))
+	// TODO: verify format, separators, values, operators, etc
+
+	if len(a) != 0 {
+		return fmt.Sprintf("%s %s %s %s %s", a, op1, f, op2, b)
+	} else {
+		return fmt.Sprintf("%s %s %s", f, op2, b)
 	}
-
-	// parse valueB
-	valueB, sepB := p.parseDateToken()
-	if !sepB.EqualTo(sep) {
-		panic(fmt.Errorf("%q found instead of %q separator", sepB, sep))
-	}
-	if err := p.checkDateValue(valueB, format); err != nil {
-		panic(fmt.Errorf("no valid data valud found: %s", err))
-	}
-
-	return fmt.Sprintf("%s %s %s", p.printDateFormat(format, sep),
-		op, p.printDateFormat(valueB, sep))
-}
-
-// parse ValueA op DataFormat op ValueB
-func (p *Parser) parseDateExpr2() string {
-	// parse valueA
-	valueA, sepA := p.parseDateToken()
-
-	// parse first operator
-	op1 := p.scanIgnoreSpace()
-	switch op1.token {
-	case LS, LEQ:
-		break // OK
-	default:
-		p.unscan(op1)
-		panic(fmt.Errorf("%q found instead of < or <=", op1))
-	}
-
-	// parse format
-	format, sep := p.parseDateToken()
-	if err := p.checkDateFormat(format); err != nil {
-		panic(fmt.Errorf("no valid data format found: %s", err))
-	}
-	if !sepA.EqualTo(sep) {
-		panic(fmt.Errorf("%q found instead of %q separator", sepA, sep))
-	}
-	if err := p.checkDateValue(valueA, format); err != nil {
-		panic(fmt.Errorf("no valid data value found: %s", err))
-	}
-
-	// parse second operator
-	op2 := p.scanIgnoreSpace()
-	switch op2.token {
-	case LS, LEQ:
-		break // OK
-	default:
-		p.unscan(op2)
-		panic(fmt.Errorf("%q found instead of < or <=", op2))
-	}
-
-	// parse valueB
-	valueB, sepB := p.parseDateToken()
-	if !sepB.EqualTo(sep) {
-		panic(fmt.Errorf("%q found instead of %q separator", sepB, sep))
-	}
-	if err := p.checkDateValue(valueB, format); err != nil {
-		panic(fmt.Errorf("no valid data value found: %s", err))
-	}
-
-	return fmt.Sprintf("%s %s %s %s %s",
-		p.printDateFormat(valueA, sep), op1,
-		p.printDateFormat(format, sep),
-		op2, p.printDateFormat(valueB, sep))
-}
-
-// parse "ValueA" op DataFormat op "ValueB"
-func (p *Parser) parseDateExprS() string {
-	var buf bytes.Buffer
-
-	// read ValueA
-	switch lex := p.scanIgnoreSpace(); lex.token {
-	case STRING:
-		buf.WriteString(lex.Unquoted())
-
-	default:
-		p.unscan(lex)
-		panic(fmt.Errorf("%q found instead of ValueA", lex))
-	}
-
-	// read operator
-	switch lex := p.scanIgnoreSpace(); lex.token {
-	case LS, LEQ:
-		buf.WriteString(" ")
-		buf.WriteString(lex.literal)
-
-	default:
-		p.unscan(lex)
-		panic(fmt.Errorf("%q found instead of < or <=", lex))
-	}
-
-	// read format
-	switch lex := p.scanIgnoreSpace(); lex.token {
-	case IDENT:
-
-	}
-
-	return buf.String()
-}
-
-// check date format
-func (p *Parser) checkDateFormat(value []Lexeme) error {
-	if len(value) != 3 {
-		return fmt.Errorf("invalid number of components")
-	}
-
-	// check they are identifiers
-	for _, lex := range value {
-		if lex.token != IDENT {
-			return fmt.Errorf("invalid type of components")
-		}
-	}
-
-	// check valid formats supported
-	// TODO: case insensitive
-	switch format := fmt.Sprintf("%s", value); format {
-	case "[YYYY MM DD]",
-		"[YY MM DD]",
-		"[DD MM YYYY]",
-		"[DD MM YY]",
-		"[MM DD YYYY]",
-		"[MM DD YY]":
-		break // OK
-	default:
-		return fmt.Errorf("%s is unknown date format", format)
-	}
-
-	return nil // OK
-}
-
-// check date value
-func (p *Parser) checkDateValue(value []Lexeme, format []Lexeme) error {
-	if len(value) != len(format) {
-		return fmt.Errorf("invalid number of components")
-	}
-
-	// check they are integers
-	for _, lex := range value {
-		if lex.token != INT {
-			return fmt.Errorf("invalid type of components")
-		}
-	}
-
-	// TODO: check the value fits the format!
-
-	return nil
-}
-
-// print date format
-func (p *Parser) printDateFormat(value []Lexeme, separator Lexeme) string {
-	s := make([]string, 0, len(value))
-	for _, v := range value {
-		s = append(s, v.literal)
-	}
-
-	return strings.Join(s, separator.literal)
-}
-
-// parse quoted or unquoted date value or format (a-sep-b-sep-c)
-func (p *Parser) parseDateToken() (value []Lexeme, separator Lexeme) {
-	//	// if it's string unquote it
-	//	switch lex := p.scanIgnoreSpace(); lex.token {
-	//	case STRING:
-	//		ll := NewScannerString(lex.Unquoted()).ScanAll(false /*keep spaces*/)
-	//		for i := len(ll) - 1; i >= 0; i-- {
-	//			p.unscan(ll[i])
-	//		}
-
-	//	default:
-	//		p.unscan(lex)
-	//	}
-
-	// 1. consume all appropriate lexem
-	switch lex := p.scanIgnoreSpace(); lex.token {
-	case IDENT, INT:
-		value = append(value, lex)
-	default:
-		p.unscan(lex)
-		panic(fmt.Errorf("%q found instead of first date token", lex))
-	}
-
-	// separator
-	separator = p.scan()
-
-	// 2. consume all appropriate lexem
-	switch lex := p.scanIgnoreSpace(); lex.token {
-	case IDENT, INT:
-		value = append(value, lex)
-	default:
-		p.unscan(lex)
-		panic(fmt.Errorf("%q found instead of second date token", lex))
-	}
-
-	// separator
-	if sep := p.scan(); !sep.EqualTo(separator) {
-		p.unscan(sep)
-		panic(fmt.Errorf("%q found instead of %q separator", sep, separator))
-	}
-
-	// 3. consume all appropriate lexem
-	switch lex := p.scanIgnoreSpace(); lex.token {
-	case IDENT, INT:
-		value = append(value, lex)
-	default:
-		p.unscan(lex)
-		panic(fmt.Errorf("%q found instead of third date token", lex))
-	}
-
-	// all value lexem should be the same type
-	for i := 1; i < len(value); i++ {
-		if value[i-1].token != value[i].token {
-			panic(fmt.Errorf("%q and %q are not the same type", value[i-1], value[i]))
-		}
-	}
-
-	return
 }
 
 // parse options
