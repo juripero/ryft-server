@@ -251,7 +251,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	// search expression
 	if len(expression) == 0 {
 		switch lex := p.scanIgnoreSpace(); {
-		case lex.IsES(): // +options
+		case lex.IsES(): // ES + options
 			expression, res.Options = p.parseSearchExpr(res.Options)
 			res.Options.Mode = "es"
 			res.Options.Dist = 0 // no these options for exact search!
@@ -261,7 +261,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			res.Options.DigitSeparator = ""
 			res.Options.DecimalPoint = ""
 
-		case lex.IsFHS(): // +options
+		case lex.IsFHS(): // FHS + options
 			expression, res.Options = p.parseSearchExpr(res.Options)
 			if res.Options.Dist == 0 {
 				res.Options.Mode = "es"
@@ -274,7 +274,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			res.Options.DigitSeparator = ""
 			res.Options.DecimalPoint = ""
 
-		case lex.IsFEDS(): // +options
+		case lex.IsFEDS(): // FEDS + options
 			expression, res.Options = p.parseSearchExpr(res.Options)
 			if res.Options.Dist == 0 {
 				res.Options.Mode = "es"
@@ -286,7 +286,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			res.Options.DigitSeparator = ""
 			res.Options.DecimalPoint = ""
 
-		case lex.IsDate(): // "as is"
+		case lex.IsDate(): // DATE + options
 			expression, res.Options = p.parseDateExpr(res.Options)
 			oldExpr = fmt.Sprintf("DATE(%s)", expression)
 			res.Options.Mode = "ds"
@@ -297,8 +297,9 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			res.Options.DigitSeparator = ""
 			res.Options.DecimalPoint = ""
 
-		case lex.IsTime(): // "as is"
-			expression = p.parseParenExpr(lex)
+		case lex.IsTime(): // TIME + options
+			expression, res.Options = p.parseTimeExpr(res.Options)
+			oldExpr = fmt.Sprintf("TIME(%s)", expression)
 			res.Options.Mode = "ts"
 			res.Options.Dist = 0 // no these options for TIME search!
 			res.Options.Reduce = false
@@ -596,7 +597,7 @@ func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 
 	// parse and pre-process expression
 	expr := p.parseUntilCommaOrRParen()
-	res := p.checkDataExpr(expr)
+	expr = p.checkDataExpr(expr)
 
 	// read options
 	switch lex := p.scanIgnoreSpace(); lex.token {
@@ -615,7 +616,7 @@ func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 		panic(fmt.Errorf("%q found instead of )", end))
 	}
 
-	return res, opts
+	return expr, opts
 }
 
 // check and pre-process DATA expression
@@ -665,9 +666,9 @@ func (p *Parser) checkDataExpr(expr string) string {
 	// get format components
 	var fa, fb, fc, sep string
 	if m := reF.FindStringSubmatch(f); len(m) == 1+5 {
-		var sep2 string
-		fa, sep, fb, sep2, fc = m[1], m[2], m[3], m[4], m[5]
-		if sep != sep2 {
+		var s2 string
+		fa, sep, fb, s2, fc = m[1], m[2], m[3], m[4], m[5]
+		if sep != s2 {
 			panic(fmt.Errorf("%q DATE format contains bad separators", f))
 		}
 	} else {
@@ -677,9 +678,9 @@ func (p *Parser) checkDataExpr(expr string) string {
 	// get first value components
 	var xa, xb, xc string
 	if m := reV.FindStringSubmatch(x); len(m) == 1+5 {
-		var sep1, sep2 string
-		xa, sep1, xb, sep2, xc = m[1], m[2], m[3], m[4], m[5]
-		if sep != sep1 || sep != sep2 {
+		var s1, s2 string
+		xa, s1, xb, s2, xc = m[1], m[2], m[3], m[4], m[5]
+		if sep != s1 || sep != s2 {
 			panic(fmt.Errorf("%q DATE value contains bad separators", x))
 		}
 	} else if len(x) != 0 { // x might be empty!
@@ -689,9 +690,9 @@ func (p *Parser) checkDataExpr(expr string) string {
 	// get second value components
 	var ya, yb, yc string
 	if m := reV.FindStringSubmatch(y); len(m) == 1+5 {
-		var sep1, sep2 string
-		ya, sep1, yb, sep2, yc = m[1], m[2], m[3], m[4], m[5]
-		if sep != sep1 || sep != sep2 {
+		var s1, s2 string
+		ya, s1, yb, s2, yc = m[1], m[2], m[3], m[4], m[5]
+		if sep != s1 || sep != s2 {
 			panic(fmt.Errorf("%q DATE value contains bad separators", y))
 		}
 	} else if len(y) != 0 { // y might be empty!
@@ -702,6 +703,150 @@ func (p *Parser) checkDataExpr(expr string) string {
 	_, _, _ = fa, fb, fc
 	_, _, _ = xa, xb, xc
 	_, _, _ = ya, yb, yc
+
+	if len(x) != 0 {
+		// smart replace: ">=" to "<=" and ">" to "<"
+		if (xop == ">" || xop == ">=") && (yop == ">" || yop == ">=") {
+			// swap arguments and operators
+			x, xop, yop, y = y, strings.Replace(yop, ">", "<", -1), strings.Replace(xop, ">", "<", -1), x
+		}
+
+		return fmt.Sprintf("%s %s %s %s %s", x, xop, f, yop, y)
+	}
+
+	// smart replace: "==" to "="
+	if yop == "==" {
+		yop = "="
+	}
+
+	return fmt.Sprintf("%s %s %s", f, yop, y)
+}
+
+// parse TIME search expression in parentheses and options
+func (p *Parser) parseTimeExpr(opts Options) (string, Options) {
+	// left paren first
+	switch beg := p.scanIgnoreSpace(); beg.token {
+	case LPAREN:
+		break // OK
+	default:
+		p.unscan(beg)
+		panic(fmt.Errorf("%q found instead of (", beg))
+	}
+
+	// parse and pre-process expression
+	expr := p.parseUntilCommaOrRParen()
+	expr = p.checkTimeExpr(expr)
+
+	// read options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		opts = p.parseSearchOptions(opts)
+	default:
+		p.unscan(lex)
+	}
+
+	// right paren last
+	switch end := p.scanIgnoreSpace(); end.token {
+	case RPAREN:
+		break // OK
+	default:
+		p.unscan(end)
+		panic(fmt.Errorf("%q found instead of )", end))
+	}
+
+	return expr, opts
+}
+
+// check and pre-process TIME expression
+/* valid time formats:
+HH:MM:SS
+HH:MM:SS:ss
+
+valid expressions:
+TimeFormat  = ValueB  (== also possible)
+TimeFormat != ValueB  (Not equals operator)
+TimeFormat >= ValueB
+TimeFormat >  ValueB
+TimeFormat <= ValueB
+TimeFormat <  ValueB
+ValueA <= TimeFormat <= ValueB
+ValueA <  TimeFormat <  ValueB
+ValueA <  TimeFormat <= ValueB
+ValueA <= TimeFormat <  ValueB
+*/
+func (p *Parser) checkTimeExpr(expr string) string {
+	// . for any single character
+	// \d+ for one or more digital
+	const FORMATS = `HH.MM.SS|HH.MM.SS.ss`
+	const VALUEX3 = `\d+.\d+.\d+`
+	const VALUEX4 = `\d+.\d+.\d+.\d+`
+
+	// \s* for zero or more spaces
+	// \"? for zero or one quote
+	reF23 := regexp.MustCompile(`^\s*(HH.MM.SS)\s*\"?(<|<=|>|>=|=|==|!=)\s*\"?(` + VALUEX3 + `)\"?\s*$`)
+	reF24 := regexp.MustCompile(`^\s*(HH.MM.SS.ss)\s*\"?(<|<=|>|>=|=|==|!=)\s*\"?(` + VALUEX4 + `)\"?\s*$`)
+	reF33 := regexp.MustCompile(`^\s*\"?(` + VALUEX3 + `)\"?\s*(<|<=|>|>=)\s*(HH.MM.SS)\s*\"?(<|<=|>|>=)\s*\"?(` + VALUEX3 + `)\"?\s*$`)
+	reF34 := regexp.MustCompile(`^\s*\"?(` + VALUEX4 + `)\"?\s*(<|<=|>|>=)\s*(HH.MM.SS.ss)\s*\"?(<|<=|>|>=)\s*\"?(` + VALUEX4 + `)\"?\s*$`)
+	reF := regexp.MustCompile(`^(HH)(.)(MM)(.)(SS)(.)?(ss)?$`)
+	reV := regexp.MustCompile(`^(\d+)(.)(\d+)(.)(\d+)(.)?(\d+)?$`)
+
+	// get main conponents
+	var x, xop, f, yop, y string
+	if m := reF34.FindStringSubmatch(expr); len(m) == 1+5 {
+		x, xop, f, yop, y = m[1], m[2], m[3], m[4], m[5] // ValueA op DataFormat op ValueB
+	} else if m := reF33.FindStringSubmatch(expr); len(m) == 1+5 {
+		x, xop, f, yop, y = m[1], m[2], m[3], m[4], m[5] // ValueA op DataFormat op ValueB
+	} else if m = reF24.FindStringSubmatch(expr); len(m) == 1+3 {
+		f, yop, y = m[1], m[2], m[3] // DataFormat op ValueB
+	} else if m = reF23.FindStringSubmatch(expr); len(m) == 1+3 {
+		f, yop, y = m[1], m[2], m[3] // DataFormat op ValueB
+	} else {
+		panic(fmt.Errorf(`"%s" is unknown TIME expression`, expr))
+	}
+
+	// get format components
+	var fa, fb, fc, fd, sep string
+	//	fmt.Printf("%s ...%q\n", expr, reF.FindStringSubmatch(f))
+	//	fmt.Printf("%s ...%q\n", expr, reV.FindStringSubmatch(x))
+	//	fmt.Printf("%s ...%q\n", expr, reV.FindStringSubmatch(y))
+	if m := reF.FindStringSubmatch(f); len(m) == 1+7 {
+		var s2, s3 string
+		fa, sep, fb, s2, fc, s3, fd = m[1], m[2], m[3], m[4], m[5], m[6], m[7]
+		if sep != s2 || (s3 != "" && sep != s3) {
+			panic(fmt.Errorf("%q TIME format contains bad separators", f))
+		}
+	} else {
+		panic(fmt.Errorf("%q is unknown TIME format", f)) // actual impossible
+	}
+
+	// get first value components
+	var xa, xb, xc, xd string
+	if m := reV.FindStringSubmatch(x); len(m) == 1+7 {
+		var s1, s2, s3 string
+		xa, s1, xb, s2, xc, s3, xd = m[1], m[2], m[3], m[4], m[5], m[6], m[7]
+		if sep != s1 || sep != s2 || (s3 != "" && sep != s3) {
+			panic(fmt.Errorf("%q TIME value contains bad separators", x))
+		}
+	} else if len(x) != 0 { // x might be empty!
+		panic(fmt.Errorf("%q is unknown TIME value", x))
+	}
+
+	// get second value components
+	var ya, yb, yc, yd string
+	if m := reV.FindStringSubmatch(y); len(m) == 1+7 {
+		var s1, s2, s3 string
+		ya, s1, yb, s2, yc, s3, yd = m[1], m[2], m[3], m[4], m[5], m[6], m[7]
+		if sep != s1 || sep != s2 || (s3 != "" && sep != s3) {
+			panic(fmt.Errorf("%q TIME value contains bad separators", y))
+		}
+	} else if len(y) != 0 { // y might be empty!
+		panic(fmt.Errorf("%q is unknown TIME value", y))
+	}
+
+	// TODO: verify hour, minute, second ranges...
+	_, _, _, _ = fa, fb, fc, fd
+	_, _, _, _ = xa, xb, xc, xd
+	_, _, _, _ = ya, yb, yc, yd
 
 	if len(x) != 0 {
 		// smart replace: ">=" to "<=" and ">" to "<"

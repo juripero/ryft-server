@@ -163,11 +163,11 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
-		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS>09:15:00))[ts]}`)
+		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))[ts]}`)
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
-		`P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}`)
+		`P{(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))[ts]}`)
 
 	testParserParse(t, true,
 		`  (RECORD.price CONTAINS NUMBER("450" < NUM < "600", ",", "."))`,
@@ -261,15 +261,15 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
-		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS>09:15:00))[ts]}`)
+		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))[ts]}`)
 
 	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
-		`P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}`)
+		`P{(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))[ts]}`)
 
 	testParserParse(t, false,
 		`((RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))  AND (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00)))`,
-		`P{AND{P{(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))[ds]}, P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}}}`)
+		`P{AND{P{(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))[ds]}, P{(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`(RECORD.Name.Actors.[].Name CONTAINS "Christian")`,
@@ -277,35 +277,35 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS = 11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS = 11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS <= 11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS <= 11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS <= 11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00))[ts]}}}`)
 
 	testParserParse(t, false,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RAW_TEXT CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RAW_TEXT CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RAW_TEXT CONTAINS TIME(HH:MM:SS != 11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
@@ -876,4 +876,51 @@ func TestParserParseDATE(t *testing.T) {
 		"DATE value contains bad separators")
 	testParserBad(t, `(RAW_TEXT CONTAINS DATE(02-28_12 <= MM-DD-YY < 02-28-12))`,
 		"DATE value contains bad separators")
+}
+
+// test for TIME (generic queries)
+func TestParserParseTIME(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 02:28:12, W=1))`,
+		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS > 02:28:12, WIDTH="1"))[ts,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > "02:28:12", W=1))`, // quotes should be removed
+		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS > 02:28:12, WIDTH="1"))[ts,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS TIME(HH-MM-SS != 02-28-12, W=1))`,
+		`P{(RAW_TEXT CONTAINS TIME(HH-MM-SS != 02-28-12, WIDTH="1"))[ts,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS TIME(02:28:12 < HH:MM:SS < 01:19:15, L=true))`,
+		`P{(RAW_TEXT CONTAINS TIME(02:28:12 < HH:MM:SS < 01:19:15, LINE="true"))[ts,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS TIME("02:28:12:55" < HH:MM:SS:ss < "01:19:15:56", L=true))`, // quotes should be removed
+		`P{(RAW_TEXT CONTAINS TIME(02:28:12:55 < HH:MM:SS:ss < 01:19:15:56, LINE="true"))[ts,line]}`)
+
+	// operator replacement
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS TIME(HH:MM:SS  ==  02:28:12, W=1))`, // == should be replaced with single =
+		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS = 02:28:12, WIDTH="1"))[ts,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS TIME(01-19-15   >   HH-MM-SS   >=   02-28-12, L=true))`,
+		`P{(RAW_TEXT CONTAINS TIME(02-28-12 <= HH-MM-SS < 01-19-15, LINE="true"))[ts,line]}`)
+
+	// bad cases
+	testParserBad(t,
+		`(RAW_TEXT CONTAINS TIME(HHH-MM-SS == Feb-28-12))`,
+		"is unknown TIME expression")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME(HH_MM-SS == 02-28-12))`,
+		"TIME format contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME(HH-MM-SS == 02_28_12))`,
+		"TIME value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME(HH-MM-SS == 02_28-12))`,
+		"TIME value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME(HH-MM-SS == 02-28_12))`,
+		"TIME value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME(02_28_12 <= HH-MM-SS < 03-28-12))`,
+		"TIME value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME(02_28-12 <= HH-MM-SS < 02-28-12))`,
+		"TIME value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME(02-28_12 <= HH-MM-SS < 02-28-12))`,
+		"TIME value contains bad separators")
 }
