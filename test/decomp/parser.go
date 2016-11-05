@@ -584,26 +584,6 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 }
 
 // parse DATE search expression in parentheses and options
-/* valid date formats:
-YYYY/MM/DD
-YY/MM/DD
-DD/MM/YYYY
-DD/MM/YY
-MM/DD/YYYY
-MM/DD/YY
-
-valid expressions:
-DateFormat  = ValueB
-DateFormat != ValueB  (Not equals operator)
-DateFormat >= ValueB
-DateFormat >  ValueB
-DateFormat <= ValueB
-DateFormat <  ValueB
-ValueA <= DateFormat <= ValueB
-ValueA <  DateFormat <  ValueB
-ValueA <  DateFormat <= ValueB
-ValueA <= DateFormat <  ValueB
-*/
 func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 	// left paren first
 	switch beg := p.scanIgnoreSpace(); beg.token {
@@ -639,35 +619,106 @@ func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 }
 
 // check and pre-process DATA expression
+/* valid date formats:
+YYYY/MM/DD
+YY/MM/DD
+DD/MM/YYYY
+DD/MM/YY
+MM/DD/YYYY
+MM/DD/YY
+
+valid expressions:
+DateFormat  = ValueB  (== also possible)
+DateFormat != ValueB  (Not equals operator)
+DateFormat >= ValueB
+DateFormat >  ValueB
+DateFormat <= ValueB
+DateFormat <  ValueB
+ValueA <= DateFormat <= ValueB
+ValueA <  DateFormat <  ValueB
+ValueA <  DateFormat <= ValueB
+ValueA <= DateFormat <  ValueB
+*/
 func (p *Parser) checkDataExpr(expr string) string {
 	// . for any single character
 	// \d+ for one or more digital
 	const FORMATS = `YYYY.MM.DD|YY.MM.DD|DD.MM.YYYY|DD.MM.YY|MM.DD.YYYY|MM.DD.YY`
-	const VALUE = `\d+.\d+.\d+`
+	const VALUEX = `\d+.\d+.\d+`
 
 	// \s* for zero or more spaces
 	// \"? for zero or one quote
-	const FORMAT2 = `^\s*(` + FORMATS + `)\s*\"?(<|<=|>|>=|=|==|!=)\s*(` + VALUE + `)\"?\s*$`
-	const FORMAT3 = `^\s*\"?(` + VALUE + `)\"?\s*(<|<=|>|>=)\s*(` + FORMATS + `)\s*\"?(<|<=|>|>=)\s*(` + VALUE + `)\"?\s*$`
+	reF2 := regexp.MustCompile(`^\s*(` + FORMATS + `)\s*\"?(<|<=|>|>=|=|==|!=)\s*\"?(` + VALUEX + `)\"?\s*$`)
+	reF3 := regexp.MustCompile(`^\s*\"?(` + VALUEX + `)\"?\s*(<|<=|>|>=)\s*(` + FORMATS + `)\s*\"?(<|<=|>|>=)\s*\"?(` + VALUEX + `)\"?\s*$`)
+	reF := regexp.MustCompile(`^(YYYY|YY|MM|DD)(.)(YYYY|YY|MM|DD)(.)(YYYY|YY|MM|DD)$`)
+	reV := regexp.MustCompile(`^(\d+)(.)(\d+)(.)(\d+)$`)
 
-	var op1, op2 string
-	var a, f, b string
-
-	if m := regexp.MustCompile(FORMAT3).FindStringSubmatch(expr); len(m) == 1+5 {
-		a, op1, f, op2, b = m[1], m[2], m[3], m[4], m[5] // ValueA op DataFormat op ValueB
-	} else if m = regexp.MustCompile(FORMAT2).FindStringSubmatch(expr); len(m) == 1+3 {
-		f, op2, b = m[1], m[2], m[3] // DataFormat op ValueB
+	// get main conponents
+	var x, xop, f, yop, y string
+	if m := reF3.FindStringSubmatch(expr); len(m) == 1+5 {
+		x, xop, f, yop, y = m[1], m[2], m[3], m[4], m[5] // ValueA op DataFormat op ValueB
+	} else if m = reF2.FindStringSubmatch(expr); len(m) == 1+3 {
+		f, yop, y = m[1], m[2], m[3] // DataFormat op ValueB
 	} else {
 		panic(fmt.Errorf(`"%s" is unknown DATE expression`, expr))
 	}
 
-	// TODO: verify format, separators, values, operators, etc
-
-	if len(a) != 0 {
-		return fmt.Sprintf("%s %s %s %s %s", a, op1, f, op2, b)
+	// get format components
+	var fa, fb, fc, sep string
+	if m := reF.FindStringSubmatch(f); len(m) == 1+5 {
+		var sep2 string
+		fa, sep, fb, sep2, fc = m[1], m[2], m[3], m[4], m[5]
+		if sep != sep2 {
+			panic(fmt.Errorf("%q DATE format contains bad separators", f))
+		}
 	} else {
-		return fmt.Sprintf("%s %s %s", f, op2, b)
+		panic(fmt.Errorf("%q is unknown DATE format", f)) // actual impossible
 	}
+
+	// get first value components
+	var xa, xb, xc string
+	if m := reV.FindStringSubmatch(x); len(m) == 1+5 {
+		var sep1, sep2 string
+		xa, sep1, xb, sep2, xc = m[1], m[2], m[3], m[4], m[5]
+		if sep != sep1 || sep != sep2 {
+			panic(fmt.Errorf("%q DATE value contains bad separators", x))
+		}
+	} else if len(x) != 0 { // x might be empty!
+		panic(fmt.Errorf("%q is unknown DATA value", x))
+	}
+
+	// get second value components
+	var ya, yb, yc string
+	if m := reV.FindStringSubmatch(y); len(m) == 1+5 {
+		var sep1, sep2 string
+		ya, sep1, yb, sep2, yc = m[1], m[2], m[3], m[4], m[5]
+		if sep != sep1 || sep != sep2 {
+			panic(fmt.Errorf("%q DATE value contains bad separators", y))
+		}
+	} else if len(y) != 0 { // y might be empty!
+		panic(fmt.Errorf("%q is unknown DATA value", y))
+	}
+
+	// TODO: verify year, month, day ranges...
+	_, _, _ = fa, fb, fc
+	_, _, _ = xa, xb, xc
+	_, _, _ = ya, yb, yc
+
+	if len(x) != 0 {
+		// smart replace: ">=" to "<=" and ">" to "<"
+		if (xop == ">" || xop == ">=") && (yop == ">" || yop == ">=") {
+			// swap arguments and operators
+			x, xop, yop, y = y, strings.Replace(yop, ">", "<", -1), strings.Replace(xop, ">", "<", -1), x
+		}
+
+		return fmt.Sprintf("%s %s %s %s %s", x, xop, f, yop, y)
+	}
+
+	// smart replace: "==" to "="
+	if yop == "==" {
+		yop = "="
+	}
+
+	return fmt.Sprintf("%s %s %s", f, yop, y)
 }
 
 // parse options

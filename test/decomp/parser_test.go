@@ -838,9 +838,42 @@ func TestParserParseDATE(t *testing.T) {
 		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12, W=1))`,
 		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12, WIDTH="1"))[ds,w=1]}`)
 	testParserParseG(t, false,
-		`(RAW_TEXT CONTAINS DATE(MM-DD-YY > 02-28-12, W=1))`,
-		`P{(RAW_TEXT CONTAINS DATE(MM-DD-YY > 02-28-12, WIDTH="1"))[ds,w=1]}`)
+		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > "02/28/12", W=1))`, // quotes should be removed
+		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12, WIDTH="1"))[ds,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS DATE(MM-DD-YY != 02-28-12, W=1))`,
+		`P{(RAW_TEXT CONTAINS DATE(MM-DD-YY != 02-28-12, WIDTH="1"))[ds,w=1]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15, L=true))`,
 		`P{(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15, LINE="true"))[ds,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS DATE("02/28/12" < MM/DD/YY < "01/19/15", L=true))`, // quotes should be removed
+		`P{(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15, LINE="true"))[ds,line]}`)
+
+	// operator replacement
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS DATE(MM-DD-YY  ==  02-28-12, W=1))`, // == should be replaced with single =
+		`P{(RAW_TEXT CONTAINS DATE(MM-DD-YY = 02-28-12, WIDTH="1"))[ds,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS DATE(01-19-15   >   MM-DD-YY   >=   02-28-12, L=true))`,
+		`P{(RAW_TEXT CONTAINS DATE(02-28-12 <= MM-DD-YY < 01-19-15, LINE="true"))[ds,line]}`)
+
+	// bad cases
+	testParserBad(t,
+		`(RAW_TEXT CONTAINS DATE(MMM_DD_YY == Feb-28-12))`,
+		"is unknown DATE expression")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE(MM_DD-YY == 02-28-12))`,
+		"DATE format contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE(MM-DD-YY == 02_28_12))`,
+		"DATE value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE(MM-DD-YY == 02_28-12))`,
+		"DATE value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE(MM-DD-YY == 02-28_12))`,
+		"DATE value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE(02_28_12 <= MM-DD-YY < 03-28-12))`,
+		"DATE value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE(02_28-12 <= MM-DD-YY < 02-28-12))`,
+		"DATE value contains bad separators")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE(02-28_12 <= MM-DD-YY < 02-28-12))`,
+		"DATE value contains bad separators")
 }
