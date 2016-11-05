@@ -63,6 +63,29 @@ func (s *Scanner) isDigit(r rune) bool {
 	return unicode.IsDigit(r)
 }
 
+// ScanAll returns all lexem.
+// panics in case of bad syntax
+func (s *Scanner) ScanAll(ignoreSpaces bool) []Lexeme {
+	var res []Lexeme
+
+	for {
+		lex := s.Scan()
+		if lex.token == EOF {
+			break // done
+		}
+
+		// space can be ignored
+		if ignoreSpaces && lex.token == WS {
+			continue
+		}
+
+		// append lexem
+		res = append(res, lex)
+	}
+
+	return res
+}
+
 // Scan returns the next lexeme.
 // panics in case of bad syntax
 func (s *Scanner) Scan() Lexeme {

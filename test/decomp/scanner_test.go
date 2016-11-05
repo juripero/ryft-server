@@ -146,6 +146,10 @@ func TestScannerScan2(t *testing.T) {
 		LPAREN, IDENT, WS, IDENT, WS, STRING, RPAREN)
 
 	// TODO: more tests for numbers
+
+	testScannerScan2(t, `YYYY/MM/DD`, IDENT, SLASH, IDENT, SLASH, IDENT)
+	testScannerScan2(t, `YYYY-MM-DD`, IDENT, MINUS, IDENT, MINUS, IDENT)
+	//testScannerScan2(t, `YYYY_MM_DD`, IDENT, ILLEGAL, IDENT, ILLEGAL, IDENT)
 }
 
 // simple tests for bad lexem

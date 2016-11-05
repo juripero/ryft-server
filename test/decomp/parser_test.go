@@ -62,9 +62,9 @@ func TestParserBad(t *testing.T) {
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS(123))`, "no string expression found")
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS("test" 123`, "found instead of )")
 
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE 123)`, "found instead of (")
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE (123`, "no expression ending found")
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE (123()`, "no expression ending found")
+	testParserBad(t, `(RAW_TEXT NOT_CONTAINS RE 123)`, "found instead of (")
+	testParserBad(t, `(RAW_TEXT NOT_CONTAINS RE (123`, "no expression ending found")
+	testParserBad(t, `(RAW_TEXT NOT_CONTAINS RE (123()`, "no expression ending found")
 
 	testParserBad(t, `(RECORD. EQUALS "123")`, "no field name found for RECORD")
 	testParserBad(t, `(RECORD.[  EQUALS "123")`, "no closing ] found")
@@ -155,11 +155,11 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
-		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY>02/28/12))[ds]}`)
+		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))[ds]}`)
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))`,
-		`P{(RAW_TEXT CONTAINS DATE(02/28/12<MM/DD/YY<01/19/15))[ds]}`)
+		`P{(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))[ds]}`)
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
@@ -253,11 +253,11 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
-		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY>02/28/12))[ds]}`)
+		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))[ds]}`)
 
 	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))`,
-		`P{(RAW_TEXT CONTAINS DATE(02/28/12<MM/DD/YY<01/19/15))[ds]}`)
+		`P{(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))[ds]}`)
 
 	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
@@ -269,7 +269,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, false,
 		`((RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))  AND (RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00)))`,
-		`P{AND{P{(RAW_TEXT CONTAINS DATE(02/28/12<MM/DD/YY<01/19/15))[ds]}, P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}}}`)
+		`P{AND{P{(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))[ds]}, P{(RAW_TEXT CONTAINS TIME(11:15:00<HH:MM:SS<13:15:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`(RECORD.Name.Actors.[].Name CONTAINS "Christian")`,
@@ -277,35 +277,35 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS = 11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY = 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS=11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS <= 11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY<=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY <= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS<=11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY>=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS>=11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
 
 	testParserParse(t, false,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RAW_TEXT CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
-		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}, P{(RAW_TEXT CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
+		`P{AND{P{(RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}, P{(RAW_TEXT CONTAINS TIME(HH:MM:SS!=11:59:00))[ts]}}}`)
 
 	testParserParse(t, true,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
@@ -341,7 +341,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, false,
 		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
-		`P{AND{P{(RECORD.body CONTAINS "DATE()")[es]}, P{(RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015))[ds]}}}`)
+		`P{AND{P{(RECORD.body CONTAINS "DATE()")[es]}, P{(RAW_TEXT CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}}}`)
 }
 
 // test for DISTANCE options parsing (generic queries)
@@ -829,4 +829,18 @@ func TestParserParseFEDS(t *testing.T) {
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS FEDS("hello", D=1, DECIMAL="."))`,
 		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+}
+
+// test for DATE (generic queries)
+func TestParserParseDATE(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12, W=1))`,
+		`P{(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12, WIDTH="1"))[ds,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS DATE(MM-DD-YY > 02-28-12, W=1))`,
+		`P{(RAW_TEXT CONTAINS DATE(MM-DD-YY > 02-28-12, WIDTH="1"))[ds,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15, L=true))`,
+		`P{(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15, LINE="true"))[ds,line]}`)
 }

@@ -39,6 +39,15 @@ func (lex Lexeme) Unquoted() string {
 	return lex.literal // "as is"
 }
 
+// EqualTo checks two lexem are equal.
+func (lex Lexeme) EqualTo(p Lexeme) bool {
+	if lex.token != p.token {
+		return false
+	}
+
+	return lex.literal == p.literal
+}
+
 // IsAnd checks is "AND" operator.
 func (lex Lexeme) IsAnd() bool {
 	if lex.token != IDENT {
