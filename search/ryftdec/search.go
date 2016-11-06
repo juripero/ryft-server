@@ -44,38 +44,79 @@ import (
 	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
+// get path relative to home directory
+func relativeToHome(home, path string) string {
+	if rel, err := filepath.Rel(home, path); err == nil {
+		return rel
+	}
+
+	return path // fallback
+}
+
 // check if input fileset contains any catalog
-func containsAnyCatalog(home string, files []string) bool {
+func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []string, error) {
+	new_files := make([]string, 0, len(files))
+	N_catalogs := 0
+
+	// check it dynamically: catalog or regular file
 	for _, mask := range files {
 		// relative -> absolute (mount point + home + ...)
 		matches, err := filepath.Glob(filepath.Join(home, mask))
 		if err != nil {
-			continue // return fmt.Errorf("failed to glob file mask %s: %s", mask, err)
+			return 0, nil, fmt.Errorf("failed to glob file mask %s: %s", mask, err)
 		}
 
 		// iterate all matches
 		for _, filePath := range matches {
 			if info, err := os.Stat(filePath); err != nil {
-				continue // return fmt.Errorf("failed to stat file: %s", err)
+				return 0, nil, fmt.Errorf("failed to stat file: %s", err)
 			} else if info.IsDir() {
+				log.WithField("path", filePath).Warnf("[%s]: is a directory, skipped", TAG)
 				continue
 			} else if info.Size() == 0 {
+				log.WithField("path", filePath).Warnf("[%s]: empty file, skipped", TAG)
 				continue
-			}
+			} /*else if strings.HasPrefix(info.Name(), ".") {
+			        log.WithField("path", filePath).Debugf("[%s]: hidden file, skipped", TAG)
+			        continue
+			}*/
 
+			log.WithField("file", filePath).Debugf("checking catalog file...")
 			cat, err := catalog.OpenCatalogReadOnly(filePath)
 			if err != nil {
 				if err == catalog.ErrNotACatalog {
+					// just a regular file, use it "as is"
+					log.WithField("file", filePath).Debugf("... just a regular file")
+					new_files = append(new_files, relativeToHome(home, filePath))
+
 					continue // go to next match
 				}
-				continue // return fmt.Errorf("failed to open catalog: %s", err)
+				return 0, nil, fmt.Errorf("failed to open catalog: %s", err)
 			}
-			cat.Close()
-			return true
+			defer cat.Close()
+
+			log.WithField("file", filePath).Debugf("... is a catalog")
+			wcat.AddCatalog(cat)
+			N_catalogs += 1
+
+			// data files (absolute path)
+			if dataFiles, err := cat.GetDataFiles(); err != nil {
+				return 0, nil, fmt.Errorf("failed to get catalog files: %s", err)
+			} else {
+				// relative to home
+				for _, file := range dataFiles {
+					new_files = append(new_files, relativeToHome(home, file))
+				}
+			}
 		}
 	}
 
-	return false
+	if N_catalogs == 0 {
+		// use source files "as is"
+		new_files = files
+	}
+
+	return N_catalogs, new_files, nil // OK
 }
 
 // Search starts asynchronous "/search" with RyftDEC engine.
@@ -95,22 +136,6 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	instanceName, homeDir, mountPoint := engine.getBackendOptions()
-
-	// in simple cases when there is only one subquery
-	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 &&
-		!containsAnyCatalog(filepath.Join(mountPoint, homeDir), cfg.Files) {
-		updateConfig(cfg, task.queries)
-		return engine.Backend.Search(cfg)
-	}
-
-	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
-		return nil, fmt.Errorf("failed to detect extension: %s", err)
-	}
-	task.log().Infof("[%s]: starting: %s as %s", TAG, cfg.Query, dumpTree(task.queries, 0))
-
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
 	task.result, err = NewCatalogPostProcessing(filepath.Join(mountPoint, homeDir, res1))
@@ -124,6 +149,29 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
 	}
 	task.log().WithField("results", res1).Infof("[%s]: temporary result catalog", TAG)
+
+	// check input data-set for catalogs
+	var hasCatalogs int
+	hasCatalogs, cfg.Files, err = checksForCatalog(task.result, cfg.Files, filepath.Join(mountPoint, homeDir))
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
+		return nil, fmt.Errorf("failed to check for catalogs: %s", err)
+	}
+
+	// in simple cases when there is only one subquery
+	// we can pass this query directly to the backend
+	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 && hasCatalogs == 0 {
+		task.result.Drop(false) // no sense to save empty working catalog
+		updateConfig(cfg, task.queries)
+		return engine.Backend.Search(cfg)
+	}
+
+	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
+		return nil, fmt.Errorf("failed to detect extension: %s", err)
+	}
+	task.log().Infof("[%s]: starting: %s as %s", TAG, cfg.Query, dumpTree(task.queries, 0))
 
 	mux := search.NewResult()
 	keepDataAs := task.config.KeepDataAs
@@ -150,7 +198,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		}
 
 		// post-processing
-		task.log().WithField("data", res.Output).Infof("final results")
+		task.log().WithField("data", res.Output).Infof("[%s]: final results", TAG)
 		for _, out := range res.Output {
 			if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
 				filepath.Join(mountPoint, homeDir, out.IndexFile),

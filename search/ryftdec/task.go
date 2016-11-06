@@ -143,6 +143,7 @@ type PostProcessing interface {
 
 	AddRyftResults(dataPath, indexPath string,
 		delimiter string, width uint, opt uint32) error
+	AddCatalog(base *catalog.Catalog) error
 
 	DrainFinalResults(task *Task, mux *search.Result,
 		keepDataAs, keepIndexAs, delimiter string,
@@ -180,6 +181,11 @@ func (cpp *CatalogPostProcessing) Drop(keep bool) {
 // add Ryft results
 func (cpp *CatalogPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width uint, opt uint32) error {
 	return cpp.cat.AddRyftResults(dataPath, indexPath, delimiter, width, opt)
+}
+
+// add another catalog as a reference
+func (cpp *CatalogPostProcessing) AddCatalog(base *catalog.Catalog) error {
+	return cpp.cat.CopyFrom(base)
 }
 
 // drain final results
@@ -296,3 +302,11 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 
 type InMemoryPostProcessing struct {
 }
+
+/*
+	// unwind indexes
+	indexes, err := cat.GetSearchIndexFile()
+	if err != nil {
+		return false, fmt.Errorf("failed to get catalog indexes: %s", err)
+	}
+*/
