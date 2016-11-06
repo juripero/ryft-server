@@ -601,12 +601,10 @@ func (cat *Catalog) ClearAll() error {
 
 // clear all tables (unsync)
 func (cat *Catalog) clearAll() error {
-	_, err := cat.db.Exec(`DELETE FROM data`)
+	_, err := cat.db.Exec(`DELETE FROM parts; DELETE FROM data;`)
 	if err != nil {
 		return fmt.Errorf("failed to delete data: %s", err)
 	}
-
-	// all parts will be deleted by trigger
 
 	return nil // OK
 }

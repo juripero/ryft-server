@@ -210,7 +210,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		err = task.result.DrainFinalResults(task, mux,
 			keepDataAs, keepIndexAs, delimiter,
-			filepath.Join(mountPoint, homeDir))
+			filepath.Join(mountPoint, homeDir),
+			res.Output)
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
 			mux.ReportError(err)
@@ -241,6 +242,12 @@ type RyftCall struct {
 	IndexFile string
 	Delimiter string
 	Width     uint
+}
+
+// get string
+func (rc RyftCall) String() string {
+	return fmt.Sprintf("RyftCall{data:%s, index:%s, delim:0x%x, width:%s}",
+		rc.DataFile, rc.IndexFile, rc.Delimiter, rc.Width)
 }
 
 // intermediate search results

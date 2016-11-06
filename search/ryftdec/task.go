@@ -147,7 +147,8 @@ type PostProcessing interface {
 
 	DrainFinalResults(task *Task, mux *search.Result,
 		keepDataAs, keepIndexAs, delimiter string,
-		mountPointAndHomeDir string) error
+		mountPointAndHomeDir string,
+		ryftCalls []RyftCall) error
 }
 
 type CatalogPostProcessing struct {
@@ -189,11 +190,28 @@ func (cpp *CatalogPostProcessing) AddCatalog(base *catalog.Catalog) error {
 }
 
 // drain final results
-func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string) error {
+func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall) error {
 	wcat := cpp.cat
-	items, err := wcat.QueryAll(0x01, 0x01, task.config.Limit)
+	items, simple, err := wcat.QueryAll(0x01, 0x01, task.config.Limit)
 	if err != nil {
 		return err
+	}
+
+	// optimization: if possible just use the DATA file from RyftCall
+	if len(keepDataAs) > 0 && simple && len(ryftCalls) == 1 {
+		defer func(dataPath string) {
+			oldPath := filepath.Join(mountPointAndHomeDir, ryftCalls[0].DataFile)
+			newPath := filepath.Join(mountPointAndHomeDir, dataPath)
+			if err := os.Rename(oldPath, newPath); err != nil {
+				log.WithError(err).Warnf("[%s]: failed to move DATA file", TAG)
+			} else {
+				log.WithFields(map[string]interface{}{
+					"old": oldPath,
+					"new": newPath,
+				}).Infof("[%s]: use DATA file from last Ryft call", TAG)
+			}
+		}(keepDataAs)
+		keepDataAs = "" // prevent futher processing
 	}
 
 	var datFile *os.File
