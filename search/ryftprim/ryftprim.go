@@ -176,6 +176,22 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
+	minimizeLatency := true
+	// if output DATA or INDEX files already exist
+	// we cannot minimize latency - need to postpone processing until ryftprim is finished
+	if len(task.IndexFileName) != 0 {
+		if _, err := os.Stat(filepath.Join(engine.MountPoint, task.IndexFileName)); !os.IsNotExist(err) {
+			task.log().WithField("path", task.IndexFileName).Warnf("[%s]: INDEX file already exists, postpone processing", TAG)
+			minimizeLatency = false
+		}
+	}
+	if len(task.DataFileName) != 0 {
+		if _, err := os.Stat(filepath.Join(engine.MountPoint, task.DataFileName)); !os.IsNotExist(err) {
+			task.log().WithField("path", task.DataFileName).Warnf("[%s]: DATA file already exists, postpone processing", TAG)
+			minimizeLatency = false
+		}
+	}
+
 	task.log().WithField("args", task.tool_args).Infof("[%s]: executing tool", TAG)
 	cmd := exec.Command(engine.ExecPath, task.tool_args...)
 
@@ -192,14 +208,14 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.tool_cmd = cmd
 
 	// do processing in background
-	go engine.process(task, res)
+	go engine.process(task, res, minimizeLatency)
 
 	return nil // OK for now
 }
 
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
-func (engine *Engine) process(task *Task, res *search.Result) {
+func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bool) {
 	defer task.log().WithField("result", res).Debugf("[%s]: end TASK processing", TAG)
 	task.log().Debugf("[%s]: start TASK processing...", TAG)
 
@@ -219,8 +235,9 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 		}
 	}()
 
-	// start INDEX&DATA processing
-	if task.enableDataProcessing {
+	// start INDEX&DATA processing (if latency is minimized)
+	// otherwise wait until ryftprim tool is finished
+	if minimizeLatency && task.enableDataProcessing {
 		task.prepareProcessing()
 
 		task.subtasks.Add(2)
@@ -232,6 +249,14 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 	// TODO: overall execution timeout?
 
 	case err := <-cmd_done: // process done
+		// start INDEX&DATA processing (if latency is NOT minimized)
+		if !minimizeLatency && err != nil && task.enableDataProcessing {
+			task.prepareProcessing()
+
+			task.subtasks.Add(2)
+			go engine.processIndex(task, res)
+			go engine.processData(task, res)
+		}
 		engine.finish(err, task, res)
 
 	case <-res.CancelChan: // client wants to stop all processing
