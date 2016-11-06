@@ -44,6 +44,40 @@ import (
 	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
+// check if input fileset contains any catalog
+func containsAnyCatalog(home string, files []string) bool {
+	for _, mask := range files {
+		// relative -> absolute (mount point + home + ...)
+		matches, err := filepath.Glob(filepath.Join(home, mask))
+		if err != nil {
+			continue // return fmt.Errorf("failed to glob file mask %s: %s", mask, err)
+		}
+
+		// iterate all matches
+		for _, filePath := range matches {
+			if info, err := os.Stat(filePath); err != nil {
+				continue // return fmt.Errorf("failed to stat file: %s", err)
+			} else if info.IsDir() {
+				continue
+			} else if info.Size() == 0 {
+				continue
+			}
+
+			cat, err := catalog.OpenCatalogReadOnly(filePath)
+			if err != nil {
+				if err == catalog.ErrNotACatalog {
+					continue // go to next match
+				}
+				continue // return fmt.Errorf("failed to open catalog: %s", err)
+			}
+			cat.Close()
+			return true
+		}
+	}
+
+	return false
+}
+
 // Search starts asynchronous "/search" with RyftDEC engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
@@ -60,21 +94,23 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
 
+	instanceName, homeDir, mountPoint := engine.getBackendOptions()
+
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
+	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 &&
+		!containsAnyCatalog(filepath.Join(mountPoint, homeDir), cfg.Files) {
 		updateConfig(cfg, task.queries)
 		return engine.Backend.Search(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.Catalogs, cfg.KeepDataAs)
+	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)
 	}
 	task.log().Infof("[%s]: starting: %s as %s", TAG, cfg.Query, dumpTree(task.queries, 0))
 
-	instanceName, homeDir, mountPoint := engine.getBackendOptions()
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
 	task.result, err = NewCatalogPostProcessing(filepath.Join(mountPoint, homeDir, res1))
@@ -227,9 +263,6 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			tempCfg.Surrounding = 0
 		}
 		tempCfg.Delimiter = catalog.DefaultDataDelimiter
-		//		tempCfg.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
-		//		tempCfg.SaveUpdatedIndexesTo = search.NewIndexFile(tempCfg.Delimiter)
-		tempCfg.WorkCatalog = task.result // to get data from input catalogs
 		// !!! use /count here, to disable INDEX&DATA processing on intermediate results
 		// !!! otherwise (sometimes) Ryft hardware may be crashed on the second call
 		res1, err1 = engine.search(task, query.SubNodes[0], &tempCfg,
@@ -258,7 +291,6 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 			// right: read input from temporary file
 			tempCfg.Files = res1.GetDataFiles()
-			tempCfg.Catalogs = nil
 			tempCfg.Delimiter = cfg.Delimiter
 			//			tempCfg.UnwindIndexesBasedOn = map[string]*search.IndexFile{
 			//				filepath.Join(mountPoint, homeDir, res1.DataFiles[0]): tempCfg.SaveUpdatedIndexesTo,
@@ -274,13 +306,13 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 				return result, err2
 			}
 
-			if !isLast && res2.Matches() > 0 && len(cfg.KeepIndexAs) > 0 && tempCfg.SaveUpdatedIndexesTo != nil {
-				//				err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
-				//					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
-				//				if err != nil {
-				//					return result, fmt.Errorf("failed to unwind second intermediate indexes: %s", err)
-				//				}
-			}
+			// if !isLast && res2.Matches() > 0 && len(cfg.KeepIndexAs) > 0 && tempCfg.SaveUpdatedIndexesTo != nil {
+			//				err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
+			//					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
+			//				if err != nil {
+			//					return result, fmt.Errorf("failed to unwind second intermediate indexes: %s", err)
+			//				}
+			// }
 
 			if isLast && len(cfg.KeepIndexAs) > 0 {
 				// TODO: save updated indexes back to text file!
@@ -314,9 +346,6 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		// left: save results to temporary file "A"
 		tempCfg := *cfg
 		// tempCfg.Delimiter
-		tempCfg.WorkCatalog = task.result // to get data from input catalogs
-		// tempCfg.UnwindIndexesBasedOn
-		// tempCfg.SaveUpdatedIndexesTo
 		if !isLast { // intermediate result
 			// as for the AND call - no sense to process INDEX&DATA
 			searchFunc = engine.Backend.Count
@@ -328,9 +357,6 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 
 		// right: save results to temporary file "B"
 		// tempCfg.Delimiter
-		tempCfg.WorkCatalog = nil // data already parsed by first call
-		// tempCfg.UnwindIndexesBasedOn
-		// tempCfg.SaveUpdatedIndexesTo
 		res2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
 		if err2 != nil {
 			return result, err2
@@ -358,11 +384,11 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 	}
 
 	updateConfig(cfg, query)
-	task.log().WithField("mode", cfg.Mode).
-		WithField("query", cfg.Query).
-		WithField("files", cfg.Files).
-		WithField("catalogs", cfg.Catalogs).
-		Infof("[%s]/%d: running backend search", TAG, task.subtaskId)
+	task.log().WithFields(map[string]interface{}{
+		"mode":  cfg.Mode,
+		"query": cfg.Query,
+		"files": cfg.Files,
+	}).Infof("[%s]/%d: running backend search", TAG, task.subtaskId)
 
 	dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))

@@ -58,9 +58,6 @@ type Task struct {
 	Delimiter     string
 	Surrounding   uint
 
-	UnwindIndexesBasedOn map[string]*search.IndexFile
-	SaveUpdatedIndexesTo *search.IndexFile
-
 	// `ryftprim` process & output
 	tool_args []string      // command line arguments
 	tool_cmd  *exec.Cmd     // `ryftprim` executable process

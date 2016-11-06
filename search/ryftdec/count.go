@@ -54,21 +54,22 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
 
+	instanceName, homeDir, mountPoint := engine.getBackendOptions()
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
+	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 &&
+		!containsAnyCatalog(filepath.Join(mountPoint, homeDir), cfg.Files) {
 		updateConfig(cfg, task.queries)
 		return engine.Backend.Count(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.Catalogs, cfg.KeepDataAs)
+	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)
 	}
 	task.log().Infof("[%s]: starting: %s as %s", TAG, cfg.Query, dumpTree(task.queries, 0))
 
-	instanceName, homeDir, mountPoint := engine.getBackendOptions()
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
 	task.result, err = NewCatalogPostProcessing(filepath.Join(mountPoint, homeDir, res1))
