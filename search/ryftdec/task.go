@@ -537,6 +537,7 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 	}
 
 	items := make([]MemItem, 0, capacity)
+BuildItems:
 	for itemDataFile, f := range mpp.indexes {
 		if (f.Opt & 0x01) != 0x01 {
 			continue // ignore temporary results
@@ -556,6 +557,11 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 				dataPos:  item.DataBeg,
 				shift:    shift,
 			})
+
+			// apply limit options here
+			if task.config.Limit != 0 && uint(len(items)) >= task.config.Limit {
+				break BuildItems
+			}
 		}
 	}
 
