@@ -292,7 +292,7 @@ func (cat *Catalog) QueryAll(opt uint32, optMask uint32, limit uint) (chan Index
 	simple := uniqueDataFiles.Int64 <= 1 &&
 		modifiedOffset.Int64 == 0 &&
 		modifiedLength.Int64 == 0
-	log.Debugf("[%s]: simple metrics: data-files:%d diff-offset:%d diff-length%d result:%t",
+	log.Debugf("[%s]: simple metrics: data-files:%d diff-offset:%d diff-length:%d result:%t",
 		TAG, uniqueDataFiles.Int64, modifiedOffset.Int64, modifiedLength.Int64, simple)
 
 	query := `

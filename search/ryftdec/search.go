@@ -246,7 +246,7 @@ type RyftCall struct {
 
 // get string
 func (rc RyftCall) String() string {
-	return fmt.Sprintf("RyftCall{data:%s, index:%s, delim:0x%x, width:%s}",
+	return fmt.Sprintf("RyftCall{data:%s, index:%s, delim:0x%x, width:%d}",
 		rc.DataFile, rc.IndexFile, rc.Delimiter, rc.Width)
 }
 
