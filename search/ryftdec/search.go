@@ -31,7 +31,6 @@
 package ryftdec
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -470,52 +469,6 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 	result.Stat = res.Stat
 	task.log().WithField("output", result).Infof("Ryft call result")
 	return result, nil // OK
-}
-
-// parse INDEX file and update indexes
-func (task *Task) parseAndUnwindIndexes(indexPath string, basedOn map[string]*search.IndexFile, saveTo *search.IndexFile, width uint) error {
-	file, err := os.Open(indexPath)
-	if err != nil {
-		return fmt.Errorf("failed to open: %s", err)
-	}
-	defer file.Close() // close at the end
-
-	// try to read all index records
-	r := bufio.NewReader(file)
-
-	for {
-		// read line by line
-		line, err := r.ReadBytes('\n')
-		if len(line) > 0 {
-			index, err := search.ParseIndex(line)
-			if err != nil {
-				return fmt.Errorf("failed to parse index: %s", err)
-			}
-
-			if basedOn != nil {
-				if f, ok := basedOn[index.File]; ok && f != nil {
-					tmp, _ := f.Unwind(index, width)
-					// task.log().Debugf("unwind %s => %s", index, tmp)
-					index = tmp
-				} else {
-					task.log().Warnf("no base found for: %s", index)
-				}
-			}
-			if saveTo != nil {
-				saveTo.AddIndex(index)
-			}
-		}
-
-		if err != nil {
-			if err == io.EOF {
-				break // done
-			} else {
-				return fmt.Errorf("failed to read: %s", err)
-			}
-		}
-	}
-
-	return nil // OK
 }
 
 // join two files

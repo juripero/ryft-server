@@ -38,32 +38,32 @@ import (
 
 // base index item
 type baseIndex struct {
-	dataBeg uint64 // begin of data
-	dataEnd uint64 // end of data (without delimiter)
-
-	File   string // base file
-	Offset uint64 // base file offset
-	//Length uint64 // (dataEnd - dataBeg)
-	//Fuzziness uint8
+	Index   Index
+	DataBeg uint64 // begin of data
+	DataEnd uint64 // end of data (without delimiter)
 }
 
 func (i baseIndex) String() string {
-	return fmt.Sprintf("{%s#%d [%d..%d)}", i.File, i.Offset, i.dataBeg, i.dataEnd)
+	return fmt.Sprintf("{%s#%d [%d..%d)}", i.Index.File, i.Index.Offset, i.DataBeg, i.DataEnd)
 }
 
 // IndexFile contains base indexes
 type IndexFile struct {
-	items  []baseIndex
+	Items []baseIndex
+	Opt   uint32 // custom option
+
 	delim  string // data delimiter
+	width  uint   // surrounding width
 	offset uint64
 }
 
 // NewIndexFile creates new empty index file
 // data delimiter is used to adjust data offsets
-func NewIndexFile(delimiter string) *IndexFile {
+func NewIndexFile(delimiter string, width uint) *IndexFile {
 	f := new(IndexFile)
-	f.items = make([]baseIndex, 0, 1024) // TODO: initial capacity
+	f.Items = make([]baseIndex, 0, 1024) // TODO: initial capacity
 	f.delim = delimiter
+	f.width = width
 	f.offset = 0
 	return f
 }
@@ -72,7 +72,7 @@ func (f *IndexFile) String() string {
 	buf := bytes.Buffer{}
 
 	buf.WriteString(fmt.Sprintf("delim:%q, offset:%d\n", f.delim, f.offset))
-	for _, i := range f.items {
+	for _, i := range f.Items {
 		buf.WriteString(i.String())
 		buf.WriteRune('\n')
 	}
@@ -82,24 +82,24 @@ func (f *IndexFile) String() string {
 
 // AddIndex adds base index to the list
 func (f *IndexFile) Add(file string, offset, length, data_pos uint64) {
-	f.items = append(f.items, baseIndex{
-		dataBeg: data_pos,
-		dataEnd: data_pos + length,
-		File:    file,
-		Offset:  offset,
-		//Length:  length,
+	f.Items = append(f.Items, baseIndex{
+		DataBeg: data_pos,
+		DataEnd: data_pos + length,
+		Index: Index{
+			File:   file,
+			Offset: offset,
+			Length: length,
+		},
 	})
 }
 
 // AddIndex adds base index to the list
 func (f *IndexFile) AddIndex(index Index) {
-	f.items = append(f.items, baseIndex{
+	f.Items = append(f.Items, baseIndex{
 		//order:  i,
-		dataBeg: f.offset,
-		dataEnd: f.offset + index.Length,
-		File:    index.File,
-		Offset:  index.Offset,
-		//Length:  index.Length,
+		DataBeg: f.offset,
+		DataEnd: f.offset + index.Length,
+		Index:   index,
 	})
 
 	f.offset += index.Length + uint64(len(f.delim))
@@ -107,18 +107,18 @@ func (f *IndexFile) AddIndex(index Index) {
 
 // get the length
 func (f *IndexFile) Len() int {
-	return len(f.items)
+	return len(f.Items)
 }
 
 // Find base item index for specific offset
 func (f *IndexFile) Find(offset uint64) int {
-	return sort.Search(len(f.items), func(i int) bool {
-		return offset < f.items[i].dataEnd
+	return sort.Search(len(f.Items), func(i int) bool {
+		return offset < f.Items[i].DataEnd
 	})
 }
 
 // Unwind unwinds the index
-func (f *IndexFile) Unwind(index Index, width uint) (Index, int) {
+func (f *IndexFile) Unwind(index Index) (Index, int) {
 	var n, shift int // item index, data shift
 
 	// we should take into account surrounding width.
@@ -127,37 +127,37 @@ func (f *IndexFile) Unwind(index Index, width uint) (Index, int) {
 	// or just a part of surrounding may be presented
 	if index.Offset == 0 {
 		// begin: [0..w]data[w]
-		dataEnd := index.Length - uint64(width+1)
+		dataEnd := index.Length - uint64(f.width+1)
 		n = f.Find(dataEnd)
 	} else {
 		// middle: [w]data[w]
 		// or end: [w]data[0..w]
-		dataBeg := index.Offset + uint64(width)
+		dataBeg := index.Offset + uint64(f.width)
 		n = f.Find(dataBeg)
 	}
 
-	if n < len(f.items) {
-		base := f.items[n]
-		index.File = base.File
+	if n < len(f.Items) {
+		base := f.Items[n]
+		index.File = base.Index.File
 
 		// found data [beg..end)
 		beg := index.Offset
 		end := index.Offset + index.Length
-		if base.dataBeg <= beg {
+		if base.DataBeg <= beg {
 			// data offset is within our base
 			// need to adjust just offset
-			index.Offset = base.Offset + (beg - base.dataBeg)
+			index.Offset = base.Index.Offset + (beg - base.DataBeg)
 		} else {
 			// data offset before our base
 			// need to truncate "begin" surrounding part
-			index.Offset = base.Offset
-			index.Length -= (base.dataBeg - beg)
-			shift = int(base.dataBeg - beg)
+			index.Offset = base.Index.Offset
+			index.Length -= (base.DataBeg - beg)
+			shift = int(base.DataBeg - beg)
 		}
-		if end > base.dataEnd {
+		if end > base.DataEnd {
 			// end of data after our base
 			// need to truncate "end" surrounding part
-			index.Length -= (end - base.dataEnd)
+			index.Length -= (end - base.DataEnd)
 		}
 	}
 
