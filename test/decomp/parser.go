@@ -180,7 +180,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	var input string
 	var operator string
 	var expression string
-	var oldExpr string
+	var oldExpr string // TODO: remove this
 
 	// input specifier (RAW_TEXT or RECORD)
 	switch lex := p.scanIgnoreSpace(); {
@@ -327,15 +327,6 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			res.Options.Reduce = false
 			res.Options.Octal = false
 
-		case lex.IsRegex(): // "as is"
-			// TODO: not supported!!!
-			// handle aliases REGEXP -> REGEX
-			if !strings.EqualFold(lex.literal, "REGEX") {
-				lex.literal = "REGEX"
-			}
-			expression = p.parseParenExpr(lex)
-			res.Options.Mode = "rs"
-
 		case lex.IsIPv4(): // "as is"
 			expression = p.parseParenExpr(lex)
 			res.Options.Mode = "ipv4"
@@ -402,6 +393,7 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 		return fmt.Sprintf("EXACT(%s)", strings.Join(args, ", "))
 
+	// fuzzy hamming search
 	case "fhs":
 		args := []string{expression}
 
@@ -421,6 +413,7 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 		return fmt.Sprintf("HAMMING(%s)", strings.Join(args, ", "))
 
+	// fuzzy edit distance search
 	case "feds":
 		args := []string{expression}
 
@@ -444,6 +437,7 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 		return fmt.Sprintf("EDIT_DISTANCE(%s)", strings.Join(args, ", "))
 
+	// date search
 	case "ds":
 		args := []string{expression}
 
@@ -455,6 +449,7 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 		return fmt.Sprintf("DATE(%s)", strings.Join(args, ", "))
 
+	// time search
 	case "ts":
 		args := []string{expression}
 
@@ -466,10 +461,16 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 		return fmt.Sprintf("TIME(%s)", strings.Join(args, ", "))
 
+	// numeric search
 	case "ns":
+
+	// currency search
 	case "cs":
-	case "rs":
+
+	// IPv4 search
 	case "ipv4":
+
+	// IPv6 search
 	case "ipv6":
 		break
 

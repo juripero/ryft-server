@@ -33,7 +33,6 @@ func testOptimizatorLimits(t *testing.T, limit int, structured bool, data string
 		"ns":   limit,
 		"ds":   limit,
 		"ts":   limit,
-		"rs":   limit,
 		"ipv4": limit,
 		"ipv6": limit,
 	}
@@ -51,7 +50,6 @@ func TestOptimizatorProcess(t *testing.T) {
 		"ns":   0,
 		"ds":   2,
 		"ts":   2,
-		"rs":   0,
 		"ipv4": 0,
 		"ipv6": 0,
 	}
@@ -105,10 +103,6 @@ func TestOptimizatorProcess(t *testing.T) {
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
 		`(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[cs]`)
-
-	testOptimizatorProcess(t, o, true,
-		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
-		`(RECORD.body CONTAINS REGEX("\w+",CASELESS))[rs]`)
 
 	testOptimizatorProcess(t, o, false,
 		`(RAW_TEXT CONTAINS "100")`,
@@ -318,10 +312,6 @@ func TestOptimizatorProcess(t *testing.T) {
 		`(RECORD.body CONTAINS FEDS("test",cs=false,d=10,w=100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)))`,
 		`AND{(RECORD.body CONTAINS "test")[feds,d=10,!cs], OR{(RAW_TEXT CONTAINS "text")[es], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}}`)
 
-	testOptimizatorProcess(t, o, false,
-		`((RAW_TEXT CONTAINS REGEX("\w+", CASELESS)) OR (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)))`,
-		`OR{(RAW_TEXT CONTAINS REGEX("\w+",CASELESS))[rs], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}`)
-
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS FHS("test"))AND((RECORD.id CONTAINS FEDS("123")) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))))`,
 		`AND{(RECORD.id CONTAINS "test")[es], AND{(RECORD.id CONTAINS "123")[es], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}}`)
@@ -333,10 +323,10 @@ func TestOptimizatorLimits(t *testing.T) {
 		"es":   1,
 		"fhs":  2,
 		"feds": 3,
-		"ns":   4,
 		"ds":   5,
 		"ts":   6,
-		"rs":   7,
+		"ns":   4,
+		"cs":   4,
 		"ipv4": 8,
 		"ipv6": 9,
 	}

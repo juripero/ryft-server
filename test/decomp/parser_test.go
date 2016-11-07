@@ -62,9 +62,9 @@ func TestParserBad(t *testing.T) {
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS(123))`, "no string expression found")
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS("test" 123`, "found instead of )")
 
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS RE 123)`, "found instead of (")
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS RE (123`, "no expression ending found")
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS RE (123()`, "no expression ending found")
+	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE 123)`, "found instead of (")
+	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE ("123"`, "no expression ending found")
+	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE ("123"()`, "no expression ending found")
 
 	testParserBad(t, `(RECORD. EQUALS "123")`, "no field name found for RECORD")
 	testParserBad(t, `(RECORD.[  EQUALS "123")`, "no closing ] found")
@@ -180,16 +180,6 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t, true,
 		`  (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
 		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[cs]}`)
-
-	testParserParse(t, true,
-		`  (RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
-		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS))[rs]}`)
-	testParserParse(t, true,
-		`  (RECORD.body CONTAINS REGEXP("\w+", CASELESS, D=5))`,
-		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS,D=5))[rs]}`)
-	testParserParse(t, true,
-		`  (RECORD.body CONTAINS REG_EXP("\w+", CASELESS, D=5))`,
-		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS,D=5))[rs]}`)
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS IPV4(IP > "127.0.0.1"))`,
@@ -334,10 +324,6 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS "FEDS")`,
 		`P{(RECORD.body CONTAINS "FEDS")[es]}`)
-
-	testParserParse(t, true,
-		`(RECORD.body CONTAINS REGEX("\w+", CASELESS))`,
-		`P{(RECORD.body CONTAINS REGEX("\w+",CASELESS))[rs]}`)
 
 	testParserParse(t, false,
 		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
