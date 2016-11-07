@@ -83,7 +83,8 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 
 	// backward compatibility (old files name)
 	params.Files = append(params.Files, params.OldFiles...)
-	if len(params.Files) == 0 && len(params.Catalogs) == 0 {
+	params.Files = append(params.Files, params.Catalogs...)
+	if len(params.Files) == 0 {
 		panic(NewServerError(http.StatusBadRequest,
 			"no any file or catalog provided"))
 	}
@@ -126,8 +127,7 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 
 	// get search engine
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	notesForTags := append(params.Files[:], params.Catalogs...)
-	engine, err := s.getSearchEngine(params.Local, notesForTags, authToken, homeDir, userTag)
+	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to get search engine"))
@@ -142,7 +142,6 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 		cfg.Query = q
 	}
 	cfg.AddFiles(params.Files) // TODO: unescape?
-	cfg.AddCatalogs(params.Catalogs)
 	cfg.Mode = params.Mode
 	cfg.Surrounding = uint(params.Surrounding)
 	cfg.Fuzziness = uint(params.Fuzziness)
