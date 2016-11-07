@@ -224,7 +224,10 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			return fmt.Errorf("failed to create DATA file: %s", err)
 		}
 		datFile = bufio.NewWriter(f)
-		defer f.Close()
+		defer func() {
+			datFile.Flush()
+			f.Close()
+		}()
 	}
 
 	// output INDEX file
@@ -235,7 +238,10 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			return fmt.Errorf("failed to create INDEX file: %s", err)
 		}
 		idxFile = bufio.NewWriter(f)
-		defer f.Close()
+		defer func() {
+			idxFile.Flush()
+			f.Close()
+		}()
 	}
 
 	// cached input DATA files
@@ -244,35 +250,42 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 		rd  *bufio.Reader
 		pos int64
 	}
-	files := make(map[string]CachedFile)
+	files := make(map[string]*CachedFile)
 
 	// handle all index items
 	for item := range items {
 		var rec search.Record
-		//rec.Data = // TODO: read data
 		// trim mount point from file name! TODO: special option for this?
 		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
 
 		cf := files[item.DataFile]
-		if cf.f == nil {
+		if cf == nil {
 			f, err := os.Open(item.DataFile)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to open data file: %s", err))
 				// continue // go to next item
 			} else {
-				defer f.Close()                    // close later
-				files[item.DataFile] = CachedFile{ // put to cache
+				cf = &CachedFile{
 					f:   f,
 					rd:  bufio.NewReader(f),
 					pos: 0,
 				}
+				files[item.DataFile] = cf // put to cache
+				defer f.Close()           // close later
 			}
 		}
 
 		var data []byte
-		if cf.f != nil {
+		if cf != nil {
 			// record's data read position in the file
 			rpos := int64(item.DataPos + uint64(item.Shift))
+
+			//task.log().WithFields(map[string]interface{}{
+			//	"cache-pos": cf.pos,
+			//	"data-pos":  rpos,
+			//	"item":      item,
+			//	"file":      cf.f.Name(),
+			//}).Debugf("[%s]: reading record data...", TAG)
 
 			if rpos < cf.pos {
 				// bad case, have to reset buffered read
@@ -294,6 +307,10 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			// discard some data
 			if rpos-cf.pos > 0 {
 				n, err := cf.rd.Discard(int(rpos - cf.pos))
+				//task.log().WithFields(map[string]interface{}{
+				//	"discarded": n,
+				//	"requested": rpos - cf.pos,
+				//}).Debugf("[%s]: discard data", TAG)
 				cf.pos += int64(n) // go forward
 				if err != nil {
 					mux.ReportError(fmt.Errorf("failed to discard data: %s", err))
@@ -303,6 +320,10 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 
 			rec.Data = make([]byte, item.Length)
 			n, err := io.ReadFull(cf.rd, rec.Data)
+			//task.log().WithFields(map[string]interface{}{
+			//	"read":      n,
+			//	"requested": item.Length,
+			//}).Debugf("[%s]: read data", TAG)
 			cf.pos += int64(n) // go forward
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to read data: %s", err))
@@ -311,6 +332,8 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			} else {
 				data = rec.Data
 			}
+		} else {
+			task.log().Warnf("[%s]: no cached DATA file found", TAG)
 		}
 
 		// output DATA file
@@ -342,7 +365,8 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 
 		// output INDEX file
 		if idxFile != nil {
-			_, err = idxFile.WriteString(fmt.Sprintf("%s,%d,%d,%d\n", item.File, item.Offset, item.Length, item.Fuzziness))
+			indexStr := fmt.Sprintf("%s,%d,%d,%d\n", item.File, item.Offset, item.Length, item.Fuzziness)
+			_, err = idxFile.WriteString(indexStr)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write INDEX: %s", err))
 				// file is corrupted, any sense to continue?
