@@ -57,7 +57,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	instanceName, homeDir, mountPoint := engine.getBackendOptions()
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
-	task.result, err = NewCatalogPostProcessing(filepath.Join(mountPoint, homeDir, res1))
+	task.result, err = NewInMemoryPostProcessing(filepath.Join(mountPoint, homeDir, res1)) // NewCatalogPostProcessing
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to create res catalog", TAG)
 		return nil, fmt.Errorf("failed to create res catalog: %s", err)

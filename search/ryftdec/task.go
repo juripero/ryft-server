@@ -185,16 +185,34 @@ func (cpp *CatalogPostProcessing) Drop(keep bool) {
 
 // add Ryft results
 func (cpp *CatalogPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width uint, opt uint32) error {
+	start := time.Now()
+	defer func() {
+		stop := time.Now()
+		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-result duration", TAG)
+	}()
+
 	return cpp.cat.AddRyftResults(dataPath, indexPath, delimiter, width, opt)
 }
 
 // add another catalog as a reference
 func (cpp *CatalogPostProcessing) AddCatalog(base *catalog.Catalog) error {
+	start := time.Now()
+	defer func() {
+		stop := time.Now()
+		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-catalog duration", TAG)
+	}()
+
 	return cpp.cat.CopyFrom(base)
 }
 
 // drain final results
 func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall, reportRecords bool) error {
+	start := time.Now()
+	defer func() {
+		stop := time.Now()
+		log.WithField("t", stop.Sub(start)).Debugf("[%s]: drain-final-results duration", TAG)
+	}()
+
 	wcat := cpp.cat
 	items, simple, err := wcat.QueryAll(0x01, 0x01, task.config.Limit)
 	if err != nil {
@@ -411,6 +429,12 @@ func (mpp *InMemoryPostProcessing) Drop(keep bool) {
 
 // add Ryft results
 func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width uint, opt uint32) error {
+	start := time.Now()
+	defer func() {
+		stop := time.Now()
+		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-result duration", TAG)
+	}()
+
 	saveTo := search.NewIndexFile(delimiter, width)
 	saveTo.Opt = opt
 	if _, ok := mpp.indexes[dataPath]; ok {
@@ -453,6 +477,12 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 
 // add another catalog as a reference
 func (mpp *InMemoryPostProcessing) AddCatalog(base *catalog.Catalog) error {
+	start := time.Now()
+	defer func() {
+		stop := time.Now()
+		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-catalog duration", TAG)
+	}()
+
 	indexes, err := base.GetSearchIndexFile()
 	if err != nil {
 		return fmt.Errorf("failed to get base catalog indexes: %s", err)
@@ -482,6 +512,12 @@ func (mpp *InMemoryPostProcessing) unwind(index search.Index) (search.Index, int
 
 // drain final results
 func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall, reportRecords bool) error {
+	start := time.Now()
+	defer func() {
+		stop := time.Now()
+		log.WithField("t", stop.Sub(start)).Debugf("[%s]: drain-final-results duration", TAG)
+	}()
+
 	// unwind all indexes first and check if it's simple case
 	simple := true
 	capacity := 0
@@ -522,6 +558,8 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 			})
 		}
 	}
+
+	// TODO: remove duplicates
 
 	// optimization: if possible just use the DATA file from RyftCall
 	if len(keepDataAs) > 0 && simple && len(ryftCalls) == 1 {
