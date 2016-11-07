@@ -149,7 +149,8 @@ type PostProcessing interface {
 	DrainFinalResults(task *Task, mux *search.Result,
 		keepDataAs, keepIndexAs, delimiter string,
 		mountPointAndHomeDir string,
-		ryftCalls []RyftCall) error
+		ryftCalls []RyftCall,
+		reportRecords bool) error
 }
 
 type CatalogPostProcessing struct {
@@ -191,7 +192,7 @@ func (cpp *CatalogPostProcessing) AddCatalog(base *catalog.Catalog) error {
 }
 
 // drain final results
-func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall) error {
+func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall, reportRecords bool) error {
 	wcat := cpp.cat
 	items, simple, err := wcat.QueryAll(0x01, 0x01, task.config.Limit)
 	if err != nil {
@@ -259,7 +260,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
 
 		cf := files[item.DataFile]
-		if cf == nil {
+		if cf == nil && (reportRecords || datFile != nil) {
 			f, err := os.Open(item.DataFile)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to open data file: %s", err))
@@ -276,7 +277,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 		}
 
 		var data []byte
-		if cf != nil {
+		if cf != nil && (reportRecords || datFile != nil) {
 			// record's data read position in the file
 			rpos := int64(item.DataPos + uint64(item.Shift))
 
@@ -332,8 +333,6 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			} else {
 				data = rec.Data
 			}
-		} else {
-			task.log().Warnf("[%s]: no cached DATA file found", TAG)
 		}
 
 		// output DATA file
@@ -373,12 +372,14 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			}
 		}
 
-		rec.Index.File = item.File
-		rec.Index.Offset = item.Offset
-		rec.Index.Length = item.Length
-		rec.Index.Fuzziness = item.Fuzziness
+		if reportRecords {
+			rec.Index.File = item.File
+			rec.Index.Offset = item.Offset
+			rec.Index.Length = item.Length
+			rec.Index.Fuzziness = item.Fuzziness
 
-		mux.ReportRecord(&rec)
+			mux.ReportRecord(&rec)
+		}
 	}
 
 	return nil // OK

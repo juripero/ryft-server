@@ -131,7 +131,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 			err = task.result.DrainFinalResults(task, mux,
 				keepDataAs, keepIndexAs, delimiter,
 				filepath.Join(mountPoint, homeDir),
-				res.Output)
+				res.Output, false /*report records*/)
 			if err != nil {
 				task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
 				mux.ReportError(err)

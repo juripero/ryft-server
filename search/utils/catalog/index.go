@@ -98,9 +98,7 @@ func (cat *Catalog) AddRyftResults(dataPath, indexPath string, delimiter string,
 	log.WithFields(map[string]interface{}{
 		"data":  dataPath,
 		"index": indexPath,
-		"delim": delimiter,
-		"width": surroundingWidth,
-	}).Infof("[%s]: adding ryft result", TAG)
+	}).Infof("[%s]: adding ryft result with delim:0x%x and width:%d", TAG, delimiter, surroundingWidth)
 
 	file, err := os.Open(indexPath)
 	if err != nil {
