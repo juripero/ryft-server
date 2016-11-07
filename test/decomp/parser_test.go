@@ -362,6 +362,11 @@ func TestParserParseDistance(t *testing.T) {
 		`(RAW_TEXT CONTAINS FHS("hello", D = " 2 "))`,
 		`P{(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="2"))[fhs,d=2]}`)
 
+	// negate
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FHS("hello", !D))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+
 	// bad cases
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=tru))`, "found instead of integer value")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=1.23))`, "found instead of integer value")
@@ -369,6 +374,7 @@ func TestParserParseDistance(t *testing.T) {
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=100000))`, "is out of range")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=65536))`, "is out of range")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=-1))`, "is out of range")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", !D=))`, "found instead of !<bool variable> expression")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D=""))`, "failed to parse integer")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", D no))`, "found instead of =")
 }
@@ -402,6 +408,11 @@ func TestParserParseWidth(t *testing.T) {
 		`(RAW_TEXT CONTAINS ES("hello", W = " 3 "))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3"))[es,w=3]}`)
 
+	// negate
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", W=4, !W))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+
 	// bad cases
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=tru))`, "found instead of integer value")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=1.23))`, "found instead of integer value")
@@ -409,6 +420,7 @@ func TestParserParseWidth(t *testing.T) {
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=100000))`, "is out of range")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=65536))`, "is out of range")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=-1))`, "is out of range")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", !W=))`, "found instead of !<bool variable> expression")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W=""))`, "failed to parse integer")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W no))`, "found instead of =")
 }
@@ -445,11 +457,21 @@ func TestParserParseLine(t *testing.T) {
 		`(RAW_TEXT CONTAINS ES("hello", L = 1))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
 
+	// negate + short form
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", L, !L))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", !L, L))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", LINE="true"))[es,line]}`)
+
 	// bad cases
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", L=tru))`, "failed to parse boolean")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", L=1.23))`, "found instead of boolean value")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", L=,))`, "found instead of boolean value")
-	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", L no))`, "found instead of =")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", !,))`, "found instead of !<bool variable> expression")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", !L=,))`, "found instead of !<bool variable> expression")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", W no))`, "found instead of =")
 }
 
 // test for CASE options parsing (generic queries)
@@ -487,11 +509,21 @@ func TestParserParseCase(t *testing.T) {
 		`(RAW_TEXT CONTAINS ES("hello", CS = 0))`,
 		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
 
+	// negate + short form
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", CS, !CS))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello", CASE="false"))[es,!cs]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS ES("hello", !CS, CS))`,
+		`P{(RAW_TEXT CONTAINS EXACT("hello"))[es]}`)
+
 	// bad cases
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS=tru))`, "failed to parse boolean")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS=1.23))`, "found instead of boolean value")
 	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS=,))`, "found instead of boolean value")
-	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS no))`, "found instead of =")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", !,))`, "found instead of !<bool variable> expression")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", !CS=,))`, "found instead of !<bool variable> expression")
+	testParserBad(t, `(RAW_TEXT EQUALS FHS("test", CS no))`, "unknown argument")
 }
 
 // test for REDUCE options parsing (generic queries)
@@ -526,11 +558,19 @@ func TestParserParseReduce(t *testing.T) {
 		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R = 1))`,
 		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
 
+	// negate + short form
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, R, !R))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS FEDS("hello", D=1, !R, R))`,
+		`P{(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1", REDUCE="true"))[feds,d=1,reduce]}`)
+
 	// bad cases
 	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R=tru))`, "failed to parse boolean")
 	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R=1.23))`, "found instead of boolean value")
 	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R=,))`, "found instead of boolean value")
-	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R no))`, "found instead of =")
+	testParserBad(t, `(RAW_TEXT EQUALS FEDS("test", R no))`, "unknown argument")
 }
 
 // test for OCTAL options parsing (generic queries)

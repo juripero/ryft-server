@@ -871,6 +871,16 @@ func (p *Parser) checkTimeExpr(expr string) string {
 func (p *Parser) parseSearchOptions(opts Options) Options {
 	// read all options
 	for {
+		// support for !CS or !LINE syntax
+		boolNot := false
+		if lex := p.scanIgnoreSpace(); lex.token == NOT {
+			// next option should be boolean
+			// and should not contains value
+			boolNot = true
+		} else {
+			p.unscan(lex)
+		}
+
 		if lex := p.scanIgnoreSpace(); lex.token == IDENT {
 			switch {
 
@@ -880,7 +890,14 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 				strings.EqualFold(lex.literal, "DISTANCE"),
 				strings.EqualFold(lex.literal, "DIST"),
 				strings.EqualFold(lex.literal, "D"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					opts.Dist = 0
+					if eq := p.scanIgnoreSpace(); eq.token == EQ {
+						panic(fmt.Errorf("%q found instead of !<bool variable> expression", eq))
+					} else {
+						p.unscan(eq)
+					}
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.Dist = uint(p.parseIntVal(0, 64*1024-1))
 				} else {
 					p.unscan(eq)
@@ -892,7 +909,15 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 				strings.EqualFold(lex.literal, "SURROUNDING"),
 				strings.EqualFold(lex.literal, "WIDTH"),
 				strings.EqualFold(lex.literal, "W"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					opts.Width = 0
+					opts.Line = false // mutual exclusive
+					if eq := p.scanIgnoreSpace(); eq.token == EQ {
+						panic(fmt.Errorf("%q found instead of !<bool variable> expression", eq))
+					} else {
+						p.unscan(eq)
+					}
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.Width = uint(p.parseIntVal(0, 64*1024-1))
 					opts.Line = false // mutual exclusive
 				} else {
@@ -903,50 +928,82 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 			// surrounding: entire line
 			case strings.EqualFold(lex.literal, "LINE"),
 				strings.EqualFold(lex.literal, "L"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					opts.Line = false
+					opts.Width = 0 // mutual exclusive
+					if eq := p.scanIgnoreSpace(); eq.token == EQ {
+						panic(fmt.Errorf("%q found instead of !<bool variable> expression", eq))
+					} else {
+						p.unscan(eq)
+					}
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.Line = p.parseBoolVal()
 					opts.Width = 0 // mutual exclusive
 				} else {
 					p.unscan(eq)
-					panic(fmt.Errorf("%q found instead of =", eq))
+					opts.Line = true // panic(fmt.Errorf("%q found instead of =", eq))
+					opts.Width = 0   // mutual exclusive
 				}
 
 			// case sensitivity flag
 			case strings.EqualFold(lex.literal, "CASE_SENSITIVE"),
 				strings.EqualFold(lex.literal, "CASE"),
 				strings.EqualFold(lex.literal, "CS"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					opts.Case = false
+					if eq := p.scanIgnoreSpace(); eq.token == EQ {
+						panic(fmt.Errorf("%q found instead of !<bool variable> expression", eq))
+					} else {
+						p.unscan(eq)
+					}
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.Case = p.parseBoolVal()
 				} else {
 					p.unscan(eq)
-					panic(fmt.Errorf("%q found instead of =", eq))
+					opts.Case = true // panic(fmt.Errorf("%q found instead of =", eq))
 				}
 
 			// reduce duplicates flag
 			case strings.EqualFold(lex.literal, "REDUCE"),
 				strings.EqualFold(lex.literal, "R"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					opts.Reduce = false
+					if eq := p.scanIgnoreSpace(); eq.token == EQ {
+						panic(fmt.Errorf("%q found instead of !<bool variable> expression", eq))
+					} else {
+						p.unscan(eq)
+					}
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.Reduce = p.parseBoolVal()
 				} else {
 					p.unscan(eq)
-					panic(fmt.Errorf("%q found instead of =", eq))
+					opts.Reduce = true // panic(fmt.Errorf("%q found instead of =", eq))
 				}
 
 			// octal flag
 			case strings.EqualFold(lex.literal, "OCTAL"),
 				strings.EqualFold(lex.literal, "OCT"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					opts.Octal = false
+					if eq := p.scanIgnoreSpace(); eq.token == EQ {
+						panic(fmt.Errorf("%q found instead of !<bool variable> expression", eq))
+					} else {
+						p.unscan(eq)
+					}
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.Octal = p.parseBoolVal()
 				} else {
 					p.unscan(eq)
-					panic(fmt.Errorf("%q found instead of =", eq))
+					opts.Octal = true // panic(fmt.Errorf("%q found instead of =", eq))
 				}
 
 			// currency symbol
 			case strings.EqualFold(lex.literal, "SYMBOL"),
 				strings.EqualFold(lex.literal, "SYMB"),
 				strings.EqualFold(lex.literal, "SYM"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					panic(fmt.Errorf("%q found instead of !<bool variable> expression", lex))
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.CurrencySymbol = p.parseStringVal()
 				} else {
 					p.unscan(eq)
@@ -956,7 +1013,9 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 			// digit separator
 			case strings.EqualFold(lex.literal, "SEPARATOR"),
 				strings.EqualFold(lex.literal, "SEP"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					panic(fmt.Errorf("%q found instead of !<bool variable> expression", lex))
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.DigitSeparator = p.parseStringVal()
 				} else {
 					p.unscan(eq)
@@ -966,7 +1025,9 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 			// decimal point
 			case strings.EqualFold(lex.literal, "DECIMAL"),
 				strings.EqualFold(lex.literal, "DEC"):
-				if eq := p.scanIgnoreSpace(); eq.token == EQ {
+				if boolNot {
+					panic(fmt.Errorf("%q found instead of !<bool variable> expression", lex))
+				} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 					opts.DecimalPoint = p.parseStringVal()
 				} else {
 					p.unscan(eq)
@@ -978,14 +1039,18 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 				panic(fmt.Errorf("unknown argument %q found", lex))
 			}
 		} else if lex.token == COMMA {
+			if boolNot {
+				panic(fmt.Errorf("%q found instead of !<bool variable> expression", lex))
+			}
 			continue
 		} else { // done
+			if boolNot {
+				panic(fmt.Errorf("%q found instead of !<bool variable> expression", lex))
+			}
 			p.unscan(lex)
-			break
+			return opts
 		}
 	}
-
-	return opts
 }
 
 // parse string expression (multiple strings or wildcards)
@@ -999,11 +1064,9 @@ func (p *Parser) parseStringExpr(start Lexeme) string {
 			buf.WriteString(lex.literal)
 		} else {
 			p.unscan(lex)
-			break
+			return buf.String()
 		}
 	}
-
-	return buf.String()
 }
 
 // parse string value
