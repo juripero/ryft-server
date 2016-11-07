@@ -98,6 +98,8 @@ func formatQuery(query string) string {
 		delimiter = strings.Trim(delimiter, " ")
 		query = strings.Replace(query, ")"+delimiter+"(", ") "+delimiter+" (", -1)
 	}
+	query = strings.Replace(query, "\n", " ", -1)
+	query = strings.Replace(query, "\t", " ", -1)
 	query = strings.Replace(query, "  ", " ", -1)
 	return query
 }

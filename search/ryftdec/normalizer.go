@@ -87,6 +87,9 @@ func queriesWithSameType(node1 *Node, node2 *Node) bool {
 
 func appendNode(srcParentNode, dstNode *Node) {
 	srcNode, otherNode := splitNodes(dstNode, srcParentNode)
+	if srcNode == nil || otherNode == nil {
+		return // something wrong
+	}
 
 	//	fmt.Printf("src-parent:\n%s\n", dumpTree(srcParentNode, 2))
 	//	fmt.Printf("dst-node:\n%s\n", dumpTree(dstNode, 2))

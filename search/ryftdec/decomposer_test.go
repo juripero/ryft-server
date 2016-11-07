@@ -266,4 +266,48 @@ func TestBugfix(t *testing.T) {
 		`[ AND]:
   [feds-0/0-false]: (RECORD.doc.doc.text_entry CONTAINS "To") AND (RECORD.doc.doc.text_entry CONTAINS "be") AND (RECORD.doc.doc.text_entry CONTAINS "or")
   [feds-1/0-false]: (RECORD.doc.doc.text_entry CONTAINS "not")`)
+
+	testQueryTree(t, `
+(
+	(
+		(
+			(RECORD.doc.text_entry CONTAINS FEDS("Lrd", DIST=2))
+			AND 
+			(RECORD.doc.text_entry CONTAINS FEDS("Halet", DIST=2))
+		)
+		AND
+		(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2))
+	)
+	OR
+	(
+		(
+			(RECORD.doc.text_entry CONTAINS FEDS("Lrd", DIST=2))
+			AND 
+			(RECORD.doc.text_entry CONTAINS FEDS("Halet", DIST=2))
+		)
+		AND 
+		(RECORD.doc.speaker CONTAINS FEDS("Hlet", DIST=2))
+	)
+	OR 
+	(
+		(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2))
+		AND 
+		(RECORD.doc.speaker CONTAINS FEDS("Hlet", DIST=2))
+	)
+)`,
+		`[  OR]:
+  [feds-2/0-false]: (RECORD.doc.text_entry CONTAINS "Lrd") AND (RECORD.doc.text_entry CONTAINS "Halet") AND (RECORD.doc.speaker CONTAINS "PONIUS")
+  [feds-2/0-false]: (RECORD.doc.text_entry CONTAINS "Lrd") AND (RECORD.doc.text_entry CONTAINS "Halet") AND (RECORD.doc.speaker CONTAINS "Hlet") OR (RECORD.doc.speaker CONTAINS "PONIUS") AND (RECORD.doc.speaker CONTAINS "Hlet")`)
+
+	testQueryTree(t, `((RECORD.doc.play_name NOT_CONTAINS "King Lear") AND 
+(((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND 
+(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2))) 
+OR 
+((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND 
+(RECORD.doc.speaker CONTAINS FEDS("Mesenger", DIST=2))) OR 
+((RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2)) AND 
+(RECORD.doc.speaker CONTAINS FEDS("Mesenger", DIST=2)))))`,
+		`[ AND]:
+  [es-0/0-false]: (RECORD.doc.play_name NOT_CONTAINS "King Lear")
+  [feds-2/0-false]: (RECORD.doc.text_entry CONTAINS "my lrd") AND (RECORD.doc.speaker CONTAINS "PONIUS") OR (RECORD.doc.text_entry CONTAINS "my lrd") AND (RECORD.doc.speaker CONTAINS "Mesenger") OR (RECORD.doc.speaker CONTAINS "PONIUS") AND (RECORD.doc.speaker CONTAINS "Mesenger")`)
 }
