@@ -122,7 +122,7 @@ func (server *Server) doJob(job SettingsJobItem) bool {
 		return true
 
 	case "delete-catalog":
-		res := deleteAllCatalogs("/", []string{job.Args})
+		res := deleteAll("/", []string{job.Args})
 		jobsLog.WithFields(map[string]interface{}{
 			"catalog": job.Args,
 			"result":  res,
