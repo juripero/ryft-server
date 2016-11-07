@@ -31,6 +31,7 @@
 package ryftdec
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -198,6 +199,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 	}
 
 	// optimization: if possible just use the DATA file from RyftCall
+	// TODO: check the INDEX order!
 	if len(keepDataAs) > 0 && simple && len(ryftCalls) == 1 {
 		defer func(dataPath string) {
 			oldPath := filepath.Join(mountPointAndHomeDir, ryftCalls[0].DataFile)
@@ -214,25 +216,35 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 		keepDataAs = "" // prevent futher processing
 	}
 
-	var datFile *os.File
+	// output DATA file
+	var datFile *bufio.Writer
 	if len(keepDataAs) > 0 {
-		datFile, err = os.Create(filepath.Join(mountPointAndHomeDir, keepDataAs))
+		f, err := os.Create(filepath.Join(mountPointAndHomeDir, keepDataAs))
 		if err != nil {
 			return fmt.Errorf("failed to create DATA file: %s", err)
 		}
-		defer datFile.Close()
+		datFile = bufio.NewWriter(f)
+		defer f.Close()
 	}
 
-	var idxFile *os.File
+	// output INDEX file
+	var idxFile *bufio.Writer
 	if len(keepIndexAs) > 0 {
-		idxFile, err = os.Create(filepath.Join(mountPointAndHomeDir, keepIndexAs))
+		f, err := os.Create(filepath.Join(mountPointAndHomeDir, keepIndexAs))
 		if err != nil {
 			return fmt.Errorf("failed to create INDEX file: %s", err)
 		}
-		defer idxFile.Close()
+		idxFile = bufio.NewWriter(f)
+		defer f.Close()
 	}
 
-	files := make(map[string]*os.File)
+	// cached input DATA files
+	type CachedFile struct {
+		f   *os.File
+		rd  *bufio.Reader
+		pos int64
+	}
+	files := make(map[string]CachedFile)
 
 	// handle all index items
 	for item := range items {
@@ -241,33 +253,63 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 		// trim mount point from file name! TODO: special option for this?
 		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
 
-		f := files[item.DataFile]
-		if f == nil {
-			f, err = os.Open(item.DataFile)
+		cf := files[item.DataFile]
+		if cf.f == nil {
+			f, err := os.Open(item.DataFile)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to open data file: %s", err))
 				// continue // go to next item
 			} else {
-				files[item.DataFile] = f // put to cache
-				defer f.Close()          // close later
+				defer f.Close()                    // close later
+				files[item.DataFile] = CachedFile{ // put to cache
+					f:   f,
+					rd:  bufio.NewReader(f),
+					pos: 0,
+				}
 			}
 		}
 
 		var data []byte
-		if f != nil {
-			_, err = f.Seek(int64(item.DataPos+uint64(item.Shift)), 0 /*os.SeekBegin*/)
-			if err != nil {
-				mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
-			} else {
-				rec.Data = make([]byte, item.Length)
-				n, err := io.ReadFull(f, rec.Data)
+		if cf.f != nil {
+			// record's data read position in the file
+			rpos := int64(item.DataPos + uint64(item.Shift))
+
+			if rpos < cf.pos {
+				// bad case, have to reset buffered read
+				task.log().WithFields(map[string]interface{}{
+					"file": cf.f.Name(),
+					"old":  cf.pos,
+					"new":  rpos,
+				}).Debugf("[%s]: reset buffered file read", TAG)
+
+				_, err = cf.f.Seek(rpos, 0 /*os.SeekBegin*/)
 				if err != nil {
-					mux.ReportError(fmt.Errorf("failed to read data: %s", err))
-				} else if uint64(n) != item.Length {
-					mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Length))
-				} else {
-					data = rec.Data
+					mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
+					continue
 				}
+				cf.rd.Reset(cf.f)
+				cf.pos = rpos
+			}
+
+			// discard some data
+			if rpos-cf.pos > 0 {
+				n, err := cf.rd.Discard(int(rpos - cf.pos))
+				cf.pos += int64(n) // go forward
+				if err != nil {
+					mux.ReportError(fmt.Errorf("failed to discard data: %s", err))
+					continue
+				}
+			}
+
+			rec.Data = make([]byte, item.Length)
+			n, err := io.ReadFull(cf.rd, rec.Data)
+			cf.pos += int64(n) // go forward
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to read data: %s", err))
+			} else if uint64(n) != item.Length {
+				mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Length))
+			} else {
+				data = rec.Data
 			}
 		}
 

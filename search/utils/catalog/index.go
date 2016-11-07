@@ -307,6 +307,7 @@ FROM parts AS p
 JOIN data AS d ON p.d_id == d.id
 WHERE ? == (p.opt&?)
 GROUP BY x_name,x_pos,x_len,x_fuzz
+ORDER BY p.d_pos
 `
 	if limit != 0 {
 		query += fmt.Sprintf("LIMIT %d\n", limit)
