@@ -6,18 +6,18 @@ import (
 
 // Lexeme is token type and corresponding literal pair.
 type Lexeme struct {
-	token   Token  // token
-	literal string // literal
+	token   Token
+	literal string
 }
 
-// NewLexemeStr creates new lexeme.
+// NewLexemeStr creates new lexeme from string.
 func NewLexemeStr(tok Token, lit string) Lexeme {
 	return Lexeme{token: tok, literal: lit}
 }
 
 // NewLexeme creates new lexeme from runes.
-func NewLexeme(tok Token, r0 ...rune) Lexeme {
-	return Lexeme{token: tok, literal: string(r0)}
+func NewLexeme(tok Token, r ...rune) Lexeme {
+	return Lexeme{token: tok, literal: string(r)}
 }
 
 // String gets string representation.

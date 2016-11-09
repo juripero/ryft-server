@@ -10,9 +10,9 @@ const (
 	WS            // whitespace
 
 	IDENT  // identifier
-	INT    // integer number
-	FLOAT  // float number
 	STRING // string (quoted)
+	FLOAT  // float number
+	INT    // integer number
 
 	EQ  // =
 	DEQ // ==

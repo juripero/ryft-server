@@ -173,7 +173,7 @@ func TestOptimizatorProcess(t *testing.T) {
 		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2]`)
 
 	testOptimizatorProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2,CS=true)) AND (RAW_TEXT CONTAINS FHS("200",DIST=1,WIDTH=2,CASE_SENSITIVE=true))`,
+		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2,CS=true)) AND (RAW_TEXT CONTAINS FHS("200",DIST=1,WIDTH=2,CASE=true))`,
 		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2]`)
 
 	testOptimizatorProcess(t, o, false,

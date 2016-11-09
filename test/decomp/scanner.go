@@ -275,7 +275,7 @@ func (s *Scanner) scanString() Lexeme {
 	}
 }
 
-// scanDigits consume a contiguous series of digits.
+// scanDigits consume a continuous series of digits.
 func (s *Scanner) scanDigits() string {
 	var buf bytes.Buffer
 
