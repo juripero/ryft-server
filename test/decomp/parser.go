@@ -296,11 +296,17 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			res.Options.SetMode("cs")
 
 		case lex.IsIPv4(): // "as is"
-			expression = p.parseParenExpr(lex)
+			expression, res.Options = p.parseIPv4or6Expr(res.Options)
+			oldExpr = fmt.Sprintf("IPV4(%s", expression)
+			if res.Options.Octal {
+				oldExpr += ", USE_OCTAL"
+			}
+			oldExpr += ")"
 			res.Options.SetMode("ipv4")
 
 		case lex.IsIPv6(): // "as is"
-			expression = p.parseParenExpr(lex)
+			expression, res.Options = p.parseIPv4or6Expr(res.Options)
+			oldExpr = fmt.Sprintf("IPV6(%s)", expression)
 			res.Options.SetMode("ipv6")
 
 		// consume all continous strings and wildcards
@@ -463,10 +469,31 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// IPv4 search
 	case "ipv4":
+		args := []string{expression}
+
+		if opts.Line { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
+		} else if opts.Width != 0 {
+			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
+		}
+
+		if opts.Octal { // FALSE by default
+			args = append(args, fmt.Sprintf(`OCTAL="%t"`, opts.Octal))
+		}
+
+		return fmt.Sprintf("IPV4(%s)", strings.Join(args, ", "))
 
 	// IPv6 search
 	case "ipv6":
-		break
+		args := []string{expression}
+
+		if opts.Line { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
+		} else if opts.Width != 0 {
+			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
+		}
+
+		return fmt.Sprintf("IPV6(%s)", strings.Join(args, ", "))
 
 	default:
 		panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
@@ -1023,6 +1050,102 @@ func (p *Parser) parseCurrencyExpr(opts Options) (string, Options) {
 	switch lex := p.scanIgnoreSpace(); lex.token {
 	case COMMA:
 		opts = p.parseSearchOptions(opts, "SYMBOL", "SEPARATOR", "DECIMAL")
+	default:
+		p.unscan(lex)
+	}
+
+	// right paren last
+	switch end := p.scanIgnoreSpace(); end.token {
+	case RPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of )", end))
+	}
+
+	return expr, opts
+}
+
+// parse IPV4/IPV6 search expression in parentheses and options
+func (p *Parser) parseIPv4or6Expr(opts Options) (string, Options) {
+	// left paren first
+	switch beg := p.scanIgnoreSpace(); beg.token {
+	case LPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of (", beg))
+	}
+
+	// parse first value and first operator [optional]
+	var x, xop string
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	// TODO case INT: // without quotes
+	case STRING:
+		x = lex.Unquoted()
+
+		// parse first operator
+		switch op := p.scanIgnoreSpace(); op.token {
+		case LS, LEQ, GT, GEQ:
+			xop = op.literal
+		default:
+			panic(fmt.Errorf("%q found instead of < or <=", op))
+		}
+
+	default:
+		p.unscan(lex)
+	}
+
+	// parse IP keyword
+	if lex := p.scanIgnoreSpace(); !lex.IsIP() {
+		panic(fmt.Errorf("%q found instead of IP", lex))
+	}
+
+	// parse second operator
+	var yop string
+	switch op := p.scanIgnoreSpace(); op.token {
+	case LS, LEQ, GT, GEQ:
+		yop = op.literal
+	case EQ, DEQ, NEQ:
+		if len(xop) != 0 {
+			panic(fmt.Errorf("%q found instead of < or <=", op))
+		}
+		yop = op.literal
+	default:
+		panic(fmt.Errorf("%q found instead of < or <=", op))
+	}
+
+	// parse second value
+	var y string
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	// TODO case INT: // without quotes
+	case STRING:
+		y = lex.Unquoted()
+
+	default:
+		panic(fmt.Errorf("%q found instead of value", lex))
+	}
+
+	var expr string
+	if len(x) != 0 {
+		// smart replace: ">=" to "<=" and ">" to "<"
+		if (xop == ">" || xop == ">=") && (yop == ">" || yop == ">=") {
+			// swap arguments and operators
+			x, xop, yop, y = y, strings.Replace(yop, ">", "<", -1), strings.Replace(xop, ">", "<", -1), x
+		}
+
+		expr = fmt.Sprintf(`"%s" %s %s %s "%s"`, x, xop, "IP", yop, y)
+	} else {
+		// smart replace: "==" to "="
+		if yop == "==" {
+			yop = "="
+		}
+
+		expr = fmt.Sprintf(`%s %s "%s"`, "IP", yop, y)
+	}
+
+	// parse options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		opts = p.parseSearchOptions(opts, "OCTAL") // TODO: no OCTAL for IPv6
 	default:
 		p.unscan(lex)
 	}

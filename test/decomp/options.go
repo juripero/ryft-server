@@ -322,7 +322,8 @@ func (o *Options) Set(option string, positonalName string) error {
 		}
 
 	// octal flag
-	case strings.EqualFold(opt, "OCTAL"),
+	case strings.EqualFold(opt, "USE_OCTAL"),
+		strings.EqualFold(opt, "OCTAL"),
 		strings.EqualFold(opt, "OCT"):
 		if not {
 			o.Octal = false

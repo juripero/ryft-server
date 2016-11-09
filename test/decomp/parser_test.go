@@ -183,11 +183,11 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS IPV4(IP > "127.0.0.1"))`,
-		`P{(RECORD.body CONTAINS IPV4(IP>"127.0.0.1"))[ipv4]}`)
+		`P{(RECORD.body CONTAINS IPV4(IP > "127.0.0.1"))[ipv4]}`)
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS IPV6(IP > "10::1"))`,
-		`P{(RECORD.body CONTAINS IPV6(IP>"10::1"))[ipv6]}`)
+		`P{(RECORD.body CONTAINS IPV6(IP > "10::1"))[ipv6]}`)
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "100")`,
@@ -1006,4 +1006,58 @@ func TestParserParseCURRENCY(t *testing.T) {
 
 	// bad cases
 	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY(CUR == Feb-28-12))`, "found instead of value")
+}
+
+// test for IPv4 (generic queries)
+func TestParserParseIPv4(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV4(IP > "0", W=1))`,
+		`P{(RAW_TEXT CONTAINS IPV4(IP > "0", WIDTH="1"))[ipv4,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV4(IP != "0", W=1))`,
+		`P{(RAW_TEXT CONTAINS IPV4(IP != "0", WIDTH="1"))[ipv4,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV4("1"  <  IP  <  "2", L=true))`,
+		`P{(RAW_TEXT CONTAINS IPV4("1" < IP < "2", LINE="true"))[ipv4,line]}`)
+
+	// operator replacement
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV4(IP  ==  "123", W=1))`, // == should be replaced with single =
+		`P{(RAW_TEXT CONTAINS IPV4(IP = "123", WIDTH="1"))[ipv4,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV4("2"   >   IP   >=   "1", L=true))`,
+		`P{(RAW_TEXT CONTAINS IPV4("1" <= IP < "2", LINE="true"))[ipv4,line]}`)
+
+	// TODO: compatibility mode
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV4(IP == Feb-28-12))`, "found instead of value")
+}
+
+// test for IPv6 (generic queries)
+func TestParserParseIPv6(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV6(IP > "0", W=1))`,
+		`P{(RAW_TEXT CONTAINS IPV6(IP > "0", WIDTH="1"))[ipv6,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV6(IP != "0", W=1))`,
+		`P{(RAW_TEXT CONTAINS IPV6(IP != "0", WIDTH="1"))[ipv6,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV6("1"  <  IP  <  "2", L=true))`,
+		`P{(RAW_TEXT CONTAINS IPV6("1" < IP < "2", LINE="true"))[ipv6,line]}`)
+
+	// operator replacement
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV6(IP  ==  "123", W=1))`, // == should be replaced with single =
+		`P{(RAW_TEXT CONTAINS IPV6(IP = "123", WIDTH="1"))[ipv6,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS IPV6("2"   >   IP   >=   "1", L=true))`,
+		`P{(RAW_TEXT CONTAINS IPV6("1" <= IP < "2", LINE="true"))[ipv6,line]}`)
+
+	// TODO: compatibility mode
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV6(IP == Feb-28-12))`, "found instead of value")
 }

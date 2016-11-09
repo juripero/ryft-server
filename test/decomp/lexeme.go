@@ -239,3 +239,12 @@ func (lex Lexeme) IsIPv6() bool {
 
 	return strings.EqualFold(lex.literal, "IPv6")
 }
+
+// IsIP checks "IP" keyword.
+func (lex Lexeme) IsIP() bool {
+	if lex.token != IDENT {
+		return false
+	}
+
+	return strings.EqualFold(lex.literal, "IP")
+}
