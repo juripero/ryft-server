@@ -6,161 +6,173 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// test lexeme scan
-func testScannerScan(t *testing.T, data string, token Token) {
-	s := NewScannerString(data)
-	if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
-		lex := s.Scan()
-		assert.Equal(t, token, lex.token, "unexpected token (data:%s)", data)
-		assert.Equal(t, data, lex.literal, "unexpected literal (data:%s)", data)
-		assert.Equal(t, EOF, s.Scan().token, "nothing more expected (data:%s)", data)
-	}
-}
-
-// test lexeme scan (multiple)
-func testScannerScan2(t *testing.T, data string, tokens ...Token) {
-	s := NewScannerString(data)
-	if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
-		for _, token := range tokens {
-			lex := s.Scan()
-			assert.Equal(t, token, lex.token, "unexpected token (data:%s)", data)
-		}
-		assert.Equal(t, EOF, s.Scan().token, "nothing more expected (data:%s)", data)
-	}
-}
-
-// test lexeme scan (should panic)
-func testScannerScanBad(t *testing.T, data string, expectedError string) {
-	s := NewScannerString(data)
-	if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
-		defer func() {
-			if r := recover(); r != nil {
-				err := r.(error)
-				assert.Contains(t, err.Error(), expectedError, "unexpected error (data:%s)", data)
-			} else {
-				assert.Fail(t, "should panic (data:%s)", data)
-			}
-		}()
-
-		s.Scan()
-	}
-}
-
 // simple tests for lexem
 func TestScannerScan(t *testing.T) {
-	testScannerScan(t, "", EOF)
-	testScannerScan(t, " ", WS)
-	testScannerScan(t, " \t", WS)
-	testScannerScan(t, " \t\n", WS)
-	testScannerScan(t, " \t\r\n", WS)
-	testScannerScan(t, "ID_ENT_123", IDENT)
-	testScannerScan(t, "#", ILLEGAL)
+	// check single lexeme
+	check1 := func(data string, token Token) {
+		s := NewScannerString(data)
+		if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
+			lex := s.Scan()
+			assert.Equal(t, token, lex.token, "unexpected token (data:%s)", data)
+			assert.Equal(t, data, lex.literal, "unexpected literal (data:%s)", data)
+			assert.Equal(t, EOF, s.Scan().token, "nothing more expected (data:%s)", data)
+		}
+	}
 
-	testScannerScan(t, "123", INT)
-	testScannerScan(t, "0123", INT)
-	testScannerScan(t, "+123", INT)
-	testScannerScan(t, "-123", INT)
-	testScannerScan(t, "123.", FLOAT)
-	testScannerScan(t, "123.1", FLOAT)
-	testScannerScan(t, "+123.", FLOAT)
-	testScannerScan(t, "-123.", FLOAT)
-	testScannerScan(t, "+123.12", FLOAT)
-	testScannerScan(t, "-123.12", FLOAT)
-	testScannerScan(t, ".1", FLOAT)
-	testScannerScan(t, "+.1", FLOAT)
-	testScannerScan(t, "-.1", FLOAT)
-	testScannerScan(t, ".1e5", FLOAT)
-	testScannerScan(t, "+.1e5", FLOAT)
-	testScannerScan(t, "-.1e5", FLOAT)
-	testScannerScan(t, ".1e+5", FLOAT)
-	testScannerScan(t, ".1e-5", FLOAT)
-	testScannerScan(t, "+.1e+5", FLOAT)
-	testScannerScan(t, "+.1e-5", FLOAT)
-	testScannerScan(t, "-.1e+5", FLOAT)
-	testScannerScan(t, "-.1e-5", FLOAT)
-	testScannerScan(t, "1e5", FLOAT)
-	testScannerScan(t, "1e+5", FLOAT)
-	testScannerScan(t, "1e-5", FLOAT)
-	testScannerScan(t, "+1e5", FLOAT)
-	testScannerScan(t, "+1e+5", FLOAT)
-	testScannerScan(t, "+1e-5", FLOAT)
-	testScannerScan(t, "-1e5", FLOAT)
-	testScannerScan(t, "-1e+5", FLOAT)
-	testScannerScan(t, "-1e-5", FLOAT)
-	testScannerScan(t, "0.1e5", FLOAT)
-	testScannerScan(t, "0.1e+5", FLOAT)
-	testScannerScan(t, "0.1e-5", FLOAT)
-	testScannerScan(t, "+0.1e5", FLOAT)
-	testScannerScan(t, "+0.1e+5", FLOAT)
-	testScannerScan(t, "+0.1e-5", FLOAT)
-	testScannerScan(t, "-0.1e5", FLOAT)
-	testScannerScan(t, "-0.1e+5", FLOAT)
-	testScannerScan(t, "-0.1e-5", FLOAT)
+	// check multiple lexem
+	checkN := func(data string, tokens ...Token) {
+		s := NewScannerString(data)
+		if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
+			for _, token := range tokens {
+				lex := s.Scan()
+				assert.Equal(t, token, lex.token, "unexpected token (data:%s)", data)
+			}
+			assert.Equal(t, EOF, s.Scan().token, "nothing more expected (data:%s)", data)
+		}
+	}
+
+	// check ScanAll
+	checkAll := func(data string, ignoreSpaces bool, tokens ...Token) {
+		s := NewScannerString(data)
+		if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
+			all := s.ScanAll(ignoreSpaces)
+			if assert.Equal(t, len(tokens), len(all)) {
+				for i, token := range tokens {
+					assert.Equal(t, token, all[i].token, "unexpected token (data:%s)", data)
+				}
+			}
+			assert.Equal(t, EOF, s.Scan().token, "nothing more expected (data:%s)", data)
+		}
+	}
+
+	// bad cases (should panic)
+	bad := func(data string, expectedError string) {
+		s := NewScannerString(data)
+		if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
+			defer func() {
+				if r := recover(); r != nil {
+					err := r.(error)
+					assert.Contains(t, err.Error(), expectedError)
+				} else {
+					assert.Fail(t, "should panic (data:%s)", data)
+				}
+			}()
+
+			s.Scan()
+		}
+	}
+
+	check1("", EOF)
+	check1(" ", WS)
+	check1(" \t", WS)
+	check1(" \t\n", WS)
+	check1(" \t\r\n", WS)
+	check1("ID_ENT_123", IDENT)
+	check1("#", ILLEGAL)
+
+	check1("123", INT)
+	check1("0123", INT)
+	check1("+123", INT)
+	check1("-123", INT)
+	check1("123.", FLOAT)
+	check1("123.1", FLOAT)
+	check1("+123.", FLOAT)
+	check1("-123.", FLOAT)
+	check1("+123.12", FLOAT)
+	check1("-123.12", FLOAT)
+	check1(".1", FLOAT)
+	check1("+.1", FLOAT)
+	check1("-.1", FLOAT)
+	check1(".1e5", FLOAT)
+	check1("+.1e5", FLOAT)
+	check1("-.1e5", FLOAT)
+	check1(".1e+5", FLOAT)
+	check1(".1e-5", FLOAT)
+	check1("+.1e+5", FLOAT)
+	check1("+.1e-5", FLOAT)
+	check1("-.1e+5", FLOAT)
+	check1("-.1e-5", FLOAT)
+	check1("1e5", FLOAT)
+	check1("1e+5", FLOAT)
+	check1("1e-5", FLOAT)
+	check1("+1e5", FLOAT)
+	check1("+1e+5", FLOAT)
+	check1("+1e-5", FLOAT)
+	check1("-1e5", FLOAT)
+	check1("-1e+5", FLOAT)
+	check1("-1e-5", FLOAT)
+	check1("0.1e5", FLOAT)
+	check1("0.1e+5", FLOAT)
+	check1("0.1e-5", FLOAT)
+	check1("+0.1e5", FLOAT)
+	check1("+0.1e+5", FLOAT)
+	check1("+0.1e-5", FLOAT)
+	check1("-0.1e5", FLOAT)
+	check1("-0.1e+5", FLOAT)
+	check1("-0.1e-5", FLOAT)
 	// TODO: more tests for numbers
 
-	testScannerScan(t, `""`, STRING)
-	testScannerScan(t, `" "`, STRING)
-	testScannerScan(t, `"'"`, STRING)
-	testScannerScan(t, `"hello"`, STRING)
-	testScannerScan(t, `"\""`, STRING)
-	testScannerScan(t, `"\'"`, STRING)
-	testScannerScan(t, `"\n\r"`, STRING)
-	testScannerScan(t, `"\xff\xeE"`, STRING)
+	check1(`""`, STRING)
+	check1(`" "`, STRING)
+	check1(`"'"`, STRING)
+	check1(`"hello"`, STRING)
+	check1(`"\""`, STRING)
+	check1(`"\'"`, STRING)
+	check1(`"\n\r"`, STRING)
+	check1(`"\xff\xeE"`, STRING)
 
-	testScannerScan(t, "==", DEQ)
-	testScannerScan(t, "=", EQ)
-	testScannerScan(t, "!=", NEQ)
-	testScannerScan(t, "!", NOT)
-	testScannerScan(t, "<=", LEQ)
-	testScannerScan(t, "<", LS)
-	testScannerScan(t, ">=", GEQ)
-	testScannerScan(t, ">", GT)
-	testScannerScan(t, "+", PLUS)
-	testScannerScan(t, "-", MINUS)
-	testScannerScan(t, "?", WCARD)
-	testScannerScan(t, "/", SLASH)
-	testScannerScan(t, ",", COMMA)
-	testScannerScan(t, ".", PERIOD)
-	testScannerScan(t, ":", COLON)
-	testScannerScan(t, ";", SEMICOLON)
+	check1("==", DEQ)
+	check1("=", EQ)
+	check1("!=", NEQ)
+	check1("!", NOT)
+	check1("<=", LEQ)
+	check1("<", LS)
+	check1(">=", GEQ)
+	check1(">", GT)
+	check1("+", PLUS)
+	check1("-", MINUS)
+	check1("?", WCARD)
+	check1("/", SLASH)
+	check1(",", COMMA)
+	check1(".", PERIOD)
+	check1(":", COLON)
+	check1(";", SEMICOLON)
 
-	testScannerScan(t, "(", LPAREN)
-	testScannerScan(t, ")", RPAREN)
-	testScannerScan(t, "[", LBRACK)
-	testScannerScan(t, "]", RBRACK)
-	testScannerScan(t, "{", LBRACE)
-	testScannerScan(t, "}", RBRACE)
-}
+	check1("(", LPAREN)
+	check1(")", RPAREN)
+	check1("[", LBRACK)
+	check1("]", RBRACK)
+	check1("{", LBRACE)
+	check1("}", RBRACE)
 
-// simple tests for lexem
-func TestScannerScan2(t *testing.T) {
-	testScannerScan2(t, "IDENT  ", IDENT, WS)
-	testScannerScan2(t, "# ", ILLEGAL, WS)
+	checkN("IDENT  ", IDENT, WS)
+	checkN("# ", ILLEGAL, WS)
 
-	testScannerScan2(t, "====", DEQ, DEQ)
-	testScannerScan2(t, "===", DEQ, EQ)
-	testScannerScan2(t, "!=!", NEQ, NOT)
+	checkN("====", DEQ, DEQ)
+	checkN("===", DEQ, EQ)
+	checkN("!=!", NEQ, NOT)
 
-	testScannerScan2(t, `?"g"?`, WCARD, STRING, WCARD)
-	testScannerScan2(t, `(RAW_TEXT CONTAINS "hello")`,
+	checkN(`?"g"?`, WCARD, STRING, WCARD)
+	checkN(`(RAW_TEXT CONTAINS "hello")`,
 		LPAREN, IDENT, WS, IDENT, WS, STRING, RPAREN)
+	checkAll(`(RAW_TEXT CONTAINS "hello")`, false,
+		LPAREN, IDENT, WS, IDENT, WS, STRING, RPAREN)
+	checkAll(`(RAW_TEXT CONTAINS "hello")`, true,
+		LPAREN, IDENT, IDENT, STRING, RPAREN)
 
 	// TODO: more tests for numbers
 
-	testScannerScan2(t, `YYYY/MM/DD`, IDENT, SLASH, IDENT, SLASH, IDENT)
-	testScannerScan2(t, `YYYY-MM-DD`, IDENT, MINUS, IDENT, MINUS, IDENT)
-	//testScannerScan2(t, `YYYY_MM_DD`, IDENT, ILLEGAL, IDENT, ILLEGAL, IDENT)
-}
+	checkN(`YYYY/MM/DD`, IDENT, SLASH, IDENT, SLASH, IDENT)
+	checkN(`YYYY-MM-DD`, IDENT, MINUS, IDENT, MINUS, IDENT)
+	checkN(`HH:MM:SS`, IDENT, COLON, IDENT, COLON, IDENT)
 
-// simple tests for bad lexem
-func TestScannerScanBad(t *testing.T) {
-	testScannerScanBad(t, `"noquote`, "no string ending found")
-	testScannerScanBad(t, `"noescape\`, "bad string escaping found")
-	// testScannerScanBad(t, `.e0`, "bad float format")
-	testScannerScanBad(t, `1.e`, "bad float format, expected digital")
-	testScannerScanBad(t, `1.0E nodigit`, "bad float format, expected digital")
-	testScannerScanBad(t, `1.0e+nodigit`, "bad float format, expected digital")
-	testScannerScanBad(t, `1.0E-nodigit`, "bad float format, expected digital")
+	bad(`"noquote`, "no string ending found")
+	bad(`"noescape\`, "bad string escaping found")
+	// bad(`.e0`, "bad float format")
+	bad(`1.e`, "bad float format, expected digital")
+	bad(`1.0E nodigit`, "bad float format, expected digital")
+	bad(`1.0e+nodigit`, "bad float format, expected digital")
+	bad(`1.0E-nodigit`, "bad float format, expected digital")
 
 	// TODO: more tests for numbers
 }

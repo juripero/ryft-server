@@ -15,6 +15,14 @@ func TestLexemeNew(t *testing.T) {
 	assert.Equal(t, "abc", NewLexeme(WS, 'a', 'b', 'c').String())
 }
 
+// test lexem equal
+func TestLexemeEqual(t *testing.T) {
+	assert.True(t, NewLexeme(EOF).EqualTo(NewLexeme(EOF)))
+	assert.True(t, NewLexeme(INT, '1').EqualTo(NewLexeme(INT, '1')))
+	assert.False(t, NewLexeme(INT, '1').EqualTo(NewLexeme(FLOAT, '1')))
+	assert.False(t, NewLexeme(INT, '1').EqualTo(NewLexeme(INT, '2')))
+}
+
 // test lexem words
 func TestLexemeIs(t *testing.T) {
 	assert.True(t, NewLexemeStr(IDENT, "aNd").IsAnd())
@@ -47,31 +55,37 @@ func TestLexemeIs(t *testing.T) {
 	assert.False(t, NewLexemeStr(IDENT, "NOT_EQUALZ").IsNotEquals())
 	assert.False(t, NewLexemeStr(INT, "NOT_EQUALS").IsNotEquals())
 
-	assert.True(t, NewLexemeStr(IDENT, "es").IsES())
-	assert.True(t, NewLexemeStr(IDENT, "exact").IsES())
+	assert.True(t, NewLexemeStr(IDENT, "eS").IsES())
+	assert.True(t, NewLexemeStr(IDENT, "exAct").IsES())
 	assert.False(t, NewLexemeStr(INT, "EXACT").IsES())
-	assert.True(t, NewLexemeStr(IDENT, "FHS").IsFHS())
-	assert.True(t, NewLexemeStr(IDENT, "HAMMING").IsFHS())
+	assert.True(t, NewLexemeStr(IDENT, "FhS").IsFHS())
+	assert.True(t, NewLexemeStr(IDENT, "HAMmING").IsFHS())
 	assert.False(t, NewLexemeStr(INT, "HAMMING").IsFHS())
-	assert.True(t, NewLexemeStr(IDENT, "FEDS").IsFEDS())
-	assert.True(t, NewLexemeStr(IDENT, "EDIT").IsFEDS())
-	assert.True(t, NewLexemeStr(IDENT, "EDIT_DIST").IsFEDS())
-	assert.True(t, NewLexemeStr(IDENT, "EDIT_DISTANCE").IsFEDS())
+	assert.True(t, NewLexemeStr(IDENT, "FEdS").IsFEDS())
+	assert.True(t, NewLexemeStr(IDENT, "EDIt").IsFEDS())
+	assert.True(t, NewLexemeStr(IDENT, "EDIt_DIST").IsFEDS())
+	assert.True(t, NewLexemeStr(IDENT, "EDiT_DISTANCE").IsFEDS())
 	assert.False(t, NewLexemeStr(INT, "EDIT_DISTANCE").IsFEDS())
-	assert.True(t, NewLexemeStr(IDENT, "DATE").IsDate())
+	assert.True(t, NewLexemeStr(IDENT, "DaTE").IsDate())
 	assert.False(t, NewLexemeStr(INT, "DATE").IsDate())
-	assert.True(t, NewLexemeStr(IDENT, "TIME").IsTime())
+	assert.True(t, NewLexemeStr(IDENT, "TiME").IsTime())
 	assert.False(t, NewLexemeStr(INT, "TIME").IsTime())
-	assert.True(t, NewLexemeStr(IDENT, "NUMBER").IsNumber())
-	assert.True(t, NewLexemeStr(IDENT, "NUMERIC").IsNumber())
+	assert.True(t, NewLexemeStr(IDENT, "NUMbER").IsNumber())
+	assert.True(t, NewLexemeStr(IDENT, "NUmERIC").IsNumber())
 	assert.False(t, NewLexemeStr(INT, "NUMBER").IsNumber())
-	assert.True(t, NewLexemeStr(IDENT, "CURRENCY").IsCurrency())
-	assert.True(t, NewLexemeStr(IDENT, "MONEY").IsCurrency())
+	assert.True(t, NewLexemeStr(IDENT, "NuM").IsNum())
+	assert.False(t, NewLexemeStr(INT, "NUM").IsNum())
+	assert.True(t, NewLexemeStr(IDENT, "CURrENCY").IsCurrency())
+	assert.True(t, NewLexemeStr(IDENT, "MOnEY").IsCurrency())
 	assert.False(t, NewLexemeStr(INT, "CURRENCY").IsCurrency())
-	assert.True(t, NewLexemeStr(IDENT, "IPv4").IsIPv4())
+	assert.True(t, NewLexemeStr(IDENT, "CuR").IsCur())
+	assert.False(t, NewLexemeStr(INT, "CUR").IsCur())
+	assert.True(t, NewLexemeStr(IDENT, "IPV4").IsIPv4())
 	assert.False(t, NewLexemeStr(INT, "IPv4").IsIPv4())
-	assert.True(t, NewLexemeStr(IDENT, "IPv6").IsIPv6())
+	assert.True(t, NewLexemeStr(IDENT, "IPV6").IsIPv6())
 	assert.False(t, NewLexemeStr(INT, "IPv6").IsIPv6())
+	assert.True(t, NewLexemeStr(IDENT, "IP").IsIP())
+	assert.False(t, NewLexemeStr(INT, "IP").IsIP())
 }
 
 // test lexem unquote

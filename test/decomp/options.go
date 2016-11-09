@@ -22,7 +22,7 @@ type Options struct {
 }
 
 // IsTheSame checks the options are the same.
-func (o Options) IsTheSame(p Options) bool {
+func (o Options) EqualTo(p Options) bool {
 	// search mode
 	if o.Mode != p.Mode {
 		return false
@@ -139,71 +139,118 @@ func (o Options) String() string {
 
 // SetMode sets the specified search mode,
 // resets non related options to their defaults
-func (o *Options) SetMode(mode string) {
+func (o *Options) SetMode(mode string) *Options {
+	// reset mode non-supported options
+	// (supported options are commented)
 	switch mode {
+
+	// EXACT
 	case "es":
-		o.Dist = 0 // no these options for exact search!
+		o.Dist = 0
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
 
+	// HAMMING
 	case "fhs":
 		if o.Dist == 0 {
 			mode = "es" // back to EXACT if no distance provided
 		}
-		o.Reduce = false // no these options for FHS!
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
+		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
 
+	// EDIT DISTANCE
 	case "feds":
 		if o.Dist == 0 {
 			mode = "es" // back to EXACT if no distance provided
+			o.Reduce = false
 		}
-		o.Octal = false // no these options for FEDS!
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
+		//o.Reduce = false
+		o.Octal = false
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
 
+	// DATE
 	case "ds":
-		o.Dist = 0 // no these options for DATE search!
+		o.Dist = 0
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
 
+	// TIME
 	case "ts":
-		o.Dist = 0 // no these options for TIME search!
+		o.Dist = 0
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
 
+	// NUMBER
 	case "ns":
 		o.Dist = 0 // no these options for NUMBER search!
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
+		//o.DigitSeparator = ""
+		//o.DecimalPoint = ""
 
+	// CURRENCY
 	case "cs":
-		o.Dist = 0 // no these options for CURRENCY search!
+		o.Dist = 0
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
 		o.Reduce = false
 		o.Octal = false
+		//o.CurrencySymbol = ""
+		//o.DigitSeparator = ""
+		//o.DecimalPoint = ""
 
+	// IPv4
 	case "ipv4":
-		o.Dist = 0 // no these options for IPv4 search!
+		o.Dist = 0
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
 		o.Reduce = false
+		//o.Octal = false
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
 
+	// IPv6
 	case "ipv6":
-		o.Dist = 0 // no these options for IPv6 search!
+		o.Dist = 0
+		//o.Width = 0
+		//o.Line = false
+		//o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
@@ -215,10 +262,12 @@ func (o *Options) SetMode(mode string) {
 	}
 
 	o.Mode = mode
+	return o
 }
 
 // Set sets some option
-func (o *Options) Set(option string, positonalName string) error {
+// positional name is optional
+func (o *Options) Set(option string, positonalName string) (bool, error) {
 	// supported formats are:
 	//  !opt    -- booleans and integer
 	//  opt     -- booleans
@@ -231,25 +280,27 @@ func (o *Options) Set(option string, positonalName string) error {
 	if lex := p.scanIgnoreSpace(); lex.token == NOT {
 		// next option should be boolean
 		// or integer (will equal to zero)
-		// and should not contains value
+		// and should not contains a value
 		not = true
 	} else {
 		p.unscan(lex)
 	}
 
 	// parse option's name
+	var named bool
 	var opt string
 	if lex := p.scanIgnoreSpace(); lex.token == IDENT {
+		named = true
 		opt = lex.literal
 		//if len(positonalName) != 0 && positonalName != lex.literal {
-		//	return fmt.Errorf("%q name found instead of positional %q", lex, positonalName)
+		//	return named, fmt.Errorf("%q name found instead of positional %q", lex, positonalName)
 		//}
 	} else if len(positonalName) != 0 {
-		p.unscan(lex)
+		p.unscan(lex) // it's actually an option value
 		p.unscan(NewLexemeStr(EQ, "="))
 		opt = positonalName
 	} else {
-		return fmt.Errorf("%q no valid option name found", opt)
+		return named, fmt.Errorf("%q no valid option name found", opt)
 	}
 
 	// parse "opt [=val]"
@@ -263,9 +314,13 @@ func (o *Options) Set(option string, positonalName string) error {
 		if not {
 			o.Dist = 0
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.Dist = uint(p.parseIntVal(0, 64*1024-1))
+			if v, err := p.parseIntVal(0, 64*1024-1); err != nil {
+				return named, err
+			} else {
+				o.Dist = uint(v)
+			}
 		} else {
-			return fmt.Errorf("%q found instead of =", eq)
+			return named, fmt.Errorf("%q found instead of =", eq)
 		}
 
 	// surrounding width
@@ -276,10 +331,14 @@ func (o *Options) Set(option string, positonalName string) error {
 			o.Width = 0
 			o.Line = false // mutual exclusive
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.Width = uint(p.parseIntVal(0, 64*1024-1))
-			o.Line = false // mutual exclusive
+			if v, err := p.parseIntVal(0, 64*1024-1); err != nil {
+				return named, err
+			} else {
+				o.Width = uint(v)
+				o.Line = false // mutual exclusive
+			}
 		} else {
-			return fmt.Errorf("%q found instead of =", eq)
+			return named, fmt.Errorf("%q found instead of =", eq)
 		}
 
 	// surrounding: entire line
@@ -289,12 +348,16 @@ func (o *Options) Set(option string, positonalName string) error {
 			o.Line = false
 			o.Width = 0 // mutual exclusive
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.Line = p.parseBoolVal()
-			o.Width = 0 // mutual exclusive
+			if v, err := p.parseBoolVal(); err != nil {
+				return named, err
+			} else {
+				o.Line = v
+				o.Width = 0 // mutual exclusive
+			}
 		} else {
-			p.unscan(eq)
-			o.Line = true // return fmt.Errorf("%q found instead of =", eq)
-			o.Width = 0   // mutual exclusive
+			p.unscan(eq) // return fmt.Errorf("%q found instead of =", eq)
+			o.Line = true
+			o.Width = 0 // mutual exclusive
 		}
 
 	// case sensitivity flag
@@ -303,10 +366,14 @@ func (o *Options) Set(option string, positonalName string) error {
 		if not {
 			o.Case = false
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.Case = p.parseBoolVal()
+			if v, err := p.parseBoolVal(); err != nil {
+				return named, err
+			} else {
+				o.Case = v
+			}
 		} else {
-			p.unscan(eq)
-			o.Case = true // return fmt.Errorf("%q found instead of =", eq)
+			p.unscan(eq) // return fmt.Errorf("%q found instead of =", eq)
+			o.Case = true
 		}
 
 	// reduce duplicates flag
@@ -315,10 +382,14 @@ func (o *Options) Set(option string, positonalName string) error {
 		if not {
 			o.Reduce = false
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.Reduce = p.parseBoolVal()
+			if v, err := p.parseBoolVal(); err != nil {
+				return named, err
+			} else {
+				o.Reduce = v
+			}
 		} else {
-			p.unscan(eq)
-			o.Reduce = true // return fmt.Errorf("%q found instead of =", eq)
+			p.unscan(eq) // return fmt.Errorf("%q found instead of =", eq)
+			o.Reduce = true
 		}
 
 	// octal flag
@@ -328,10 +399,14 @@ func (o *Options) Set(option string, positonalName string) error {
 		if not {
 			o.Octal = false
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.Octal = p.parseBoolVal()
+			if v, err := p.parseBoolVal(); err != nil {
+				return named, err
+			} else {
+				o.Octal = v
+			}
 		} else {
-			p.unscan(eq)
-			o.Octal = true // return fmt.Errorf("%q found instead of =", eq)
+			p.unscan(eq) // return fmt.Errorf("%q found instead of =", eq)
+			o.Octal = true
 		}
 
 	// currency symbol
@@ -339,42 +414,57 @@ func (o *Options) Set(option string, positonalName string) error {
 		strings.EqualFold(opt, "SYMB"),
 		strings.EqualFold(opt, "SYM"):
 		if not {
-			return fmt.Errorf("! is not supported for string variable")
+			return named, fmt.Errorf("! is not supported for string option")
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.CurrencySymbol = p.parseStringVal()
+			if v, err := p.parseStringVal(); err != nil {
+				return named, err
+			} else {
+				o.CurrencySymbol = v
+				// TODO: limit the length to 1?
+			}
 		} else {
-			return fmt.Errorf("%q found instead of =", eq)
+			return named, fmt.Errorf("%q found instead of =", eq)
 		}
 
 	// digit separator
 	case strings.EqualFold(opt, "SEPARATOR"),
 		strings.EqualFold(opt, "SEP"):
 		if not {
-			return fmt.Errorf("! is not supported for string variable")
+			return named, fmt.Errorf("! is not supported for string option")
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.DigitSeparator = p.parseStringVal()
+			if v, err := p.parseStringVal(); err != nil {
+				return named, err
+			} else {
+				o.DigitSeparator = v
+				// TODO: limit the length to 1?
+			}
 		} else {
-			return fmt.Errorf("%q found instead of =", eq)
+			return named, fmt.Errorf("%q found instead of =", eq)
 		}
 
 	// decimal point
 	case strings.EqualFold(opt, "DECIMAL"),
 		strings.EqualFold(opt, "DEC"):
 		if not {
-			return fmt.Errorf("! is not supported for string variable")
+			return named, fmt.Errorf("! is not supported for string option")
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			o.DecimalPoint = p.parseStringVal()
+			if v, err := p.parseStringVal(); err != nil {
+				return named, err
+			} else {
+				o.DecimalPoint = v
+				// TODO: limit the length to 1?
+			}
 		} else {
-			return fmt.Errorf("%q found instead of =", eq)
+			return named, fmt.Errorf("%q found instead of =", eq)
 		}
 
 	default:
-		return fmt.Errorf("unknown option %q found", opt)
+		return named, fmt.Errorf("unknown option %q found", opt)
 	}
 
 	if !p.EOF() {
-		return fmt.Errorf("parse option: extra data at the end")
+		return named, fmt.Errorf("extra data at the end")
 	}
 
-	return nil
+	return named, nil // OK
 }

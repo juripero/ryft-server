@@ -57,7 +57,7 @@ func (o *Optimizator) Process(q Query) Query {
 // check if two queries have the same type and options
 func (o *Optimizator) isTheSameType(a Query, b Query) bool {
 	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
-		return aa.Options.IsTheSame(bb.Options)
+		return aa.Options.EqualTo(bb.Options)
 	}
 
 	return false

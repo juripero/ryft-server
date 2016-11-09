@@ -1172,8 +1172,12 @@ func (p *Parser) parseSearchOptions(opts Options, positionalNames ...string) Opt
 
 		// parse and set an option
 		if option := strings.TrimSpace(p.parseUntilCommaOrRParen()); len(option) != 0 {
-			if err := opts.Set(option, posName); err != nil {
+			if named, err := opts.Set(option, posName); err != nil {
 				panic(fmt.Errorf("failed to parse option: %s", err))
+			} else if named {
+				// if named option parsed
+				// stop positional arguments
+				positionalNames = nil
 			}
 		}
 
@@ -1207,48 +1211,48 @@ func (p *Parser) parseStringExpr(start Lexeme) string {
 }
 
 // parse string value
-func (p *Parser) parseStringVal() string {
+func (p *Parser) parseStringVal() (string, error) {
 	if val := p.scanIgnoreSpace(); val.token == STRING {
-		return val.Unquoted()
+		return val.Unquoted(), nil
 	} else if val.token == IDENT || val.token == INT || val.token == FLOAT {
-		return val.literal // as is
+		return val.literal, nil // as is
 	} else {
-		panic(fmt.Errorf("%q found instead of string value", val))
+		return "", fmt.Errorf("%q found instead of string value", val)
 	}
 }
 
 // parse integer value
-func (p *Parser) parseIntVal(min, max int64) int64 {
+func (p *Parser) parseIntVal(min, max int64) (int64, error) {
 	if val := p.scanIgnoreSpace(); val.token == INT || val.token == STRING {
 		i, err := strconv.ParseInt(strings.TrimSpace(val.Unquoted()), 10, 64)
 		if err != nil {
 			p.unscan(val)
 			// ParseInt() error already contains input string reference
-			panic(fmt.Errorf("failed to parse integer: %s", err))
+			return 0, fmt.Errorf("failed to parse integer: %s", err)
 		}
 
 		if i < min || max < i {
 			p.unscan(val)
-			panic(fmt.Errorf("value %d is out of range [%d,%d]", i, min, max))
+			return 0, fmt.Errorf("value %d is out of range [%d,%d]", i, min, max)
 		}
 
-		return i // OK
+		return i, nil // OK
 	} else {
 		p.unscan(val)
-		panic(fmt.Errorf("%q found instead of integer value", val))
+		return 0, fmt.Errorf("%q found instead of integer value", val)
 	}
 }
 
 // parse boolean value
-func (p *Parser) parseBoolVal() bool {
+func (p *Parser) parseBoolVal() (bool, error) {
 	if val := p.scanIgnoreSpace(); val.token == INT || val.token == IDENT || val.token == STRING {
 		b, err := strconv.ParseBool(strings.TrimSpace(val.Unquoted()))
 		if err != nil {
 			// ParseBool() error already contains input string reference
-			panic(fmt.Errorf("failed to parse boolean: %s", err))
+			return false, fmt.Errorf("failed to parse boolean: %s", err)
 		}
-		return b // OK
+		return b, nil // OK
 	} else {
-		panic(fmt.Errorf("%q found instead of boolean value", val))
+		return false, fmt.Errorf("%q found instead of boolean value", val)
 	}
 }
