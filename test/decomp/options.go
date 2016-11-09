@@ -218,11 +218,12 @@ func (o *Options) SetMode(mode string) {
 }
 
 // Set sets some option
-func (o *Options) Set(option string) error {
+func (o *Options) Set(option string, positonalName string) error {
 	// supported formats are:
 	//  !opt    -- booleans and integer
 	//  opt     -- booleans
 	//  opt=val -- any
+	// val      -- if positional name provided
 	p := NewParserString(option)
 
 	// support for !opt syntax
@@ -236,134 +237,138 @@ func (o *Options) Set(option string) error {
 		p.unscan(lex)
 	}
 
-	// parse "opt [=val]"
-	if opt := p.scanIgnoreSpace(); opt.token == IDENT {
-		switch {
-
-		// fuzziness distance
-		case strings.EqualFold(opt.literal, "FUZZINESS"),
-			strings.EqualFold(opt.literal, "DISTANCE"),
-			strings.EqualFold(opt.literal, "DIST"),
-			strings.EqualFold(opt.literal, "D"):
-			if not {
-				o.Dist = 0
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.Dist = uint(p.parseIntVal(0, 64*1024-1))
-			} else {
-				p.unscan(eq)
-				return fmt.Errorf("%q found instead of =", eq)
-			}
-
-		// surrounding width
-		case strings.EqualFold(opt.literal, "SURROUNDING"),
-			strings.EqualFold(opt.literal, "WIDTH"),
-			strings.EqualFold(opt.literal, "W"):
-			if not {
-				o.Width = 0
-				o.Line = false // mutual exclusive
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.Width = uint(p.parseIntVal(0, 64*1024-1))
-				o.Line = false // mutual exclusive
-			} else {
-				p.unscan(eq)
-				return fmt.Errorf("%q found instead of =", eq)
-			}
-
-		// surrounding: entire line
-		case strings.EqualFold(opt.literal, "LINE"),
-			strings.EqualFold(opt.literal, "L"):
-			if not {
-				o.Line = false
-				o.Width = 0 // mutual exclusive
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.Line = p.parseBoolVal()
-				o.Width = 0 // mutual exclusive
-			} else {
-				p.unscan(eq)
-				o.Line = true // return fmt.Errorf("%q found instead of =", eq)
-				o.Width = 0   // mutual exclusive
-			}
-
-		// case sensitivity flag
-		case strings.EqualFold(opt.literal, "CASE"),
-			strings.EqualFold(opt.literal, "CS"):
-			if not {
-				o.Case = false
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.Case = p.parseBoolVal()
-			} else {
-				p.unscan(eq)
-				o.Case = true // return fmt.Errorf("%q found instead of =", eq)
-			}
-
-		// reduce duplicates flag
-		case strings.EqualFold(opt.literal, "REDUCE"),
-			strings.EqualFold(opt.literal, "R"):
-			if not {
-				o.Reduce = false
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.Reduce = p.parseBoolVal()
-			} else {
-				p.unscan(eq)
-				o.Reduce = true // return fmt.Errorf("%q found instead of =", eq)
-			}
-
-		// octal flag
-		case strings.EqualFold(opt.literal, "OCTAL"),
-			strings.EqualFold(opt.literal, "OCT"):
-			if not {
-				o.Octal = false
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.Octal = p.parseBoolVal()
-			} else {
-				p.unscan(eq)
-				o.Octal = true // return fmt.Errorf("%q found instead of =", eq)
-			}
-
-		// currency symbol
-		case strings.EqualFold(opt.literal, "SYMBOL"),
-			strings.EqualFold(opt.literal, "SYMB"),
-			strings.EqualFold(opt.literal, "SYM"):
-			if not {
-				return fmt.Errorf("! is not supported for string variable")
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.CurrencySymbol = p.parseStringVal()
-			} else {
-				p.unscan(eq)
-				return fmt.Errorf("%q found instead of =", eq)
-			}
-
-		// digit separator
-		case strings.EqualFold(opt.literal, "SEPARATOR"),
-			strings.EqualFold(opt.literal, "SEP"):
-			if not {
-				return fmt.Errorf("! is not supported for string variable")
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.DigitSeparator = p.parseStringVal()
-			} else {
-				p.unscan(eq)
-				return fmt.Errorf("%q found instead of =", eq)
-			}
-
-		// decimal point
-		case strings.EqualFold(opt.literal, "DECIMAL"),
-			strings.EqualFold(opt.literal, "DEC"):
-			if not {
-				return fmt.Errorf("! is not supported for string variable")
-			} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-				o.DecimalPoint = p.parseStringVal()
-			} else {
-				p.unscan(eq)
-				return fmt.Errorf("%q found instead of =", eq)
-			}
-
-		default:
-			p.unscan(opt)
-			return fmt.Errorf("unknown option %q found", opt)
-		}
+	// parse option's name
+	var opt string
+	if lex := p.scanIgnoreSpace(); lex.token == IDENT {
+		opt = lex.literal
+		//if len(positonalName) != 0 && positonalName != lex.literal {
+		//	return fmt.Errorf("%q name found instead of positional %q", lex, positonalName)
+		//}
+	} else if len(positonalName) != 0 {
+		p.unscan(lex)
+		p.unscan(NewLexemeStr(EQ, "="))
+		opt = positonalName
 	} else {
-		p.unscan(opt)
 		return fmt.Errorf("%q no valid option name found", opt)
+	}
+
+	// parse "opt [=val]"
+	switch {
+
+	// fuzziness distance
+	case strings.EqualFold(opt, "FUZZINESS"),
+		strings.EqualFold(opt, "DISTANCE"),
+		strings.EqualFold(opt, "DIST"),
+		strings.EqualFold(opt, "D"):
+		if not {
+			o.Dist = 0
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.Dist = uint(p.parseIntVal(0, 64*1024-1))
+		} else {
+			return fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// surrounding width
+	case strings.EqualFold(opt, "SURROUNDING"),
+		strings.EqualFold(opt, "WIDTH"),
+		strings.EqualFold(opt, "W"):
+		if not {
+			o.Width = 0
+			o.Line = false // mutual exclusive
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.Width = uint(p.parseIntVal(0, 64*1024-1))
+			o.Line = false // mutual exclusive
+		} else {
+			return fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// surrounding: entire line
+	case strings.EqualFold(opt, "LINE"),
+		strings.EqualFold(opt, "L"):
+		if not {
+			o.Line = false
+			o.Width = 0 // mutual exclusive
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.Line = p.parseBoolVal()
+			o.Width = 0 // mutual exclusive
+		} else {
+			p.unscan(eq)
+			o.Line = true // return fmt.Errorf("%q found instead of =", eq)
+			o.Width = 0   // mutual exclusive
+		}
+
+	// case sensitivity flag
+	case strings.EqualFold(opt, "CASE"),
+		strings.EqualFold(opt, "CS"):
+		if not {
+			o.Case = false
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.Case = p.parseBoolVal()
+		} else {
+			p.unscan(eq)
+			o.Case = true // return fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// reduce duplicates flag
+	case strings.EqualFold(opt, "REDUCE"),
+		strings.EqualFold(opt, "R"):
+		if not {
+			o.Reduce = false
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.Reduce = p.parseBoolVal()
+		} else {
+			p.unscan(eq)
+			o.Reduce = true // return fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// octal flag
+	case strings.EqualFold(opt, "OCTAL"),
+		strings.EqualFold(opt, "OCT"):
+		if not {
+			o.Octal = false
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.Octal = p.parseBoolVal()
+		} else {
+			p.unscan(eq)
+			o.Octal = true // return fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// currency symbol
+	case strings.EqualFold(opt, "SYMBOL"),
+		strings.EqualFold(opt, "SYMB"),
+		strings.EqualFold(opt, "SYM"):
+		if not {
+			return fmt.Errorf("! is not supported for string variable")
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.CurrencySymbol = p.parseStringVal()
+		} else {
+			return fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// digit separator
+	case strings.EqualFold(opt, "SEPARATOR"),
+		strings.EqualFold(opt, "SEP"):
+		if not {
+			return fmt.Errorf("! is not supported for string variable")
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.DigitSeparator = p.parseStringVal()
+		} else {
+			return fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// decimal point
+	case strings.EqualFold(opt, "DECIMAL"),
+		strings.EqualFold(opt, "DEC"):
+		if not {
+			return fmt.Errorf("! is not supported for string variable")
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			o.DecimalPoint = p.parseStringVal()
+		} else {
+			return fmt.Errorf("%q found instead of =", eq)
+		}
+
+	default:
+		return fmt.Errorf("unknown option %q found", opt)
 	}
 
 	if !p.EOF() {

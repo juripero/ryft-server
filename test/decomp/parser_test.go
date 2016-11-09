@@ -171,11 +171,11 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`  (RECORD.price CONTAINS NUMBER("450" < NUM < "600", ",", "."))`,
-		`P{(RECORD.price CONTAINS NUMBER("450"<NUM<"600",",","."))[ns]}`)
+		`P{(RECORD.price CONTAINS NUMBER("450" < NUM < "600", ",", "."))[ns,sep=",",dot="."]}`)
 
 	testParserParse(t, true,
 		`  (RECORD.price CONTAINS NUMERIC("450" < NUM < "600", ",", "."))`,
-		`P{(RECORD.price CONTAINS NUMBER("450"<NUM<"600",",","."))[ns]}`)
+		`P{(RECORD.price CONTAINS NUMBER("450" < NUM < "600", ",", "."))[ns,sep=",",dot="."]}`)
 
 	testParserParse(t, true,
 		`  (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
@@ -946,4 +946,34 @@ func TestParserParseTIME(t *testing.T) {
 		"TIME value contains bad separators")
 	testParserBad(t, `(RAW_TEXT CONTAINS TIME(02-28_12 <= HH-MM-SS < 02-28-12))`,
 		"TIME value contains bad separators")
+}
+
+// test for NUMBER (generic queries)
+func TestParserParseNUMBER(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS NUMBER(NUM > "0", W=1))`,
+		`P{(RAW_TEXT CONTAINS NUMBER(NUM > "0", WIDTH="1"))[ns,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS NUMBER(NUM > 0, W=1))`, // quotes should be added
+		`P{(RAW_TEXT CONTAINS NUMBER(NUM > "0", WIDTH="1"))[ns,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS NUMERIC(NUM != 0, W=1))`,
+		`P{(RAW_TEXT CONTAINS NUMBER(NUM != "0", WIDTH="1"))[ns,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS NUMBER(1  <  NUM  <  2, L=true))`,
+		`P{(RAW_TEXT CONTAINS NUMBER("1" < NUM < "2", LINE="true"))[ns,line]}`)
+
+	// operator replacement
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS NUMBER(NUM  ==  123, W=1))`, // == should be replaced with single =
+		`P{(RAW_TEXT CONTAINS NUMBER(NUM = "123", WIDTH="1"))[ns,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS NUMBER(2   >   NUM   >=   1, L=true))`,
+		`P{(RAW_TEXT CONTAINS NUMBER("1" <= NUM < "2", LINE="true"))[ns,line]}`)
+
+	// TODO: compatibility mode
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER(NUM == Feb-28-12))`, "found instead of value")
 }

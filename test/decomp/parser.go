@@ -158,7 +158,6 @@ func (p *Parser) parseQuery3() Query {
 	if lex := p.scanIgnoreSpace(); lex.token == LPAREN {
 		arg := p.parseQuery0()
 		if end := p.scanIgnoreSpace(); end.token != RPAREN {
-			p.unscan(end)
 			panic(fmt.Errorf("%q found instead of closing )", end))
 		}
 
@@ -204,11 +203,9 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 						buf.WriteString(lex.literal)
 						buf.WriteString(end.literal)
 					} else {
-						p.unscan(end)
 						panic(fmt.Errorf("no closing ] found"))
 					}
 				} else {
-					p.unscan(lex)
 					panic(fmt.Errorf("no field name found for RECORD"))
 				}
 			} else {
@@ -231,7 +228,6 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		expression = fmt.Sprintf(`"%s"`, lex) // plain simple query
 
 	default:
-		p.unscan(lex)
 		panic(fmt.Errorf("found %q, expected RAW_TEXT or RECORD", lex))
 	}
 
@@ -243,7 +239,6 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			operator = lex.literal
 
 		default:
-			p.unscan(lex)
 			panic(fmt.Errorf("found %q, expected CONTAINS or EQUALS", lex))
 		}
 	}
@@ -273,12 +268,16 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			oldExpr = fmt.Sprintf("TIME(%s)", expression)
 			res.Options.SetMode("ts")
 
-		case lex.IsNumber(): // "as is"
-			// handle aliases NUMERIC -> NUMBER
-			if !strings.EqualFold(lex.literal, "NUMBER") {
-				lex.literal = "NUMBER"
+		case lex.IsNumber(): // NUMBER + options
+			expression, res.Options = p.parseNumberExpr(res.Options)
+			oldExpr = fmt.Sprintf("NUMBER(%s", expression)
+			if res.Options.DigitSeparator != "" {
+				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.DigitSeparator)
 			}
-			expression = p.parseParenExpr(lex)
+			if res.Options.DecimalPoint != "" {
+				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.DecimalPoint)
+			}
+			oldExpr += ")"
 			res.Options.SetMode("ns")
 
 		case lex.IsCurrency(): // "as is"
@@ -299,7 +298,6 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression = p.parseStringExpr(lex)
 
 		default:
-			p.unscan(lex)
 			panic(fmt.Errorf("%q is unexpected expression", lex))
 		}
 	}
@@ -410,6 +408,23 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// numeric search
 	case "ns":
+		args := []string{expression}
+
+		if opts.Line { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
+		} else if opts.Width != 0 {
+			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
+		}
+
+		if len(opts.DigitSeparator) != 0 {
+			args = append(args, fmt.Sprintf(`SEPARATOR="%s"`, opts.DigitSeparator))
+		}
+
+		if len(opts.DecimalPoint) != 0 {
+			args = append(args, fmt.Sprintf(`DECIMAL="%s"`, opts.DecimalPoint))
+		}
+
+		return fmt.Sprintf("NUMBER(%s)", strings.Join(args, ", "))
 
 	// currency search
 	case "cs":
@@ -438,7 +453,6 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 	case LPAREN:
 		buf.WriteString(beg.literal)
 	default:
-		p.unscan(beg)
 		panic(fmt.Errorf("%q found instead of (", beg))
 	}
 
@@ -451,7 +465,6 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 		case LPAREN:
 			deep++
 		case EOF, ILLEGAL:
-			p.unscan(lex)
 			panic(fmt.Errorf("no expression ending found"))
 		}
 		buf.WriteString(lex.literal)
@@ -499,7 +512,6 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	case LPAREN:
 		break // OK
 	default:
-		p.unscan(beg)
 		panic(fmt.Errorf("%q found instead of (", beg))
 	}
 
@@ -509,11 +521,10 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 		res = p.parseStringExpr(lex)
 
 	default:
-		p.unscan(lex)
 		panic(fmt.Errorf("no string expression found"))
 	}
 
-	// read options
+	// parse options
 	switch lex := p.scanIgnoreSpace(); lex.token {
 	case COMMA:
 		opts = p.parseSearchOptions(opts)
@@ -526,7 +537,6 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	case RPAREN:
 		break // OK
 	default:
-		p.unscan(end)
 		panic(fmt.Errorf("%q found instead of )", end))
 	}
 
@@ -540,7 +550,6 @@ func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 	case LPAREN:
 		break // OK
 	default:
-		p.unscan(beg)
 		panic(fmt.Errorf("%q found instead of (", beg))
 	}
 
@@ -548,7 +557,7 @@ func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 	expr := p.parseUntilCommaOrRParen()
 	expr = p.checkDataExpr(expr)
 
-	// read options
+	// parse options
 	switch lex := p.scanIgnoreSpace(); lex.token {
 	case COMMA:
 		opts = p.parseSearchOptions(opts)
@@ -561,7 +570,6 @@ func (p *Parser) parseDateExpr(opts Options) (string, Options) {
 	case RPAREN:
 		break // OK
 	default:
-		p.unscan(end)
 		panic(fmt.Errorf("%q found instead of )", end))
 	}
 
@@ -678,7 +686,6 @@ func (p *Parser) parseTimeExpr(opts Options) (string, Options) {
 	case LPAREN:
 		break // OK
 	default:
-		p.unscan(beg)
 		panic(fmt.Errorf("%q found instead of (", beg))
 	}
 
@@ -686,7 +693,7 @@ func (p *Parser) parseTimeExpr(opts Options) (string, Options) {
 	expr := p.parseUntilCommaOrRParen()
 	expr = p.checkTimeExpr(expr)
 
-	// read options
+	// parse options
 	switch lex := p.scanIgnoreSpace(); lex.token {
 	case COMMA:
 		opts = p.parseSearchOptions(opts)
@@ -699,7 +706,6 @@ func (p *Parser) parseTimeExpr(opts Options) (string, Options) {
 	case RPAREN:
 		break // OK
 	default:
-		p.unscan(end)
 		panic(fmt.Errorf("%q found instead of )", end))
 	}
 
@@ -812,12 +818,112 @@ func (p *Parser) checkTimeExpr(expr string) string {
 	return fmt.Sprintf("%s %s %s", f, yop, y)
 }
 
+// parse NUMBER search expression in parentheses and options
+func (p *Parser) parseNumberExpr(opts Options) (string, Options) {
+	// left paren first
+	switch beg := p.scanIgnoreSpace(); beg.token {
+	case LPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of (", beg))
+	}
+
+	// parse first value and first operator [optional]
+	var x, xop string
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case STRING, FLOAT, INT:
+		x = lex.Unquoted()
+
+		// parse first operator
+		switch op := p.scanIgnoreSpace(); op.token {
+		case LS, LEQ, GT, GEQ:
+			xop = op.literal
+		default:
+			panic(fmt.Errorf("%q found instead of < or <=", op))
+		}
+
+	default:
+		p.unscan(lex)
+	}
+
+	// parse NUM keyword
+	if lex := p.scanIgnoreSpace(); !lex.IsNum() {
+		panic(fmt.Errorf("%q found instead of NUM", lex))
+	}
+
+	// parse second operator
+	var yop string
+	switch op := p.scanIgnoreSpace(); op.token {
+	case LS, LEQ, GT, GEQ:
+		yop = op.literal
+	case EQ, DEQ, NEQ:
+		if len(xop) != 0 {
+			panic(fmt.Errorf("%q found instead of < or <=", op))
+		}
+		yop = op.literal
+	default:
+		panic(fmt.Errorf("%q found instead of < or <=", op))
+	}
+
+	// parse second value
+	var y string
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case STRING, FLOAT, INT:
+		y = lex.Unquoted()
+
+	default:
+		panic(fmt.Errorf("%q found instead of value", lex))
+	}
+
+	var expr string
+	if len(x) != 0 {
+		// smart replace: ">=" to "<=" and ">" to "<"
+		if (xop == ">" || xop == ">=") && (yop == ">" || yop == ">=") {
+			// swap arguments and operators
+			x, xop, yop, y = y, strings.Replace(yop, ">", "<", -1), strings.Replace(xop, ">", "<", -1), x
+		}
+
+		expr = fmt.Sprintf(`"%s" %s %s %s "%s"`, x, xop, "NUM", yop, y)
+	} else {
+		// smart replace: "==" to "="
+		if yop == "==" {
+			yop = "="
+		}
+
+		expr = fmt.Sprintf(`%s %s "%s"`, "NUM", yop, y)
+	}
+
+	// parse options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		opts = p.parseSearchOptions(opts, "SEPARATOR", "DECIMAL")
+	default:
+		p.unscan(lex)
+	}
+
+	// right paren last
+	switch end := p.scanIgnoreSpace(); end.token {
+	case RPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of )", end))
+	}
+
+	return expr, opts
+}
+
 // parse options
-func (p *Parser) parseSearchOptions(opts Options) Options {
-	for {
+func (p *Parser) parseSearchOptions(opts Options, positionalNames ...string) Options {
+	for i := 0; ; i++ {
+		var posName string
+		if i < len(positionalNames) {
+			posName = positionalNames[i]
+		}
+		// TODO: check no positional names after a named option
+
 		// parse and set an option
 		if option := strings.TrimSpace(p.parseUntilCommaOrRParen()); len(option) != 0 {
-			if err := opts.Set(option); err != nil {
+			if err := opts.Set(option, posName); err != nil {
 				panic(fmt.Errorf("failed to parse option: %s", err))
 			}
 		}
@@ -830,7 +936,6 @@ func (p *Parser) parseSearchOptions(opts Options) Options {
 			p.unscan(lex)
 			return opts
 		default:
-			p.unscan(lex)
 			panic(fmt.Errorf("%q found instead of , or )", lex))
 		}
 	}
@@ -859,7 +964,6 @@ func (p *Parser) parseStringVal() string {
 	} else if val.token == IDENT || val.token == INT || val.token == FLOAT {
 		return val.literal // as is
 	} else {
-		p.unscan(val)
 		panic(fmt.Errorf("%q found instead of string value", val))
 	}
 }
@@ -891,13 +995,11 @@ func (p *Parser) parseBoolVal() bool {
 	if val := p.scanIgnoreSpace(); val.token == INT || val.token == IDENT || val.token == STRING {
 		b, err := strconv.ParseBool(strings.TrimSpace(val.Unquoted()))
 		if err != nil {
-			p.unscan(val)
 			// ParseBool() error already contains input string reference
 			panic(fmt.Errorf("failed to parse boolean: %s", err))
 		}
 		return b // OK
 	} else {
-		p.unscan(val)
 		panic(fmt.Errorf("%q found instead of boolean value", val))
 	}
 }

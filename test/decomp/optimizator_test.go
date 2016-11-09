@@ -242,7 +242,7 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.date CONTAINS NUMBER("00" < NUM < "11")) OR (RECORD.date CONTAINS NUMBER("11" > NUM > "22"))`,
-		`OR{(RECORD.date CONTAINS NUMBER("00"<NUM<"11"))[ns], (RECORD.date CONTAINS NUMBER("11">NUM>"22"))[ns]}`)
+		`OR{(RECORD.date CONTAINS NUMBER("00" < NUM < "11"))[ns], (RECORD.date CONTAINS NUMBER("22" < NUM < "11"))[ns]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.date CONTAINS CURRENCY("00" < NUM < "11")) OR (RECORD.date CONTAINS CURRENCY("11" > NUM > "22"))`,
@@ -294,11 +294,11 @@ func TestOptimizatorProcess(t *testing.T) {
 
 	testOptimizatorProcess(t, o, true,
 		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS NUMBER(NUM < 7))`,
-		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS NUMBER(NUM<7))[ns]}`)
+		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS NUMBER(NUM < "7"))[ns]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
-		`AND{(RECORD.id CONTAINS NUMBER(NUM<7))[ns], (RECORD.id CONTAINS NUMBER(NUM<8))[ns]}`)
+		`AND{(RECORD.id CONTAINS NUMBER(NUM < "7"))[ns], (RECORD.id CONTAINS NUMBER(NUM < "8"))[ns]}`)
 
 	testOptimizatorProcess(t, o, true,
 		`((RECORD.id CONTAINS FHS("test"))AND(RECORD.id CONTAINS FEDS("123", CS=true, D=1, W=2)))`,

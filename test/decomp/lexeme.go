@@ -193,6 +193,15 @@ func (lex Lexeme) IsNumber() bool {
 		strings.EqualFold(lex.literal, "NUMERIC")
 }
 
+// IsNum checks "NUM" keyword.
+func (lex Lexeme) IsNum() bool {
+	if lex.token != IDENT {
+		return false
+	}
+
+	return strings.EqualFold(lex.literal, "NUM")
+}
+
 // IsCurrency checks "CURRENCY" search type.
 func (lex Lexeme) IsCurrency() bool {
 	if lex.token != IDENT {
