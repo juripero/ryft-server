@@ -213,6 +213,15 @@ func (lex Lexeme) IsCurrency() bool {
 		strings.EqualFold(lex.literal, "MONEY")
 }
 
+// IsCur checks "CUR" keyword.
+func (lex Lexeme) IsCur() bool {
+	if lex.token != IDENT {
+		return false
+	}
+
+	return strings.EqualFold(lex.literal, "CUR")
+}
+
 // IsIPv4 checks "IPv4" search type.
 func (lex Lexeme) IsIPv4() bool {
 	if lex.token != IDENT {

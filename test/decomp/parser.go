@@ -280,8 +280,19 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			oldExpr += ")"
 			res.Options.SetMode("ns")
 
-		case lex.IsCurrency(): // "as is"
-			expression = p.parseParenExpr(lex)
+		case lex.IsCurrency(): // CURRENCY + options
+			expression, res.Options = p.parseCurrencyExpr(res.Options)
+			oldExpr = fmt.Sprintf("CURRENCY(%s", expression)
+			if res.Options.CurrencySymbol != "" {
+				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.CurrencySymbol)
+			}
+			if res.Options.DigitSeparator != "" {
+				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.DigitSeparator)
+			}
+			if res.Options.DecimalPoint != "" {
+				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.DecimalPoint)
+			}
+			oldExpr += ")"
 			res.Options.SetMode("cs")
 
 		case lex.IsIPv4(): // "as is"
@@ -428,6 +439,27 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// currency search
 	case "cs":
+		args := []string{expression}
+
+		if opts.Line { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
+		} else if opts.Width != 0 {
+			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
+		}
+
+		if len(opts.CurrencySymbol) != 0 {
+			args = append(args, fmt.Sprintf(`SYMBOL="%s"`, opts.CurrencySymbol))
+		}
+
+		if len(opts.DigitSeparator) != 0 {
+			args = append(args, fmt.Sprintf(`SEPARATOR="%s"`, opts.DigitSeparator))
+		}
+
+		if len(opts.DecimalPoint) != 0 {
+			args = append(args, fmt.Sprintf(`DECIMAL="%s"`, opts.DecimalPoint))
+		}
+
+		return fmt.Sprintf("CURRENCY(%s)", strings.Join(args, ", "))
 
 	// IPv4 search
 	case "ipv4":
@@ -897,6 +929,100 @@ func (p *Parser) parseNumberExpr(opts Options) (string, Options) {
 	switch lex := p.scanIgnoreSpace(); lex.token {
 	case COMMA:
 		opts = p.parseSearchOptions(opts, "SEPARATOR", "DECIMAL")
+	default:
+		p.unscan(lex)
+	}
+
+	// right paren last
+	switch end := p.scanIgnoreSpace(); end.token {
+	case RPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of )", end))
+	}
+
+	return expr, opts
+}
+
+// parse CURRENCY search expression in parentheses and options
+func (p *Parser) parseCurrencyExpr(opts Options) (string, Options) {
+	// left paren first
+	switch beg := p.scanIgnoreSpace(); beg.token {
+	case LPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of (", beg))
+	}
+
+	// parse first value and first operator [optional]
+	var x, xop string
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case STRING, FLOAT, INT:
+		x = lex.Unquoted()
+
+		// parse first operator
+		switch op := p.scanIgnoreSpace(); op.token {
+		case LS, LEQ, GT, GEQ:
+			xop = op.literal
+		default:
+			panic(fmt.Errorf("%q found instead of < or <=", op))
+		}
+
+	default:
+		p.unscan(lex)
+	}
+
+	// parse CUR keyword
+	if lex := p.scanIgnoreSpace(); !lex.IsCur() {
+		panic(fmt.Errorf("%q found instead of CUR", lex))
+	}
+
+	// parse second operator
+	var yop string
+	switch op := p.scanIgnoreSpace(); op.token {
+	case LS, LEQ, GT, GEQ:
+		yop = op.literal
+	case EQ, DEQ, NEQ:
+		if len(xop) != 0 {
+			panic(fmt.Errorf("%q found instead of < or <=", op))
+		}
+		yop = op.literal
+	default:
+		panic(fmt.Errorf("%q found instead of < or <=", op))
+	}
+
+	// parse second value
+	var y string
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case STRING, FLOAT, INT:
+		y = lex.Unquoted()
+
+	default:
+		panic(fmt.Errorf("%q found instead of value", lex))
+	}
+
+	var expr string
+	if len(x) != 0 {
+		// smart replace: ">=" to "<=" and ">" to "<"
+		if (xop == ">" || xop == ">=") && (yop == ">" || yop == ">=") {
+			// swap arguments and operators
+			x, xop, yop, y = y, strings.Replace(yop, ">", "<", -1), strings.Replace(xop, ">", "<", -1), x
+		}
+
+		expr = fmt.Sprintf(`"%s" %s %s %s "%s"`, x, xop, "CUR", yop, y)
+	} else {
+		// smart replace: "==" to "="
+		if yop == "==" {
+			yop = "="
+		}
+
+		expr = fmt.Sprintf(`%s %s "%s"`, "CUR", yop, y)
+	}
+
+	// parse options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		opts = p.parseSearchOptions(opts, "SYMBOL", "SEPARATOR", "DECIMAL")
 	default:
 		p.unscan(lex)
 	}

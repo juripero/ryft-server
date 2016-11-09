@@ -179,7 +179,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`  (RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[cs]}`)
+		`P{(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))[cs,sym="$",sep=",",dot="."]}`)
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS IPV4(IP > "127.0.0.1"))`,
@@ -299,7 +299,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`P{(RECORD.price CONTAINS CURRENCY("$450"<CUR<"$10,100.50","$",",","."))[cs]}`)
+		`P{(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))[cs,sym="$",sep=",",dot="."]}`)
 
 	testParserParse(t, true,
 		`(RECORD.body CONTAINS FHS("test", cs=true, d=10, w=100))`,
@@ -976,4 +976,34 @@ func TestParserParseNUMBER(t *testing.T) {
 
 	// bad cases
 	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER(NUM == Feb-28-12))`, "found instead of value")
+}
+
+// test for CURRENCY (generic queries)
+func TestParserParseCURRENCY(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS CURRENCY(CUR > "0", W=1))`,
+		`P{(RAW_TEXT CONTAINS CURRENCY(CUR > "0", WIDTH="1"))[cs,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS CURRENCY(CUR > 0, W=1))`, // quotes should be added
+		`P{(RAW_TEXT CONTAINS CURRENCY(CUR > "0", WIDTH="1"))[cs,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS CURRENCY(CUR != 0, W=1))`,
+		`P{(RAW_TEXT CONTAINS CURRENCY(CUR != "0", WIDTH="1"))[cs,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS CURRENCY(1  <  CUR  <  2, L=true))`,
+		`P{(RAW_TEXT CONTAINS CURRENCY("1" < CUR < "2", LINE="true"))[cs,line]}`)
+
+	// operator replacement
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS CURRENCY(CUR  ==  123, W=1))`, // == should be replaced with single =
+		`P{(RAW_TEXT CONTAINS CURRENCY(CUR = "123", WIDTH="1"))[cs,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS CURRENCY(2   >   CUR   >=   1, L=true))`,
+		`P{(RAW_TEXT CONTAINS CURRENCY("1" <= CUR < "2", LINE="true"))[cs,line]}`)
+
+	// TODO: compatibility mode
+
+	// bad cases
+	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY(CUR == Feb-28-12))`, "found instead of value")
 }
