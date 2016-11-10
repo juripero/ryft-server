@@ -34,6 +34,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // ParseIndex parses Index record from custom line.
@@ -65,9 +66,13 @@ func ParseIndex(buf []byte) (index Index, err error) {
 
 	// Fuzziness
 	var fuzz uint64
-	fuzz, err = strconv.ParseUint(string(fields[n-1]), 10, 8)
-	if err != nil {
-		return index, fmt.Errorf("failed to parse fuzziness: %s", err)
+	if strings.EqualFold(string(fields[n-1]), "n/a") {
+		fuzz = 0 // TODO: check special value for N/A
+	} else {
+		fuzz, err = strconv.ParseUint(string(fields[n-1]), 10, 8)
+		if err != nil {
+			return index, fmt.Errorf("failed to parse fuzziness: %s", err)
+		}
 	}
 
 	// update index
