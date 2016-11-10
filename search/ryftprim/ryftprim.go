@@ -176,16 +176,16 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
-	minimizeLatency := true
+	minimizeLatency := engine.MinimizeLatency // from configuration
 	// if output DATA or INDEX files already exist
 	// we cannot minimize latency - need to postpone processing until ryftprim is finished
-	if len(task.IndexFileName) != 0 {
+	if minimizeLatency && len(task.IndexFileName) != 0 {
 		if _, err := os.Stat(filepath.Join(engine.MountPoint, task.IndexFileName)); !os.IsNotExist(err) {
 			task.log().WithField("path", task.IndexFileName).Warnf("[%s]: INDEX file already exists, postpone processing", TAG)
 			minimizeLatency = false
 		}
 	}
-	if len(task.DataFileName) != 0 {
+	if minimizeLatency && len(task.DataFileName) != 0 {
 		if _, err := os.Stat(filepath.Join(engine.MountPoint, task.DataFileName)); !os.IsNotExist(err) {
 			task.log().WithField("path", task.DataFileName).Warnf("[%s]: DATA file already exists, postpone processing", TAG)
 			minimizeLatency = false
@@ -250,7 +250,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 
 	case err := <-cmd_done: // process done
 		// start INDEX&DATA processing (if latency is NOT minimized)
-		if !minimizeLatency && err != nil && task.enableDataProcessing {
+		if !minimizeLatency && task.enableDataProcessing && err == nil {
 			task.prepareProcessing()
 
 			task.subtasks.Add(2)

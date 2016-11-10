@@ -56,6 +56,10 @@ type Engine struct {
 
 	KeepResultFiles bool // false by default
 
+	// false - start data processing once ryftprim is finished
+	// true - start data processing immediatelly after ryftprim is started
+	MinimizeLatency bool
+
 	// poll timeouts & limits
 	OpenFilePollTimeout time.Duration
 	ReadFilePollTimeout time.Duration
