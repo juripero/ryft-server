@@ -206,6 +206,7 @@ func TestParserBad(t *testing.T) {
 	testParserBad(t, `() AND () AND ()`, "expected RAW_TEXT or RECORD")
 	testParserBad(t, `() AND OR" "() MOR ()`, "expected RAW_TEXT or RECORD")
 	testParserBad(t, `(RAW_TEXT CONTAINS "?"`, "found instead of )")
+	testParserBad(t, `{RAW_TEXT CONTAINS "?"`, "found instead of }")
 
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS)`, "found instead of (")
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS(123))`, "no string expression found")
@@ -237,6 +238,10 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t, false,
 		` ( RAW_TEXT  CONTAINS  "?" ) `,
 		`P{(RAW_TEXT CONTAINS "?")[es]}`)
+
+	testParserParse(t, false,
+		` { RAW_TEXT  CONTAINS  "?" } `,
+		`B{(RAW_TEXT CONTAINS "?")[es]}`)
 
 	testParserParse(t, false,
 		` ( RAW_TEXT CONTAINS ?)  `,

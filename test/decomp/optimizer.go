@@ -4,14 +4,15 @@ import (
 	"fmt"
 )
 
-// Optimizator contains some optimizer options.
-type Optimizator struct {
+// Optimizer contains some optimizer options.
+type Optimizer struct {
 	// number of boolean operators per search type
 	OperatorLimits map[string]int // `json:"limits,omitempty" yaml:"limits,omitempty"`
+	// TODO: flag for structured searches
 }
 
 // Process optimizes input query.
-func (o *Optimizator) Process(q Query) Query {
+func (o *Optimizer) Process(q Query) Query {
 	if q.Operator != "" && len(q.Arguments) > 0 {
 		a := o.Process(q.Arguments[0])
 
@@ -55,7 +56,7 @@ func (o *Optimizator) Process(q Query) Query {
 }
 
 // check if two queries have the same type and options
-func (o *Optimizator) isTheSameType(a Query, b Query) bool {
+func (o *Optimizer) isTheSameType(a Query, b Query) bool {
 	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
 		return aa.Options.EqualTo(bb.Options)
 	}
@@ -64,7 +65,7 @@ func (o *Optimizator) isTheSameType(a Query, b Query) bool {
 }
 
 // get the bool operations limit
-func (o *Optimizator) getLimit(a Query, b Query) int {
+func (o *Optimizer) getLimit(a Query, b Query) int {
 	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
 		if aa.Options.Mode == bb.Options.Mode {
 			return o.getModeLimit(aa.Options.Mode)
@@ -75,7 +76,7 @@ func (o *Optimizator) getLimit(a Query, b Query) int {
 }
 
 // get the bool operations limit
-func (o *Optimizator) getModeLimit(mode string) int {
+func (o *Optimizer) getModeLimit(mode string) int {
 	if len(mode) == 0 {
 		mode = "es" // "es" by default
 	}

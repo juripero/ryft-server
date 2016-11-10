@@ -155,7 +155,8 @@ func (p *Parser) parseQuery2() Query {
 
 // parse () and simple queries
 func (p *Parser) parseQuery3() Query {
-	if lex := p.scanIgnoreSpace(); lex.token == LPAREN {
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case LPAREN: // (...)
 		arg := p.parseQuery0()
 		if end := p.scanIgnoreSpace(); end.token != RPAREN {
 			panic(fmt.Errorf("%q found instead of )", end))
@@ -164,7 +165,18 @@ func (p *Parser) parseQuery3() Query {
 		res := Query{Operator: "P"}
 		res.Arguments = append(res.Arguments, arg)
 		return res
-	} else {
+
+	case LBRACE: // {...}
+		arg := p.parseQuery0()
+		if end := p.scanIgnoreSpace(); end.token != RBRACE {
+			panic(fmt.Errorf("%q found instead of }", end))
+		}
+
+		res := Query{Operator: "B"}
+		res.Arguments = append(res.Arguments, arg)
+		return res
+
+	default:
 		p.unscan(lex)
 		q := p.parseSimpleQuery()
 		return Query{Simple: q}

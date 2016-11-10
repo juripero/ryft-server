@@ -31,7 +31,7 @@ type Query struct {
 	Simple    *SimpleQuery
 	Arguments []Query
 
-	boolOps int // number of boolean operations inside (optimizator)
+	boolOps int // number of boolean operations inside (optimizer)
 }
 
 // String gets query as a string.
