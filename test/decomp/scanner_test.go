@@ -10,8 +10,7 @@ import (
 func TestScannerScan(t *testing.T) {
 	// check single lexeme
 	check1 := func(data string, token Token) {
-		s := NewScannerString(data)
-		if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
+		if s := NewScannerString(data); assert.NotNil(t, s) {
 			lex := s.Scan()
 			assert.Equal(t, token, lex.token, "unexpected token (data:%s)", data)
 			assert.Equal(t, data, lex.literal, "unexpected literal (data:%s)", data)
@@ -21,8 +20,7 @@ func TestScannerScan(t *testing.T) {
 
 	// check multiple lexem
 	checkN := func(data string, tokens ...Token) {
-		s := NewScannerString(data)
-		if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
+		if s := NewScannerString(data); assert.NotNil(t, s) {
 			for _, token := range tokens {
 				lex := s.Scan()
 				assert.Equal(t, token, lex.token, "unexpected token (data:%s)", data)
@@ -33,8 +31,7 @@ func TestScannerScan(t *testing.T) {
 
 	// check ScanAll
 	checkAll := func(data string, ignoreSpaces bool, tokens ...Token) {
-		s := NewScannerString(data)
-		if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
+		if s := NewScannerString(data); assert.NotNil(t, s) {
 			all := s.ScanAll(ignoreSpaces)
 			if assert.Equal(t, len(tokens), len(all)) {
 				for i, token := range tokens {
@@ -47,8 +44,7 @@ func TestScannerScan(t *testing.T) {
 
 	// bad cases (should panic)
 	bad := func(data string, expectedError string) {
-		s := NewScannerString(data)
-		if assert.NotNil(t, s, "no scanner created (data:%s)", data) {
+		if s := NewScannerString(data); assert.NotNil(t, s) {
 			defer func() {
 				if r := recover(); r != nil {
 					err := r.(error)

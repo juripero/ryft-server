@@ -158,7 +158,7 @@ func (p *Parser) parseQuery3() Query {
 	if lex := p.scanIgnoreSpace(); lex.token == LPAREN {
 		arg := p.parseQuery0()
 		if end := p.scanIgnoreSpace(); end.token != RPAREN {
-			panic(fmt.Errorf("%q found instead of closing )", end))
+			panic(fmt.Errorf("%q found instead of )", end))
 		}
 
 		res := Query{Operator: "P"}
@@ -295,8 +295,8 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			oldExpr += ")"
 			res.Options.SetMode("cs")
 
-		case lex.IsIPv4(): // "as is"
-			expression, res.Options = p.parseIPv4or6Expr(res.Options)
+		case lex.IsIPv4(): // IPv4 + options
+			expression, res.Options = p.parseIPv4Expr(res.Options)
 			oldExpr = fmt.Sprintf("IPV4(%s", expression)
 			if res.Options.Octal {
 				oldExpr += ", USE_OCTAL"
@@ -304,8 +304,8 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			oldExpr += ")"
 			res.Options.SetMode("ipv4")
 
-		case lex.IsIPv6(): // "as is"
-			expression, res.Options = p.parseIPv4or6Expr(res.Options)
+		case lex.IsIPv6(): // IPv6 + options
+			expression, res.Options = p.parseIPv6Expr(res.Options)
 			oldExpr = fmt.Sprintf("IPV6(%s)", expression)
 			res.Options.SetMode("ipv6")
 
@@ -340,7 +340,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 func (p *Parser) genericExpression(expression string, opts Options) string {
 	switch opts.Mode {
 	// exact search
-	case "es", "":
+	case "es":
 		args := []string{expression}
 
 		if opts.Line { // LINE is mutual exclusive with WIDTH
@@ -494,15 +494,14 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 		}
 
 		return fmt.Sprintf("IPV6(%s)", strings.Join(args, ", "))
-
-	default:
-		panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
 	}
 
+	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
 	return expression // leave it "as is"
 }
 
 // parse expression in parentheses
+/*
 func (p *Parser) parseParenExpr(name Lexeme) string {
 	var buf bytes.Buffer
 	buf.WriteString(name.literal)
@@ -531,6 +530,7 @@ func (p *Parser) parseParenExpr(name Lexeme) string {
 
 	return buf.String()
 }
+*/
 
 // parse expression in parentheses
 func (p *Parser) parseUntilCommaOrRParen() string {
@@ -549,11 +549,9 @@ ForLoop:
 			}
 		case LPAREN:
 			deep++
-		case COMMA:
+		case COMMA, EOF:
 			p.unscan(lex)
 			break ForLoop
-		case EOF:
-			panic(fmt.Errorf("not expected EOF found"))
 		}
 
 		buf.WriteString(lex.literal)
@@ -688,7 +686,7 @@ func (p *Parser) checkDataExpr(expr string) string {
 			panic(fmt.Errorf("%q DATE format contains bad separators", f))
 		}
 	} else {
-		panic(fmt.Errorf("%q is unknown DATE format", f)) // actual impossible
+		panic(fmt.Errorf("%q is unknown DATE format", f)) // actually impossible
 	}
 
 	// get first value components
@@ -827,7 +825,7 @@ func (p *Parser) checkTimeExpr(expr string) string {
 			panic(fmt.Errorf("%q TIME format contains bad separators", f))
 		}
 	} else {
-		panic(fmt.Errorf("%q is unknown TIME format", f)) // actual impossible
+		panic(fmt.Errorf("%q is unknown TIME format", f)) // actually impossible
 	}
 
 	// get first value components
@@ -1065,8 +1063,8 @@ func (p *Parser) parseCurrencyExpr(opts Options) (string, Options) {
 	return expr, opts
 }
 
-// parse IPV4/IPV6 search expression in parentheses and options
-func (p *Parser) parseIPv4or6Expr(opts Options) (string, Options) {
+// parse IPV4 search expression in parentheses and options
+func (p *Parser) parseIPv4Expr(opts Options) (string, Options) {
 	// left paren first
 	switch beg := p.scanIgnoreSpace(); beg.token {
 	case LPAREN:
@@ -1078,7 +1076,7 @@ func (p *Parser) parseIPv4or6Expr(opts Options) (string, Options) {
 	// parse first value and first operator [optional]
 	var x, xop string
 	switch lex := p.scanIgnoreSpace(); lex.token {
-	// TODO case INT: // without quotes
+	// TODO case INT: // without quotes - A.B.C.D format
 	case STRING:
 		x = lex.Unquoted()
 
@@ -1116,7 +1114,7 @@ func (p *Parser) parseIPv4or6Expr(opts Options) (string, Options) {
 	// parse second value
 	var y string
 	switch lex := p.scanIgnoreSpace(); lex.token {
-	// TODO case INT: // without quotes
+	// TODO case INT: // without quotes - A.B.C.D format
 	case STRING:
 		y = lex.Unquoted()
 
@@ -1145,7 +1143,103 @@ func (p *Parser) parseIPv4or6Expr(opts Options) (string, Options) {
 	// parse options
 	switch lex := p.scanIgnoreSpace(); lex.token {
 	case COMMA:
-		opts = p.parseSearchOptions(opts, "OCTAL") // TODO: no OCTAL for IPv6
+		opts = p.parseSearchOptions(opts, "OCTAL")
+	default:
+		p.unscan(lex)
+	}
+
+	// right paren last
+	switch end := p.scanIgnoreSpace(); end.token {
+	case RPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of )", end))
+	}
+
+	return expr, opts
+}
+
+// parse IPV6 search expression in parentheses and options
+func (p *Parser) parseIPv6Expr(opts Options) (string, Options) {
+	// left paren first
+	switch beg := p.scanIgnoreSpace(); beg.token {
+	case LPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of (", beg))
+	}
+
+	// parse first value and first operator [optional]
+	var x, xop string
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	// TODO case INT: // without quotes 1::1
+	case STRING:
+		x = lex.Unquoted()
+
+		// parse first operator
+		switch op := p.scanIgnoreSpace(); op.token {
+		case LS, LEQ, GT, GEQ:
+			xop = op.literal
+		default:
+			panic(fmt.Errorf("%q found instead of < or <=", op))
+		}
+
+	default:
+		p.unscan(lex)
+	}
+
+	// parse IP keyword
+	if lex := p.scanIgnoreSpace(); !lex.IsIP() {
+		panic(fmt.Errorf("%q found instead of IP", lex))
+	}
+
+	// parse second operator
+	var yop string
+	switch op := p.scanIgnoreSpace(); op.token {
+	case LS, LEQ, GT, GEQ:
+		yop = op.literal
+	case EQ, DEQ, NEQ:
+		if len(xop) != 0 {
+			panic(fmt.Errorf("%q found instead of < or <=", op))
+		}
+		yop = op.literal
+	default:
+		panic(fmt.Errorf("%q found instead of < or <=", op))
+	}
+
+	// parse second value
+	var y string
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	// TODO case INT: // without quotes 1::1
+	case STRING:
+		y = lex.Unquoted()
+
+	default:
+		panic(fmt.Errorf("%q found instead of value", lex))
+	}
+
+	var expr string
+	if len(x) != 0 {
+		// smart replace: ">=" to "<=" and ">" to "<"
+		if (xop == ">" || xop == ">=") && (yop == ">" || yop == ">=") {
+			// swap arguments and operators
+			x, xop, yop, y = y, strings.Replace(yop, ">", "<", -1), strings.Replace(xop, ">", "<", -1), x
+		}
+
+		expr = fmt.Sprintf(`"%s" %s %s %s "%s"`, x, xop, "IP", yop, y)
+	} else {
+		// smart replace: "==" to "="
+		if yop == "==" {
+			yop = "="
+		}
+
+		expr = fmt.Sprintf(`%s %s "%s"`, "IP", yop, y)
+	}
+
+	// parse options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		opts = p.parseSearchOptions(opts)
 	default:
 		p.unscan(lex)
 	}
@@ -1168,7 +1262,6 @@ func (p *Parser) parseSearchOptions(opts Options, positionalNames ...string) Opt
 		if i < len(positionalNames) {
 			posName = positionalNames[i]
 		}
-		// TODO: check no positional names after a named option
 
 		// parse and set an option
 		if option := strings.TrimSpace(p.parseUntilCommaOrRParen()); len(option) != 0 {
@@ -1185,11 +1278,11 @@ func (p *Parser) parseSearchOptions(opts Options, positionalNames ...string) Opt
 		switch lex := p.scanIgnoreSpace(); lex.token {
 		case COMMA:
 			continue
-		case RPAREN:
+		case RPAREN, EOF:
 			p.unscan(lex)
 			return opts
-		default:
-			panic(fmt.Errorf("%q found instead of , or )", lex))
+			//default:
+			//	panic(fmt.Errorf("%q found instead of , or )", lex))
 		}
 	}
 }

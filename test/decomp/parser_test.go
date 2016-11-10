@@ -6,6 +6,155 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// parse simple queries
+func TestParserParseSimpleQuery(t *testing.T) {
+	// check
+	check := func(structured bool, data string, expectedOld, expectedNew string) {
+		if p := NewParserString(data); assert.NotNil(t, p) {
+			if res := p.parseSimpleQuery(); assert.NotNil(t, res) {
+				if expectedOld != "" {
+					assert.Equal(t, expectedOld, res.String(), "old not expected (data:%s)", data)
+				}
+				if expectedNew != "" {
+					assert.Equal(t, expectedNew, res.GenericString(), "new not expected (data:%s)", data)
+				}
+				assert.Equal(t, structured, res.Structured, "unstructured (data:%s)", data)
+			}
+		}
+	}
+
+	// bad cases (should panic)
+	bad := func(data string, expectedError string) {
+		if p := NewParserString(data); assert.NotNil(t, p) {
+			defer func() {
+				if r := recover(); r != nil {
+					err := r.(error)
+					assert.Contains(t, err.Error(), expectedError)
+				} else {
+					assert.Fail(t, "should panic (data:%s)", data)
+				}
+			}()
+
+			_ = p.parseSimpleQuery()
+		}
+	}
+
+	// shortcuts
+	check(false,
+		`                   "?"  `,
+		`(RAW_TEXT CONTAINS "?")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("?"))[es]`)
+	check(false,
+		`                   "hello"  `,
+		`(RAW_TEXT CONTAINS "hello")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false,
+		`                   "he"??"o"  `,
+		`(RAW_TEXT CONTAINS "he"??"o")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("he"??"o"))[es]`)
+	check(false,
+		`                    hello  `,
+		`(RAW_TEXT CONTAINS "hello")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false,
+		`                    123  `,
+		`(RAW_TEXT CONTAINS "123")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("123"))[es]`)
+	check(false,
+		`                    123.456  `,
+		`(RAW_TEXT CONTAINS "123.456")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("123.456"))[es]`)
+
+	// input
+	bad(`,`, "expected RAW_TEXT or RECORD")
+	check(false,
+		` RAW_TEXT CONTAINS "hello" `,
+		`(RAW_TEXT CONTAINS "hello")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(true,
+		` RECORD.text CONTAINS "hello" `,
+		`(RECORD.text CONTAINS "hello")[es]`,
+		`(RECORD.text CONTAINS EXACT("hello"))[es]`)
+	bad(`RECORD. CONTAINS "hello"`, "no field name found for RECORD")
+	bad(`RECORD., CONTAINS "hello"`, "no field name found for RECORD")
+	bad(`RECORD."no" CONTAINS "hello"`, "no field name found for RECORD")
+	check(true,
+		` RECORD.[] CONTAINS "hello" `,
+		`(RECORD.[] CONTAINS "hello")[es]`,
+		`(RECORD.[] CONTAINS EXACT("hello"))[es]`)
+	bad(`RECORD.[ CONTAINS "hello"`, "no closing ] found")
+
+	// operators
+	check(false,
+		` RAW_TEXT CONTAINS "hello" `,
+		`(RAW_TEXT CONTAINS "hello")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false,
+		` RAW_TEXT NOT_CONTAINS "hello" `,
+		`(RAW_TEXT NOT_CONTAINS "hello")[es]`,
+		`(RAW_TEXT NOT_CONTAINS EXACT("hello"))[es]`)
+	check(false,
+		` RAW_TEXT EQUALS "hello" `,
+		`(RAW_TEXT EQUALS "hello")[es]`,
+		`(RAW_TEXT EQUALS EXACT("hello"))[es]`)
+	check(false,
+		` RAW_TEXT NOT_EQUALS "hello" `,
+		`(RAW_TEXT NOT_EQUALS "hello")[es]`,
+		`(RAW_TEXT NOT_EQUALS EXACT("hello"))[es]`)
+	bad(`RAW_TEXT IS "hello"`, "expected CONTAINS or EQUALS")
+
+	// search types
+	check(false,
+		` RAW_TEXT CONTAINS "hello" `,
+		`(RAW_TEXT CONTAINS "hello")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false,
+		` RAW_TEXT CONTAINS ? `,
+		`(RAW_TEXT CONTAINS ?)[es]`,
+		`(RAW_TEXT CONTAINS EXACT(?))[es]`)
+	check(false,
+		` RAW_TEXT CONTAINS ES("hello") `,
+		`(RAW_TEXT CONTAINS "hello")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false,
+		` RAW_TEXT CONTAINS FHS("hello",D=1) `,
+		`(RAW_TEXT CONTAINS "hello")[fhs,d=1]`,
+		`(RAW_TEXT CONTAINS HAMMING("hello", DISTANCE="1"))[fhs,d=1]`)
+	check(false,
+		` RAW_TEXT CONTAINS FEDS("hello",D=1) `,
+		`(RAW_TEXT CONTAINS "hello")[feds,d=1]`,
+		`(RAW_TEXT CONTAINS EDIT_DISTANCE("hello", DISTANCE="1"))[feds,d=1]`)
+	check(false,
+		` RAW_TEXT CONTAINS DATE(YY/MM/DD != 00/11/22) `,
+		`(RAW_TEXT CONTAINS DATE(YY/MM/DD != 00/11/22))[ds]`,
+		`(RAW_TEXT CONTAINS DATE(YY/MM/DD != 00/11/22))[ds]`)
+	check(false,
+		` RAW_TEXT CONTAINS TIME(HH:MM:SS != 00:11:22) `,
+		`(RAW_TEXT CONTAINS TIME(HH:MM:SS != 00:11:22))[ts]`,
+		`(RAW_TEXT CONTAINS TIME(HH:MM:SS != 00:11:22))[ts]`)
+	check(false,
+		` RAW_TEXT CONTAINS NUMBER(NUM != 0) `,
+		`(RAW_TEXT CONTAINS NUMBER(NUM != "0"))[ns]`,
+		`(RAW_TEXT CONTAINS NUMBER(NUM != "0"))[ns]`)
+	check(false,
+		` RAW_TEXT CONTAINS CURRENCY(CUR != 0) `,
+		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0"))[cs]`,
+		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0"))[cs]`)
+	check(false,
+		` RAW_TEXT CONTAINS IPv4(IP != "0.0.0.0") `,
+		`(RAW_TEXT CONTAINS IPV4(IP != "0.0.0.0"))[ipv4]`,
+		`(RAW_TEXT CONTAINS IPV4(IP != "0.0.0.0"))[ipv4]`)
+	check(false,
+		` RAW_TEXT CONTAINS IPv4(IP != "0.0.0.0", OCT) `,
+		`(RAW_TEXT CONTAINS IPV4(IP != "0.0.0.0", USE_OCTAL))[ipv4,octal]`,
+		`(RAW_TEXT CONTAINS IPV4(IP != "0.0.0.0", OCTAL="true"))[ipv4,octal]`)
+	check(false,
+		` RAW_TEXT CONTAINS IPv6(IP != "1::0") `,
+		`(RAW_TEXT CONTAINS IPV6(IP != "1::0"))[ipv6]`,
+		`(RAW_TEXT CONTAINS IPV6(IP != "1::0"))[ipv6]`)
+	bad(` RAW_TEXT CONTAINS 123 `, "is unexpected expression")
+}
+
 // test parser
 func testParserParse(t *testing.T, structured bool, data string, parsed string) {
 	res, err := ParseQuery(data)
@@ -56,19 +205,15 @@ func TestParserBad(t *testing.T) {
 	testParserBad(t, `() AND (OR)`, "expected RAW_TEXT or RECORD")
 	testParserBad(t, `() AND () AND ()`, "expected RAW_TEXT or RECORD")
 	testParserBad(t, `() AND OR" "() MOR ()`, "expected RAW_TEXT or RECORD")
-	testParserBad(t, `(RAW_TEXT CONTAINS "?"`, "found instead of closing )")
+	testParserBad(t, `(RAW_TEXT CONTAINS "?"`, "found instead of )")
 
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS)`, "found instead of (")
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS(123))`, "no string expression found")
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS("test" 123`, "found instead of )")
 
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE 123)`, "found instead of (")
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE ("123"`, "not expected EOF found")
-	testParserBad(t, `(RAW_TEXT NOT_CONTAINS DATE ("123"()`, "not expected EOF found")
-
 	testParserBad(t, `(RECORD. EQUALS "123")`, "no field name found for RECORD")
 	testParserBad(t, `(RECORD.[  EQUALS "123")`, "no closing ] found")
-	testParserBad(t, `(RECORDZ  EQUALS "123")`, "found instead of closing )")
+	testParserBad(t, `(RECORDZ  EQUALS "123")`, "found instead of )")
 	testParserBad(t, `(RECORD CONTAINZ "123")`, "expected CONTAINS or EQUALS")
 	testParserBad(t, `(RECORD CONTAINS UNKNOWN("123"))`, "is unexpected expression")
 
@@ -625,6 +770,10 @@ func TestParserParseDATE(t *testing.T) {
 	testParserBad(t,
 		`(RAW_TEXT CONTAINS DATE(MMM_DD_YY == Feb-28-12))`,
 		"is unknown DATE expression")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE[YY-MM-DD == 02-28-12])`,
+		"found instead of (")
+	testParserBad(t, `(RAW_TEXT CONTAINS DATE(YY-MM-DD == 02-28-12`,
+		"found instead of )")
 	testParserBad(t, `(RAW_TEXT CONTAINS DATE(MM_DD-YY == 02-28-12))`,
 		"DATE format contains bad separators")
 	testParserBad(t, `(RAW_TEXT CONTAINS DATE(MM-DD-YY == 02_28_12))`,
@@ -659,6 +808,9 @@ func TestParserParseTIME(t *testing.T) {
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS TIME("02:28:12:55" < HH:MM:SS:ss < "01:19:15:56", L=true))`, // quotes should be removed
 		`P{(RAW_TEXT CONTAINS TIME(02:28:12:55 < HH:MM:SS:ss < 01:19:15:56, LINE="true"))[ts,line]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS TIME(HH:MM:SS:ss < "01:19:15:56", L=true))`, // quotes should be removed
+		`P{(RAW_TEXT CONTAINS TIME(HH:MM:SS:ss < 01:19:15:56, LINE="true"))[ts,line]}`)
 
 	// operator replacement
 	testParserParseG(t, false,
@@ -672,6 +824,10 @@ func TestParserParseTIME(t *testing.T) {
 	testParserBad(t,
 		`(RAW_TEXT CONTAINS TIME(HHH-MM-SS == Feb-28-12))`,
 		"is unknown TIME expression")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME[HH-MM-SS == 02-28-12])`,
+		"found instead of (")
+	testParserBad(t, `(RAW_TEXT CONTAINS TIME(HH-MM-SS == 02-28-12`,
+		"found instead of )")
 	testParserBad(t, `(RAW_TEXT CONTAINS TIME(HH_MM-SS == 02-28-12))`,
 		"TIME format contains bad separators")
 	testParserBad(t, `(RAW_TEXT CONTAINS TIME(HH-MM-SS == 02_28_12))`,
@@ -716,6 +872,12 @@ func TestParserParseNUMBER(t *testing.T) {
 
 	// bad cases
 	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER(NUM == Feb-28-12))`, "found instead of value")
+	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER[NUM == 0])`, "found instead of (")
+	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER(NUM == 0])`, "found instead of )")
+	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER(123 != NUM == 0))`, "found instead of < or <=")
+	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER(123 <= NAM == 0))`, "found instead of NUM")
+	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER(123 <= NUM == 0))`, "found instead of < or <=")
+	testParserBad(t, `(RAW_TEXT CONTAINS NUMBER(123 <= NUM : 0))`, "found instead of < or <=")
 }
 
 // test for CURRENCY (generic queries)
@@ -746,6 +908,12 @@ func TestParserParseCURRENCY(t *testing.T) {
 
 	// bad cases
 	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY(CUR == Feb-28-12))`, "found instead of value")
+	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY[CUR == 0])`, "found instead of (")
+	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY(CUR == 0])`, "found instead of )")
+	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY(123 != CUR == 0))`, "found instead of < or <=")
+	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY(123 <= CAR == 0))`, "found instead of CUR")
+	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY(123 <= CUR == 0))`, "found instead of < or <=")
+	testParserBad(t, `(RAW_TEXT CONTAINS CURRENCY(123 <= CUR : 0))`, "found instead of < or <=")
 }
 
 // test for IPv4 (generic queries)
@@ -773,6 +941,12 @@ func TestParserParseIPv4(t *testing.T) {
 
 	// bad cases
 	testParserBad(t, `(RAW_TEXT CONTAINS IPV4(IP == Feb-28-12))`, "found instead of value")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV4[IP == "0"])`, "found instead of (")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV4(IP == "0"])`, "found instead of )")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV4("123" != IP == "0"))`, "found instead of < or <=")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV4("123" <= JP == "0"))`, "found instead of IP")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV4("123" <= IP == "0"))`, "found instead of < or <=")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV4("123" <= IP / "0"))`, "found instead of < or <=")
 }
 
 // test for IPv6 (generic queries)
@@ -800,4 +974,10 @@ func TestParserParseIPv6(t *testing.T) {
 
 	// bad cases
 	testParserBad(t, `(RAW_TEXT CONTAINS IPV6(IP == Feb-28-12))`, "found instead of value")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV6[IP == "0"])`, "found instead of (")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV6(IP == "0"])`, "found instead of )")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV6("123" != IP == "0"))`, "found instead of < or <=")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV6("123" <= JP == "0"))`, "found instead of IP")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV6("123" <= IP == "0"))`, "found instead of < or <=")
+	testParserBad(t, `(RAW_TEXT CONTAINS IPV6("123" <= IP / "0"))`, "found instead of < or <=")
 }
