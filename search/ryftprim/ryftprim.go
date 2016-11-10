@@ -238,6 +238,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	// start INDEX&DATA processing (if latency is minimized)
 	// otherwise wait until ryftprim tool is finished
 	if minimizeLatency && task.enableDataProcessing {
+		task.dataProcessingEnabled = true
 		task.prepareProcessing()
 
 		task.subtasks.Add(2)
@@ -251,6 +252,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	case err := <-cmd_done: // process done
 		// start INDEX&DATA processing (if latency is NOT minimized)
 		if !minimizeLatency && task.enableDataProcessing && err == nil {
+			task.dataProcessingEnabled = true
 			task.prepareProcessing()
 
 			task.subtasks.Add(2)
@@ -262,7 +264,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	case <-res.CancelChan: // client wants to stop all processing
 		task.log().Warnf("[%s]: cancelling by client", TAG)
 
-		if task.enableDataProcessing {
+		if task.dataProcessingEnabled {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
 			task.cancelData()
@@ -334,7 +336,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	}
 
 	// stop subtasks if processing enabled
-	if task.enableDataProcessing {
+	if task.dataProcessingEnabled {
 		if err != nil || error_suppressed {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
@@ -362,7 +364,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 			case <-res.CancelChan: // client wants to stop all processing
 				task.log().Warnf("[%s]: ***cancelling by client", TAG)
-				if task.enableDataProcessing {
+				if task.dataProcessingEnabled {
 					task.log().Debugf("[%s]: ***cancelling INDEX&DATA processing...", TAG)
 					task.cancelIndex()
 					task.cancelData()

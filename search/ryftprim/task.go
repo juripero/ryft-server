@@ -65,15 +65,16 @@ type Task struct {
 	tool_done int32         // tool stopped, atomic
 
 	// index & data
-	enableDataProcessing bool
-	indexChan            chan search.Index // INDEX to DATA
-	cancelIndexChan      chan struct{}     // to cancel INDEX processing (hard stop)
-	cancelDataChan       chan struct{}     // to cancel DATA processing (hard stop)
-	indexCancelled       int32             // hard stop, atomic
-	indexStopped         int32             // soft stop, atomic
-	dataCancelled        int32             // hard stop, atomic
-	dataStopped          int32             // soft stop, atomic
-	subtasks             sync.WaitGroup
+	enableDataProcessing  bool              // need to enable data-processing
+	dataProcessingEnabled bool              // data-processing actually enabled
+	indexChan             chan search.Index // INDEX to DATA
+	cancelIndexChan       chan struct{}     // to cancel INDEX processing (hard stop)
+	cancelDataChan        chan struct{}     // to cancel DATA processing (hard stop)
+	indexCancelled        int32             // hard stop, atomic
+	indexStopped          int32             // soft stop, atomic
+	dataCancelled         int32             // hard stop, atomic
+	dataStopped           int32             // soft stop, atomic
+	subtasks              sync.WaitGroup
 
 	// some processing statistics
 	totalDataLength uint64 // total DATA length expected, sum of all index.Length
