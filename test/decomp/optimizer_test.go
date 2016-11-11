@@ -6,6 +6,153 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// test optimizer combine
+func TestOptimizerCombine(t *testing.T) {
+	// check custom search query
+	check := func(structured bool, expectedBoolOps int, data string, expected string) {
+		if q, err := ParseQuery(data); assert.NoError(t, err) {
+			o := new(Optimizer)
+			res := o.combine(q)
+			assert.Equal(t, expected, res.GenericString())
+			assert.Equal(t, expectedBoolOps, res.boolOps)
+			assert.Equal(t, structured, res.IsStructured())
+		}
+	}
+
+	// no bool ops
+	check(false, 0,
+		`                         "hello"`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false, 0,
+		`                       ( "hello" )`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false, 0,
+		` RAW_TEXT CONTAINS       "hello"`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false, 0,
+		`(RAW_TEXT CONTAINS       "hello")`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false, 0,
+		`{RAW_TEXT CONTAINS       "hello"}`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false, 0,
+		`((RAW_TEXT CONTAINS       "hello"))`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false, 0,
+		`{{RAW_TEXT CONTAINS       "hello"}}`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false, 0,
+		`{(RAW_TEXT CONTAINS       "hello")}`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(false, 0,
+		`({RAW_TEXT CONTAINS       "hello"})`,
+		`(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(true, 0,
+		` RECORD CONTAINS       "hello"`,
+		`(RECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, 0,
+		`(RECORD CONTAINS       "hello")`,
+		`(RECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, 0,
+		`{RECORD CONTAINS       "hello"}`,
+		`(RECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, 0,
+		`((RECORD CONTAINS       "hello"))`,
+		`(RECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, 0,
+		`{{RECORD CONTAINS       "hello"}}`,
+		`(RECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, 0,
+		`{(RECORD CONTAINS       "hello")}`,
+		`(RECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, 0,
+		`({RECORD CONTAINS       "hello"})`,
+		`(RECORD CONTAINS EXACT("hello"))[es]`)
+
+	// the same bool operator
+	check(false, 1,
+		`(RAW_TEXT EQUALS       "100")  AND (RAW_TEXT EQUALS       "200")`,
+		`(RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS EXACT("200"))[es]`)
+	check(false, 1,
+		`(RAW_TEXT EQUALS       "100")  OR (RAW_TEXT EQUALS       "200")`,
+		`(RAW_TEXT EQUALS EXACT("100")) OR (RAW_TEXT EQUALS EXACT("200"))[es]`)
+	check(false, 1,
+		`(RAW_TEXT EQUALS       "100")  XOR (RAW_TEXT EQUALS       "200")`,
+		`(RAW_TEXT EQUALS EXACT("100")) XOR (RAW_TEXT EQUALS EXACT("200"))[es]`)
+	check(false, 1,
+		`((RAW_TEXT EQUALS      "100")) AND (RAW_TEXT EQUALS       "200")`,
+		`(RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS EXACT("200"))[es]`)
+	check(false, 1,
+		`(RAW_TEXT EQUALS       "100")  OR ((RAW_TEXT EQUALS      "200"))`,
+		`(RAW_TEXT EQUALS EXACT("100")) OR (RAW_TEXT EQUALS EXACT("200"))[es]`)
+	check(false, 1,
+		`((RAW_TEXT EQUALS      "100")) XOR ((RAW_TEXT EQUALS      "200"))`,
+		`(RAW_TEXT EQUALS EXACT("100")) XOR (RAW_TEXT EQUALS EXACT("200"))[es]`)
+	check(false, 1,
+		`(((RAW_TEXT EQUALS     "100")) XOR ((RAW_TEXT EQUALS      "200")))`,
+		`(RAW_TEXT EQUALS EXACT("100")) XOR (RAW_TEXT EQUALS EXACT("200"))[es]`)
+
+	// two the same bool operators
+	check(false, 2,
+		`(RAW_TEXT EQUALS       "100")  AND (RAW_TEXT EQUALS       "200")  AND (RAW_TEXT EQUALS       "300")`,
+		`(RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS EXACT("200")) AND (RAW_TEXT EQUALS EXACT("300"))[es]`)
+	check(false, 2,
+		`(RAW_TEXT EQUALS       "100")  OR (RAW_TEXT EQUALS       "200")  OR (RAW_TEXT EQUALS       "300")`,
+		`(RAW_TEXT EQUALS EXACT("100")) OR (RAW_TEXT EQUALS EXACT("200")) OR (RAW_TEXT EQUALS EXACT("300"))[es]`)
+	check(false, 2,
+		`(RAW_TEXT EQUALS       "100")  XOR (RAW_TEXT EQUALS       "200")  XOR (RAW_TEXT EQUALS       "300")`,
+		`(RAW_TEXT EQUALS EXACT("100")) XOR (RAW_TEXT EQUALS EXACT("200")) XOR (RAW_TEXT EQUALS EXACT("300"))[es]`)
+	check(false, 2,
+		`((RAW_TEXT EQUALS      "100")) AND (RAW_TEXT EQUALS       "200")  AND (RAW_TEXT EQUALS       "300")`,
+		`(RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS EXACT("200")) AND (RAW_TEXT EQUALS EXACT("300"))[es]`)
+	check(false, 2,
+		`(RAW_TEXT EQUALS       "100")  OR ((RAW_TEXT EQUALS      "200")) OR (RAW_TEXT EQUALS       "300")`,
+		`(RAW_TEXT EQUALS EXACT("100")) OR (RAW_TEXT EQUALS EXACT("200")) OR (RAW_TEXT EQUALS EXACT("300"))[es]`)
+	check(false, 2,
+		`(RAW_TEXT EQUALS       "100")  XOR (RAW_TEXT EQUALS       "200")  XOR ((RAW_TEXT EQUALS      "300"))`,
+		`(RAW_TEXT EQUALS EXACT("100")) XOR (RAW_TEXT EQUALS EXACT("200")) XOR (RAW_TEXT EQUALS EXACT("300"))[es]`)
+
+	// two different bool operators (check priority)
+	check(false, 2,
+		`(RAW_TEXT EQUALS        "100")  AND (RAW_TEXT EQUALS       "200")   OR (RAW_TEXT EQUALS       "300")`,
+		`((RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS EXACT("200"))) OR (RAW_TEXT EQUALS EXACT("300"))[es]`)
+	check(false, 2,
+		`(RAW_TEXT EQUALS       "100")  OR  (RAW_TEXT EQUALS       "200")  AND (RAW_TEXT EQUALS       "300")`,
+		`(RAW_TEXT EQUALS EXACT("100")) OR ((RAW_TEXT EQUALS EXACT("200")) AND (RAW_TEXT EQUALS EXACT("300")))[es]`)
+	check(false, 2,
+		`(RAW_TEXT EQUALS        "100")  AND ((RAW_TEXT EQUALS      "200")   OR (RAW_TEXT EQUALS       "300"))`,
+		`(RAW_TEXT EQUALS EXACT("100")) AND ((RAW_TEXT EQUALS EXACT("200")) OR (RAW_TEXT EQUALS EXACT("300")))[es]`)
+	check(false, 2,
+		`(RAW_TEXT EQUALS        "100")  AND (RAW_TEXT EQUALS       "200")   XOR (RAW_TEXT EQUALS       "300")`,
+		`((RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS EXACT("200"))) XOR (RAW_TEXT EQUALS EXACT("300"))[es]`)
+	check(false, 2,
+		`(RAW_TEXT EQUALS        "100")  XOR (RAW_TEXT EQUALS       "200")   OR (RAW_TEXT EQUALS       "300")`,
+		`((RAW_TEXT EQUALS EXACT("100")) XOR (RAW_TEXT EQUALS EXACT("200"))) OR (RAW_TEXT EQUALS EXACT("300"))[es]`)
+
+	// three different bool operators (check priority)
+	check(false, 3,
+		`(RAW_TEXT EQUALS        "100")  AND (RAW_TEXT EQUALS       "200")   OR  (RAW_TEXT EQUALS       "300")  AND (RAW_TEXT EQUALS       "400")`,
+		`((RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS EXACT("200"))) OR ((RAW_TEXT EQUALS EXACT("300")) AND (RAW_TEXT EQUALS EXACT("400")))[es]`)
+	check(false, 3,
+		`(RAW_TEXT EQUALS        "100")  AND (RAW_TEXT EQUALS       "200")   XOR  (RAW_TEXT EQUALS       "300")  AND (RAW_TEXT EQUALS       "400")`,
+		`((RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS EXACT("200"))) XOR ((RAW_TEXT EQUALS EXACT("300")) AND (RAW_TEXT EQUALS EXACT("400")))[es]`)
+	check(false, 3,
+		`(RAW_TEXT EQUALS        "100")  XOR (RAW_TEXT EQUALS       "200")   OR  (RAW_TEXT EQUALS       "300")  XOR (RAW_TEXT EQUALS       "400")`,
+		`((RAW_TEXT EQUALS EXACT("100")) XOR (RAW_TEXT EQUALS EXACT("200"))) OR ((RAW_TEXT EQUALS EXACT("300")) XOR (RAW_TEXT EQUALS EXACT("400")))[es]`)
+
+	// check options and structured queries
+	check(false, 2,
+		`(RAW_TEXT EQUALS       "100")  AND (RAW_TEXT EQUALS     FHS("200",D=1))           AND (RAW_TEXT EQUALS       "300")`,
+		`(RAW_TEXT EQUALS EXACT("100")) AND (RAW_TEXT EQUALS HAMMING("200", DISTANCE="1")) AND (RAW_TEXT EQUALS EXACT("300"))`)
+	check(true, 2,
+		`(RECORD EQUALS       "100")  AND (RECORD EQUALS     FHS("200",D=1))           AND (RECORD EQUALS       "300")`,
+		`(RECORD EQUALS EXACT("100")) AND (RECORD EQUALS HAMMING("200", DISTANCE="1")) AND (RECORD EQUALS EXACT("300"))`)
+	check(false, 2,
+		`(RECORD EQUALS       "100")  AND (RAW_TEXT EQUALS     FHS("200",D=1))           AND (RECORD EQUALS       "300")`,
+		`(RECORD EQUALS EXACT("100")) AND (RAW_TEXT EQUALS HAMMING("200", DISTANCE="1")) AND (RECORD EQUALS EXACT("300"))`)
+}
+
+/*
 // make new Optimizer
 func testNewOptimizer(limits map[string]int) *Optimizer {
 	return &Optimizer{OperatorLimits: limits}
@@ -376,3 +523,4 @@ func TestOptimizerLimits2(t *testing.T) {
 		`(RAW_TEXT CONTAINS "A") AND ((RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")) AND ((RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")) AND (RAW_TEXT CONTAINS "F")`,
 		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
 }
+*/

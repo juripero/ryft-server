@@ -21,8 +21,16 @@ type Options struct {
 	DecimalPoint   string // Decimal point marker, for example "." (CURRENCY, NUMBER)
 }
 
+// DefaultOptions creates default options
+// Case sensitivity is set by default
+func DefaultOptions() Options {
+	return Options{
+		Case: true,
+	}
+}
+
 // IsTheSame checks the options are the same.
-func (o Options) EqualTo(p Options) bool {
+func (o Options) EqualsTo(p Options) bool {
 	// search mode
 	if o.Mode != p.Mode {
 		return false

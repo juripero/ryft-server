@@ -21,8 +21,8 @@ func NewParser(r io.Reader) *Parser {
 	p := &Parser{scanner: NewScanner(r)}
 
 	// default options
+	p.baseOpts = DefaultOptions()
 	p.baseOpts.Mode = "es"
-	p.baseOpts.Case = true
 
 	return p
 }

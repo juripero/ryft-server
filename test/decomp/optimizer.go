@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 )
 
@@ -13,6 +14,11 @@ type Optimizer struct {
 
 // Process optimizes input query.
 func (o *Optimizer) Process(q Query) Query {
+	return o.process(q)
+}
+
+// Optimize input query.
+func (o *Optimizer) process(q Query) Query {
 	if q.Operator != "" && len(q.Arguments) > 0 {
 		a := o.Process(q.Arguments[0])
 
@@ -22,7 +28,7 @@ func (o *Optimizer) Process(q Query) Query {
 			b := o.Process(q.Arguments[i])
 
 			boolOps := a.boolOps + b.boolOps
-			if o.isTheSameType(a, b) && boolOps < o.getLimit(a, b) {
+			if boolOps < o.getLimit(a, b) {
 				// combine two arguments into one
 				tmp := Query{boolOps: boolOps + 1}
 				tmp.Simple = &SimpleQuery{Options: a.Simple.Options}
@@ -55,19 +61,83 @@ func (o *Optimizer) Process(q Query) Query {
 	return q // nothing to optimize
 }
 
-// check if two queries have the same type and options
-func (o *Optimizer) isTheSameType(a Query, b Query) bool {
-	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
-		return aa.Options.EqualTo(bb.Options)
+// Combine all subqueries to one.
+func (o *Optimizer) combine(q Query) Query {
+	if q.Operator != "" && len(q.Arguments) > 0 {
+		// simple case of one argument
+		if len(q.Arguments) == 1 {
+			return o.combine(q.Arguments[0])
+		}
+
+		// combine all arguments
+		var oldExpr bytes.Buffer
+		var newExpr bytes.Buffer
+		opts := DefaultOptions()
+		structured := true
+		res := Query{
+			boolOps: len(q.Arguments) - 1,
+		}
+		for i := 0; i < len(q.Arguments); i++ {
+			// print operator
+			if i != 0 {
+				oldExpr.WriteRune(' ')
+				oldExpr.WriteString(q.Operator)
+				oldExpr.WriteRune(' ')
+
+				newExpr.WriteRune(' ')
+				newExpr.WriteString(q.Operator)
+				newExpr.WriteRune(' ')
+			}
+
+			// combine argument
+			a := o.combine(q.Arguments[i])
+			res.boolOps += a.boolOps
+			if a.boolOps > 0 {
+				oldExpr.WriteRune('(')
+				oldExpr.WriteString(a.Simple.Expression)
+				oldExpr.WriteRune(')')
+
+				newExpr.WriteRune('(')
+				newExpr.WriteString(a.Simple.GenericExpr)
+				newExpr.WriteRune(')')
+			} else { // as is
+				//oldExpr.WriteRune('(')
+				oldExpr.WriteString(a.Simple.Expression)
+				//oldExpr.WriteRune(')')
+
+				//newExpr.WriteRune('(')
+				newExpr.WriteString(a.Simple.GenericExpr)
+				//newExpr.WriteRune(')')
+			}
+
+			// keep options if they are equal
+			if i == 0 {
+				opts = a.Simple.Options
+			} else if !opts.EqualsTo(a.Simple.Options) {
+				opts = DefaultOptions() // reset to default
+			}
+
+			structured = structured && a.Simple.Structured
+		}
+
+		res.Simple = &SimpleQuery{
+			Structured:  structured,
+			Expression:  oldExpr.String(),
+			GenericExpr: newExpr.String(),
+			Options:     opts,
+		}
+
+		return res
 	}
 
-	return false
+	return q // nothing to optimize
 }
 
 // get the bool operations limit
 func (o *Optimizer) getLimit(a Query, b Query) int {
 	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
-		if aa.Options.Mode == bb.Options.Mode {
+		if aa.Options.EqualsTo(bb.Options) {
+			// both simple queries are the same type!
 			return o.getModeLimit(aa.Options.Mode)
 		}
 	}

@@ -8,17 +8,17 @@ import (
 
 // test options equal
 func TestOptionsEqual(t *testing.T) {
-	assert.True(t, Options{}.EqualTo(Options{}))
-	assert.False(t, Options{}.EqualTo(Options{DecimalPoint: "."}))
-	assert.False(t, Options{}.EqualTo(Options{DigitSeparator: ","}))
-	assert.False(t, Options{}.EqualTo(Options{CurrencySymbol: "$"}))
-	assert.False(t, Options{}.EqualTo(Options{Octal: true}))
-	assert.False(t, Options{}.EqualTo(Options{Reduce: true}))
-	assert.False(t, Options{}.EqualTo(Options{Case: true}))
-	assert.False(t, Options{}.EqualTo(Options{Line: true}))
-	assert.False(t, Options{}.EqualTo(Options{Width: 1}))
-	assert.False(t, Options{}.EqualTo(Options{Dist: 1}))
-	assert.False(t, Options{}.EqualTo(Options{Mode: "es"}))
+	assert.True(t, Options{}.EqualsTo(Options{}))
+	assert.False(t, Options{}.EqualsTo(Options{DecimalPoint: "."}))
+	assert.False(t, Options{}.EqualsTo(Options{DigitSeparator: ","}))
+	assert.False(t, Options{}.EqualsTo(Options{CurrencySymbol: "$"}))
+	assert.False(t, Options{}.EqualsTo(Options{Octal: true}))
+	assert.False(t, Options{}.EqualsTo(Options{Reduce: true}))
+	assert.False(t, Options{}.EqualsTo(Options{Case: true}))
+	assert.False(t, Options{}.EqualsTo(Options{Line: true}))
+	assert.False(t, Options{}.EqualsTo(Options{Width: 1}))
+	assert.False(t, Options{}.EqualsTo(Options{Dist: 1}))
+	assert.False(t, Options{}.EqualsTo(Options{Mode: "es"}))
 
 	assert.Equal(t, "", Options{Case: true}.String())
 	assert.Equal(t, `[fake,d=1,w=1,!cs,reduce,octal,sym="$",sep=",",dot="."]`,
