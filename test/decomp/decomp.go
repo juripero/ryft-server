@@ -79,6 +79,10 @@ func (q Query) GenericString() string {
 		buf.WriteString("}")
 	}
 
+	if q.boolOps != 0 {
+		buf.WriteString(fmt.Sprintf("x%d", q.boolOps))
+	}
+
 	return buf.String()
 }
 
