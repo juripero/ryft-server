@@ -151,12 +151,104 @@ func TestOptimizerCombine(t *testing.T) {
 		`(RECORD EQUALS EXACT("100")) AND (RAW_TEXT EQUALS HAMMING("200", DISTANCE="1")) AND (RECORD EQUALS EXACT("300"))x2`)
 }
 
-/*
-// make new Optimizer
-func testNewOptimizer(limits map[string]int) *Optimizer {
-	return &Optimizer{OperatorLimits: limits}
+// test for optimization limits
+func TestOptimizerLimits2(t *testing.T) {
+	// check
+	check := func(limit int, structured bool, data string, expected string) {
+		limits := map[string]int{
+			"es":   limit,
+			"fhs":  limit,
+			"feds": limit,
+			"ds":   limit,
+			"ts":   limit,
+			"ns":   limit,
+			"cs":   limit,
+			"ipv4": limit,
+			"ipv6": limit,
+		}
+
+		o := &Optimizer{
+			OperatorLimits:        limits,
+			DifferentOptionsLimit: limit,
+		}
+
+		q, err := ParseQuery(data)
+		if assert.NoError(t, err) {
+			res := o.Process(q)
+			assert.Equal(t, expected, res.GenericString())
+			assert.Equal(t, structured, res.IsStructured())
+		}
+	}
+
+	check(0, true, // (A) (B) (C) (D) (E) (F) no queries should be combined
+		`(RECORD CONTAINS "A") AND (RECORD CONTAINS "B") AND (RECORD CONTAINS "C") AND (RECORD CONTAINS "D") AND (RECORD CONTAINS "E") AND (RECORD CONTAINS "F")`,
+		`AND{(RECORD CONTAINS EXACT("A"))[es], (RECORD CONTAINS EXACT("B"))[es], (RECORD CONTAINS EXACT("C"))[es], (RECORD CONTAINS EXACT("D"))[es], (RECORD CONTAINS EXACT("E"))[es], (RECORD CONTAINS EXACT("F"))[es]}`)
+
+	check(1, true, // (AB) (CD) (EF)
+		`(RECORD CONTAINS "A") AND (RECORD CONTAINS "B") AND (RECORD CONTAINS "C") AND (RECORD CONTAINS "D") AND (RECORD CONTAINS "E") AND (RECORD CONTAINS "F")`,
+		`AND{(RECORD CONTAINS EXACT("A")) AND (RECORD CONTAINS EXACT("B"))[es]x1, (RECORD CONTAINS EXACT("C")) AND (RECORD CONTAINS EXACT("D"))[es]x1, (RECORD CONTAINS EXACT("E")) AND (RECORD CONTAINS EXACT("F"))[es]x1}`)
+
+	check(2, true, // (ABC) (DEF)
+		`(RECORD CONTAINS "A") AND (RECORD CONTAINS "B") AND (RECORD CONTAINS "C") AND (RECORD CONTAINS "D") AND (RECORD CONTAINS "E") AND (RECORD CONTAINS "F")`,
+		`AND{((RECORD CONTAINS EXACT("A")) AND (RECORD CONTAINS EXACT("B"))) AND (RECORD CONTAINS EXACT("C"))[es]x2, ((RECORD CONTAINS EXACT("D")) AND (RECORD CONTAINS EXACT("E"))) AND (RECORD CONTAINS EXACT("F"))[es]x2}`)
+
+	check(3, true, // (ABCD) (EF)
+		`(RECORD CONTAINS "A") AND (RECORD CONTAINS "B") AND (RECORD CONTAINS "C") AND (RECORD CONTAINS "D") AND (RECORD CONTAINS "E") AND (RECORD CONTAINS "F")`,
+		`AND{(((RECORD CONTAINS EXACT("A")) AND (RECORD CONTAINS EXACT("B"))) AND (RECORD CONTAINS EXACT("C"))) AND (RECORD CONTAINS EXACT("D"))[es]x3, (RECORD CONTAINS EXACT("E")) AND (RECORD CONTAINS EXACT("F"))[es]x1}`)
+
+	check(0, true, // (A) ((B) (C)) ((D) (E)) (F) - additional parenthesis
+		`(RECORD CONTAINS "A") AND ((RECORD CONTAINS "B") AND (RECORD CONTAINS "C")) AND ((RECORD CONTAINS "D") AND (RECORD CONTAINS "E")) AND (RECORD CONTAINS "F")`,
+		`AND{(RECORD CONTAINS EXACT("A"))[es], AND{(RECORD CONTAINS EXACT("B"))[es], (RECORD CONTAINS EXACT("C"))[es]}, AND{(RECORD CONTAINS EXACT("D"))[es], (RECORD CONTAINS EXACT("E"))[es]}, (RECORD CONTAINS EXACT("F"))[es]}`)
+
+	check(1, true, // (A) (BC) (DE) (F)
+		`(RECORD CONTAINS "A") AND ((RECORD CONTAINS "B") AND (RECORD CONTAINS "C")) AND ((RECORD CONTAINS "D") AND (RECORD CONTAINS "E")) AND (RECORD CONTAINS "F")`,
+		`AND{(RECORD CONTAINS EXACT("A"))[es], (RECORD CONTAINS EXACT("B")) AND (RECORD CONTAINS EXACT("C"))[es]x1, (RECORD CONTAINS EXACT("D")) AND (RECORD CONTAINS EXACT("E"))[es]x1, (RECORD CONTAINS EXACT("F"))[es]}`)
+
+	check(2, true, // (ABC) (DEF)
+		`(RECORD CONTAINS "A") AND ((RECORD CONTAINS "B") AND (RECORD CONTAINS "C")) AND ((RECORD CONTAINS "D") AND (RECORD CONTAINS "E")) AND (RECORD CONTAINS "F")`,
+		`AND{(RECORD CONTAINS EXACT("A")) AND ((RECORD CONTAINS EXACT("B")) AND (RECORD CONTAINS EXACT("C")))[es]x2, ((RECORD CONTAINS EXACT("D")) AND (RECORD CONTAINS EXACT("E"))) AND (RECORD CONTAINS EXACT("F"))[es]x2}`)
 }
 
+// test for get limit
+func TestOptimizerGetLimit(t *testing.T) {
+	limits := map[string]int{
+		"es":   1,
+		"fhs":  2,
+		"feds": 3,
+		"ds":   5,
+		"ts":   6,
+		"ns":   4,
+		"cs":   4,
+		"ipv4": 8,
+		"ipv6": 9,
+	}
+	o := &Optimizer{
+		OperatorLimits: limits,
+	}
+
+	assert.Equal(t, 0, o.getModeLimit("bad"))         // invalid mode
+	assert.Equal(t, limits["es"], o.getModeLimit("")) // default to ES
+	for k, v := range limits {
+		assert.Equal(t, v, o.getModeLimit(k))
+	}
+
+	assert.Equal(t, 0, o.getLimit( // bad queries
+		Query{},
+		Query{}))
+	assert.Equal(t, 0, o.getLimit( // diff options
+		Query{
+			Simple: &SimpleQuery{
+				Options: Options{Mode: "fhs"},
+			},
+		},
+		Query{
+			Simple: &SimpleQuery{
+				Options: Options{Mode: "feds"},
+			},
+		}))
+}
+
+/*
 // test optimizer
 func testOptimizerProcess(t *testing.T, o *Optimizer, structured bool, data string, optimized string) {
 	p := NewParserString(data)
@@ -168,24 +260,6 @@ func testOptimizerProcess(t *testing.T, o *Optimizer, structured bool, data stri
 		assert.Equal(t, optimized, res.String(), "not expected (data:%s)", data)
 		assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
 	}
-}
-
-// test for optimization limits
-func testOptimizerLimits(t *testing.T, limit int, structured bool, data string, optimized string) {
-	limits := map[string]int{
-		"es":   limit,
-		"fhs":  limit,
-		"feds": limit,
-		"ds":   limit,
-		"ts":   limit,
-		"ns":   limit,
-		"cs":   limit,
-		"ipv4": limit,
-		"ipv6": limit,
-	}
-
-	o := testNewOptimizer(limits)
-	testOptimizerProcess(t, o, structured, data, optimized)
 }
 
 // test for optimization
@@ -203,98 +277,6 @@ func TestOptimizerProcess(t *testing.T) {
 	}
 
 	o := testNewOptimizer(limits)
-
-	testOptimizerProcess(t, o, false,
-		`                   "?"`,
-		`(RAW_TEXT CONTAINS "?")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`                   "hello"`,
-		`(RAW_TEXT CONTAINS "hello")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`                 "he" ? ? "o"`,
-		`(RAW_TEXT CONTAINS "he"??"o")[es]`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.body CONTAINS "FEDS")`,
-		`(RECORD.body CONTAINS "FEDS")[es]`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.body CONTAINS FHS("test", cs = true, dist = 10, WIDTH = 100))`,
-		`(RECORD.body CONTAINS "test")[fhs,d=10]`) // no width for structured search!
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.body CONTAINS FEDS("test", cs= FALSE ,  DIST =10, WIDTH=100))`,
-		`(RECORD.body CONTAINS "test")[feds,d=10,!cs]`) // no width for structured search!
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.body CONTAINS FEDS("test", ,, DIST =0, WIDTH=10))`,
-		`(RECORD.body CONTAINS "test")[es]`) // no width for structured search!
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
-		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))[ds]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))`,
-		`(RAW_TEXT CONTAINS DATE(02/28/12 < MM/DD/YY < 01/19/15))[ds]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))`,
-		`(RAW_TEXT CONTAINS TIME(HH:MM:SS > 09:15:00))[ts]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))`,
-		`(RAW_TEXT CONTAINS TIME(11:15:00 < HH:MM:SS < 13:15:00))[ts]`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))[cs,sym="$",sep=",",dot="."]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "100")`,
-		`(RAW_TEXT CONTAINS "100")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`((RAW_TEXT CONTAINS "100"))`,
-		`(RAW_TEXT CONTAINS "100")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "DATE()")`,
-		`(RAW_TEXT CONTAINS "DATE()")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "TIME()")`,
-		`(RAW_TEXT CONTAINS "TIME()")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "NUMBER()")`,
-		`(RAW_TEXT CONTAINS "NUMBER()")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "CURRENCY()")`,
-		`(RAW_TEXT CONTAINS "CURRENCY()")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "REGEX()")`,
-		`(RAW_TEXT CONTAINS "REGEX()")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "100") AND ((RAW_TEXT CONTAINS "200"))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`((RAW_TEXT CONTAINS "100")) AND (RAW_TEXT CONTAINS "200")`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`((RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200"))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
 
 	testOptimizerProcess(t, o, false,
 		`(RECORD.body CONTAINS FHS("100")) AND (RAW_TEXT CONTAINS FHS("200"))`,
@@ -463,63 +445,5 @@ func TestOptimizerProcess(t *testing.T) {
 	testOptimizerProcess(t, o, true,
 		`((RECORD.id CONTAINS FHS("test"))AND((RECORD.id CONTAINS FEDS("123")) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))))`,
 		`AND{(RECORD.id CONTAINS "test")[es], AND{(RECORD.id CONTAINS "123")[es], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}}`)
-}
-
-// test for optimization limits
-func TestOptimizerLimits(t *testing.T) {
-	limits := map[string]int{
-		"es":   1,
-		"fhs":  2,
-		"feds": 3,
-		"ds":   5,
-		"ts":   6,
-		"ns":   4,
-		"cs":   4,
-		"ipv4": 8,
-		"ipv6": 9,
-	}
-
-	o := testNewOptimizer(limits)
-
-	assert.Equal(t, 0, o.getModeLimit("---"), "invalid mode")
-	assert.Equal(t, limits["es"], o.getModeLimit(""), "default to ES")
-	for k, v := range limits {
-		assert.Equal(t, v, o.getModeLimit(k))
-	}
-
-	assert.Equal(t, 0, o.getLimit(Query{}, Query{}), "bad queries")
-	assert.Equal(t, 0, o.getLimit(Query{Simple: &SimpleQuery{Options: Options{Mode: "fhs"}}},
-		Query{Simple: &SimpleQuery{Options: Options{Mode: "feds"}}}), "bad queries")
-}
-
-// test for optimization limits
-func TestOptimizerLimits2(t *testing.T) {
-	testOptimizerLimits(t, 0, false,
-		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A")[es], (RAW_TEXT CONTAINS "B")[es], (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D")[es], (RAW_TEXT CONTAINS "E")[es], (RAW_TEXT CONTAINS "F")[es]}`)
-
-	testOptimizerLimits(t, 1, false,
-		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B")[es], (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D")[es], (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
-
-	testOptimizerLimits(t, 2, false,
-		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
-
-	testOptimizerLimits(t, 3, false,
-		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C") AND (RAW_TEXT CONTAINS "D")[es], (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
-
-	testOptimizerLimits(t, 0, false,
-		`(RAW_TEXT CONTAINS "A") AND ((RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")) AND ((RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")) AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A")[es], AND{(RAW_TEXT CONTAINS "B")[es], (RAW_TEXT CONTAINS "C")[es]}, AND{(RAW_TEXT CONTAINS "D")[es], (RAW_TEXT CONTAINS "E")[es]}, (RAW_TEXT CONTAINS "F")[es]}`)
-
-	testOptimizerLimits(t, 1, false,
-		`(RAW_TEXT CONTAINS "A") AND ((RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")) AND ((RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")) AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A")[es], (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")[es], (RAW_TEXT CONTAINS "F")[es]}`)
-
-	testOptimizerLimits(t, 2, false,
-		`(RAW_TEXT CONTAINS "A") AND ((RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")) AND ((RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E")) AND (RAW_TEXT CONTAINS "F")`,
-		`AND{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B") AND (RAW_TEXT CONTAINS "C")[es], (RAW_TEXT CONTAINS "D") AND (RAW_TEXT CONTAINS "E") AND (RAW_TEXT CONTAINS "F")[es]}`)
 }
 */

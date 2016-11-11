@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	//"fmt"
 )
 
 // Optimizer contains some optimizer options.
@@ -10,6 +10,7 @@ type Optimizer struct {
 	// number of boolean operators per search type
 	OperatorLimits map[string]int // `json:"limits,omitempty" yaml:"limits,omitempty"`
 	// TODO: flag for structured searches
+	DifferentOptionsLimit int
 }
 
 // Process optimizes input query.
@@ -19,28 +20,79 @@ func (o *Optimizer) Process(q Query) Query {
 
 // Optimize input query.
 func (o *Optimizer) process(q Query) Query {
-	if q.Operator != "" && len(q.Arguments) > 0 {
-		a := o.Process(q.Arguments[0])
+	if q.Operator == "B" { // special case for {...}
+		return o.combine(q)
+	} else if q.Operator != "" && len(q.Arguments) > 0 {
+		// oldBoolOps := q.Arguments[0].boolOps
+		a := o.process(q.Arguments[0])
 
 		// preprocess and try to combine arguments
 		args := make([]Query, 0, len(q.Arguments))
 		for i := 1; i < len(q.Arguments); i++ {
 			b := o.Process(q.Arguments[i])
 
-			boolOps := a.boolOps + b.boolOps
-			if boolOps < o.getLimit(a, b) {
+			if o.canCombine(a, b) {
 				// combine two arguments into one
-				tmp := Query{boolOps: boolOps + 1}
+				// both a & b should have simple queries!
+				tmp := Query{boolOps: a.boolOps + b.boolOps + 1}
 				tmp.Simple = &SimpleQuery{Options: a.Simple.Options}
 				tmp.Simple.Structured = a.Simple.Structured && b.Simple.Structured
-				tmp.Simple.Expression = fmt.Sprintf("%s %s %s", //"(%s %s %s)",
-					a.Simple.Expression,
-					q.Operator,
-					b.Simple.Expression)
-				tmp.Simple.GenericExpr = fmt.Sprintf("%s %s %s", //"(%s %s %s)",
-					a.Simple.GenericExpr,
-					q.Operator,
-					b.Simple.GenericExpr)
+
+				var oldExpr bytes.Buffer
+				var newExpr bytes.Buffer
+
+				// print first argument
+				if a.boolOps > 0 {
+					oldExpr.WriteRune('(')
+					oldExpr.WriteString(a.Simple.Expression)
+					oldExpr.WriteRune(')')
+
+					newExpr.WriteRune('(')
+					newExpr.WriteString(a.Simple.GenericExpr)
+					newExpr.WriteRune(')')
+				} else { // as is
+					//oldExpr.WriteRune('(')
+					oldExpr.WriteString(a.Simple.Expression)
+					//oldExpr.WriteRune(')')
+
+					//newExpr.WriteRune('(')
+					newExpr.WriteString(a.Simple.GenericExpr)
+					//newExpr.WriteRune(')')
+				}
+
+				// print operator
+				if true {
+					oldExpr.WriteRune(' ')
+					oldExpr.WriteString(q.Operator)
+					oldExpr.WriteRune(' ')
+
+					newExpr.WriteRune(' ')
+					newExpr.WriteString(q.Operator)
+					newExpr.WriteRune(' ')
+				}
+
+				// print second argument
+				if b.boolOps > 0 {
+					oldExpr.WriteRune('(')
+					oldExpr.WriteString(b.Simple.Expression)
+					oldExpr.WriteRune(')')
+
+					newExpr.WriteRune('(')
+					newExpr.WriteString(b.Simple.GenericExpr)
+					newExpr.WriteRune(')')
+				} else { // as is
+					//oldExpr.WriteRune('(')
+					oldExpr.WriteString(b.Simple.Expression)
+					//oldExpr.WriteRune(')')
+
+					//newExpr.WriteRune('(')
+					newExpr.WriteString(b.Simple.GenericExpr)
+					//newExpr.WriteRune(')')
+				}
+
+				tmp.Simple.Expression = oldExpr.String()
+				tmp.Simple.GenericExpr = newExpr.String()
+
 				a = tmp // next iteration
 			} else {
 				args = append(args, a) // leave it "as is"
@@ -133,12 +185,31 @@ func (o *Optimizer) combine(q Query) Query {
 	return q // nothing to optimize
 }
 
+// checks if we can combine two queries
+func (o *Optimizer) canCombine(a Query, b Query) bool {
+	// we cannot combine non-structured (RAW_TEXT) queries
+	if !a.IsStructured() || !b.IsStructured() {
+		return false
+	}
+
+	// getLimit also checks the options are the same
+	// and both queries has the "simple" form
+	if (a.boolOps + b.boolOps) < o.getLimit(a, b) {
+		return true
+	}
+
+	return false
+}
+
 // get the bool operations limit
 func (o *Optimizer) getLimit(a Query, b Query) int {
 	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
 		if aa.Options.EqualsTo(bb.Options) {
 			// both simple queries are the same type!
 			return o.getModeLimit(aa.Options.Mode)
+		} else {
+			// type or options are different
+			return o.DifferentOptionsLimit
 		}
 	}
 
