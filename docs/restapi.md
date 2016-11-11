@@ -571,6 +571,9 @@ If `catalog` parameter is provided then file will be appended to that catalog
 file instead of standalone file uploading. This feature is used to upload a
 bunch of small files to a bigger catalog data file.
 
+The `catalog` parameter contains full catalog's path.
+All non-existsing sub-directories will be created automatically.
+
 Special keyword `{{random}}` can be used to generate unique catalog names.
 This keyword will be replaced with some unique hexadecimal string.
 For example, `catalog=foo-{{random}}.catalog` will be replaced to something like
@@ -593,9 +596,12 @@ Once provided the delimiter cannot be changed for the same catalog.
 ### POST files `file` parameter
 
 To upload a file the `file` parameter should be provided.
-It contains full path of the uploaded data content. For example, if `file=foo.txt`
-then the data will be saved under `/ryftone/test/foo.txt` (assuming user's
+It contains full path of the uploaded data content. For example, if `file=bar/foo.txt`
+then the data will be saved under `/ryftone/test/bar/foo.txt` (assuming user's
 home directory is `test`).
+
+If `catalog` parameter is not specified the `file` parameter contains full path.
+All non-existsing sub-directories will be created automatically.
 
 Special keyword `{{random}}` can be used to generate unique filenames.
 This keyword will be replaced with some unique hexadecimal string.
@@ -637,7 +643,7 @@ Multiple parameters can be used together.
 Also wildcards are supported. To delete all JSON files just pass `file=*.json`.
 
 All the names should be relative to the Ryft volume and user's home.
-The `file=/foo.txt` request will delete `/ryftone/test/foo.txt` on the Ryft box
+The `file=bar/foo.txt` request will delete `/ryftone/test/bar/foo.txt` on the Ryft box
 (assuming user's home directory is *test*).
 
 
