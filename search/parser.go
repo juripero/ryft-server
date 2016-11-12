@@ -59,7 +59,7 @@ func ParseIndex(buf []byte) (index Index, err error) {
 
 	// Length
 	var length uint64
-	length, err = strconv.ParseUint(string(fields[n-2]), 10, 16)
+	length, err = strconv.ParseUint(string(fields[n-2]), 10, 64)
 	if err != nil {
 		return index, fmt.Errorf("failed to parse length: %s", err)
 	}
