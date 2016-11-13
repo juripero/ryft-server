@@ -168,8 +168,8 @@ func TestOptimizerLimits(t *testing.T) {
 		}
 
 		o := &Optimizer{
-			OperatorLimits:        limits,
-			DifferentOptionsLimit: limit,
+			OperatorLimits: limits,
+			CombineLimit:   limit,
 		}
 
 		q, err := ParseQuery(data)
@@ -207,6 +207,22 @@ func TestOptimizerLimits(t *testing.T) {
 	check(2, true, // (A(BC)) ((DE)F)
 		`(RECORD CONTAINS "A") AND ((RECORD CONTAINS "B") XOR (RECORD CONTAINS "C")) AND ((RECORD CONTAINS "D") OR (RECORD CONTAINS "E")) AND (RECORD CONTAINS "F")`,
 		`AND{(RECORD CONTAINS EXACT("A")) AND ((RECORD CONTAINS EXACT("B")) XOR (RECORD CONTAINS EXACT("C")))[es]x2, ((RECORD CONTAINS EXACT("D")) OR (RECORD CONTAINS EXACT("E"))) AND (RECORD CONTAINS EXACT("F"))[es]x2}`)
+
+	check(10, false, // (A) (B) no queries should be combined
+		`(RECORD CONTAINS "A") AND (RAW_TEXT CONTAINS "B")`,
+		`AND{(RECORD CONTAINS EXACT("A"))[es], (RAW_TEXT CONTAINS EXACT("B"))[es]}`)
+
+	check(10, false, // (A) (B) no queries should be combined
+		`(RAW_TEXT CONTAINS "A") AND (RECORD CONTAINS "B")`,
+		`AND{(RAW_TEXT CONTAINS EXACT("A"))[es], (RECORD CONTAINS EXACT("B"))[es]}`)
+
+	check(10, false, // (A) (B) no queries should be combined
+		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B")`,
+		`AND{(RAW_TEXT CONTAINS EXACT("A"))[es], (RAW_TEXT CONTAINS EXACT("B"))[es]}`)
+
+	check(0, false, // (A) (B) force queries to be combined
+		`{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B")}`,
+		`(RAW_TEXT CONTAINS EXACT("A")) AND (RAW_TEXT CONTAINS EXACT("B"))[es]x1`)
 }
 
 // test for get limit

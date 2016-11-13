@@ -9,8 +9,7 @@ import (
 type Optimizer struct {
 	// number of boolean operators per search type
 	OperatorLimits map[string]int // `json:"limits,omitempty" yaml:"limits,omitempty"`
-	// TODO: flag for structured searches
-	DifferentOptionsLimit int
+	CombineLimit   int            // `json:"limit" yaml:"limit,omitempty"`
 }
 
 // Process optimizes input query.
@@ -193,9 +192,8 @@ func (o *Optimizer) canCombine(a Query, b Query) bool {
 		return false
 	}
 
-	// getLimit also checks the options are the same
-	// and both queries has the "simple" form
-	if (a.boolOps + b.boolOps) < o.getLimit(a, b) {
+	// getLimit also checks both queries has the "simple" form
+	if lim := o.getLimit(a, b); lim < 0 || (a.boolOps+b.boolOps) < lim {
 		return true
 	}
 
@@ -205,12 +203,12 @@ func (o *Optimizer) canCombine(a Query, b Query) bool {
 // get the bool operations limit
 func (o *Optimizer) getLimit(a Query, b Query) int {
 	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
-		if aa.Options.EqualsTo(bb.Options) {
+		if false && aa.Options.EqualsTo(bb.Options) {
 			// both simple queries are the same type!
 			return o.getModeLimit(aa.Options.Mode)
 		} else {
 			// type or options are different
-			return o.DifferentOptionsLimit
+			return o.CombineLimit
 		}
 	}
 
