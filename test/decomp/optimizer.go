@@ -25,6 +25,7 @@ func (o *Optimizer) process(q Query) Query {
 	} else if q.Operator != "" && len(q.Arguments) > 0 {
 		// oldBoolOps := q.Arguments[0].boolOps
 		a := o.process(q.Arguments[0])
+		first := true
 
 		// preprocess and try to combine arguments
 		args := make([]Query, 0, len(q.Arguments))
@@ -42,7 +43,7 @@ func (o *Optimizer) process(q Query) Query {
 				var newExpr bytes.Buffer
 
 				// print first argument
-				if a.boolOps > 0 {
+				if a.boolOps > 0 && first {
 					oldExpr.WriteRune('(')
 					oldExpr.WriteString(a.Simple.Expression)
 					oldExpr.WriteRune(')')
@@ -93,10 +94,10 @@ func (o *Optimizer) process(q Query) Query {
 				tmp.Simple.Expression = oldExpr.String()
 				tmp.Simple.GenericExpr = newExpr.String()
 
-				a = tmp // next iteration
+				a, first = tmp, false // next iteration
 			} else {
 				args = append(args, a) // leave it "as is"
-				a = b                  // next iteration
+				a, first = b, true     // next iteration
 			}
 		}
 

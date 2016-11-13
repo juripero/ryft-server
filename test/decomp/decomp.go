@@ -8,7 +8,7 @@ import (
 // SimpleQuery contains one query (relational expression)
 type SimpleQuery struct {
 	Structured  bool    // true for structured search (RECORD), false for RAW_TEXT
-	Expression  string  // search expression
+	Expression  string  // search expression (old format)
 	GenericExpr string  // search expression (generic format)
 	Options     Options // search options
 }
@@ -86,7 +86,7 @@ func (q Query) GenericString() string {
 	return buf.String()
 }
 
-// IsStructured returns true for structured queries, false for RAW text
+// IsStructured returns `true` for structured queries, `false` for RAW text
 func (q Query) IsStructured() bool {
 	if q.Simple != nil {
 		return q.Simple.Structured
