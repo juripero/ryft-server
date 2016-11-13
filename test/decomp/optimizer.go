@@ -35,8 +35,13 @@ func (o *Optimizer) process(q Query) Query {
 				// combine two arguments into one
 				// both a & b should have simple queries!
 				tmp := Query{boolOps: a.boolOps + b.boolOps + 1}
-				tmp.Simple = &SimpleQuery{Options: a.Simple.Options}
+				tmp.Simple = &SimpleQuery{}
 				tmp.Simple.Structured = a.Simple.Structured && b.Simple.Structured
+				if a.Simple.Options.EqualsTo(b.Simple.Options) {
+					tmp.Simple.Options = a.Simple.Options
+				} else {
+					tmp.Simple.Options = DefaultOptions() // reset to default
+				}
 
 				var oldExpr bytes.Buffer
 				var newExpr bytes.Buffer

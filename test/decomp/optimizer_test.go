@@ -223,6 +223,13 @@ func TestOptimizerLimits(t *testing.T) {
 	check(0, false, // (A) (B) force queries to be combined
 		`{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B")}`,
 		`(RAW_TEXT CONTAINS EXACT("A")) AND (RAW_TEXT CONTAINS EXACT("B"))[es]x1`)
+	check(0, false, // (A) (B) force queries to be combined
+		`{(RAW_TEXT CONTAINS FHS("A",d=1)) AND (RAW_TEXT CONTAINS "B")}`,
+		`(RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1")) AND (RAW_TEXT CONTAINS EXACT("B"))x1`)
+
+	check(-1, true, // (A) (B) different options
+		`((RECORD CONTAINS FHS("A",d=1)) AND (RECORD CONTAINS FEDS("B",d=1)))`,
+		`(RECORD CONTAINS HAMMING("A", DISTANCE="1")) AND (RECORD CONTAINS EDIT_DISTANCE("B", DISTANCE="1"))x1`)
 }
 
 // test for get limit
