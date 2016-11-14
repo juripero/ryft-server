@@ -585,7 +585,7 @@ func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id i
 func (cat *Catalog) newDataFilePath() string {
 	dir, file := filepath.Split(cat.path)
 	// make file hidden and randomize by unix timestamp
-	absPath := filepath.Join(cat.GetDataDir(), fmt.Sprintf(".data-%016x-%s", time.Now().UnixNano(), file))
+	absPath := filepath.Join(cat.GetDataDir(), fmt.Sprintf(".data-%016x.%s", time.Now().UnixNano(), file))
 
 	if path, err := filepath.Rel(dir, absPath); err == nil {
 		return path
