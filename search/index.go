@@ -47,7 +47,7 @@ type Index struct {
 	File      string `json:"file" msgpack:"file"`                     // filename
 	Offset    uint64 `json:"offset" msgpack:"offset"`                 // data offset
 	Length    uint64 `json:"length" msgpack:"length"`                 // length of data
-	Fuzziness uint8  `json:"fuzziness" msgpack:"fuzziness"`           // fuzziness distance
+	Fuzziness int32  `json:"fuzziness" msgpack:"fuzziness"`           // fuzziness distance
 	Host      string `json:"host,omitempty" msgpack:"host,omitempty"` // optional host address (used in cluster mode)
 }
 
@@ -70,7 +70,7 @@ func NewIndex(file string, offset, length uint64) *Index {
 // Release releases the Index object.
 // Please call this method once record is used.
 func (idx *Index) Release() {
-	// release data
+	// release data (for GC)
 	idx.File = ""
 	idx.Host = ""
 

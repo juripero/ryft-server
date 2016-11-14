@@ -63,11 +63,11 @@ func ParseIndex(buf []byte) (*Index, error) {
 	}
 
 	// Fuzziness distance
-	var dist uint64
+	var dist int64
 	if strings.EqualFold(string(fields[n-1]), "n/a") {
-		dist = 0 // TODO: check special value for N/A
+		dist = -1 // TODO: check special value for N/A
 	} else {
-		dist, err = strconv.ParseUint(string(bytes.TrimSpace(fields[n-1])), 10, 8)
+		dist, err = strconv.ParseInt(string(bytes.TrimSpace(fields[n-1])), 10, 31)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse fuzziness distance: %s", err)
 		}
@@ -76,7 +76,7 @@ func ParseIndex(buf []byte) (*Index, error) {
 	// create index
 	path := string(bytes.TrimSpace(file))
 	index := NewIndex(path, offset, length)
-	index.Fuzziness = uint8(dist)
+	index.Fuzziness = int32(dist)
 
 	return index, nil // OK
 }
