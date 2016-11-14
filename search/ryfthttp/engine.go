@@ -91,9 +91,6 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	for _, file := range cfg.Files {
 		q.Add("files", file) // TODO: replace with "file", "files" will be deprecated
 	}
-	for _, catalog := range cfg.Catalogs {
-		q.Add("catalog", catalog)
-	}
 	if len(cfg.Mode) != 0 {
 		q.Set("mode", cfg.Mode)
 	}
@@ -155,6 +152,11 @@ func SetLogLevelString(level string) error {
 // SetLogLevel changes global module log level.
 func SetLogLevel(level logrus.Level) {
 	log.Level = level
+}
+
+// GetLogLevel gets global module log level.
+func GetLogLevel() logrus.Level {
+	return log.Level
 }
 
 // log returns task related logger.

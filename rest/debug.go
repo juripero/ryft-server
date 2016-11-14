@@ -27,37 +27,29 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
-
-package ryftone
+package rest
 
 import (
-	"github.com/Sirupsen/logrus"
+	"runtime"
+
+	"github.com/gin-gonic/gin"
 )
 
-var (
-	// package logger instance
-	log = logrus.New()
+// handle /debug/stack endpoint: information current goroutines
+func (server *Server) DoDebugStack(ctx *gin.Context) {
+	ctx.Header("Content-Type", "text/plain; charset=utf-8")
+	ctx.Writer.Write(getAllStacks())
+}
 
-	TAG = "ryftone"
-)
-
-// SetLogLevelString changes global module log level.
-func SetLogLevelString(level string) error {
-	ll, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
+// returns a formatted stack trace of all goroutines.
+// see runtime.debug.Stack as a reference!
+func getAllStacks() []byte {
+	buf := make([]byte, 1024)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			return buf[:n]
+		}
+		buf = make([]byte, 2*len(buf))
 	}
-
-	log.Level = ll
-	return nil // OK
-}
-
-// SetLogLevel changes global module log level.
-func SetLogLevel(level logrus.Level) {
-	log.Level = level
-}
-
-// GetLogLevel gets global module log level.
-func GetLogLevel() logrus.Level {
-	return log.Level
 }

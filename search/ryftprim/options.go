@@ -42,16 +42,17 @@ import (
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{
-		"instance-name":   engine.Instance,
-		"ryftprim-exec":   engine.ExecPath,
-		"ryftprim-legacy": engine.LegacyMode,
-		"ryftone-mount":   engine.MountPoint,
-		"home-dir":        engine.HomeDir,
-		"open-poll":       engine.OpenFilePollTimeout.String(),
-		"read-poll":       engine.ReadFilePollTimeout.String(),
-		"read-limit":      engine.ReadFilePollLimit,
-		"keep-files":      engine.KeepResultFiles,
-		"index-host":      engine.IndexHost,
+		"instance-name":    engine.Instance,
+		"ryftprim-exec":    engine.ExecPath,
+		"ryftprim-legacy":  engine.LegacyMode,
+		"ryftone-mount":    engine.MountPoint,
+		"home-dir":         engine.HomeDir,
+		"open-poll":        engine.OpenFilePollTimeout.String(),
+		"read-poll":        engine.ReadFilePollTimeout.String(),
+		"read-limit":       engine.ReadFilePollLimit,
+		"keep-files":       engine.KeepResultFiles,
+		"minimize-latency": engine.MinimizeLatency,
+		"index-host":       engine.IndexHost,
 	}
 }
 
@@ -118,7 +119,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	// create working directory
 	work_dir := filepath.Join(engine.MountPoint, engine.HomeDir, engine.Instance)
 	// TODO: option to clear working dir before start?
-	err = os.MkdirAll(work_dir, os.ModeDir)
+	err = os.MkdirAll(work_dir, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create working directory: %s", err)
 	}
@@ -162,6 +163,14 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		engine.KeepResultFiles, err = utils.AsBool(v)
 		if err != nil {
 			return fmt.Errorf(`failed to convert "keep-files" option: %s`, err)
+		}
+	}
+
+	// minimize latency flag
+	if v, ok := opts["minimize-latency"]; ok {
+		engine.MinimizeLatency, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to convert "minimize-latency" option: %s`, err)
 		}
 	}
 

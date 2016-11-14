@@ -56,6 +56,10 @@ type Engine struct {
 
 	KeepResultFiles bool // false by default
 
+	// false - start data processing once ryftprim is finished
+	// true - start data processing immediatelly after ryftprim is started
+	MinimizeLatency bool
+
 	// poll timeouts & limits
 	OpenFilePollTimeout time.Duration
 	ReadFilePollTimeout time.Duration
@@ -138,6 +142,11 @@ func SetLogLevelString(level string) error {
 // SetLogLevel changes global module log level.
 func SetLogLevel(level logrus.Level) {
 	log.Level = level
+}
+
+// GetLogLevel gets global module log level.
+func GetLogLevel() logrus.Level {
+	return log.Level
 }
 
 // log returns task related log entry.

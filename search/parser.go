@@ -34,6 +34,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // ParseIndex parses index from Ryft index file line.
@@ -56,21 +57,26 @@ func ParseIndex(buf []byte) (*Index, error) {
 	}
 
 	// Length
-	length, err := strconv.ParseUint(string(bytes.TrimSpace(fields[n-2])), 10, 16)
+	length, err := strconv.ParseUint(string(bytes.TrimSpace(fields[n-2])), 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse length: %s", err)
 	}
 
 	// Fuzziness distance
-	dist, err := strconv.ParseUint(string(bytes.TrimSpace(fields[n-1])), 10, 8)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse fuzziness: %s", err)
+	var dist uint64
+	if strings.EqualFold(string(fields[n-1]), "n/a") {
+		dist = 0 // TODO: check special value for N/A
+	} else {
+		dist, err = strconv.ParseUint(string(bytes.TrimSpace(fields[n-1])), 10, 8)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse fuzziness distance: %s", err)
+		}
 	}
 
 	// create index
 	path := string(bytes.TrimSpace(file))
-	idx := NewIndex(path, offset, length)
-	idx.Fuzziness = uint8(dist)
+	index := NewIndex(path, offset, length)
+	index.Fuzziness = uint8(dist)
 
-	return idx, nil // OK
+	return index, nil // OK
 }

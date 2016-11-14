@@ -49,6 +49,10 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 		panic(NewServerErrorWithDetails(http.StatusBadRequest,
 			err.Error(), "failed to parse request parameters"))
 	}
+	params.Files = append(params.Files, params.Catalogs...)
+	params.Files = append(params.Files, params.Dirs...)
+	params.Catalogs = nil
+	params.Dirs = nil
 
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	mountPoint, err := s.getMountPoint(homeDir)
@@ -58,12 +62,11 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
-	log.WithField("dirs", params.Dirs).
-		WithField("files", params.Files).
-		WithField("catalogs", params.Catalogs).
-		WithField("user", userName).
-		WithField("home", homeDir).
-		Info("deleting...")
+	log.WithFields(map[string]interface{}{
+		"files": params.Files,
+		"user":  userName,
+		"home":  homeDir,
+	}).Info("deleting...")
 
 	// for each requested file|dir|catalog get list of tags from consul KV/partition.
 	// based of these tags determine the list of nodes having such file|dir|catalog.
@@ -72,12 +75,8 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 
 	result := make(map[string]interface{})
 	if !params.Local && !s.Config.LocalOnly && !params.isEmpty() {
-		files := params.Dirs[:]
-		files = append(files, params.Files...)
-		files = append(files, params.Catalogs...)
-
-		services, tags, err := s.getConsulInfoForFiles(userTag, files)
-		if err != nil || len(tags) != len(files) {
+		services, tags, err := s.getConsulInfoForFiles(userTag, params.Files)
+		if err != nil || len(tags) != len(params.Files) {
 			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 				err.Error(), "failed to map files to tags"))
 		}
@@ -109,20 +108,14 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 			node.Params.Local = true
 
 			// check tags (no tags - all nodes)
-			for k, f := range files {
+			for k, f := range params.Files {
 				if i == 0 {
 					// print for the first service only
 					log.WithField("item", f).WithField("tags", tags[k]).Debugf("related tags")
 				}
 				if len(tags[k]) == 0 || hasSomeTag(service.ServiceTags, tags[k]) {
 					// based on 'k' index detect what the 'f' is: dir, file or catalog
-					if k < len(params.Dirs) {
-						node.Params.Dirs = append(node.Params.Dirs, f)
-					} else if k < len(params.Dirs)+len(params.Files) {
-						node.Params.Files = append(node.Params.Files, f)
-					} else {
-						node.Params.Catalogs = append(node.Params.Catalogs, f)
-					}
+					node.Params.Files = append(node.Params.Files, f)
 				}
 			}
 
@@ -161,7 +154,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 
 			if node.Error != nil {
 				result[node.Name] = map[string]interface{}{
-					"error": err.Error(),
+					"error": node.Error.Error(),
 				}
 			} else {
 				result[node.Name] = node.Result
@@ -189,19 +182,9 @@ func (s *Server) deleteLocalFiles(mountPoint string, params DeleteFilesParams) m
 		}
 	}
 
-	// delete directories first ...
-	for dir, err := range deleteAll(mountPoint, params.Dirs) {
+	// delete all
+	for dir, err := range deleteAll(mountPoint, params.Files) {
 		updateResult(dir, err)
-	}
-
-	// ... then delete files
-	for file, err := range deleteAll(mountPoint, params.Files) {
-		updateResult(file, err)
-	}
-
-	// ... then delete catalogs
-	for cat, err := range deleteAllCatalogs(mountPoint, params.Catalogs) {
-		updateResult(cat, err)
 	}
 
 	return res
@@ -278,61 +261,30 @@ func deleteAll(mountPoint string, items []string) map[string]error {
 			if err != nil {
 				rel = file // ignore error and get absolute path
 			}
-			res[rel] = os.RemoveAll(file)
-		}
-	}
 
-	return res
-}
-
-// remove catalogs
-func deleteAllCatalogs(mountPoint string, items []string) map[string]error {
-	res := map[string]error{}
-	for _, item := range items {
-		path := filepath.Join(mountPoint, item)
-		matches, err := filepath.Glob(path)
-		if err != nil {
-			res[item] = err
-			continue
-		}
-
-		// remove all matches
-		for _, catalogPath := range matches {
-			rel, err := filepath.Rel(mountPoint, catalogPath)
-			if err != nil {
-				rel = catalogPath // ignore error and get absolute path
-			}
-
-			// get catalog
-			cat, err := catalog.OpenCatalogReadOnly(catalogPath)
-			if err != nil {
-				res[rel] = err
-				continue
-			}
-			defer func() {
+			// try to get catalog
+			if cat, err := catalog.OpenCatalogReadOnly(file); err == nil {
+				// get catalog's data files
+				dataDir := cat.GetDataDir()
 				cat.DropFromCache()
-				cat.Close() // it's ok to close later at function exit
-				res[rel] = os.RemoveAll(catalogPath)
-			}()
+				cat.Close()
 
-			// get data files
-			files, err := cat.GetDataFiles()
-			if err != nil {
+				// delete catalog's data directory
+				err = os.RemoveAll(dataDir)
+				if err != nil {
+					res[rel] = err
+					continue
+				}
+
+				// delete catalog's meta-data file
+				res[rel] = os.RemoveAll(file)
+				continue
+			} else if err != catalog.ErrNotACatalog {
 				res[rel] = err
 				continue
 			}
 
-			// make relative path
-			for i, f := range files {
-				if rf, err := filepath.Rel(mountPoint, f); err == nil {
-					files[i] = rf
-				}
-			}
-
-			// delete all data files
-			for name, err := range deleteAll(mountPoint, files) {
-				res[name] = err
-			}
+			res[rel] = os.RemoveAll(file)
 		}
 	}
 

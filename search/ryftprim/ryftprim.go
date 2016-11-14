@@ -44,7 +44,6 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftone"
-	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
 // Prepare `ryftprim` command line arguments.
@@ -116,91 +115,11 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// search query
 	args = append(args, "-q", ryftone.PrepareQuery(cfg.Query))
 
-	// files and catalogs combined
-	files := []string{}
-	files = append(files, cfg.Files...)
-	files = append(files, cfg.Catalogs...)
-	file_args := []string{} // with catalogs, after glob()
-	N_catalogs := 0
-
-	// check it dynamically: catalog or regular file
-	for _, mask := range files {
-		// relative -> absolute (mount point + home + ...)
-		matches, err := filepath.Glob(filepath.Join(engine.MountPoint, engine.HomeDir, mask))
-		if err != nil {
-			return fmt.Errorf("failed to glob file mask %s: %s", mask, err)
-		}
-
-		// iterate all matches
-		for _, filePath := range matches {
-			if info, err := os.Stat(filePath); err != nil {
-				return fmt.Errorf("failed to stat file: %s", err)
-			} else if info.IsDir() {
-				task.log().WithField("path", filePath).Warnf("[%s]: is a directory, skipped", TAG)
-				continue
-			} else if info.Size() == 0 {
-				task.log().WithField("path", filePath).Warnf("[%s]: empty file, skipped", TAG)
-				continue
-			} /*else if strings.HasPrefix(info.Name(), ".") {
-				task.log().WithField("path", filePath).Debugf("[%s]: hidden file, skipped", TAG)
-				continue
-			}*/
-
-			task.log().WithField("file", filePath).Debugf("checking catalog file...")
-			cat, err := catalog.OpenCatalogReadOnly(filePath)
-			if err != nil {
-				if err == catalog.ErrNotACatalog {
-					// just a regular file, use it "as is"
-					task.log().WithField("file", filePath).Debugf("... just a regular file")
-					file_args = append(file_args, "-f", engine.relativeToMountPointAbs(filePath))
-
-					continue // go to next match
-				}
-				return fmt.Errorf("failed to open catalog: %s", err)
-			}
-			defer cat.Close()
-
-			task.log().WithField("file", filePath).Debugf("... is a catalog")
-			if tc, ok := cfg.WorkCatalog.(*catalog.Catalog); ok && tc != nil {
-				// TODO: refactor this logic
-				tc.CopyFrom(cat)
-			}
-			N_catalogs += 1
-
-			// data files (absolute path)
-			files, err := cat.GetDataFiles()
-			if err != nil {
-				return fmt.Errorf("failed to get catalog files: %s", err)
-			}
-
-			// unwind indexes
-			indexes, err := cat.GetSearchIndexFile()
-			if err != nil {
-				return fmt.Errorf("failed to get catalog indexes: %s", err)
-			}
-
-			// relative to mount point
-			for _, file := range files {
-				file_args = append(file_args, "-f", engine.relativeToMountPointAbs(file))
-			}
-
-			// update unwind index base
-			for path, f := range indexes {
-				cfg.SetUnwindIndexesBasedOn(path, f)
-			}
-		}
-	}
-
-	if N_catalogs == 0 {
-		// no catalogs were found
-		// can use input "as is"
-		for _, file := range files {
-			path := filepath.Join(engine.HomeDir, file)
-			path = engine.relativeToMountPoint(path)
-			args = append(args, "-f", path)
-		}
-	} else {
-		args = append(args, file_args...)
+	// files
+	for _, file := range cfg.Files {
+		path := filepath.Join(engine.HomeDir, file)
+		path = engine.relativeToMountPoint(path)
+		args = append(args, "-f", path)
 	}
 
 	// INDEX results file
@@ -240,10 +159,6 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	// limit number of records
 	task.Limit = uint64(cfg.Limit)
 
-	// unwind index feature
-	task.UnwindIndexesBasedOn = cfg.UnwindIndexesBasedOn
-	task.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
-
 	return nil // OK
 }
 
@@ -258,6 +173,22 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		if err := engine.removeFile(task.DataFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove old DATA file", TAG)
 			return fmt.Errorf("failed to remove old DATA file: %s", err)
+		}
+	}
+
+	minimizeLatency := engine.MinimizeLatency // from configuration
+	// if output DATA or INDEX files already exist
+	// we cannot minimize latency - need to postpone processing until ryftprim is finished
+	if minimizeLatency && len(task.IndexFileName) != 0 {
+		if _, err := os.Stat(filepath.Join(engine.MountPoint, task.IndexFileName)); !os.IsNotExist(err) {
+			task.log().WithField("path", task.IndexFileName).Warnf("[%s]: INDEX file already exists, postpone processing", TAG)
+			minimizeLatency = false
+		}
+	}
+	if minimizeLatency && len(task.DataFileName) != 0 {
+		if _, err := os.Stat(filepath.Join(engine.MountPoint, task.DataFileName)); !os.IsNotExist(err) {
+			task.log().WithField("path", task.DataFileName).Warnf("[%s]: DATA file already exists, postpone processing", TAG)
+			minimizeLatency = false
 		}
 	}
 
@@ -277,14 +208,14 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.tool_cmd = cmd
 
 	// do processing in background
-	go engine.process(task, res)
+	go engine.process(task, res, minimizeLatency)
 
 	return nil // OK for now
 }
 
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
-func (engine *Engine) process(task *Task, res *search.Result) {
+func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bool) {
 	defer task.log().WithField("result", res).Debugf("[%s]: end TASK processing", TAG)
 	task.log().Debugf("[%s]: start TASK processing...", TAG)
 
@@ -304,8 +235,10 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 		}
 	}()
 
-	// start INDEX&DATA processing
-	if task.enableDataProcessing {
+	// start INDEX&DATA processing (if latency is minimized)
+	// otherwise wait until ryftprim tool is finished
+	if minimizeLatency && task.enableDataProcessing {
+		task.dataProcessingEnabled = true
 		task.prepareProcessing()
 
 		task.subtasks.Add(2)
@@ -317,12 +250,21 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 	// TODO: overall execution timeout?
 
 	case err := <-cmd_done: // process done
+		// start INDEX&DATA processing (if latency is NOT minimized)
+		if !minimizeLatency && task.enableDataProcessing && err == nil {
+			task.dataProcessingEnabled = true
+			task.prepareProcessing()
+
+			task.subtasks.Add(2)
+			go engine.processIndex(task, res)
+			go engine.processData(task, res)
+		}
 		engine.finish(err, task, res)
 
 	case <-res.CancelChan: // client wants to stop all processing
 		task.log().Warnf("[%s]: cancelling by client", TAG)
 
-		if task.enableDataProcessing {
+		if task.dataProcessingEnabled {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
 			task.cancelData()
@@ -394,7 +336,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	}
 
 	// stop subtasks if processing enabled
-	if task.enableDataProcessing {
+	if task.dataProcessingEnabled {
 		if err != nil || error_suppressed {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
@@ -422,7 +364,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 			case <-res.CancelChan: // client wants to stop all processing
 				task.log().Warnf("[%s]: ***cancelling by client", TAG)
-				if task.enableDataProcessing {
+				if task.dataProcessingEnabled {
 					task.log().Debugf("[%s]: ***cancelling INDEX&DATA processing...", TAG)
 					task.cancelIndex()
 					task.cancelData()
@@ -575,33 +517,12 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 	// close at the end
 	defer file.Close()
-	modifiedRecords := 0
-	defer func() {
-		if modifiedRecords != 0 {
-			task.log().WithField("records", modifiedRecords).Warnf("some records are modified!")
-		}
-	}()
 
 	// try to process all INDEX records
 	r := bufio.NewReader(file)
 	offset := uint64(0)
 	for index := range task.indexChan {
 		dataLen := index.Length
-		shift := 0
-		if task.UnwindIndexesBasedOn != nil {
-			if f, ok := task.UnwindIndexesBasedOn[index.File]; ok && f != nil {
-				var tmp search.Index
-				tmp, shift = f.Unwind(index, task.Surrounding)
-				// task.log().Debugf("unwind %s => %s", index, tmp)
-				index = tmp
-			}
-		}
-		if task.SaveUpdatedIndexesTo != nil {
-			task.SaveUpdatedIndexesTo.AddIndex(index)
-		}
-		if shift != 0 || index.Length != dataLen {
-			modifiedRecords += 1
-		}
 
 		// trim mount point from file name! TODO: special option for this?
 		index.File = strings.TrimPrefix(index.File,
@@ -626,8 +547,6 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 			return // no sense to continue processing
 		}
-		// assertion: index.Length+shift <= dataLen
-		rec.Data = rec.Data[shift : shift+int(index.Length)]
 
 		if atomic.LoadInt32(&task.dataCancelled) != 0 {
 			task.log().Debugf("[%s]: DATA processing cancelled ***", TAG)

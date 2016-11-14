@@ -416,6 +416,20 @@ VALUES (?,?,?,?,?)`, filename, offset, length, data_id, data_pos)
 	return data_file, data_pos, delim, nil // OK
 }
 
+// get data directory
+// return absollute path!
+func getDataDir(path string) string {
+	// take a look at Catalog.newDataFilePath() function!
+	base, file := filepath.Split(path)
+	dataDir := filepath.Join(base, fmt.Sprintf(".%s.catalog", file))
+	return dataDir
+}
+
+// GetDataDir gets the data directory (absolute path)
+func (cat *Catalog) GetDataDir() string {
+	return getDataDir(cat.path)
+}
+
 // GetDataFiles gets the list of data files (absolute path)
 func (cat *Catalog) GetDataFiles() ([]string, error) {
 	// TODO: several attempts if DB is locked
@@ -489,10 +503,11 @@ func (cat *Catalog) getSearchIndexFileSync() (map[string]*search.IndexFile, erro
 
 // get list of parts (unsynchronized)
 func (cat *Catalog) getSearchIndexFile() (map[string]*search.IndexFile, error) {
-	rows, err := cat.db.Query(`SELECT
-parts.name,parts.pos,parts.len,data.file,parts.d_pos FROM parts
-JOIN data ON parts.d_id = data.id
-ORDER BY parts.pos`)
+	rows, err := cat.db.Query(`
+SELECT p.name, p.pos, p.len, p.d_pos, d.file, d.s_w, d.delim
+FROM parts AS p
+JOIN data AS d ON p.d_id = d.id
+ORDER BY p.d_pos`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parts: %s", err)
 	}
@@ -502,12 +517,14 @@ ORDER BY parts.pos`)
 	for rows.Next() {
 		var file, data string
 		var offset, length, data_pos uint64
-		if err := rows.Scan(&file, &offset, &length, &data, &data_pos); err != nil {
+		var delim sql.NullString
+		var width uint
+		if err := rows.Scan(&file, &offset, &length, &data_pos, &data, &width, &delim); err != nil {
 			return nil, fmt.Errorf("failed to scan parts: %s", err)
 		}
 		f := res[data]
 		if f == nil {
-			f = search.NewIndexFile("")
+			f = search.NewIndexFile(delim.String, width)
 			res[data] = f
 		}
 
@@ -566,9 +583,15 @@ func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id i
 
 // generate new data file path
 func (cat *Catalog) newDataFilePath() string {
-	_, file := filepath.Split(cat.path)
+	dir, file := filepath.Split(cat.path)
 	// make file hidden and randomize by unix timestamp
-	return fmt.Sprintf(".%s.catalog%c.data-%016x-%s", file, filepath.Separator, time.Now().UnixNano(), file)
+	absPath := filepath.Join(cat.GetDataDir(), fmt.Sprintf(".data-%016x-%s", time.Now().UnixNano(), file))
+
+	if path, err := filepath.Rel(dir, absPath); err == nil {
+		return path
+	}
+
+	return absPath // fallback
 }
 
 // clear all tables
@@ -581,12 +604,10 @@ func (cat *Catalog) ClearAll() error {
 
 // clear all tables (unsync)
 func (cat *Catalog) clearAll() error {
-	_, err := cat.db.Exec(`DELETE FROM data`)
+	_, err := cat.db.Exec(`DELETE FROM parts; DELETE FROM data;`)
 	if err != nil {
 		return fmt.Errorf("failed to delete data: %s", err)
 	}
-
-	// all parts will be deleted by trigger
 
 	return nil // OK
 }

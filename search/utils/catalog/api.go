@@ -32,9 +32,7 @@ package catalog
 
 import (
 	"errors"
-	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -55,6 +53,11 @@ var ErrNotACatalog = errors.New("not a catalog")
 // SetLogLevel changes global module log level.
 func SetLogLevel(level logrus.Level) {
 	log.Level = level
+}
+
+// GetLogLevel gets global module log level.
+func GetLogLevel() logrus.Level {
+	return log.Level
 }
 
 // IsCatalog check if file is a catalog
@@ -138,10 +141,7 @@ func getCatalog(path string, readOnly bool) (*Catalog, bool, error) {
 
 	if readOnly {
 		// quick check by looking at data directory
-		// take a look at Catalog.newDataFilePath() function!
-		base, file := filepath.Split(path)
-		dataDir := filepath.Join(base, fmt.Sprintf(".%s.catalog", file))
-
+		dataDir := getDataDir(path)
 		if info, err := os.Stat(dataDir); os.IsNotExist(err) || !info.IsDir() {
 			return nil, false, ErrNotACatalog
 		}

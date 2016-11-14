@@ -37,6 +37,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/getryft/ryft-server/search"
 )
@@ -97,9 +98,7 @@ func (cat *Catalog) AddRyftResults(dataPath, indexPath string, delimiter string,
 	log.WithFields(map[string]interface{}{
 		"data":  dataPath,
 		"index": indexPath,
-		"delim": delimiter,
-		"width": surroundingWidth,
-	}).Infof("[%s]: adding ryft result", TAG)
+	}).Infof("[%s]: adding ryft result with delim:0x%x and width:%d", TAG, delimiter, surroundingWidth)
 
 	file, err := os.Open(indexPath)
 	if err != nil {
@@ -123,6 +122,12 @@ VALUES(?,0,?,?)`, dataPath, delimiter, surroundingWidth)
 	}
 	if data_id, err = res.LastInsertId(); err != nil {
 		return fmt.Errorf("failed to get new data file id: %s", err)
+	}
+
+	// create temporary table to put indexes to...
+	tmpName := fmt.Sprintf("temp.parts_%x", time.Now().UnixNano())
+	if _, err := tx.Exec(fmt.Sprintf(`CREATE TABLE %s AS SELECT * FROM main.parts WHERE 0`, tmpName)); err != nil {
+		return fmt.Errorf("failed to create temp table: %s", err)
 	}
 
 	// try to read all index records
@@ -205,9 +210,9 @@ AND ? BETWEEN p.d_pos AND p.d_pos+p.len-1`, index.File, offset) // TODO: ORDER B
 			}
 
 			// insert new file part (data file will be updated by INSERT trigger!)
-			_, err = tx.Exec(`INSERT
-INTO main.parts(name,pos,len,opt,d_id,d_pos,u_name,u_pos,u_len,u_shift)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, index.File, index.Offset, index.Length,
+			_, err = tx.Exec(fmt.Sprintf(`INSERT
+INTO %s(name,pos,len,opt,d_id,d_pos,u_name,u_pos,u_len,u_shift)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, tmpName), index.File, index.Offset, index.Length,
 				(uint32(index.Fuzziness)<<24)|opt, data_id, data_pos,
 				base_uname, base_upos, base_ulen, shift)
 			if err != nil {
@@ -227,6 +232,16 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, index.File, index.Offset, index.Length,
 		}
 
 		// TODO: do we need stop/cancel here?
+	}
+
+	// copy indexes from temporary table
+	if _, err := tx.Exec(fmt.Sprintf(`INSERT INTO main.parts SELECT * FROM %s;`, tmpName)); err != nil {
+		return fmt.Errorf("failed to copy temp table: %s", err)
+	}
+
+	// drop temporary table
+	if _, err := tx.Exec(fmt.Sprintf(`DROP TABLE %s;`, tmpName)); err != nil {
+		return fmt.Errorf("failed to drop temp table: %s", err)
 	}
 
 	// commit transaction
@@ -249,9 +264,36 @@ type IndexItem struct {
 }
 
 // query all unwinded items
-func (cat *Catalog) QueryAll(opt uint32, optMask uint32) (chan IndexItem, error) {
-	// TODO: data file
-	rows, err := cat.db.Query(`
+func (cat *Catalog) QueryAll(opt uint32, optMask uint32, limit uint) (chan IndexItem, bool, error) {
+	// first detect DATA file modification:
+	// if output DATA file is the only one
+	// if there is no data shifts
+	// if there is no data length changes
+	// then we can use the latest data file produced by Ryft
+
+	var uniqueDataFiles sql.NullInt64
+	check1 := cat.db.QueryRow(`SELECT COUNT(DISTINCT p.d_id) FROM parts AS p WHERE ? == (p.opt&?)`, opt, optMask)
+	if err := check1.Scan(&uniqueDataFiles); err != nil {
+		return nil, false, err
+	}
+	var modifiedOffset sql.NullInt64
+	check2 := cat.db.QueryRow(`SELECT COUNT(*) FROM (SELECT ifnull(p.u_shift, 0) AS x_shift FROM parts AS p WHERE ? == (p.opt&?) AND x_shift != 0)`, opt, optMask)
+	if err := check2.Scan(&modifiedOffset); err != nil {
+		return nil, false, err
+	}
+	var modifiedLength sql.NullInt64
+	check3 := cat.db.QueryRow(`SELECT COUNT(*) FROM (SELECT ifnull(p.u_len, p.len) AS x_len FROM parts AS p WHERE ? == (p.opt&?) AND x_len != p.len)`, opt, optMask)
+	if err := check3.Scan(&modifiedLength); err != nil {
+		return nil, false, err
+	}
+
+	simple := uniqueDataFiles.Int64 <= 1 &&
+		modifiedOffset.Int64 == 0 &&
+		modifiedLength.Int64 == 0
+	log.Debugf("[%s]: simple metrics: data-files:%d diff-offset:%d diff-length:%d result:%t",
+		TAG, uniqueDataFiles.Int64, modifiedOffset.Int64, modifiedLength.Int64, simple)
+
+	query := `
 SELECT
 	ifnull(p.u_name, p.name) AS x_name,
 	ifnull(p.u_pos, p.pos) AS x_pos,
@@ -262,9 +304,17 @@ SELECT
 FROM parts AS p
 JOIN data AS d ON p.d_id == d.id
 WHERE ? == (p.opt&?)
-GROUP BY x_name,x_pos,x_len,x_fuzz;`, opt, optMask)
+GROUP BY x_name,x_pos,x_len,x_fuzz
+ORDER BY p.d_pos
+`
+	if limit != 0 {
+		query += fmt.Sprintf("LIMIT %d\n", limit)
+	}
+
+	// TODO: data file
+	rows, err := cat.db.Query(query, opt, optMask)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	ch := make(chan IndexItem, 1024)
@@ -286,7 +336,7 @@ GROUP BY x_name,x_pos,x_len,x_fuzz;`, opt, optMask)
 		}
 	}()
 
-	return ch, nil // OK
+	return ch, simple, nil // OK
 }
 
 // Unwind one index,

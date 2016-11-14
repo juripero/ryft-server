@@ -53,6 +53,9 @@ func TestParseIndexGood(t *testing.T) {
 	// comas in filename
 	testParseIndexGood(t, "bar,foo.txt,0,0,0", "bar,foo.txt", 0, 0, 0)
 	testParseIndexGood(t, "foo,bar,foo.txt,0,0,0", "foo,bar,foo.txt", 0, 0, 0)
+
+	// n/a fuzziness distance
+	testParseIndexGood(t, "foo.txt,1,2,n/a", "foo.txt", 1, 2, 0)
 }
 
 // "bad" cases
@@ -66,7 +69,7 @@ func TestParseIndexBad(t *testing.T) {
 	testParseIndexBad(t, "foo.txt,0,0.0,0", "failed to parse length")
 	testParseIndexBad(t, "foo.txt,0,b,0", "failed to parse length")
 	testParseIndexBad(t, "foo.txt,0,1b,0", "failed to parse length")
-	testParseIndexBad(t, "foo.txt,0,66666,0", "failed to parse length") // out of 16 bits
+	// testParseIndexBad(t, "foo.txt,0,66666,0", "failed to parse length") // out of 16 bits
 
 	testParseIndexBad(t, "foo.txt,0,0,0.0", "failed to parse fuzziness")
 	testParseIndexBad(t, "foo.txt,0,0,c", "failed to parse fuzziness")

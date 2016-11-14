@@ -31,14 +31,15 @@
 package ryftdec
 
 import (
-	_ "fmt"
 	"strings"
 )
 
 func normalizeTree(node *Node, booleansLimit map[string]int) {
 	sameLevelNormalization(node, booleansLimit)
+	//fmt.Printf("after same-level:\n%s\n", dumpTree(node, 1))
 	if node.hasSubnodes() {
 		differentLevelNormalization(node, booleansLimit)
+		//fmt.Printf("after diff-level:\n%s\n", dumpTree(node, 1))
 	}
 }
 
@@ -47,6 +48,7 @@ func sameLevelNormalization(node *Node, booleansLimit map[string]int) {
 		subnodesType := node.SubNodes[0].Type
 		node.Expression = node.SubNodes[0].Expression + " " + node.Expression + " " + node.SubNodes[1].Expression
 		node.Type = subnodesType
+		node.Options = node.SubNodes[0].Options
 		node.SubNodes = node.SubNodes[0:0]
 
 		// Parent node changed, try to normalize it too
@@ -85,17 +87,26 @@ func queriesWithSameType(node1 *Node, node2 *Node) bool {
 
 func appendNode(srcParentNode, dstNode *Node) {
 	srcNode, otherNode := splitNodes(dstNode, srcParentNode)
+	if srcNode == nil || otherNode == nil {
+		return // something wrong
+	}
+
+	//	fmt.Printf("src-parent:\n%s\n", dumpTree(srcParentNode, 2))
+	//	fmt.Printf("dst-node:\n%s\n", dumpTree(dstNode, 2))
+	//	fmt.Printf("src-node:\n%s\n", dumpTree(srcNode, 2))
+	//	fmt.Printf("other-node:\n%s\n", dumpTree(otherNode, 2))
 
 	dstNode.Expression = dstNode.Expression + " " + dstNode.Parent.Expression + " " + srcNode.Expression
 	srcParentNode.Expression = otherNode.Expression
 	srcParentNode.Type = otherNode.Type
-	srcParentNode.SubNodes = srcParentNode.SubNodes[0:0]
+	srcParentNode.SubNodes = otherNode.SubNodes
+	srcParentNode.Options = otherNode.Options
 }
 
 func splitNodes(dstNode, parentNode *Node) (*Node, *Node) {
 	var srcNode, otherNode *Node
 	for _, node := range parentNode.SubNodes {
-		if node.Type == dstNode.Type {
+		if node.Type == dstNode.Type && node.optionsEqual(dstNode) {
 			srcNode = node
 		} else {
 			otherNode = node

@@ -51,6 +51,8 @@ func TestValidQueries(t *testing.T) {
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
+		`(RECORD.doc.play_name NOT_CONTAINS "King Lear")`,
+		`(RAW_TEXT NOT_EQUALS "?")`,
 		`(RAW_TEXT CONTAINS "?")`,
 		`(RAW_TEXT CONTAINS ?)`,
 		`(RAW_TEXT CONTAINS "he"??"o")`,
@@ -99,7 +101,7 @@ func TestDetectExtension(t *testing.T) {
 	}
 
 	for _, d := range data {
-		ext, err := detectExtension(d.fileNames, nil, d.dataOut)
+		ext, err := detectExtension(d.fileNames, d.dataOut)
 		if d.expectedErr {
 			assert.Error(t, err)
 		} else {

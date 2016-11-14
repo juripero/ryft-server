@@ -177,8 +177,20 @@ func main() {
 		"booleans-per-expression": server.Config.BooleansPerExpression,
 	}).Debug("other configuration")
 
-	// Create a router with default middleware: logger, recover
-	router := gin.Default()
+	// Create a router
+	router := gin.New()
+
+	// /version API endpoint (without logging!)
+	router.GET("/version", func(ctx *gin.Context) {
+		info := map[string]interface{}{
+			"version":  Version,
+			"git-hash": GitHash,
+		}
+		ctx.JSON(http.StatusOK, info)
+	})
+
+	// default middleware: logger, recover
+	router.Use(gin.Logger(), gin.Recovery())
 
 	// Allow CORS requests for * (all domains)
 	router.Use(cors.Cors("*"))
@@ -241,15 +253,6 @@ func main() {
 		router.POST("/login", mw.LoginHandler())
 	}
 
-	// /version API endpoint
-	router.GET("/version", func(ctx *gin.Context) {
-		info := map[string]interface{}{
-			"version":  Version,
-			"git-hash": GitHash,
-		}
-		ctx.JSON(http.StatusOK, info)
-	})
-
 	// main API endpoints
 	private.GET("/search", server.DoSearch)
 	private.GET("/count", server.DoCount)
@@ -257,6 +260,13 @@ func main() {
 	private.GET("/files", server.DoGetFiles)
 	private.DELETE("/files", server.DoDeleteFiles)
 	private.POST("/files", server.DoPostFiles)
+
+	// debug API endpoints
+	if server.Config.DebugMode {
+		router.GET("/debug/stack", server.DoDebugStack)
+		router.GET("/logging/level", server.DoLoggingLevel)
+		router.POST("/logging/level", server.DoLoggingLevel)
+	}
 
 	// static assets
 	for _, asset := range AssetNames() {
