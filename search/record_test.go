@@ -12,7 +12,7 @@ func TestRecordSimple(t *testing.T) {
 	assert.NotNil(t, rec)
 	assert.NotNil(t, rec.Index)
 	assert.NotEmpty(t, rec.Data)
-	assert.Equal(t, `Record{{a.txt#1, len:2, d:0}, data:"0x0102"}`, rec.String())
+	assert.Equal(t, `Record{{a.txt#1, len:2, d:0}, data:"#0102"}`, rec.String())
 
 	rec.Release()
 	assert.Nil(t, rec.Index)
