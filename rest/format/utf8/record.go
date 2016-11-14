@@ -37,39 +37,29 @@ import (
 )
 
 // RECORD format specific data.
-type Record map[string]interface{}
-
-const (
-	recFieldIndex = "_index"
-	recFieldError = "_error"
-	recFieldData  = "data"
-)
+type Record search.Record
 
 // NewRecord creates new format specific data.
 func NewRecord() interface{} {
-	return &Record{}
+	return (*Record)(search.NewRecord(nil, nil))
 }
 
 // FromRecord converts RECORD to format specific data.
+// WARNING: the data of 'rec' is modified!
 func FromRecord(rec *search.Record) *Record {
 	if rec == nil {
 		return nil
 	}
 
-	res := Record{}
-	// res.RawData = rec.Data
+	// but it's stored in the "data" field
+	if rec.RawData != nil {
+		rec.Data = string(rec.RawData)
+		rec.RawData = nil
+	} else {
+		rec.Data = nil
+	}
 
-	// try to parse raw data as utf-8 string...
-	res[recFieldData] = string(rec.Data)
-	//if !utf8.Valid()
-	//if err == nil {
-	//} else {
-	//	res[recFieldError] = fmt.Sprintf("failed to parse UTF-8 data: %s", err) // res.Error =
-	//}
-
-	res[recFieldIndex] = FromIndex(rec.Index) // res.Index =
-
-	return &res
+	return (*Record)(rec)
 }
 
 // ToRecord converts format specific data to RECORD.
@@ -78,6 +68,9 @@ func ToRecord(rec *Record) *search.Record {
 		return nil
 	}
 
-	return search.NewRecord((*rec)[recFieldIndex].(*search.Index),
-		[]byte((*rec)[recFieldData].(string)))
+	// assign raw data back
+	if s, ok := rec.Data.(string); ok {
+		rec.RawData = []byte(s)
+	}
+	return (*search.Record)(rec)
 }

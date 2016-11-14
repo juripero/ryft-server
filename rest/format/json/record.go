@@ -67,9 +67,9 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 	res := Record{}
 	// res.RawData = rec.Data
 
-	if len(rec.Data) != 0 {
+	if len(rec.RawData) != 0 {
 		// try to parse raw data as JSON...
-		err := json.Unmarshal(rec.Data, &res)
+		err := json.Unmarshal(rec.RawData, &res)
 		if err == nil {
 			// field filtration: if fields is empty all fields are used in result
 			// othewise only requested fields are copied (missing fields are ignored)

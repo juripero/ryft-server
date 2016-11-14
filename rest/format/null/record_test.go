@@ -45,4 +45,8 @@ func TestFormatRecord(t *testing.T) {
 	testRecordEqual(t, rec1.(*Record), rec2.(*Record))
 
 	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"}}`)
+
+	assert.Nil(t, ToRecord(nil))
+	assert.Nil(t, FromRecord(nil))
+	assert.NotNil(t, fmt.NewRecord())
 }

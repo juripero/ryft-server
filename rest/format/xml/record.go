@@ -70,8 +70,8 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 	// res.RawData = rec.Data
 
 	// try to parse raw data as XML...
-	if len(rec.Data) != 0 {
-		parsed, err := parseXml(rec.Data, fields)
+	if len(rec.RawData) != 0 {
+		parsed, err := parseXml(rec.RawData, fields)
 		if parsed != nil {
 			// res.Data = parsed
 			for k, v := range parsed {

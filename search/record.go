@@ -46,8 +46,9 @@ var recPool = &sync.Pool{
 
 // Record is INDEX and DATA combined.
 type Record struct {
-	Index *Index `json:"_index,omitempty" msgpack:"_index,omitempty"` // relatedmeta-data
-	Data  []byte `json:"data,omitempty" msgpack:"data,omitempty"`     // base-64 encoded in general case
+	Index   *Index      `json:"_index,omitempty" msgpack:"_index,omitempty"` // relatedmeta-data
+	RawData []byte      `json:"raw,omitempty" msgpack:"raw,omitempty"`       // base-64 encoded in general case
+	Data    interface{} `json:"data,omitempty" msgpack:"data,omitempty"`     // format specific data
 }
 
 // NewRecord creates a new Record object.
@@ -58,6 +59,7 @@ func NewRecord(index *Index, data []byte) *Record {
 
 	// initialize
 	rec.Index = index
+	rec.RawData = data
 	rec.Data = data
 
 	return rec
@@ -72,7 +74,8 @@ func (rec *Record) Release() {
 		idx.Release()
 	}
 
-	// release data
+	// release data (for GC)
+	rec.RawData = nil
 	rec.Data = nil
 
 	// put back to pool
@@ -82,5 +85,5 @@ func (rec *Record) Release() {
 // String gets the string representation of Record.
 func (rec Record) String() string {
 	return fmt.Sprintf("Record{%s, data:%q}",
-		rec.Index, utils.DumpAsString(rec.Data))
+		rec.Index, utils.DumpAsString(rec.RawData))
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,21 +32,26 @@ func TestFormatRecord(t *testing.T) {
 	fmt, err := New()
 	assert.NoError(t, err)
 	assert.NotNil(t, fmt)
-	rec1 := fmt.NewRecord()
-	rec := rec1.(*Record)
-	rec.Data = []byte("hello")
-	rec.Index = fmt.ToIndex(NewIndex())
-	rec.Index.File = "foo.txt"
-	rec.Index.Offset = 123
-	rec.Index.Length = 456
-	rec.Index.Fuzziness = 7
-	rec.Index.Host = "localhost"
+
+	// fake index
+	idx := search.NewIndex("foo.txt", 123, 456)
+	idx.Fuzziness = 7
+	idx.UpdateHost("localhost")
+
+	// base record
+	rec := search.NewRecord(idx, []byte("hello"))
+
+	rec1 := fmt.FromRecord(rec)
+	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"},"data":"aGVsbG8="}`) // base-64 encoded
 
 	rec2 := fmt.FromRecord(fmt.ToRecord(rec1))
 	testRecordEqual(t, rec1.(*Record), rec2.(*Record))
 
-	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"},"data":"aGVsbG8="}`) // base-64 encoded
+	rec.RawData = nil // should be omitted
+	rec3 := FromRecord(rec)
+	testRecordMarshal(t, rec3, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"}}`)
 
-	rec.Data = nil // should be omitted
-	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"}}`)
+	assert.Nil(t, ToRecord(nil))
+	assert.Nil(t, FromRecord(nil))
+	assert.NotNil(t, fmt.NewRecord())
 }

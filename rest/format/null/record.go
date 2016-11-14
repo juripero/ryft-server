@@ -46,11 +46,20 @@ func NewRecord() interface{} {
 // FromRecord converts RECORD to format specific data.
 // WARNING: the data of 'rec' will be lost!
 func FromRecord(rec *search.Record) *Record {
+	if rec == nil {
+		return nil
+	}
+
 	rec.Data = nil // no data
+	rec.RawData = nil
 	return (*Record)(rec)
 }
 
 // ToRecord converts format specific data to RECORD.
 func ToRecord(rec *Record) *search.Record {
+	if rec == nil {
+		return nil
+	}
+
 	return (*search.Record)(rec)
 }

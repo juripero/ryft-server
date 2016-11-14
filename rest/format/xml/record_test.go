@@ -47,22 +47,22 @@ func TestFormatRecord(t *testing.T) {
 
 	// fields option
 	fmt.AddFields("a,b")
-	rec.Data = []byte("<body><value>hello</value><a>aaa</a><b>bbb</b></body>")
+	rec.RawData = []byte("<body><value>hello</value><a>aaa</a><b>bbb</b></body>")
 	rec1 = fmt.FromRecord(rec)
 	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},"a":"aaa", "b":"bbb"}`)
 
-	rec.Data = nil // should be omitted
+	rec.RawData = nil // should be omitted
 	rec2 := fmt.FromRecord(rec)
 	testRecordMarshal(t, rec2, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7}}`)
 
 	// bad input XML
-	rec.Data = []byte("<body></boby>")
+	rec.RawData = []byte("<body></boby>")
 	rec3 := fmt.FromRecord(rec)
 	testRecordMarshal(t, rec3, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},
 "_error":"failed to parse XML data: xml.Decoder.Token() - XML syntax error on line 1: element <body> closed by </boby>"}`)
 
 	// bad input XML (not an object)
-	rec.Data = []byte("<body>123</body>")
+	rec.RawData = []byte("<body>123</body>")
 	rec4 := fmt.FromRecord(rec)
 	testRecordMarshal(t, rec4, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},
 "_error":"data is not an object"}`)

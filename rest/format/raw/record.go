@@ -43,11 +43,33 @@ func NewRecord() interface{} {
 }
 
 // FromRecord converts RECORD to format specific data.
+// WARNING: the data of 'rec' is modified!
 func FromRecord(rec *search.Record) *Record {
+	if rec == nil {
+		return nil
+	}
+
+	// only raw data is used
+	// but it's stored in the "data" field
+	if rec.RawData != nil {
+		rec.Data = rec.RawData
+		rec.RawData = nil
+	} else {
+		rec.Data = nil
+	}
+
 	return (*Record)(rec)
 }
 
 // ToRecord converts format specific data to RECORD.
 func ToRecord(rec *Record) *search.Record {
+	if rec == nil {
+		return nil
+	}
+
+	// assign raw data back
+	if b, ok := rec.Data.([]byte); ok {
+		rec.RawData = b
+	}
 	return (*search.Record)(rec)
 }

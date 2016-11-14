@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,25 +32,26 @@ func TestFormatRecord(t *testing.T) {
 	fmt, err := New()
 	assert.NoError(t, err)
 	assert.NotNil(t, fmt)
-	rec1 := fmt.NewRecord()
-	rec := rec1.(*Record)
-	(*rec)[recFieldData] = "hello"
-	idx := fmt.ToIndex(NewIndex())
-	idx.File = "foo.txt"
-	idx.Offset = 123
-	idx.Length = 456
+
+	// fake index
+	idx := search.NewIndex("foo.txt", 123, 456)
 	idx.Fuzziness = 7
-	idx.Host = "localhost"
-	(*rec)[recFieldIndex] = idx
+	idx.UpdateHost("localhost")
+
+	// base record
+	rec := search.NewRecord(idx, []byte("hello"))
+
+	rec1 := fmt.FromRecord(rec)
+	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"},"data":"hello"}`)
 
 	rec2 := fmt.FromRecord(fmt.ToRecord(rec1))
 	testRecordEqual(t, rec1.(*Record), rec2.(*Record))
 
-	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"},"data":"hello"}`)
-
-	delete(*rec, recFieldData) // = nil // should be omitted
-	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"}}`)
+	rec.RawData = nil // should be omitted
+	rec3 := fmt.FromRecord(rec)
+	testRecordMarshal(t, rec3, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7, "host":"localhost"}}`)
 
 	assert.Nil(t, ToRecord(nil))
 	assert.Nil(t, FromRecord(nil))
+	assert.NotNil(t, fmt.NewRecord())
 }

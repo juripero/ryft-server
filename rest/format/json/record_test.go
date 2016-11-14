@@ -47,23 +47,23 @@ func TestFormatRecord(t *testing.T) {
 
 	// fields option
 	fmt.AddFields("a,b")
-	rec.Data = []byte(`{"value":"hello", "a":"aaa", "b":"bbb"}`)
+	rec.RawData = []byte(`{"value":"hello", "a":"aaa", "b":"bbb"}`)
 	rec1 = fmt.FromRecord(rec)
 	testIndexMarshal(t, rec.Index, `{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7}`)
 	testRecordMarshal(t, rec1, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},"a":"aaa", "b":"bbb"}`)
 
-	rec.Data = nil // should be omitted
+	rec.RawData = nil // should be omitted
 	rec2 := fmt.FromRecord(rec)
 	testRecordMarshal(t, rec2, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7}}`)
 
 	// bad input JSON
-	rec.Data = []byte("{]")
+	rec.RawData = []byte("{]")
 	rec3 := fmt.FromRecord(rec)
 	testRecordMarshal(t, rec3, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},
 "_error":"failed to parse JSON data: invalid character ']' looking for beginning of object key string"}`)
 
 	// bad input JSON (not an object)
-	rec.Data = []byte("[123]")
+	rec.RawData = []byte("[123]")
 	rec4 := fmt.FromRecord(rec)
 	testRecordMarshal(t, rec4, `{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},
 "_error":"failed to parse JSON data: json: cannot unmarshal array into Go value of type json.Record"}`)
