@@ -51,6 +51,10 @@ type Config struct {
 	KeepDataAs  string
 	KeepIndexAs string
 	Delimiter   string
+
+	// processing control
+	ReportIndex bool // if false, no processing enabled at all (/count)
+	ReportData  bool // if false, just indexes will be read
 }
 
 // NewEmptyConfig creates new empty search configuration.
@@ -79,7 +83,7 @@ func (cfg *Config) AddFiles(files []string) {
 
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
-	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, width:%d, dist:%d, cs:%t, nodes:%d, limit:%d, keep-data:%q, keep-index:%q, delim:%q}",
-		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive,
-		cfg.Nodes, cfg.Limit, cfg.KeepDataAs, cfg.KeepIndexAs, cfg.Delimiter)
+	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, width:%d, dist:%d, cs:%t, nodes:%d, limit:%d, keep-data:%q, keep-index:%q, delim:%q, index:%t, data:%t}",
+		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes,
+		cfg.Limit, cfg.KeepDataAs, cfg.KeepIndexAs, cfg.Delimiter, cfg.ReportIndex, cfg.ReportData)
 }
