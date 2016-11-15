@@ -48,6 +48,20 @@ func DumpAsString(v interface{}) string {
 	return fmt.Sprintf("%v", v)
 }
 
+// convert any byte array to hex-escaped string
+// for example []byte{0x0d, 0x0a} -> "\x0d\x0a"
+func HexEscape(str []byte) string {
+	var buf bytes.Buffer
+	buf.Grow(4 * len(str)) // reserve
+	for _, b := range str {
+		buf.WriteByte('\\')
+		buf.WriteByte('x')
+		buf.WriteString(fmt.Sprintf("%02x", b))
+	}
+
+	return buf.String()
+}
+
 // check if data is printable ASCII
 func isAsciiPrintable(v []byte) bool {
 	for _, r := range bytes.Runes(v) {
