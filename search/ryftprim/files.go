@@ -35,7 +35,6 @@ import (
 	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
 )
 
 // Files starts synchronous "/files" with RyftPrim engine.
@@ -43,8 +42,7 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	log.WithField("path", path).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	fullPath := filepath.Join(engine.MountPoint, engine.HomeDir, path)
-	info, err := ryftone.GetDirInfo(fullPath, path)
+	info, err := search.ReadDir(filepath.Join(engine.MountPoint, engine.HomeDir), path)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)

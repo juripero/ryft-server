@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-
 	"github.com/getryft/ryft-server/search"
 )
 
@@ -81,14 +80,14 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftPrim{instance:%q, ryftone:%q, home:%q, ryftprim:%q}",
+	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q, ryftprim:%q}",
 		engine.Instance, engine.MountPoint, engine.HomeDir, engine.ExecPath)
 	// TODO: other parameters?
 }
 
 // Search starts asynchronous "/search" with RyftPrim engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(true) // enable INDEX&DATA processing
+	task := NewTask(cfg) // enable INDEX&DATA processing
 	task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
 
 	// prepare command line arguments
@@ -109,7 +108,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 // Count starts asynchronous "/count" with RyftPrim engine.
 func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(false) // disable INDEX&DATA processing
+	task := NewTask(cfg) // disable INDEX&DATA processing
 	task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
 
 	// prepare command line arguments
