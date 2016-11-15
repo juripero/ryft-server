@@ -69,13 +69,14 @@ type ResultReader struct {
 	cancelChan chan struct{} // to cancel processing
 	cancelled  int32         // hard stop, atomic
 	stopped    int32         // soft stop, atomic
+	finishing  int32         // finishing flag, atomic
 
 	// some processing statistics
 	totalDataLength uint64 // total DATA length expected, sum of all index.Length and delimiters
 }
 
 // NewResultReader creates new reader
-func NewResultReader(dataPath, indexPath string, delimiter string) *ResultReader {
+func NewResultReader(task *Task, dataPath, indexPath string, delimiter string) *ResultReader {
 	rr := new(ResultReader)
 	rr.IndexPath = indexPath
 	rr.DataPath = dataPath
@@ -85,6 +86,7 @@ func NewResultReader(dataPath, indexPath string, delimiter string) *ResultReader
 	// rr.cancelled = 0
 	// rr.stopped = 0
 
+	rr.task = task
 	return rr
 }
 
@@ -107,6 +109,8 @@ func (rr *ResultReader) isCancelled() int {
 // Stop processing (soft stop).
 // Keep reading until EOF.
 func (rr *ResultReader) stop() {
+	rr.finish() // also finishing, just in case
+
 	if atomic.CompareAndSwapInt32(&rr.stopped, 0, 1) {
 		rr.task.log().Debugf("[%s]: stop processing...", TAG)
 	}
@@ -115,6 +119,19 @@ func (rr *ResultReader) stop() {
 // check if processing has stopped (non-zero).
 func (rr *ResultReader) isStopped() int {
 	return (int)(atomic.LoadInt32(&rr.stopped))
+}
+
+// Finish processing.
+// ryftprim tool is finished so we can check read attempts!
+func (rr *ResultReader) finish() {
+	if atomic.CompareAndSwapInt32(&rr.finishing, 0, 1) {
+		rr.task.log().Debugf("[%s]: finishing processing...", TAG)
+	}
+}
+
+// check if processing is finishing (non-zero).
+func (rr *ResultReader) isFinishing() int {
+	return (int)(atomic.LoadInt32(&rr.finishing))
 }
 
 // Process the INDEX and DATA files and populate search.Result
@@ -148,7 +165,7 @@ func (rr *ResultReader) process(res *search.Result) {
 
 	// if ryftprim tool is not finished (no INDEX/DATA available)
 	// attempt limit check should be disabled (rr.isStopped() == 0)!
-	for attempt := 0; attempt < rr.ReadFilePollLimit; attempt += rr.isStopped() {
+	for attempt := 0; attempt < rr.ReadFilePollLimit; attempt += rr.isFinishing() {
 		// read line by line
 		part, err := idxRd.ReadBytes('\n')
 		if len(part) > 0 {
@@ -243,7 +260,7 @@ func (rr *ResultReader) process(res *search.Result) {
 								"expected": rr.Delimiter,
 								"received": string(delim),
 							}).Warnf("[%s]: unexpected delimiter found at %d", TAG, dataPos)
-							res.ReportError(fmt.Errorf("unexpected %q delimiter found at %d", string(delim), err))
+							res.ReportError(fmt.Errorf("%q unexpected delimiter found at %d", string(delim), err))
 							return // failed
 						}
 
@@ -257,8 +274,7 @@ func (rr *ResultReader) process(res *search.Result) {
 						index.File = rel
 					} else {
 						// keep the absolute filepath as fallback
-						rr.task.log().WithError(err).WithField("path", index.File).
-							Warnf("[%s]: failed to get relative path to %q", rr.RelativeToHome)
+						rr.task.log().WithError(err).Debugf("[%s]: FAILED to get relative path", TAG)
 					}
 				}
 
@@ -271,7 +287,7 @@ func (rr *ResultReader) process(res *search.Result) {
 
 				res.ReportRecord(rec)
 				if rr.Limit > 0 && res.RecordsReported() >= rr.Limit {
-					rr.task.log().WithField("limit", rr.Limit).Infof("[%s]: processing stopped by limit", TAG)
+					rr.task.log().WithField("limit", rr.Limit).Debugf("[%s]: processing stopped by limit", TAG)
 					return // done
 				}
 			}
@@ -300,7 +316,7 @@ func (rr *ResultReader) process(res *search.Result) {
 		case <-rr.cancelChan:
 			rr.task.log().WithField("expected-data-length", rr.totalDataLength).
 				Debugf("[%s]: processing cancelled", TAG)
-			return // full stop
+			return // cancelled
 		}
 	}
 
@@ -355,7 +371,7 @@ func (rr *ResultReader) readData(f *bufio.Reader, length uint64) ([]byte, error)
 
 	// if ryftprim tool is not finished (no INDEX/DATA available)
 	// attempt limit check should be disabled (rr.isStopped() == 0)!
-	for attempt := 0; attempt < rr.ReadFilePollLimit; attempt += rr.isStopped() {
+	for attempt := 0; attempt < rr.ReadFilePollLimit; attempt += rr.isFinishing() {
 		n, err := f.Read(buf[pos:])
 		// rr.task.log().Debugf("[%s]: read %d bytes", TAG, n) // FIXME: DEBUG
 		if n > 0 {

@@ -32,6 +32,7 @@ package ryftprim
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -125,6 +126,21 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to run %s /count: %s", TAG, err)
 	}
 	return res, nil // OK
+}
+
+// Files starts synchronous "/files" with RyftPrim engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	log.WithField("path", path).Infof("[%s]: start /files", TAG)
+
+	// read directory content
+	info, err := search.ReadDir(filepath.Join(engine.MountPoint, engine.HomeDir), path)
+	if err != nil {
+		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
+		return nil, fmt.Errorf("failed to read directory content: %s", err)
+	}
+
+	log.WithField("info", info).Debugf("[%s] done /files", TAG)
+	return info, nil // OK
 }
 
 // SetLogLevelString changes global module log level.

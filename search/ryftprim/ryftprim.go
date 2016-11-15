@@ -39,7 +39,6 @@ import (
 	"strings"
 
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
 )
 
 // Prepare `ryftprim` command line arguments.
@@ -107,7 +106,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	}
 
 	// search query
-	args = append(args, "-q", ryftone.PrepareQuery(cfg.Query))
+	args = append(args, "-q", cfg.Query)
 
 	// files
 	for _, file := range cfg.Files {
