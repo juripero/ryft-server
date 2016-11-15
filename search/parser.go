@@ -64,10 +64,10 @@ func ParseIndex(buf []byte) (*Index, error) {
 
 	// Fuzziness distance
 	var dist int64
-	if strings.EqualFold(string(fields[n-1]), "n/a") {
+	if str := string(bytes.TrimSpace(fields[n-1])); strings.EqualFold(str, "n/a") {
 		dist = -1 // TODO: check special value for N/A
 	} else {
-		dist, err = strconv.ParseInt(string(bytes.TrimSpace(fields[n-1])), 10, 31)
+		dist, err = strconv.ParseInt(str, 10, 31)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse fuzziness distance: %s", err)
 		}

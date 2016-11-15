@@ -56,6 +56,7 @@ func TestParseIndexGood(t *testing.T) {
 
 	// n/a fuzziness distance
 	check("foo.txt,1,2,n/a", "foo.txt", 1, 2, -1)
+	check("foo.txt,1,2,n/a\n", "foo.txt", 1, 2, -1)
 
 	// bad cases
 	bad("foo.txt,0,0", "invalid number of fields in")
