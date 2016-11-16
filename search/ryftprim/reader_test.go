@@ -10,10 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	testLogLevel = "debug"
-)
-
 // generate fake ryftprim content (3 records)
 func testFakeRyftprim3(od, oi *os.File, delim string) {
 	// first record
@@ -468,7 +464,7 @@ func TestReaderFailedToReadIndex(t *testing.T) {
 		assert.EqualValues(t, 0, res.RecordsReported()) {
 		// check first error
 		if err := <-res.ErrorChan; assert.NotNil(t, err) {
-			assert.Contains(t, err.Error(), "processing cancelled by attempt limit")
+			assert.Contains(t, err.Error(), "cancelled by attempt limit")
 		}
 	}
 }

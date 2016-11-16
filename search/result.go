@@ -109,12 +109,10 @@ func (res *Result) RecordsReported() uint64 {
 	return atomic.LoadUint64(&res.recordsReported)
 }
 
-// Cancel stops the search processing.
+// Cancel stops the search processing and ignores all records and errors.
 //  return number of ignored errors and records
 func (res *Result) Cancel() (errors uint64, records uint64) {
-	if atomic.CompareAndSwapInt32(&res.isCancelled, 0, 1) {
-		close(res.CancelChan)
-	}
+	res.JustCancel()
 
 	// drain channels
 	for {
@@ -144,6 +142,14 @@ func (res *Result) Cancel() (errors uint64, records uint64) {
 				records++
 			}
 		}
+	}
+}
+
+// JustCancel just stops the search processing.
+// Still need to read all records and errors.
+func (res *Result) JustCancel() {
+	if atomic.CompareAndSwapInt32(&res.isCancelled, 0, 1) {
+		close(res.CancelChan)
 	}
 }
 

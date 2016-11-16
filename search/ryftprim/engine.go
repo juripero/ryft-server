@@ -143,7 +143,7 @@ func SetLogLevelString(level string) error {
 		return err
 	}
 
-	log.Level = ll
+	SetLogLevel(ll)
 	return nil // OK
 }
 

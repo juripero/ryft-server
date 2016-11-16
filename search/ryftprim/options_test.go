@@ -62,6 +62,8 @@ func TestOptions(t *testing.T) {
 			"minimize-latency":        false,
 			"index-host":              "",
 		}, engine.Options())
+
+		assert.EqualValues(t, `ryftprim{instance:"", ryftone:"/ryftone", home:"/", ryftprim:"/usr/bin/ryftprim"}`, engine.String())
 	}
 
 	check(fake("home-dir", "/"))

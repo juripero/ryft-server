@@ -275,7 +275,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 						index.File = rel
 					} else {
 						// keep the absolute filepath as fallback
-						rr.log().WithError(err).Debugf("[%s/reader]: FAILED to get relative path", TAG)
+						rr.log().WithError(err).Debugf("[%s/reader]: failed to get relative path", TAG)
 					}
 				}
 

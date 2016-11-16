@@ -43,6 +43,10 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
+var (
+	ErrCancelled = fmt.Errorf("cancelled by user")
+)
+
 // Prepare `ryftprim` command line arguments.
 // This function converts search configuration to `ryftprim` command line arguments.
 // See `ryftprim -h` for option description.
@@ -183,7 +187,10 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
-	task.log().WithField("args", task.toolArgs).Infof("[%s]: executing tool", TAG)
+	task.log().WithFields(map[string]interface{}{
+		"tool": engine.ExecPath,
+		"args": task.toolArgs,
+	}).Infof("[%s]: executing tool", TAG)
 	task.toolCmd = exec.Command(engine.ExecPath, task.toolArgs...)
 
 	// prepare combined STDERR&STDOUT output
@@ -237,7 +244,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 		task.log().Warnf("[%s]: cancelling by client", TAG)
 
 		if task.results != nil {
-			task.log().Debugf("[%s]: cancelling reading...", TAG)
+			task.log().Debugf("[%s]: cancel reading...", TAG)
 			task.results.cancel()
 		}
 
@@ -253,7 +260,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 			}
 		}
 
-		engine.finish(fmt.Errorf("cancelled"), task, res)
+		engine.finish(ErrCancelled, task, res)
 	}
 }
 
@@ -265,12 +272,14 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// tool output
 	out := task.toolOut.Bytes()
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: tool failed", TAG)
-		task.log().Warnf("[%s]: tool output:\n%s", TAG, out)
-	} else {
-		task.log().Debugf("[%s]: tool finished", TAG)
-		task.log().Debugf("[%s]: tool output:\n%s", TAG, out)
+	if err != ErrCancelled {
+		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: tool failed", TAG)
+			task.log().Warnf("[%s]: tool output:\n%s", TAG, out)
+		} else {
+			task.log().Debugf("[%s]: tool finished", TAG)
+			task.log().Debugf("[%s]: tool output:\n%s", TAG, out)
+		}
 	}
 
 	// notify processing subtasks the tool is finished!
@@ -292,13 +301,13 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	}
 
 	// notify client about error
-	if err != nil {
+	if err != nil && err != ErrCancelled {
 		res.ReportError(fmt.Errorf("%s failed with %s\n%s", TAG, err, out))
 	}
 
 	// suppress some errors
 	errorSuppressed := false
-	if err != nil {
+	/*if err != nil {
 		switch {
 		// if no files found it's better to report 0 matches (TODO: report 0 files also, TODO: engine configuration for this)
 		case strings.Contains(string(out), "ERROR:  Input data set cannot be empty"):
@@ -306,19 +315,19 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			errorSuppressed, err = true, nil            // suppress error
 			res.Stat = search.NewStat(engine.IndexHost) // empty stats
 		}
-	}
+	}*/
 
 	// stop processing if enabled
 	if task.results != nil {
 		if err != nil || errorSuppressed {
-			task.log().Debugf("[%s]: cancelling reader...", TAG)
+			task.log().Debugf("[%s]: cancel reading...", TAG)
 			task.results.cancel()
 		} else {
-			task.log().Debugf("[%s]: stopping reader...", TAG)
+			task.log().Debugf("[%s]: stop reading...", TAG)
 			task.results.stop()
 		}
 
-		task.log().Debugf("[%s]: waiting reader...", TAG)
+		task.log().Debugf("[%s]: wait reading...", TAG)
 		// do wait in goroutine
 		// at the same time monitor the res.Cancel event!
 		doneCh := make(chan struct{})
@@ -336,7 +345,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 			case <-res.CancelChan: // client wants to stop all processing
 				task.log().Warnf("[%s]: ***cancelling by client", TAG)
-				task.log().Debugf("[%s]: ***cancelling reader...", TAG)
+				task.log().Debugf("[%s]: ***cancel reading...", TAG)
 				task.results.cancel()
 
 				// sleep a while to take subtasks a chance to finish
