@@ -54,7 +54,7 @@ func TestReaderUsual(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -133,7 +133,7 @@ func TestReaderNoData(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -212,7 +212,7 @@ func TestReaderLimit(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -283,7 +283,7 @@ func TestReaderFailedToOpenIndex(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -335,7 +335,7 @@ func TestReaderFailedToOpenData(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -387,7 +387,7 @@ func TestReaderCancelToOpenIndex(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -429,7 +429,7 @@ func TestReaderFailedToReadIndex(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -484,7 +484,7 @@ func TestReaderCancelToReadIndex(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -537,7 +537,7 @@ func TestReaderCancelToOpenData(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -590,7 +590,7 @@ func TestReaderFailedToParseIndex(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -654,7 +654,7 @@ func TestReaderFailedToReadData(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -711,7 +711,7 @@ func TestReaderCancelToReadData(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -766,7 +766,7 @@ func TestReaderFailedToReadDelim(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -824,7 +824,7 @@ func TestReaderUnexpectedDelim(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
@@ -882,7 +882,7 @@ func TestReaderCancelToReadDelim(t *testing.T) {
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
-	rr := NewResultReader(NewTask(nil), dataPath, indexPath, delimiter)
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, delimiter)
 	rr.RelativeToHome = "/ryftone"
 	rr.OpenFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollTimeout = 50 * time.Millisecond

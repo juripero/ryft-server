@@ -64,7 +64,7 @@ type Task struct {
 
 	// config & results
 	config     *search.Config
-	results    *ResultReader
+	results    *ResultsReader
 	resultWait sync.WaitGroup
 }
 
@@ -85,7 +85,7 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 		return // already started
 	}
 
-	rr := NewResultReader(task,
+	rr := NewResultsReader(task,
 		task.DataFileName, task.IndexFileName,
 		task.config.Delimiter)
 

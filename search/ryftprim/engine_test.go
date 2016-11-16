@@ -8,16 +8,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// write a script (executable file)
+func testWriteScript(path string, script string) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	f.WriteString(script)
+	return nil // OK
+}
+
 // valid results
 func TestEngineUsual(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	// prepare ryftprim emulation script
-	f, err := os.OpenFile("/tmp/ryftprim.sh", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if !assert.NoError(t, err) || !assert.NotNil(t, f) {
-		return
-	}
-	f.WriteString(`#!/bin/bash
+	if err := testWriteScript("/tmp/ryftprim.sh",
+		`#!/bin/bash
 # test script to emulate ryftprim
 
 # initial delay
@@ -55,10 +64,11 @@ echo "Duration: 100"
 echo "Total Bytes: 1024"
 echo "Data Rate: 100 MB/sec"
 echo "Fabric Data Rate: 200 MB/sec"
-`)
-	f.Close()
+`); !assert.NoError(t, err) {
+		return
+	}
 
-	defer os.RemoveAll(f.Name())
+	defer os.RemoveAll("/tmp/ryftprim.sh")
 	defer os.RemoveAll("/tmp/ryft")
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")

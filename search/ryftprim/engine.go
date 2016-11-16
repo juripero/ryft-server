@@ -162,6 +162,11 @@ func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
 }
 
+// log returns reader related log entry.
+func (rr *ResultsReader) log() *logrus.Entry {
+	return rr.task.log()
+}
+
 // factory creates new engine.
 func factory(opts map[string]interface{}) (search.Engine, error) {
 	engine, err := NewEngine(opts)

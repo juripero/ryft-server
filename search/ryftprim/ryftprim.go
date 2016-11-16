@@ -206,8 +206,8 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
 func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bool) {
-	defer task.log().WithField("result", res).Debugf("[%s]: end TASK processing", TAG)
-	task.log().Debugf("[%s]: start TASK processing...", TAG)
+	defer task.log().WithField("result", res).Debugf("[%s]: end TASK", TAG)
+	task.log().Debugf("[%s]: start TASK...", TAG)
 
 	// wait tool for process done
 	doneCh := make(chan error, 1)
@@ -237,7 +237,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 		task.log().Warnf("[%s]: cancelling by client", TAG)
 
 		if task.results != nil {
-			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
+			task.log().Debugf("[%s]: cancelling reading...", TAG)
 			task.results.cancel()
 		}
 
@@ -266,10 +266,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// tool output
 	out := task.toolOut.Bytes()
 	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed", TAG)
+		task.log().WithError(err).Warnf("[%s]: tool failed", TAG)
 		task.log().Warnf("[%s]: tool output:\n%s", TAG, out)
 	} else {
-		task.log().Debugf("[%s]: finished", TAG)
+		task.log().Debugf("[%s]: tool finished", TAG)
 		task.log().Debugf("[%s]: tool output:\n%s", TAG, out)
 	}
 
@@ -311,14 +311,14 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// stop processing if enabled
 	if task.results != nil {
 		if err != nil || errorSuppressed {
-			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
+			task.log().Debugf("[%s]: cancelling reader...", TAG)
 			task.results.cancel()
 		} else {
-			task.log().Debugf("[%s]: stopping INDEX&DATA processing...", TAG)
+			task.log().Debugf("[%s]: stopping reader...", TAG)
 			task.results.stop()
 		}
 
-		task.log().Debugf("[%s]: waiting INDEX&DATA...", TAG)
+		task.log().Debugf("[%s]: waiting reader...", TAG)
 		// do wait in goroutine
 		// at the same time monitor the res.Cancel event!
 		doneCh := make(chan struct{})
@@ -336,7 +336,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 			case <-res.CancelChan: // client wants to stop all processing
 				task.log().Warnf("[%s]: ***cancelling by client", TAG)
-				task.log().Debugf("[%s]: ***cancelling INDEX&DATA processing...", TAG)
+				task.log().Debugf("[%s]: ***cancelling reader...", TAG)
 				task.results.cancel()
 
 				// sleep a while to take subtasks a chance to finish
@@ -344,7 +344,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			}
 		}
 
-		task.log().Debugf("[%s]: INDEX&DATA finished", TAG)
+		task.log().Debugf("[%s]: done reading", TAG)
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing

@@ -43,8 +43,8 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// ResultReader reads INDEX and DATA files.
-type ResultReader struct {
+// ResultsReader reads INDEX and DATA files.
+type ResultsReader struct {
 	task *Task // used for logging
 
 	IndexPath string // INDEX file path (absolute)
@@ -75,9 +75,9 @@ type ResultReader struct {
 	totalDataLength uint64 // total DATA length expected, sum of all index.Length and delimiters
 }
 
-// NewResultReader creates new reader
-func NewResultReader(task *Task, dataPath, indexPath string, delimiter string) *ResultReader {
-	rr := new(ResultReader)
+// NewResultsReader creates new reader
+func NewResultsReader(task *Task, dataPath, indexPath string, delimiter string) *ResultsReader {
+	rr := new(ResultsReader)
 	rr.IndexPath = indexPath
 	rr.DataPath = dataPath
 	rr.Delimiter = delimiter
@@ -85,59 +85,60 @@ func NewResultReader(task *Task, dataPath, indexPath string, delimiter string) *
 	rr.cancelChan = make(chan struct{})
 	// rr.cancelled = 0
 	// rr.stopped = 0
+	// rr.finishing = 0
 
-	rr.task = task
+	rr.task = task // (used for logging)
 	return rr
 }
 
 // Cancel processing (hard stop).
 // Stop as soon as possible.
-func (rr *ResultReader) cancel() {
+func (rr *ResultsReader) cancel() {
 	rr.stop() // also stop, just in case
 
 	if atomic.CompareAndSwapInt32(&rr.cancelled, 0, 1) {
-		rr.task.log().Debugf("[%s]: cancel processing...", TAG)
+		rr.log().Debugf("[%s/reader]: cancelling...", TAG)
 		close(rr.cancelChan) // stop ASAP, notify all
 	}
 }
 
 // check if processing has cancelled (non-zero).
-func (rr *ResultReader) isCancelled() int {
+func (rr *ResultsReader) isCancelled() int {
 	return (int)(atomic.LoadInt32(&rr.cancelled))
 }
 
 // Stop processing (soft stop).
 // Keep reading until EOF.
-func (rr *ResultReader) stop() {
+func (rr *ResultsReader) stop() {
 	rr.finish() // also finishing, just in case
 
 	if atomic.CompareAndSwapInt32(&rr.stopped, 0, 1) {
-		rr.task.log().Debugf("[%s]: stop processing...", TAG)
+		rr.log().Debugf("[%s/reader]: stopping...", TAG)
 	}
 }
 
 // check if processing has stopped (non-zero).
-func (rr *ResultReader) isStopped() int {
+func (rr *ResultsReader) isStopped() int {
 	return (int)(atomic.LoadInt32(&rr.stopped))
 }
 
 // Finish processing.
 // ryftprim tool is finished so we can check read attempts!
-func (rr *ResultReader) finish() {
+func (rr *ResultsReader) finish() {
 	if atomic.CompareAndSwapInt32(&rr.finishing, 0, 1) {
-		rr.task.log().Debugf("[%s]: finishing processing...", TAG)
+		rr.log().Debugf("[%s/reader]: finishing...", TAG)
 	}
 }
 
 // check if processing is finishing (non-zero).
-func (rr *ResultReader) isFinishing() int {
+func (rr *ResultsReader) isFinishing() int {
 	return (int)(atomic.LoadInt32(&rr.finishing))
 }
 
 // Process the INDEX and DATA files and populate search.Result
-func (rr *ResultReader) process(res *search.Result) {
-	defer rr.task.log().Debugf("[%s]: end processing", TAG)
-	rr.task.log().Debugf("[%s]: start processing...", TAG)
+func (rr *ResultsReader) process(res *search.Result) {
+	defer rr.log().Debugf("[%s/reader]: end processing", TAG)
+	rr.log().Debugf("[%s/reader]: begin processing...", TAG)
 
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
@@ -147,8 +148,8 @@ func (rr *ResultReader) process(res *search.Result) {
 		// if operation is cancelled `f` is nil
 		f, err := rr.openFile(rr.IndexPath)
 		if err != nil {
-			rr.task.log().WithError(err).WithField("path", rr.IndexPath).
-				Warnf("[%s]: failed to open INDEX file", TAG)
+			rr.log().WithError(err).WithField("path", rr.IndexPath).
+				Warnf("[%s/reader]: failed to open INDEX file", TAG)
 			res.ReportError(fmt.Errorf("failed to open INDEX file: %s", err))
 			return // failed
 		} else if f == nil {
@@ -176,10 +177,10 @@ func (rr *ResultReader) process(res *search.Result) {
 
 		if err != nil {
 			if err == io.EOF {
-				// rr.task.log().WithError(err).Debugf("[%s]: failed to read line from INDEX file", TAG) // FIXME: DEBUG
+				// rr.log().WithError(err).Debugf("[%s/reader]: failed to read line from INDEX file", TAG) // FIXME: DEBUG
 				// will sleep a while and try again...
 			} else {
-				rr.task.log().WithError(err).Warnf("[%s]: INDEX processing failed", TAG)
+				rr.log().WithError(err).Warnf("[%s/reader]: INDEX processing failed", TAG)
 				res.ReportError(fmt.Errorf("INDEX processing failed: %s", err))
 				return // failed
 			}
@@ -187,12 +188,12 @@ func (rr *ResultReader) process(res *search.Result) {
 			line := bytes.Join(parts, nil /*no separator*/)
 			parts = parts[0:0] // clear for the next iteration
 
-			// rr.task.log().WithField("line", string(bytes.TrimSpace(line))).
-			// Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
+			// rr.log().WithField("line", string(bytes.TrimSpace(line))).
+			// Debugf("[%s/reader]: new INDEX line read", TAG) // FIXME: DEBUG
 
 			index, err := search.ParseIndex(line)
 			if err != nil {
-				rr.task.log().WithError(err).Warnf("failed to parse INDEX from %q", bytes.TrimSpace(line))
+				rr.log().WithError(err).Warnf("[%s/reader]: failed to parse INDEX from %q", TAG, bytes.TrimSpace(line))
 				res.ReportError(fmt.Errorf("failed to parse INDEX: %s", err))
 				return // failed
 
@@ -217,8 +218,8 @@ func (rr *ResultReader) process(res *search.Result) {
 						// if operation is cancelled `f` is nil
 						f, err := rr.openFile(rr.DataPath)
 						if err != nil {
-							rr.task.log().WithError(err).WithField("path", rr.DataPath).
-								Warnf("[%s]: failed to open DATA file", TAG)
+							rr.log().WithError(err).WithField("path", rr.DataPath).
+								Warnf("[%s/reader]: failed to open DATA file", TAG)
 							res.ReportError(fmt.Errorf("failed to open DATA file: %s", err))
 							return // failed
 						} else if f == nil {
@@ -232,7 +233,7 @@ func (rr *ResultReader) process(res *search.Result) {
 					// try to read data: if operation is cancelled `data` is nil
 					data, err = rr.readData(datRd, index.Length)
 					if err != nil {
-						rr.task.log().WithError(err).Warnf("[%s]: failed to read DATA", TAG)
+						rr.log().WithError(err).Warnf("[%s/reader]: failed to read DATA", TAG)
 						res.ReportError(fmt.Errorf("failed to read DATA: %s", err))
 						return // failed
 					} else if data == nil {
@@ -242,12 +243,12 @@ func (rr *ResultReader) process(res *search.Result) {
 
 					// read and check delimiter
 					if len(rr.Delimiter) > 0 {
-						// datRd.Discard(len(rr.Delimiter))
+						// or just ... datRd.Discard(len(rr.Delimiter))
 
 						// try to read delimiter: if operation is cancelled `delim` is nil
 						delim, err := rr.readData(datRd, uint64(len(rr.Delimiter)))
 						if err != nil {
-							rr.task.log().WithError(err).Warnf("[%s]: failed to read DATA delimiter", TAG)
+							rr.log().WithError(err).Warnf("[%s/reader]: failed to read DATA delimiter", TAG)
 							res.ReportError(fmt.Errorf("failed to read DATA delimiter: %s", err))
 							return // failed
 						} else if delim == nil {
@@ -256,10 +257,10 @@ func (rr *ResultReader) process(res *search.Result) {
 
 						// check delimiter expected
 						if string(delim) != rr.Delimiter {
-							rr.task.log().WithFields(map[string]interface{}{
+							rr.log().WithFields(map[string]interface{}{
 								"expected": rr.Delimiter,
 								"received": string(delim),
-							}).Warnf("[%s]: unexpected delimiter found at %d", TAG, dataPos)
+							}).Warnf("[%s/reader]: unexpected delimiter found at %d", TAG, dataPos)
 							res.ReportError(fmt.Errorf("%q unexpected delimiter found at %d", string(delim), dataPos))
 							return // failed
 						}
@@ -274,7 +275,7 @@ func (rr *ResultReader) process(res *search.Result) {
 						index.File = rel
 					} else {
 						// keep the absolute filepath as fallback
-						rr.task.log().WithError(err).Debugf("[%s]: FAILED to get relative path", TAG)
+						rr.log().WithError(err).Debugf("[%s/reader]: FAILED to get relative path", TAG)
 					}
 				}
 
@@ -283,17 +284,17 @@ func (rr *ResultReader) process(res *search.Result) {
 
 				// report new record
 				rec := search.NewRecord(index, data)
-				// rr.task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
+				// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
 				res.ReportRecord(rec)
 				if rr.Limit > 0 && res.RecordsReported() >= rr.Limit {
-					rr.task.log().WithField("limit", rr.Limit).Debugf("[%s]: processing stopped by limit", TAG)
+					rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 					return // done
 				}
 			}
 
 			if rr.isCancelled() != 0 {
-				rr.task.log().Debugf("[%s]: ***processing cancelled", TAG)
+				rr.log().Debugf("[%s/reader]: cancelled***", TAG)
 			} else {
 				continue // go to next INDEX ASAP
 			}
@@ -301,37 +302,37 @@ func (rr *ResultReader) process(res *search.Result) {
 
 		// check for soft stops
 		if rr.isStopped() != 0 {
-			rr.task.log().WithField("expected-data-length", rr.totalDataLength).
-				Debugf("[%s]: processing stopped", TAG)
+			rr.log().WithField("expected-data-length", rr.totalDataLength).
+				Debugf("[%s/reader]: stopped", TAG)
 			return // full stop
 		}
 
 		// no data available or failed to read
 		// just sleep a while and try again
-		// rr.task.log().Debugf("[%s]: poll...", TAG) // FIXME: DEBUG
+		// rr.log().Debugf("[%s/reader]: poll...", TAG) // FIXME: DEBUG
 		select {
 		case <-time.After(rr.ReadFilePollTimeout):
 			// continue
 
 		case <-rr.cancelChan:
-			rr.task.log().WithField("expected-data-length", rr.totalDataLength).
-				Debugf("[%s]: processing cancelled", TAG)
+			rr.log().WithField("expected-data-length", rr.totalDataLength).
+				Debugf("[%s/reader]: cancelled", TAG)
 			return // cancelled
 		}
 	}
 
 	// if we are here we reach the read attempt limit
-	rr.task.log().Warnf("processing cancelled by attempt limit %s (%dx%s)",
-		rr.ReadFilePollTimeout*time.Duration(rr.ReadFilePollLimit),
+	rr.log().Warnf("[%s/reader]: cancelled by attempt limit %s (%dx%s)",
+		TAG, rr.ReadFilePollTimeout*time.Duration(rr.ReadFilePollLimit),
 		rr.ReadFilePollLimit, rr.ReadFilePollTimeout)
-	res.ReportError(fmt.Errorf("processing cancelled by attempt limit"))
+	res.ReportError(fmt.Errorf("cancelled by attempt limit"))
 }
 
 // INTRUSIVE: openFile tries to open file until it's open
 // or until operation is cancelled by calling code.
 // NOTE, if operation is cancelled the file is nil!
-func (rr *ResultReader) openFile(path string) (*os.File, error) {
-	// rr.task.log().WithField("path", path).Debugf("[%s]: trying to open file...", TAG) // FIXME: DEBUG
+func (rr *ResultsReader) openFile(path string) (*os.File, error) {
+	// rr.log().WithField("path", path).Debugf("[%s/reader]: trying to open file...", TAG) // FIXME: DEBUG
 
 	for {
 		// try to open (wait until file will be created by Ryft hardware)...
@@ -339,7 +340,7 @@ func (rr *ResultReader) openFile(path string) (*os.File, error) {
 		if err == nil {
 			return f, nil // OK
 		} else if os.IsNotExist(err) {
-			// rr.task.log().WithError(err).Warnf("[%s]: failed to open file", TAG) // FIXME: DEBUG
+			// rr.log().WithError(err).Warnf("[%s/reader]: failed to open file", TAG) // FIXME: DEBUG
 			// ignore just "not exists" errors
 			// will sleep a while and try again...
 		} else {
@@ -353,7 +354,7 @@ func (rr *ResultReader) openFile(path string) (*os.File, error) {
 			continue
 
 		case <-rr.cancelChan:
-			rr.task.log().WithField("path", path).Warnf("[%s]: open file cancelled", TAG)
+			rr.log().WithField("path", path).Warnf("[%s/reader]: open file cancelled", TAG)
 			return nil, nil // fmt.Errorf("cancelled")
 		}
 	}
@@ -363,8 +364,8 @@ func (rr *ResultReader) openFile(path string) (*os.File, error) {
 // or until operation is cancelled by calling code.
 // providing `limit` we can limit the overall number of attempts to poll.
 // if operation is cancelled the `data` is nil.
-func (rr *ResultReader) readData(f *bufio.Reader, length uint64) ([]byte, error) {
-	// rr.task.log().Debugf("[%s]: start reading %d bytes...", TAG, length) // FIXME: DEBUG
+func (rr *ResultsReader) readData(f *bufio.Reader, length uint64) ([]byte, error) {
+	// rr.log().Debugf("[%s/reader]: start reading %d bytes...", TAG, length) // FIXME: DEBUG
 
 	buf := make([]byte, length)
 	pos := uint64(0) // actual number of bytes read
@@ -373,7 +374,7 @@ func (rr *ResultReader) readData(f *bufio.Reader, length uint64) ([]byte, error)
 	// attempt limit check should be disabled (rr.isStopped() == 0)!
 	for attempt := 0; attempt < rr.ReadFilePollLimit; attempt += rr.isFinishing() {
 		n, err := f.Read(buf[pos:])
-		// rr.task.log().Debugf("[%s]: read %d bytes", TAG, n) // FIXME: DEBUG
+		// rr.log().Debugf("[%s/reader]: read %d bytes", TAG, n) // FIXME: DEBUG
 		if n > 0 {
 			// if we got something
 			// reset attempt count
@@ -385,7 +386,7 @@ func (rr *ResultReader) readData(f *bufio.Reader, length uint64) ([]byte, error)
 		}
 		if err != nil {
 			if err == io.EOF { // ignore just EOF
-				// rr.task.log().WithError(err).Debugf("[%s]: failed to read (%d of %d)", TAG, pos, length) // FIXME: DEBUG
+				// rr.log().WithError(err).Debugf("[%s/reader]: failed to read (%d of %d)", TAG, pos, length) // FIXME: DEBUG
 				// will sleep a while and try again
 			} else {
 				return nil, err // report others
@@ -403,12 +404,12 @@ func (rr *ResultReader) readData(f *bufio.Reader, length uint64) ([]byte, error)
 			// continue
 
 		case <-rr.cancelChan:
-			rr.task.log().Warnf("[%s]: read file cancelled", TAG)
+			rr.log().Warnf("[%s/reader]: read file cancelled", TAG)
 			return nil, nil // fmt.Errorf("cancelled")
 		}
 	}
 
-	return buf[0:pos], fmt.Errorf("cancelled by attempt limit %s (%dx%s)",
-		rr.ReadFilePollTimeout*time.Duration(rr.ReadFilePollLimit),
+	return buf[0:pos], fmt.Errorf("[%s/reader]: cancelled by attempt limit %s (%dx%s)",
+		TAG, rr.ReadFilePollTimeout*time.Duration(rr.ReadFilePollLimit),
 		rr.ReadFilePollLimit, rr.ReadFilePollTimeout)
 }
