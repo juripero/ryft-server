@@ -260,7 +260,7 @@ func (rr *ResultReader) process(res *search.Result) {
 								"expected": rr.Delimiter,
 								"received": string(delim),
 							}).Warnf("[%s]: unexpected delimiter found at %d", TAG, dataPos)
-							res.ReportError(fmt.Errorf("%q unexpected delimiter found at %d", string(delim), err))
+							res.ReportError(fmt.Errorf("%q unexpected delimiter found at %d", string(delim), dataPos))
 							return // failed
 						}
 

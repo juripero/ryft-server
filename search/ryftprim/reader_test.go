@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	testLogLevel = "error"
+	testLogLevel = "debug"
 )
 
 // generate fake ryftprim content (3 records)
@@ -44,7 +44,7 @@ func testFakeRyftprim3(od, oi *os.File, delim string) {
 }
 
 // valid results
-func TestResultsUsual(t *testing.T) {
+func TestReaderUsual(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -123,7 +123,7 @@ func TestResultsUsual(t *testing.T) {
 }
 
 // valid results (no data read)
-func TestResultsNoData(t *testing.T) {
+func TestReaderNoData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -202,7 +202,7 @@ func TestResultsNoData(t *testing.T) {
 }
 
 // valid results with limit
-func TestResultsLimit(t *testing.T) {
+func TestReaderLimit(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -273,7 +273,7 @@ func TestResultsLimit(t *testing.T) {
 }
 
 // bad results (failed to open INDEX file)
-func TestResultsFailedToOpenIndex(t *testing.T) {
+func TestReaderFailedToOpenIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -325,7 +325,7 @@ func TestResultsFailedToOpenIndex(t *testing.T) {
 }
 
 // bad results (failed to open DATA file)
-func TestResultsFailedToOpenData(t *testing.T) {
+func TestReaderFailedToOpenData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -377,7 +377,7 @@ func TestResultsFailedToOpenData(t *testing.T) {
 }
 
 // bad results (cancel to open INDEX file)
-func TestResultsCancelToOpenIndex(t *testing.T) {
+func TestReaderCancelToOpenIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -419,7 +419,7 @@ func TestResultsCancelToOpenIndex(t *testing.T) {
 }
 
 // bad results (failed to read INDEX)
-func TestResultsFailedToReadIndex(t *testing.T) {
+func TestReaderFailedToReadIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -474,7 +474,7 @@ func TestResultsFailedToReadIndex(t *testing.T) {
 }
 
 // bad results (cancel to read INDEX)
-func TestResultsCancelToReadIndex(t *testing.T) {
+func TestReaderCancelToReadIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -527,7 +527,7 @@ func TestResultsCancelToReadIndex(t *testing.T) {
 }
 
 // bad results (cancel to open DATA file)
-func TestResultsCancelToOpenData(t *testing.T) {
+func TestReaderCancelToOpenData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -580,7 +580,7 @@ func TestResultsCancelToOpenData(t *testing.T) {
 }
 
 // bad results (failed to parse INDEX)
-func TestResultsFailedToParseIndex(t *testing.T) {
+func TestReaderFailedToParseIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -644,7 +644,7 @@ func TestResultsFailedToParseIndex(t *testing.T) {
 }
 
 // bad results (failed to read DATA)
-func TestResultsFailedToReadData(t *testing.T) {
+func TestReaderFailedToReadData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -701,7 +701,7 @@ func TestResultsFailedToReadData(t *testing.T) {
 }
 
 // bad results (cancel to read DATA)
-func TestResultsCancelToReadData(t *testing.T) {
+func TestReaderCancelToReadData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -756,7 +756,7 @@ func TestResultsCancelToReadData(t *testing.T) {
 }
 
 // bad results (failed to read DATA delimiter)
-func TestResultsFailedToReadDelim(t *testing.T) {
+func TestReaderFailedToReadDelim(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -814,7 +814,7 @@ func TestResultsFailedToReadDelim(t *testing.T) {
 }
 
 // bad results (unexpected DATA delimiter)
-func TestResultsUnexpectedDelim(t *testing.T) {
+func TestReaderUnexpectedDelim(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"
@@ -872,7 +872,7 @@ func TestResultsUnexpectedDelim(t *testing.T) {
 }
 
 // bad results (cancel to read DATA delimiter)
-func TestResultsCancelToReadDelim(t *testing.T) {
+func TestReaderCancelToReadDelim(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	indexPath := "/tmp/ryftprim-index.txt"

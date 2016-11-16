@@ -39,11 +39,9 @@ type Engine interface {
 	// Get current engine options.
 	Options() map[string]interface{}
 
-	// Run asynchronous "/search" operation.
+	// Run asynchronous "/search" or "/count" operation.
+	// if cfg.ReportIndex == false then "/count" is assumed.
 	Search(cfg *Config) (*Result, error)
-
-	// Run asynchronous "/count" operation.
-	Count(cfg *Config) (*Result, error)
 
 	// Run *synchronous* "/files" operation.
 	Files(path string) (*DirInfo, error)

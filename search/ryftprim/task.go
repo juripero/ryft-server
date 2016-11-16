@@ -34,6 +34,8 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -48,8 +50,8 @@ var (
 // RyftPrim task related data.
 type Task struct {
 	Identifier    string // unique
-	IndexFileName string // INDEX filename, relative to user's home
-	DataFileName  string // DATA filename, relative to user's home
+	IndexFileName string // INDEX filename, absolute
+	DataFileName  string // DATA filename, absolute
 
 	// flags to keep results
 	KeepIndexFile bool
@@ -61,8 +63,9 @@ type Task struct {
 	toolOut  *bytes.Buffer // combined STDOUT and STDERR
 
 	// config & results
-	config  *search.Config
-	results *ResultReader
+	config     *search.Config
+	results    *ResultReader
+	resultWait sync.WaitGroup
 }
 
 // NewTask creates new task.
@@ -71,13 +74,44 @@ func NewTask(config *search.Config) *Task {
 
 	task := new(Task)
 	task.Identifier = fmt.Sprintf("%016x", id)
+
 	task.config = config
-
-	// NOTE: index file should have 'txt' extension,
-	// otherwise `ryftprim` adds '.txt' anyway.
-	// all files are hidden!
-	task.IndexFileName = fmt.Sprintf(".idx-%s.txt", task.Identifier)
-	task.DataFileName = fmt.Sprintf(".dat-%s.bin", task.Identifier)
-
 	return task
+}
+
+// start processing in goroutine
+func (task *Task) startProcessing(engine *Engine, res *search.Result) {
+	if task.results != nil {
+		return // already started
+	}
+
+	rr := NewResultReader(task,
+		task.DataFileName, task.IndexFileName,
+		task.config.Delimiter)
+
+	// result reader options
+	rr.Limit = uint64(task.config.Limit) // limit the total number of records
+	rr.ReadData = task.config.ReportData // if `false` only indexes will be reported
+
+	// report filepath relative to home and update index's host
+	rr.RelativeToHome = filepath.Join(engine.MountPoint, engine.HomeDir)
+	rr.UpdateHostTo = engine.IndexHost
+
+	// intrusive mode: poll timeouts & limits
+	rr.OpenFilePollTimeout = engine.OpenFilePollTimeout
+	rr.ReadFilePollTimeout = engine.ReadFilePollTimeout
+	rr.ReadFilePollLimit = engine.ReadFilePollLimit
+
+	task.resultWait.Add(1)
+	go func() {
+		defer task.resultWait.Done()
+		rr.process(res)
+	}()
+
+	task.results = rr
+}
+
+// wait processing is done
+func (task *Task) waitProcessingDone() {
+	task.resultWait.Wait()
 }

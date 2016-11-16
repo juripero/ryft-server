@@ -48,11 +48,12 @@ var (
 
 // RyftPrim engine uses `ryftprim` utility as a backend.
 type Engine struct {
-	Instance   string // empty by default. might be some server instance name like ".server-1234"
-	ExecPath   string // "/usr/bin/ryftprim" by default
-	LegacyMode bool   // legacy mode to get machine readable statistics
-	MountPoint string // "/ryftone" by default
-	HomeDir    string // subdir of mountpoint
+	Instance         string // empty by default. might be some server instance name like ".server-1234"
+	ExecPath         string // "/usr/bin/ryftprim" by default
+	LegacyMode       bool   // legacy mode to get machine readable statistics
+	KillToolOnCancel bool   // flag to kill ryftprim if cancelled
+	MountPoint       string // "/ryftone" by default
+	HomeDir          string // subdir of mountpoint
 
 	KeepResultFiles bool // false by default
 
@@ -86,54 +87,46 @@ func (engine *Engine) String() string {
 	// TODO: other parameters?
 }
 
-// Search starts asynchronous "/search" with RyftPrim engine.
+// Search starts asynchronous "/search" operation.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg) // enable INDEX&DATA processing
-	task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
+	if cfg.ReportData && !cfg.ReportIndex {
+		return nil, fmt.Errorf("failed to report DATA without INDEX")
+		// or just be silent: cfg.ReportIndex = true
+	}
+
+	task := NewTask(cfg)
+	if cfg.ReportIndex {
+		task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
+	} else {
+		task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
+	}
 
 	// prepare command line arguments
-	err := engine.prepare(task, cfg)
+	err := engine.prepare(task)
 	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to prepare /search", TAG)
-		return nil, fmt.Errorf("failed to prepare %s /search: %s", TAG, err)
+		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
+		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
 	}
 
 	res := search.NewResult()
 	err = engine.run(task, res)
 	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to run /search", TAG)
-		return nil, fmt.Errorf("failed to run %s /search: %s", TAG, err)
+		task.log().WithError(err).Warnf("[%s]: failed to run", TAG)
+		return nil, fmt.Errorf("failed to run %s: %s", TAG, err)
 	}
 	return res, nil // OK
 }
 
-// Count starts asynchronous "/count" with RyftPrim engine.
-func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg) // disable INDEX&DATA processing
-	task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
-
-	// prepare command line arguments
-	err := engine.prepare(task, cfg)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to prepare /count", TAG)
-		return nil, fmt.Errorf("failed to prepare %s /count: %s", TAG, err)
-	}
-
-	res := search.NewResult()
-	err = engine.run(task, res)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to run /count", TAG)
-		return nil, fmt.Errorf("failed to run %s /count: %s", TAG, err)
-	}
-	return res, nil // OK
-}
-
-// Files starts synchronous "/files" with RyftPrim engine.
+// Files starts synchronous "/files" operation.
 func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	log.WithField("path", path).Infof("[%s]: start /files", TAG)
+	home := filepath.Join(engine.MountPoint, engine.HomeDir)
+	log.WithFields(map[string]interface{}{
+		"home": home,
+		"path": path,
+	}).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	info, err := search.ReadDir(filepath.Join(engine.MountPoint, engine.HomeDir), path)
+	info, err := search.ReadDir(home, path)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)
@@ -169,13 +162,13 @@ func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
 }
 
-// factory creates new RyftPrim engine.
+// factory creates new engine.
 func factory(opts map[string]interface{}) (search.Engine, error) {
 	engine, err := NewEngine(opts)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create %s engine: %s", TAG, err)
+		return nil, fmt.Errorf("failed to create %s engine: %s", TAG, err)
 	}
-	return engine, nil
+	return engine, nil // OK
 }
 
 // package initialization
