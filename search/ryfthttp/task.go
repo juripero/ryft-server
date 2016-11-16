@@ -41,7 +41,7 @@ var (
 	taskId = uint64(0 * time.Now().UnixNano())
 )
 
-// RyftPrim task related data.
+// RyftHTTP task related data.
 type Task struct {
 	Identifier string // unique
 }

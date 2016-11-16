@@ -41,17 +41,20 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// Search starts asynchronous "/search" with RyftHttp engine.
+// Search starts asynchronous "/search" or "/count" operation.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	task := NewTask()
-	task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
+	if cfg.ReportIndex {
+		task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
+	} else {
+		task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
+	}
 
 	// prepare request URL
-	url := engine.prepareUrl(cfg, "raw")
-	url.Path += "/search"
+	url := engine.prepareSearchUrl(cfg)
 
 	// prepare request
-	task.log().WithField("url", url.String()).Debugf("[%s]: sending GET", TAG)
+	task.log().WithField("url", url.String()).Infof("[%s]: sending GET", TAG)
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to create request", TAG)
@@ -84,8 +87,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// do HTTP request
 		resp, err := engine.httpClient.Do(req)
 		if err != nil {
-			task.log().WithError(err).Warnf("[%s]: failed to send HTTP request", TAG)
-			res.ReportError(fmt.Errorf("failed to send HTTP request: %s", err))
+			task.log().WithError(err).Warnf("[%s]: failed to send request", TAG)
+			res.ReportError(fmt.Errorf("failed to send request: %s", err))
 			return
 		}
 
@@ -153,7 +156,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				}
 
 			case codec.TAG_STAT:
-				var stat format.Statistics
+				var stat format.Stat
 				err := dec.Next(&stat)
 				if err == nil {
 					res.Stat = format.ToStat(&stat)

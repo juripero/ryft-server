@@ -39,13 +39,13 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// Count starts asynchronous "/count" with RyftPrim engine.
+// Count starts asynchronous "/count" operation.
 func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	task := NewTask()
 	task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
 
 	// prepare request URL
-	url := engine.prepareUrl(cfg, "raw")
+	url := engine.prepareSearchUrl(cfg)
 	url.Path += "/count"
 
 	// prepare request, TODO: authentication?
@@ -91,7 +91,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		// TODO: task cancellation!!
 
 		decoder := json.NewDecoder(resp.Body)
-		var stat format.Statistics
+		var stat format.Stat
 		err = decoder.Decode(&stat)
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to decode response", TAG)

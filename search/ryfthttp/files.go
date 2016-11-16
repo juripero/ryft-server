@@ -38,11 +38,10 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// Files starts synchronous "/files" with RyftPrim engine.
+// Files starts synchronous "/files" operation.
 func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	// prepare request URL TODO: move to dedicated function
 	url := engine.prepareFilesUrl(path)
-	url.Path += "/files"
 
 	task := NewTask()
 
