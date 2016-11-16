@@ -247,9 +247,7 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`,
 		`[IPv6]: (RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`)
-}
 
-func TestBugfix(t *testing.T) {
 	testQueryTree(t, `(RECORD CONTAINS FHS("hello", DIST=1))`,
 		`[fhs-1/0-false]: (RECORD CONTAINS "hello")`)
 
@@ -313,4 +311,10 @@ OR
 		`[ AND]:
   [es-0/0-false]: (RECORD.doc.play_name NOT_CONTAINS "King Lear")
   [feds-2/0-false]: (RECORD.doc.text_entry CONTAINS "my lrd") AND (RECORD.doc.speaker CONTAINS "PONIUS") OR (RECORD.doc.text_entry CONTAINS "my lrd") AND (RECORD.doc.speaker CONTAINS "Mesenger") OR (RECORD.doc.speaker CONTAINS "PONIUS") AND (RECORD.doc.speaker CONTAINS "Mesenger")`)
+}
+
+func TestBugfix(t *testing.T) {
+	testQueryTree(t, `( RECORD.block CONTAINS FHS(""?"INDIANA"?"",CS=true,DIST=0,WIDTH=0) )`,
+		`[fhs-0/0-true]: (RECORD.block CONTAINS ""?"INDIANA"?"")`)
+
 }
