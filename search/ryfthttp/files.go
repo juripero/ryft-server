@@ -40,15 +40,14 @@ import (
 
 // Files starts synchronous "/files" operation.
 func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	// prepare request URL TODO: move to dedicated function
+	task := NewTask(nil)
 	url := engine.prepareFilesUrl(path)
 
-	task := NewTask()
-
-	// prepare request, TODO: authentication?
+	// prepare request
+	task.log().WithField("url", url.String()).Infof("[%s]: sending GET", TAG)
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
-		task.log().WithError(err).Errorf("failed to create HTTP request")
+		task.log().WithError(err).Errorf("failed to create request")
 		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
@@ -60,39 +59,34 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 		req.Header.Set("Authorization", engine.AuthToken)
 	}
 
+	return engine.doFiles(task, req)
+}
+
+// do /files processing
+func (engine *Engine) doFiles(task *Task, req *http.Request) (*search.DirInfo, error) {
 	// do HTTP request
 	resp, err := engine.httpClient.Do(req)
 	if err != nil {
-		task.log().WithError(err).Errorf("failed to send HTTP request")
-		return nil, fmt.Errorf("failed to send HTTP request: %s", err)
+		task.log().WithError(err).Errorf("failed to send request")
+		return nil, fmt.Errorf("failed to send request: %s", err)
 	}
 
 	defer resp.Body.Close() // close it later
 
 	// check status code
 	if resp.StatusCode != http.StatusOK {
-		task.log().WithField("status", resp.StatusCode).Errorf("invalid HTTP response status")
-		return nil, fmt.Errorf("invalid HTTP response status: %d %s", resp.StatusCode, resp.Status)
+		task.log().WithField("status", resp.StatusCode).Errorf("invalid response status")
+		return nil, fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	// TODO: use dedicated structure from transcode here!
-	var info struct {
-		Path  string   `json:"dir"`
-		Files []string `json:"files,omitempty"`
-		Dirs  []string `json:"folders,omitempty"`
-	}
-
+	// decode body
+	res := search.NewDirInfo("")
 	dec := json.NewDecoder(resp.Body)
-	err = dec.Decode(&info)
+	err = dec.Decode(res)
 	if err != nil {
-		task.log().WithError(err).Errorf("failed to decode HTTP response")
-		return nil, fmt.Errorf("failed to decode HTTP response: %s", err)
+		task.log().WithError(err).Errorf("failed to decode response")
+		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
-
-	res := &search.DirInfo{}
-	res.Path = info.Path
-	res.Files = info.Files
-	res.Dirs = info.Dirs
 
 	return res, nil // OK
 }

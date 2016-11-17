@@ -34,6 +34,8 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
+
+	"github.com/getryft/ryft-server/search"
 )
 
 var (
@@ -44,14 +46,17 @@ var (
 // RyftHTTP task related data.
 type Task struct {
 	Identifier string // unique
+
+	config *search.Config
 }
 
 // NewTask creates new task.
-func NewTask() *Task {
+func NewTask(cfg *search.Config) *Task {
 	id := atomic.AddUint64(&taskId, 1)
 
 	task := new(Task)
 	task.Identifier = fmt.Sprintf("http-%08x", id)
 
+	task.config = cfg
 	return task
 }

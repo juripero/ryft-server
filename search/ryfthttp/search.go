@@ -43,14 +43,7 @@ import (
 
 // Search starts asynchronous "/search" or "/count" operation.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask()
-	if cfg.ReportIndex {
-		task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
-	} else {
-		task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
-	}
-
-	// prepare request URL
+	task := NewTask(cfg)
 	url := engine.prepareSearchUrl(cfg)
 
 	// prepare request
@@ -70,106 +63,116 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	res := search.NewResult()
+	go engine.doSearch(task, req, res)
 
-	// handle GET response
+	return res, nil // OK for now
+}
+
+// do /search processing
+func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result) {
+	// some futher cleanup
+	defer res.Close()
+	defer res.ReportDone()
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	cancelCh := make(chan struct{})
+	req.Cancel = cancelCh
+	var cancelled int32 // atomic
+
+	// do HTTP request
+	resp, err := engine.httpClient.Do(req)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to send request", TAG)
+		res.ReportError(fmt.Errorf("failed to send request: %s", err))
+		return // failed
+	}
+
+	defer resp.Body.Close() // close it later
+
+	// check status code
+	if resp.StatusCode != http.StatusOK {
+		task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid response status", TAG)
+		res.ReportError(fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status))
+		return // failed (not 200)
+	}
+
+	// read response and report records and/or statistics
+	dec, _ := codec.NewStreamDecoder(resp.Body)
+
+	// handle task cancellation
 	go func() {
-		// some futher cleanup
-		defer res.Close()
-		defer res.ReportDone()
-
-		done_ch := make(chan struct{})
-		defer close(done_ch)
-
-		cancel_ch := make(chan struct{})
-		req.Cancel = cancel_ch
-		var cancelled int32
-
-		// do HTTP request
-		resp, err := engine.httpClient.Do(req)
-		if err != nil {
-			task.log().WithError(err).Warnf("[%s]: failed to send request", TAG)
-			res.ReportError(fmt.Errorf("failed to send request: %s", err))
-			return
-		}
-
-		defer resp.Body.Close() // close it later
-
-		// check status code
-		if resp.StatusCode != http.StatusOK {
-			task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid HTTP response status", TAG)
-			res.ReportError(fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status))
-			return
-		}
-
-		// read response and report records and/or statistics
-		dec, _ := codec.NewStreamDecoder(resp.Body)
-
-		// handle task cancellation
-		go func() {
-			select {
-			case <-res.CancelChan:
-				task.log().Warnf("[%s]: cancelled by user...", TAG)
-				if atomic.CompareAndSwapInt32(&cancelled, 0, 1) {
-					close(cancel_ch) // cancel the request
-				}
-
-			case <-done_ch:
-				task.log().Debugf("[%s]: finished", TAG)
-				return
+		select {
+		case <-res.CancelChan:
+			task.log().Warnf("[%s]: cancelling by client", TAG)
+			if atomic.CompareAndSwapInt32(&cancelled, 0, 1) {
+				close(cancelCh) // cancel the request, once
 			}
-		}()
 
-		for atomic.LoadInt32(&cancelled) == 0 {
-			tag, _ := dec.NextTag()
-			switch tag {
-			case codec.TAG_EOF:
-				task.log().Infof("[%s]: got end of response", TAG)
-				return // DONE
-
-			case codec.TAG_REC:
-				var item format.Record
-				err := dec.Next(&item)
-				if err != nil {
-					task.log().WithError(err).Warnf("[%s]: failed to decode record", TAG)
-					res.ReportError(err)
-					return // stop processing
-				} else {
-					rec := format.ToRecord(&item)
-					// task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
-					rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-					res.ReportRecord(rec)
-					// continue
-				}
-
-			case codec.TAG_ERR:
-				var msg string
-				err := dec.Next(&msg)
-				if err != nil {
-					task.log().WithError(err).Warnf("[%s]: failed to decode error", TAG)
-					res.ReportError(err)
-					return // stop processing
-				} else {
-					err := fmt.Errorf("%s", msg)
-					// task.log().WithError(err).Debugf("[%s]: new error received", TAG)
-					res.ReportError(err)
-					// continue
-				}
-
-			case codec.TAG_STAT:
-				var stat format.Stat
-				err := dec.Next(&stat)
-				if err == nil {
-					res.Stat = format.ToStat(&stat)
-					task.log().WithField("stat", res.Stat).
-						Infof("[%s]: statistics received", TAG)
-				}
-
-			default:
-				task.log().WithField("tag", tag).Errorf("unknown tag, ignored")
-				return // no sense to continue processing
-			}
+		case <-doneCh:
+			task.log().Debugf("[%s]: done", TAG)
+			return
 		}
 	}()
 
-	return res, nil // OK for now
+	// read stream of tag-object pairs
+	for atomic.LoadInt32(&cancelled) == 0 {
+		tag, err := dec.NextTag()
+		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to decode next tag", TAG)
+			res.ReportError(fmt.Errorf("failed to decode next tag: %s", err))
+			return // failed
+		}
+
+		switch tag {
+		case codec.TAG_EOF:
+			task.log().WithField("result", res).Infof("[%s]: got end of response", TAG)
+			return // DONE
+
+		case codec.TAG_REC:
+			item := format.NewRecord()
+			if err := dec.Next(item); err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to decode record", TAG)
+				res.ReportError(fmt.Errorf("failed to decode record: %s", err))
+				return // failed
+			} else {
+				rec := format.ToRecord(item)
+				// task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG) // FIXME: DEBUG
+				rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+				res.ReportRecord(rec)
+				// continue
+			}
+
+		case codec.TAG_ERR:
+			var msg string
+			if err := dec.Next(&msg); err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to decode error", TAG)
+				res.ReportError(fmt.Errorf("failed to decode error: %s", err))
+				return // failed
+			} else {
+				err := fmt.Errorf("%s", msg)
+				// task.log().WithError(err).Debugf("[%s]: new error received", TAG) // FIXME: DEBUG
+				res.ReportError(err)
+				// continue
+			}
+
+		case codec.TAG_STAT:
+			stat := format.NewStat()
+			if err := dec.Next(stat); err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to decode statistics", TAG)
+				res.ReportError(fmt.Errorf("failed to decode statistics: %s", err))
+				return // failed
+			} else {
+				task.log().WithField("stat", res.Stat).
+					Debugf("[%s]: statistics received", TAG)
+				res.Stat = format.ToStat(stat)
+				// continue
+			}
+
+		default:
+			task.log().WithField("tag", tag).Errorf("[%s]: unknown tag", TAG)
+			return // failed, no sense to continue processing
+		}
+	}
 }
