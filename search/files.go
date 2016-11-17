@@ -43,9 +43,9 @@ import (
 
 // DirInfo is directory's content.
 type DirInfo struct {
-	Path  string   // directory path (relative to mount point)
-	Files []string // list of files
-	Dirs  []string // subdirectories
+	Path  string   `json:"dir"`               // directory path (relative to mount point)
+	Files []string `json:"files,omitempty"`   // list of files
+	Dirs  []string `json:"folders,omitempty"` // subdirectories
 }
 
 // ReadDir gets directory content from filesystem.

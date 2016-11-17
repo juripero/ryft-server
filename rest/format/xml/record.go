@@ -55,7 +55,7 @@ type Record_0 struct {
 }
 
 // NewRecord creates new format specific data.
-func NewRecord() interface{} {
+func NewRecord() *Record {
 	return new(Record)
 }
 
