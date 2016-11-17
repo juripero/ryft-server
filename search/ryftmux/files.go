@@ -36,23 +36,26 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// Files starts synchronous "/files" with RyftMUX engine.
+// Files starts synchronous "/files" operation.
 func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	task := NewTask()
+	task := NewTask(nil)
 
-	ch := make(chan *search.DirInfo, len(engine.Backends))
+	task.log().WithField("path", path).Infof("[%s]: start /files", TAG)
+	defer task.log().Debugf("[%s]: done", TAG)
+
+	resCh := make(chan *search.DirInfo, len(engine.Backends))
 
 	// prepare requests
 	for _, backend := range engine.Backends {
-		// do search in goroutine
+		// get files in goroutine
 		go func(backend search.Engine) {
 			res, err := backend.Files(path)
 			if err != nil {
-				task.log().WithError(err).Warnf("failed to start /files subtask")
+				task.log().WithError(err).Warnf("failed to start /files backend")
 				// TODO: report as multiplexed error?
-				ch <- nil
+				resCh <- nil
 			} else {
-				ch <- res
+				resCh <- res
 			}
 		}(backend)
 	}
@@ -63,28 +66,29 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	muxDirs := map[string]int{}
 	for _ = range engine.Backends {
 		select {
-		case res, ok := <-ch:
+		case res, ok := <-resCh:
 			if ok && res != nil {
 				// check directory path is consistent
 				if len(muxPath) == 0 {
 					muxPath = res.Path
 				}
 				if muxPath != res.Path {
-					task.log().WithField("path1", muxPath).
-						WithField("path2", res.Path).
-						Warnf("failed to start /files subtask")
-					return nil, fmt.Errorf("inconsistent directory %q != %q",
+					task.log().WithFields(map[string]interface{}{
+						"mux-path": muxPath,
+						"res-path": res.Path,
+					}).Warnf("path inconsistency detected!")
+					return nil, fmt.Errorf("inconsistent path %q != %q",
 						muxPath, res.Path)
 				}
 
 				// merge files
 				for _, f := range res.Files {
-					muxFiles[f] += 1
+					muxFiles[f]++
 				}
 
 				// merge dirs
 				for _, d := range res.Dirs {
-					muxDirs[d] += 1
+					muxDirs[d]++
 				}
 			}
 		}
@@ -94,10 +98,10 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	mux := search.NewDirInfo(muxPath)
 	mux.Files = make([]string, 0, len(muxFiles))
 	mux.Dirs = make([]string, 0, len(muxDirs))
-	for f, _ := range muxFiles {
+	for f := range muxFiles {
 		mux.Files = append(mux.Files, f)
 	}
-	for d, _ := range muxDirs {
+	for d := range muxDirs {
 		mux.Dirs = append(mux.Dirs, d)
 	}
 

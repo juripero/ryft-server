@@ -56,17 +56,12 @@ type Engine struct {
 func NewEngine(backends ...search.Engine) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backends = backends
-	return engine, nil
-}
-
-// prepare task configuration
-func (engine *Engine) prepare(task *Task, cfg *search.Config) {
-	task.Limit = uint64(cfg.Limit)
+	return engine, nil // OK
 }
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftMUX{backends:%s}", engine.Backends)
+	return fmt.Sprintf("ryftmux{backends:%s}", engine.Backends)
 	// TODO: other parameters?
 }
 
@@ -84,7 +79,7 @@ func SetLogLevelString(level string) error {
 		return err
 	}
 
-	log.Level = ll
+	SetLogLevel(ll)
 	return nil // OK
 }
 
@@ -116,6 +111,7 @@ func factory(opts map[string]interface{}) (search.Engine, error) {
 */
 
 // package initialization
+/*
 func init() {
 	// should be created manually!
 	// search.RegisterEngine(TAG, factory)
@@ -123,3 +119,4 @@ func init() {
 	// be silent by default
 	// log.Level = logrus.WarnLevel
 }
+*/
