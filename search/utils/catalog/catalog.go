@@ -32,19 +32,23 @@ package catalog
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/getryft/ryft-server/search/utils/index"
-
+	"github.com/Sirupsen/logrus"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const (
-	dbSchemeVersion = 1 // current scheme version
+var (
+	// logger instance
+	log = logrus.New()
+
+	TAG = "catalog"
 )
 
 // default data size limit used by all new catalogs
@@ -59,10 +63,25 @@ var DefaultDataDelimiter string
 // default temp directory
 var DefaultTempDirectory string = "/tmp/"
 
+// ErrNotACatalog is used to indicate the file is not a catalog meta-data file.
+var ErrNotACatalog = errors.New("not a catalog")
+
+// SetLogLevel changes global module log level.
+func SetLogLevel(level logrus.Level) {
+	log.Level = level
+}
+
+// GetLogLevel gets global module log level.
+func GetLogLevel() logrus.Level {
+	return log.Level
+}
+
 // SetDefaultCacheDropTimeout sets default cache drop-timeout
 func SetDefaultCacheDropTimeout(timeout time.Duration) {
 	DefaultCacheDropTimeout = timeout
 	globalCache.DropTimeout = timeout
+
+	log.WithField("timeout", timeout).Debugf("[%s]: default cache-drop timeout has changed")
 }
 
 // Catalog struct contains catalog related meta-data.
@@ -81,6 +100,87 @@ type Catalog struct {
 	cacheDrop *time.Timer // pending drop from cache
 }
 
+// OpenCatalog opens catalog file in write mode.
+func OpenCatalog(path string) (*Catalog, error) {
+	cat, cached, err := getCatalog(path, false)
+	if err != nil {
+		log.WithError(err).Errorf("[%s]: failed to get catalog", TAG)
+		return nil, err
+	}
+
+	// update database scheme
+	if !cached {
+		log.WithField("path", path).Debugf("[%s]: updating scheme...", TAG)
+		if err := cat.updateSchemeSync(); err != nil {
+			cat.Close()
+			return nil, err
+		}
+	}
+
+	return cat, nil // OK
+}
+
+// OpenCatalog opens catalog file in read-only mode.
+func OpenCatalogReadOnly(path string) (*Catalog, error) {
+	cat, _, err := getCatalog(path, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return cat, nil // OK
+}
+
+// OpenCatalog opens catalog file in write mode.
+func OpenCatalogNoCache(path string) (*Catalog, error) {
+	// create new catalog
+	cat, err := openCatalog(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// update database scheme
+	log.WithField("path", path).Debugf("[%s]: updating scheme...")
+	if err := cat.updateSchemeSync(); err != nil {
+		cat.Close()
+		return nil, err
+	}
+
+	return cat, nil // OK
+}
+
+// get catalog (from cache or new)
+func getCatalog(path string, readOnly bool) (*Catalog, bool, error) {
+	globalCache.Lock()
+	defer globalCache.Unlock()
+
+	// try to get existing catalog
+	if cat := globalCache.get(path); cat != nil {
+		return cat, true, nil // OK
+	}
+
+	if readOnly {
+		// quick check by looking at data directory
+		dataDir := getDataDir(path)
+		if info, err := os.Stat(dataDir); os.IsNotExist(err) || !info.IsDir() {
+			return nil, false, ErrNotACatalog
+		}
+	}
+
+	// create new one and put to cache
+	cat, err := openCatalog(path)
+	if err == nil && cat != nil {
+		globalCache.put(path, cat)
+		cat.cacheAddRef()
+	}
+
+	return cat, false, err
+}
+
+// get log entry
+func (cat *Catalog) log() *logrus.Entry {
+	return log.WithField("path", cat.path)
+}
+
 // openCatalog opens catalog file.
 func openCatalog(path string) (*Catalog, error) {
 	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_txlock=exclusive", path))
@@ -93,7 +193,7 @@ func openCatalog(path string) (*Catalog, error) {
 	cat.path = filepath.Clean(path)
 	cat.db = db
 
-	log.WithField("path", path).Debugf("[%s]: open new catalog", TAG)
+	cat.log().Debugf("[%s]: open new catalog", TAG)
 	return cat, nil // OK
 }
 
@@ -106,8 +206,8 @@ func (cat *Catalog) Close() error {
 
 	// close database
 	if db := cat.db; db != nil {
-		log.WithField("path", cat.path).Debugf("[%s]: close catalog", TAG)
 		cat.db = nil
+		cat.log().Debugf("[%s]: close catalog", TAG)
 		return db.Close()
 	}
 
@@ -115,15 +215,15 @@ func (cat *Catalog) Close() error {
 }
 
 // DropFromCache force remove catalog from cache.
-func (cat *Catalog) DropFromCache() error {
-	if cat.cache != nil {
-		cat.cache.Drop(cat.path)
-		//  cat.cacheRelease()
+func (cat *Catalog) DropFromCache() bool {
+	if cc := cat.cache; cc != nil {
 		cat.cache = nil
-		return nil
+		cat.log().Debugf("[%s]: drop from cache", TAG)
+		cc.Drop(cat.path)
+		return true
 	}
 
-	return nil // already closed
+	return false // already closed
 }
 
 // Get catalog's path
@@ -133,14 +233,18 @@ func (cat *Catalog) GetPath() string {
 
 // cache: add reference
 func (cat *Catalog) cacheAddRef() {
-	if ref := atomic.AddInt32(&cat.cacheRef, +1); ref == 1 {
+	ref := atomic.AddInt32(&cat.cacheRef, +1)
+	cat.log().WithField("ref", ref).Debugf("[%s]: add reference", TAG) // FIXME: DEBUG
+	if ref == 1 {
 		cat.stopDropTimerSync() // just in case
 	}
 }
 
 // cache: release
 func (cat *Catalog) cacheRelease() {
-	if ref := atomic.AddInt32(&cat.cacheRef, -1); ref == 0 {
+	ref := atomic.AddInt32(&cat.cacheRef, -1)
+	cat.log().WithField("ref", ref).Debugf("[%s]: release reference", TAG) // FIXME: DEBUG
+	if ref == 0 {
 		// for the last reference start the drop timer
 		cat.startDropTimerSync(cat.CacheDropTimeout)
 	}
@@ -153,15 +257,15 @@ func (cat *Catalog) startDropTimerSync(timeout time.Duration) {
 
 	if cat.cacheDrop != nil && cat.cacheDrop.Reset(timeout) {
 		// timer is updated
+		cat.log().Debugf("[%s]: refresh drop-timer", TAG) // FIXME: DEBUG
 	} else {
 		cat.cacheDrop = time.AfterFunc(timeout, func() {
-			if cat.cache != nil {
-				log.WithField("path", cat.path).Debugf("[%s]: dropping catalog by timer", TAG)
-				cat.cache.Drop(cat.path)
-				cat.cache = nil
+			cat.log().Debugf("[%s]: drop-timeout is expired...", TAG)
+			if cat.DropFromCache() {
 				cat.Close()
 			}
 		})
+		cat.log().WithField("timeout", timeout).Debugf("[%s]: start drop-timer", TAG) // FIXME: DEBUG
 	}
 }
 
@@ -170,450 +274,10 @@ func (cat *Catalog) stopDropTimerSync() {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()
 
-	if cat.cacheDrop != nil {
-		cat.cacheDrop.Stop()
+	if cd := cat.cacheDrop; cd != nil {
 		cat.cacheDrop = nil
-	}
-}
-
-// Check database scheme (synchronized).
-func (cat *Catalog) CheckScheme() bool {
-	if ok, err := cat.checkSchemeSync(); err != nil || !ok {
-		return false
-	}
-
-	return true
-}
-
-// Check database scheme (synchronized).
-func (cat *Catalog) checkSchemeSync() (bool, error) {
-	cat.mutex.Lock()
-	defer cat.mutex.Unlock()
-
-	return cat.checkScheme()
-}
-
-// Check database scheme (unsynchronized).
-func (cat *Catalog) checkScheme() (bool, error) {
-	var version int32
-
-	// get current scheme version
-	row := cat.db.QueryRow("PRAGMA user_version;")
-	if err := row.Scan(&version); err != nil {
-		return false, fmt.Errorf("failed to get scheme version: %s", err)
-	}
-
-	return version >= dbSchemeVersion, nil // OK
-}
-
-// Updates database scheme (synchronized).
-func (cat *Catalog) updateSchemeSync() error {
-	cat.mutex.Lock()
-	defer cat.mutex.Unlock()
-
-	return cat.updateScheme()
-}
-
-// Updates database scheme (unsynchronized).
-func (cat *Catalog) updateScheme() error {
-	var version int32
-
-	// get current scheme version
-	row := cat.db.QueryRow("PRAGMA user_version")
-	if err := row.Scan(&version); err != nil {
-		return fmt.Errorf("failed to get scheme version: %s", err)
-	}
-
-	if version >= dbSchemeVersion {
-		return nil // nothing to do
-	}
-
-	// need to update scheme, should be done under exclusive transaction
-	tx, err := cat.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin update scheme transaction: %s", err)
-	}
-	defer tx.Rollback() // just in case
-
-	// 0 => 1
-	if version <= 0 {
-		if err := cat.updateSchemeToVersion1(tx); err != nil {
-			return fmt.Errorf("failed to update to version 1: %s", err)
+		if cd.Stop() {
+			cat.log().Debugf("[%s]: stop drop-timer", TAG) // FIXME: DEBUG
 		}
 	}
-
-	// 1 => 2 (example)
-	if false && version <= 1 {
-		if err := cat.updateSchemeToVersion2(tx); err != nil {
-			return fmt.Errorf("failed to update to version 2: %s", err)
-		}
-	}
-
-	// commit changes
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit update scheme transaction: %s", err)
-	}
-
-	return nil // OK
-}
-
-// version1: create tables
-func (cat *Catalog) updateSchemeToVersion1(tx *sql.Tx) error {
-	SCRIPT := `-- create tables
-CREATE TABLE IF NOT EXISTS data (
-	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	file STRING UNIQUE NOT NULL,  -- data filename, relative to catalog file
-	len INTEGER DEFAULT (0),      -- total data length, offset for the next file part
-	opt INTEGER DEFAULT (0),      -- TBD (busy/activity monitor)
-	s_w INTEGER DEFAULT (0),      -- surrounding width
-	delim BLOB                    -- delimiter, should be set once
-);
-CREATE TABLE IF NOT EXISTS parts (
-	id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	name STRING NOT NULL,         -- filename
-	pos INTEGER NOT NULL,         -- part offset
-	len INTEGER NOT NULL,         -- part length, -1 if unknown yet
-	opt INTEGER DEFAULT (0),      -- TBD (busy/activity monitor, deleted, corrupted)
-	d_id INTEGER NOT NULL REFERENCES data (id) ON DELETE CASCADE,
-	d_pos INTEGER NOT NULL,       -- position in data file
-
-	u_name STRING,                -- unwinded filename
-	u_pos INTEGER,                -- unwinded offset
-	u_len INTEGER,                -- unwinded length
-	u_shift INTEGER               -- shift of data position due to parent
-);
-
--- create triggers
-CREATE TRIGGER IF NOT EXISTS part_insert
-	AFTER INSERT ON parts
-	FOR EACH ROW WHEN (0 < NEW.len)
-BEGIN
-	-- on part insert update data file's length
-	UPDATE data SET
-		len = len + NEW.len + ifnull(length(data.delim),0)
-	WHERE data.id = NEW.d_id;
-END;
-CREATE TRIGGER IF NOT EXISTS part_update
-	BEFORE UPDATE ON parts
-	FOR EACH ROW WHEN (OLD.len <= 0) AND (0 < NEW.len)
-BEGIN
-	UPDATE data SET
-		len = len + NEW.len + ifnull(length(data.delim),0)
-	WHERE data.id = NEW.d_id;
-END;
-
--- update scheme version
-PRAGMA user_version = 1;`
-
-	if _, err := tx.Exec(SCRIPT); err != nil {
-		return fmt.Errorf("failed to create tables: %s", err)
-	}
-
-	return nil // OK
-}
-
-// version2: update tables (example)
-func (cat *Catalog) updateSchemeToVersion2(tx *sql.Tx) error {
-	SCRIPT := ` -- just an example
-ALTER TABLE data ADD COLUMN foo INTEGER;
-ALTER TABLE parts ADD COLUMN foo INTEGER;
-
--- update scheme version
-PRAGMA user_version = 2;`
-
-	if _, err := tx.Exec(SCRIPT); err != nil {
-		return fmt.Errorf("failed to update tables: %s", err)
-	}
-
-	return nil // OK
-}
-
-// AddFile adds file part to catalog.
-// return data file path (absolute), offset where to write and delimiter
-func (cat *Catalog) AddFile(filename string, offset, length int64, pdelim *string) (string, int64, string, error) {
-	// TODO: several attempts if DB is locked
-	data_file, data_pos, delim, err := cat.addFileSync(filename, offset, length, pdelim)
-	if err != nil {
-		return "", 0, "", err
-	}
-
-	// convert to absolute path
-	dir, _ := filepath.Split(cat.path)
-	data_file = filepath.Join(dir, data_file)
-
-	return data_file, data_pos, delim, nil // OK
-}
-
-// adds file part to catalog (synchronized).
-func (cat *Catalog) addFileSync(filename string, offset, length int64, pdelim *string) (string, int64, string, error) {
-	cat.mutex.Lock()
-	defer cat.mutex.Unlock()
-
-	return cat.addFile(filename, offset, length, pdelim)
-}
-
-// adds file part to catalog (unsynchronized).
-func (cat *Catalog) addFile(filename string, offset int64, length int64, pdelim *string) (string, int64, string, error) {
-	// should be done under exclusive transaction
-	tx, err := cat.db.Begin()
-	if err != nil {
-		return "", 0, "", fmt.Errorf("failed to begin transaction: %s", err)
-	}
-	defer tx.Rollback() // just in case
-
-	// find existing part first
-	if 0 <= offset {
-		row := tx.QueryRow(`SELECT
-parts.id,parts.pos,parts.len,parts.d_pos,data.file FROM parts
-JOIN data ON data.id = parts.d_id
-WHERE parts.name IS ?
-AND ? BETWEEN parts.pos AND parts.pos+parts.len-1`, filename, offset)
-
-		var p_id, p_pos, p_len, d_pos int64
-		var data_file string
-		if err := row.Scan(&p_id, &p_pos, &p_len, &d_pos, &data_file); err == nil {
-			// check new part fits existing part
-			beg, end := offset, offset+length
-			p_beg, p_end := p_pos, p_pos+p_len
-			if p_beg <= beg && beg < p_end && p_beg <= end && end < p_end {
-				return data_file, d_pos + (beg - p_beg), "", nil // use this part
-				// no delimiter should be provided since we write into the mid of file part!
-			}
-
-			// TODO: can we do something better? write a new part and delete previous?
-			return "", 0, "", fmt.Errorf("part will override existing part [%d..%d)", p_beg, p_end)
-		} else if err != sql.ErrNoRows {
-			return "", 0, "", fmt.Errorf("failed to find existing part: %s", err)
-		}
-	}
-
-	// find appropriate data file
-	data_id, data_file, data_pos, delim, err := cat.findDataFile(tx, length, pdelim)
-	if err != nil {
-		return "", 0, "", err
-	}
-
-	if offset < 0 { // automatic offset
-		var val sql.NullInt64
-		row := tx.QueryRow(`SELECT SUM(len) FROM parts WHERE name IS ? LIMIT 1`, filename)
-		if err := row.Scan(&val); err != nil {
-			return "", 0, "", fmt.Errorf("failed to calculate offset: %s", err)
-		}
-		if val.Valid {
-			offset = val.Int64
-		} else {
-			offset = 0 // no any parts found
-		}
-	}
-
-	// insert new file part (data file will be updated by INSERT trigger!)
-	_, err = tx.Exec(`INSERT
-INTO parts(name,pos,len,d_id,d_pos)
-VALUES (?,?,?,?,?)`, filename, offset, length, data_id, data_pos)
-	if err != nil {
-		return "", 0, "", fmt.Errorf("failed to insert file part: %s", err)
-	}
-
-	// commit transaction
-	if err := tx.Commit(); err != nil {
-		return "", 0, "", fmt.Errorf("failed to commit transaction: %s", err)
-	}
-
-	return data_file, data_pos, delim, nil // OK
-}
-
-// get data directory
-// return absollute path!
-func getDataDir(path string) string {
-	// take a look at Catalog.newDataFilePath() function!
-	base, file := filepath.Split(path)
-	dataDir := filepath.Join(base, fmt.Sprintf(".%s.catalog", file))
-	return dataDir
-}
-
-// GetDataDir gets the data directory (absolute path)
-func (cat *Catalog) GetDataDir() string {
-	return getDataDir(cat.path)
-}
-
-// GetDataFiles gets the list of data files (absolute path)
-func (cat *Catalog) GetDataFiles() ([]string, error) {
-	// TODO: several attempts if DB is locked
-	files, err := cat.getDataFilesSync()
-	if err != nil {
-		return nil, err
-	}
-
-	// convert to absolute path
-	dir, _ := filepath.Split(cat.path)
-	for i := 0; i < len(files); i++ {
-		files[i] = filepath.Join(dir, files[i])
-	}
-
-	return files, nil // OK
-}
-
-// get list of data files (synchronized)
-func (cat *Catalog) getDataFilesSync() ([]string, error) {
-	cat.mutex.Lock()
-	defer cat.mutex.Unlock()
-
-	return cat.getDataFiles()
-}
-
-// get list of data files (unsynchronized)
-func (cat *Catalog) getDataFiles() ([]string, error) {
-	rows, err := cat.db.Query(`SELECT file FROM data`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get data files: %s", err)
-	}
-	defer rows.Close()
-
-	files := []string{}
-	for rows.Next() {
-		var file string
-		if err := rows.Scan(&file); err != nil {
-			return nil, fmt.Errorf("failed to scan data file: %s", err)
-		}
-		files = append(files, file)
-	}
-
-	return files, nil // OK
-}
-
-// get list of parts (synchronized)
-func (cat *Catalog) GetSearchIndexFile() (map[string]*index.IndexFile, error) {
-	f, err := cat.getSearchIndexFileSync()
-	if err != nil {
-		return nil, err
-	}
-
-	// convert to absolute path
-	res := make(map[string]*index.IndexFile)
-	dir, _ := filepath.Split(cat.path)
-	for n, i := range f {
-		full := filepath.Join(dir, n)
-		res[full] = i
-	}
-
-	return res, nil // OK
-}
-
-// get list of parts (synchronized)
-func (cat *Catalog) getSearchIndexFileSync() (map[string]*index.IndexFile, error) {
-	cat.mutex.Lock()
-	defer cat.mutex.Unlock()
-
-	return cat.getSearchIndexFile()
-}
-
-// get list of parts (unsynchronized)
-func (cat *Catalog) getSearchIndexFile() (map[string]*index.IndexFile, error) {
-	rows, err := cat.db.Query(`
-SELECT p.name, p.pos, p.len, p.d_pos, d.file, d.s_w, d.delim
-FROM parts AS p
-JOIN data AS d ON p.d_id = d.id
-ORDER BY p.d_pos`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get parts: %s", err)
-	}
-	defer rows.Close()
-
-	res := make(map[string]*index.IndexFile)
-	for rows.Next() {
-		var file, data string
-		var offset, length, data_pos uint64
-		var delim sql.NullString
-		var width uint
-		if err := rows.Scan(&file, &offset, &length, &data_pos, &data, &width, &delim); err != nil {
-			return nil, fmt.Errorf("failed to scan parts: %s", err)
-		}
-		f := res[data]
-		if f == nil {
-			f = index.NewIndexFile(delim.String, width)
-			res[data] = f
-		}
-
-		f.Add(file, offset, length, data_pos)
-	}
-
-	return res, nil // OK
-}
-
-// find appropriate data file and reserve space
-// return data id, data path and write offset
-func (cat *Catalog) findDataFile(tx *sql.Tx, length int64, pdelim *string) (id int64, file string, offset int64, delim string, err error) {
-	// TODO: if length is unknown - lock whole data by setting opt|=1...
-	// need to run monitor to prevent infinite data file locking...
-
-	var data_delim sql.NullString
-	row := tx.QueryRow(`SELECT id,file,len,delim FROM data WHERE (len+?) <= ? LIMIT 1`, length, cat.DataSizeLimit)
-	if err = row.Scan(&id, &file, &offset, &data_delim); err != nil {
-		if err != sql.ErrNoRows {
-			return 0, "", 0, "", fmt.Errorf("failed to find data file: %s", err)
-		} else {
-			err = nil // ignore error, and...
-
-			if pdelim != nil {
-				delim = *pdelim
-			} else {
-				delim = DefaultDataDelimiter
-			}
-		}
-
-		// ... create new data file
-		file, offset = cat.newDataFilePath(), 0
-		var res sql.Result
-		res, err = tx.Exec(`INSERT INTO data(file,len,delim) VALUES (?,0,?)`, file, delim)
-		if err != nil {
-			return 0, "", 0, "", fmt.Errorf("failed to insert new data file: %s", err)
-		}
-		if id, err = res.LastInsertId(); err != nil {
-			return 0, "", 0, "", fmt.Errorf("failed to get new data file id: %s", err)
-		}
-
-		return // OK
-	}
-
-	// ensure delimiter is the same each time
-	//if pdelim != nil {
-	//	fmt.Printf("delimiter check (old:#%x, new:#%x)\n", data_delim.String, *pdelim)
-	//}
-	if data_delim.Valid && pdelim != nil && data_delim.String != *pdelim {
-		return 0, "", 0, "", fmt.Errorf("delimiter cannot be changed (old:#%x, new:#%x)", data_delim.String, *pdelim)
-	}
-	delim = data_delim.String
-
-	return // OK
-}
-
-// generate new data file path
-func (cat *Catalog) newDataFilePath() string {
-	dir, file := filepath.Split(cat.path)
-	// make file hidden and randomize by unix timestamp
-	absPath := filepath.Join(cat.GetDataDir(), fmt.Sprintf(".data-%016x-%s", time.Now().UnixNano(), file))
-
-	if path, err := filepath.Rel(dir, absPath); err == nil {
-		return path
-	}
-
-	return absPath // fallback
-}
-
-// clear all tables
-func (cat *Catalog) ClearAll() error {
-	cat.mutex.Lock()
-	defer cat.mutex.Unlock()
-
-	return cat.clearAll()
-}
-
-// clear all tables (unsync)
-func (cat *Catalog) clearAll() error {
-	_, err := cat.db.Exec(`DELETE FROM parts; DELETE FROM data;`)
-	if err != nil {
-		return fmt.Errorf("failed to delete data: %s", err)
-	}
-
-	return nil // OK
 }

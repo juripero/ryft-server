@@ -40,7 +40,67 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/index"
 )
+
+// get list of parts (synchronized)
+func (cat *Catalog) GetSearchIndexFile() (map[string]*index.IndexFile, error) {
+	f, err := cat.getSearchIndexFileSync()
+	if err != nil {
+		return nil, err
+	}
+
+	// convert to absolute path
+	res := make(map[string]*index.IndexFile)
+	dir, _ := filepath.Split(cat.path)
+	for n, i := range f {
+		full := filepath.Join(dir, n)
+		res[full] = i
+	}
+
+	return res, nil // OK
+}
+
+// get list of parts (synchronized)
+func (cat *Catalog) getSearchIndexFileSync() (map[string]*index.IndexFile, error) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.getSearchIndexFile()
+}
+
+// get list of parts (unsynchronized)
+func (cat *Catalog) getSearchIndexFile() (map[string]*index.IndexFile, error) {
+	rows, err := cat.db.Query(`
+SELECT p.name, p.pos, p.len, p.d_pos, d.file, d.s_w, d.delim
+FROM parts AS p
+JOIN data AS d ON p.d_id = d.id
+ORDER BY p.d_pos`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parts: %s", err)
+	}
+	defer rows.Close()
+
+	res := make(map[string]*index.IndexFile)
+	for rows.Next() {
+		var file, data string
+		var offset, length, data_pos uint64
+		var delim sql.NullString
+		var width uint
+		if err := rows.Scan(&file, &offset, &length, &data_pos, &data, &width, &delim); err != nil {
+			return nil, fmt.Errorf("failed to scan parts: %s", err)
+		}
+		f := res[data]
+		if f == nil {
+			f = index.NewIndexFile(delim.String, width)
+			res[data] = f
+		}
+
+		f.Add(file, offset, length, data_pos)
+	}
+
+	return res, nil // OK
+}
 
 // Copy another catalog
 func (cat *Catalog) CopyFrom(base *Catalog) error {

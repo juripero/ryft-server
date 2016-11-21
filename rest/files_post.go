@@ -627,7 +627,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	defer cat.Close()
 
 	// update catalog atomically
-	data_path, data_pos, data_delim, err := cat.AddFile(filePath, params.Offset, params.Length, delim)
+	data_path, data_pos, data_delim, err := cat.AddFilePart(filePath, params.Offset, params.Length, delim)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
 	}
