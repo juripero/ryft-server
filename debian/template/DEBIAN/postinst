@@ -24,13 +24,17 @@ fixUIDGID /usr/bin/ryft-server
 fixUIDGID /usr/bin/ryftrest
 
 # configurations
-fixUIDGID /etc/init/ryft-server-d.conf
-fixUIDGID /etc/ryft-server.conf
-fixUIDGID /etc/ryft-users.yaml
+chown "$target_uid:$target_gid" -f /etc/init/ryft-server-d.conf
+chown "$target_uid:$target_gid" -f /etc/ryft-server.conf
+chown "$target_uid:$target_gid" -f /etc/ryft-users.yaml
 
 # other
-fixUIDGID /var/log/ryft
-fixUIDGID /var/ryft
+chown "$target_uid:$target_gid" -f /var/log/ryft
+chown "$target_uid:$target_gid" -f -R /var/ryft
+
+# backward compatibility
+chown "$target_uid:$target_gid" -f -R /ryftone/.rest-*
+chown "$target_uid:$target_gid" -f /var/log/ryft/server.log
 
 echo $NAME starting...
 service $NAME start
