@@ -22,7 +22,7 @@ Search specific:
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
--n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use.
+-n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use (default is 4).
 -d|--fuzziness=<D> Specifies the fuzzy search distance.
 -w|--width=<W>     Specifies the surrounding width.
 -e|--delimiter=<E> Specifies the delimiter used between found records.
@@ -38,10 +38,10 @@ REST specific:
 -u|--user=<cred> Use user credentials, "username:password".
   |--auth
 --search         Use /search endpoint (used by default) to print all found items.
---count          Use /count endpoint instead of /search to print just statistics.
+--count          Use /count endpoint instead of /search to print just statistics (default).
 --limit=N        Specifies the limit on total number of records printed (used with /search).
---local          Specifies the local search. Opposite to --cluster.
---cluster        Specifies the cluster search. Opposite to --local. Used by default.
+--local          Specifies the local search. Opposite to --cluster. (default)
+--cluster        Specifies the cluster search. Opposite to --local.
 --format=<fmt>   Specifies format of the result records, can be:
                      - raw - base-64 encoded data, by default.
                      - xml - decode XML records
@@ -58,6 +58,9 @@ REST specific:
 
 -v|--verbose     Tells curl to be verbose.
 -vv|--pretty     Get pretty (properly indented) formatting with jq tool.
+--drate          Reformat output to add Data Rate
+--details        Reformat output to add Data Rate and details on intermediate results
+
 
 Examples:
 
@@ -93,9 +96,9 @@ INDEX=
 
 ADDRESS=http://localhost:8765
 AUTH_USER=
-ENDPOINT=/search
+ENDPOINT=/count
 LIMIT=
-LOCAL=false
+LOCAL=true
 FORMAT=
 FIELDS=
 STATS=true
@@ -103,8 +106,61 @@ STREAM=
 SPARK=
 
 # be silent by default
+
 VERBOSE=-s
 PRETTY=
+ADD_DRATE=
+ADD_DETAILS=
+HIDE_HOSTNAME=true
+#
+# individual pieces jq formatting to add units of measurment for demo displays 
+#
+UNITS1=' if .duration >= 1000 then
+                {"Duration(sec)         ": ((.duration / 1000)|.*10+0.5|floor|./10)}
+        else {"Duration(msec)        ": .duration}
+        end
+        + if .totalBytes >= 1099511627776 then
+                {"Total Bytes(TB)       ": ((.totalBytes / 1024 / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
+        elif .totalBytes >= 1073741824 then
+                {"Total Bytes(GB)       ": ((.totalBytes / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
+        elif .totalBytes >= 1048576 then
+                {"Total Bytes(MB)       ": ((.totalBytes / 1024 / 1024)|.*100+0.005|floor|./100)}
+        elif .totalBytes >= 1024 then
+                {"Total Bytes(KB)       ": ((.totalBytes / 1024)|.*100+0.005|floor|./100)}
+        else {"Total Bytes           ": .totalBytes}
+        end'
+
+UNITS_DR=' + if .dataRate >= 1024 then
+                {"Data Rate(GB/s)       ": ((.dataRate / 1024)|.*100+0.005|floor|./100)}
+        elif .dataRate < 0.001 then
+                {"Data Rate(KB/s)       ": ((.dataRate * 1024)|.*100+0.005|floor|./100)}
+        else {"Data Rate(MB/s)       ": (.dataRate |.*100+0.005|floor|./100)}
+        end'
+
+UNITS2=' + {"Matches               ": .matches}
+        + if .fabricDataRate >= 1024 then
+                {"Fabric Data Rate(GB/s)": ((.fabricDataRate / 1024)|.*100+0.005|floor|./100)}
+        elif .fabricDataRate < 0.001 then
+                {"Fabric Data Rate(KB/s)": ((.fabricDataRate * 1024)|.*100+0.005|floor|./100)}
+        else {"Fabric Data Rate(MB/s)": .fabricDataRate}
+        end
+        + if .fabricDuration >= 1000 then
+                {"Fabric Duration(sec)  ": ((.fabricDuration / 1000)|.*100+0.005|floor|./100)}
+        else {"Fabric Duration(msec) ": .fabricDuration}
+        end'
+
+UNITS_H=' + {"Host                  ": .host}'
+
+UNITS_H_DET=' + {"Host             ": .details.host}'
+
+UNITS_1_DET=' + {"Duration         ": .details.duration}
+                + {"Total Bytes      ": .details.totalBytes}'
+
+UNITS_DR_DET=' + {"Data Rate        ": .details.dataRate}'
+
+UNITS_2_DET='	+ {"Matches          ": .details.matches}
+		+ {"Fabric Data Rate ": .details.fabricDataRate}
+		+ {"Fabric Duration  ": .details.fabricDuration}'
 
 # parse options
 while [[ $# > 0 ]]; do
@@ -231,6 +287,7 @@ while [[ $# > 0 ]]; do
 		;;
 	--cluster)
 		LOCAL="false"
+		HIDE_HOSTNAME=
 		shift
 		;;
 	--format=*)
@@ -263,12 +320,24 @@ while [[ $# > 0 ]]; do
 		;;
 	-vv|--pretty)
 		VERBOSE="-s" # tell curl to be silent
-		PRETTY="jq ."
+		PRETTY=true
 		shift
 		;;
 	-v|--verbose)
 		VERBOSE="-v"
 		PRETTY=""
+		shift
+		;;
+	--drate)
+		VERBOSE="-s"
+		PRETTY=true
+		ADD_DRATE=true
+		shift
+		;;
+	--details)
+		VERBOSE="-s" # tell curl to be silent
+		PRETTY=true
+		ADD_DETAILS=true
 		shift
 		;;
 	-h|--help)
@@ -282,7 +351,7 @@ while [[ $# > 0 ]]; do
 done
 
 [[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
-[[ -z "$FILES" && -z "$CATALOGS" ]] && fail "no any file or catalog provided, run '$0 --help' for help"
+[[ -z "$FILES" && -z "$CATALOGS" ]] && fail "no file or catalog provided, run '$0 --help' for help"
 
 # build the URL
 URL_DATA=(--data-urlencode "local=$LOCAL")
@@ -315,9 +384,43 @@ done
 [[ -z `which curl`  ]] && fail "no curl found, run 'apt-get install curl' to install it"
 [[ ! -z "$PRETTY" ]] && [[ -z `which jq`  ]] && fail "no jq found, run 'apt-get install jq' to install it"
 
+if [[ ! -z "$PRETTY" ]]; then
+# setup jq filter based on user inputs
+# check for query error; if local, remove hosts; if not dataRate, remove data rate; and normalize measurements
+# Build up the filtering string
+	if [[ -z "$ADD_DETAILS" ]]; then
+                DETAILS="."
+        else
+                DETAILS=". +{details}"
+	fi
+	if [[ ! -z "$HIDE_HOSTNAME" ]]; then
+                if [[ ! -z "$ADD_DRATE" ]]; then
+			# Delete hostname, leave dataRate
+                        JQ_STR="${DETAILS} | .message // ( . | del(.host) | ${UNITS1} ${UNITS_DR} ${UNITS2}"
+#			UNITS_DETAILS="${UNITS_1_DET} ${UNITS_DR_DET} ${UNITS_2_DET}"
+                else
+			# Delete hostname and dataRate
+                        JQ_STR="${DETAILS} | .message // ( . | del(.dataRate,.host) | ${UNITS1} ${UNITS2}"
+#			UNITS_DETAILS="${UNITS_1_DET} ${UNITS_2_DET}"
+                fi
+	elif [[ -z "$ADD_DRATE" ]]; then
+                JQ_STR="${DETAILS} | .message // ( . | del(.dataRate) | ${UNITS1} ${UNITS2} ${UNITS_H}"
+#		UNITS_DETAILS="${UNITS_H_DET} ${UNITS_1_DET} ${UNITS_2_DET}"
+        else
+                JQ_STR="${DETAILS} | .message // ( . | ${UNITS1} ${UNITS_DR} ${UNITS2} ${UNITS_H}"
+#		UNITS_DETAILS="${UNITS_H_DET} ${UNITS_1_DET} ${UNITS_DR_DET} ${UNITS_2_DET}"
+	fi
+	if [[ ! -z "$ADD_DETAILS" ]]; then
+		JQ_STR="$JQ_STR | . +{details})"
+	else
+		JQ_STR="${JQ_STR})"
+	fi
+fi
 # do the search and print error/results
 if [[ -z "$PRETTY" ]]; then
+        # Flat output for feeding into other processes
 	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
 else
-	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | $PRETTY
+        # Prettified output without data rate or details
+	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | jq "$JQ_STR"
 fi
