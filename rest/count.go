@@ -134,7 +134,9 @@ func (s *Server) DoCount(ctx *gin.Context) {
 
 		case <-res.DoneChan:
 			if res.Stat != nil {
-				res.Stat.Extra["request"] = &params
+				if s.Config.ExtraRequest {
+					res.Stat.Extra["request"] = &params
+				}
 				stat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, stat)
 			} else {

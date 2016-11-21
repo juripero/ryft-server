@@ -264,7 +264,9 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 			}
 
 			if params.Stats && res.Stat != nil {
-				res.Stat.Extra["request"] = &params
+				if s.Config.ExtraRequest {
+					res.Stat.Extra["request"] = &params
+				}
 				xstat := tcode.FromStat(res.Stat)
 				err := enc.EncodeStat(xstat)
 				if err != nil {

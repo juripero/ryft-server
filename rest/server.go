@@ -87,6 +87,7 @@ type ServerConfig struct {
 	LocalOnly      bool                   `yaml:"local-only,omitempty"`
 	DebugMode      bool                   `yaml:"debug-mode,omitempty"`
 	KeepResults    bool                   `yaml:"keep-results,omitempty"`
+	ExtraRequest   bool                   `yaml:"extra-request,omitempty"`
 
 	Logging        string                       `yaml:"logging,omitempty"`
 	LoggingOptions map[string]map[string]string `yaml:"logging-options,omitempty"`
@@ -162,6 +163,7 @@ func NewServer() *Server {
 	s := new(Server)
 
 	// default configuration
+	// s.Config.ExtraRequest = true
 	s.Config.SearchBackend = "ryftprim"
 	s.Config.BackendOptions = map[string]interface{}{}
 	s.Config.Busyness.UpdateLatency = 1 * time.Second
