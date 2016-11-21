@@ -49,6 +49,8 @@ type Statistics struct {
 
 	Host    string        `json:"host,omitempty" msgpack:"host,omitempty"`
 	Details []*Statistics `json:"details,omitempty" msgpack:"details,omitempty"`
+
+	Extra map[string]interface{} `json:"extra,omitempty" msgpack:"extra,omitempty"`
 }
 
 // NewStat creates new format specific data.
@@ -73,6 +75,15 @@ func FromStat(stat *search.Statistics) *Statistics {
 	for _, s := range stat.Details {
 		res.Details = append(res.Details, FromStat(s))
 	}
+
+	// extra
+	if stat.Extra != nil {
+		res.Extra = make(map[string]interface{})
+		for k, v := range stat.Extra {
+			res.Extra[k] = v
+		}
+	}
+
 	return res
 }
 
@@ -92,5 +103,16 @@ func ToStat(stat *Statistics) *search.Statistics {
 	for _, s := range stat.Details {
 		res.Details = append(res.Details, ToStat(s))
 	}
+
+	// extra
+	if stat.Extra != nil {
+		if res.Extra == nil {
+			res.Extra = make(map[string]interface{})
+		}
+		for k, v := range stat.Extra {
+			res.Extra[k] = v
+		}
+	}
+
 	return res
 }

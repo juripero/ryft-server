@@ -50,12 +50,16 @@ type Statistics struct {
 	// merge details - all statistics grouped by hostname
 	Details []*Statistics
 	Host    string // optional host address (used in cluster mode)
+
+	// some extra information (request, performance stats, etc)
+	Extra map[string]interface{}
 }
 
 // NewStat creates empty statistics.
 func NewStat(host string) *Statistics {
 	stat := new(Statistics)
 	stat.Host = host
+	stat.Extra = make(map[string]interface{})
 	return stat
 }
 
