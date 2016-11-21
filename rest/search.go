@@ -119,7 +119,7 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 	// we can use two formats:
 	// - with tags to report data records and the statistics in one stream
 	// - without tags to report just data records (this format is used by Spark)
-	enc, err := codec.NewEncoder(ctx.Writer, accept, params.Stream, params.Spark)
+	enc, err := codec.NewEncoder(ctx.Writer, accept, params.Stream)
 	if err != nil {
 		panic(NewServerError(http.StatusBadRequest, err.Error()))
 	}
@@ -156,6 +156,8 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 	} else {
 		cfg.Delimiter = d
 	}
+	cfg.ReportIndex = true // /search
+	cfg.ReportData = true  // TODO: format != null
 
 	log.WithField("config", cfg).WithField("user", userName).
 		WithField("home", homeDir).WithField("cluster", userTag).

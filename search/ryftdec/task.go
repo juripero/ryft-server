@@ -42,6 +42,7 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
+	"github.com/getryft/ryft-server/search/utils/index"
 )
 
 var (
@@ -339,8 +340,8 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 				}
 			}
 
-			rec.Data = make([]byte, item.Length)
-			n, err := io.ReadFull(cf.rd, rec.Data)
+			rec.RawData = make([]byte, item.Length)
+			n, err := io.ReadFull(cf.rd, rec.RawData)
 			//task.log().WithFields(map[string]interface{}{
 			//	"read":      n,
 			//	"requested": item.Length,
@@ -351,7 +352,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			} else if uint64(n) != item.Length {
 				mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Length))
 			} else {
-				data = rec.Data
+				data = rec.RawData
 			}
 		}
 
@@ -407,13 +408,13 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 
 // in-memory based post-processing
 type InMemoryPostProcessing struct {
-	indexes map[string]*search.IndexFile // [datafile] -> indexes
+	indexes map[string]*index.IndexFile // [datafile] -> indexes
 }
 
 // create in-memory-based post-processing tool
 func NewInMemoryPostProcessing(path string) (PostProcessing, error) {
 	mpp := new(InMemoryPostProcessing)
-	mpp.indexes = make(map[string]*search.IndexFile)
+	mpp.indexes = make(map[string]*index.IndexFile)
 	return mpp, nil
 }
 
@@ -435,7 +436,7 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-result duration", TAG)
 	}()
 
-	saveTo := search.NewIndexFile(delimiter, width)
+	saveTo := index.NewIndexFile(delimiter, width)
 	saveTo.Opt = opt
 	if _, ok := mpp.indexes[dataPath]; ok {
 		return fmt.Errorf("the index file %s already exists in the map", dataPath)
@@ -460,7 +461,7 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 				return fmt.Errorf("failed to parse index: %s", err)
 			}
 
-			saveTo.AddIndex(index)
+			saveTo.AddIndex(*index)
 		}
 
 		if err != nil {
@@ -686,8 +687,8 @@ BuildItems:
 				}
 			}
 
-			rec.Data = make([]byte, item.Index.Length)
-			n, err := io.ReadFull(cf.rd, rec.Data)
+			rec.RawData = make([]byte, item.Index.Length)
+			n, err := io.ReadFull(cf.rd, rec.RawData)
 			//task.log().WithFields(map[string]interface{}{
 			//	"read":      n,
 			//	"requested": item.Length,
@@ -698,7 +699,7 @@ BuildItems:
 			} else if uint64(n) != item.Index.Length {
 				mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Index.Length))
 			} else {
-				data = rec.Data
+				data = rec.RawData
 			}
 		}
 

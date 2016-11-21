@@ -44,9 +44,6 @@ var (
 	TAG = "catalog"
 )
 
-// global cache instance
-var globalCache = NewCache()
-
 // ErrNotACatalog is used to indicate the file is not a catalog meta-data file.
 var ErrNotACatalog = errors.New("not a catalog")
 

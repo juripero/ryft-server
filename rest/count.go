@@ -95,11 +95,13 @@ func (s *Server) DoCount(ctx *gin.Context) {
 	} else {
 		cfg.Delimiter = d
 	}
+	cfg.ReportIndex = false // /count
+	cfg.ReportData = false
 
 	log.WithField("config", cfg).WithField("user", userName).
 		WithField("home", homeDir).WithField("cluster", userTag).
 		Infof("start /count")
-	res, err := engine.Count(cfg)
+	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
 			err.Error(), "failed to start search"))

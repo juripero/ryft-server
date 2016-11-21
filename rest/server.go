@@ -204,7 +204,7 @@ func (s *Server) ParseConfig(fileName string) error {
 	}
 
 	// assign catalog options
-	catalog.DefaultCacheDropTimeout = s.Config.Catalogs.CacheDropTimeout
+	catalog.SetDefaultCacheDropTimeout(s.Config.Catalogs.CacheDropTimeout)
 	catalog.DefaultDataDelimiter = s.Config.Catalogs.DataDelimiter
 	catalog.DefaultTempDirectory = s.Config.Catalogs.TempDirectory
 

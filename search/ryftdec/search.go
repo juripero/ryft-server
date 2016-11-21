@@ -251,7 +251,7 @@ func (rc RyftCall) String() string {
 
 // intermediate search results
 type SearchResult struct {
-	Stat   *search.Statistics
+	Stat   *search.Stat
 	Output []RyftCall // list of data/index files
 }
 
@@ -320,7 +320,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		// !!! use /count here, to disable INDEX&DATA processing on intermediate results
 		// !!! otherwise (sometimes) Ryft hardware may be crashed on the second call
 		res1, err1 = engine.search(task, query.SubNodes[0], &tempCfg,
-			engine.Backend.Count, mux, isLast && false)
+			engine.Backend.Search /*Count*/, mux, isLast && false)
 		if err1 != nil {
 			return result, err1
 		}
@@ -352,7 +352,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 			//			tempCfg.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
 			if !isLast { // intermediate result
 				// as for the first call - no sense to process INDEX&DATA
-				searchFunc = engine.Backend.Count
+				searchFunc = engine.Backend.Search /*Count*/
 			}
 			res2, err2 = engine.search(task, query.SubNodes[1], &tempCfg,
 				searchFunc, mux, isLast && true)
@@ -402,7 +402,7 @@ func (engine *Engine) search(task *Task, query *Node, cfg *search.Config, search
 		// tempCfg.Delimiter
 		if !isLast { // intermediate result
 			// as for the AND call - no sense to process INDEX&DATA
-			searchFunc = engine.Backend.Count
+			searchFunc = engine.Backend.Search /*Count*/
 		}
 		res1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
 		if err1 != nil {
@@ -510,7 +510,7 @@ func fileJoin(result, first, second string) (uint64, error) {
 }
 
 // combine statistics
-func statCombine(mux *search.Statistics, stat *search.Statistics) {
+func statCombine(mux *search.Stat, stat *search.Stat) {
 	mux.Matches += stat.Matches
 	mux.TotalBytes += stat.TotalBytes
 

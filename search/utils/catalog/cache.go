@@ -35,6 +35,9 @@ import (
 	"time"
 )
 
+// global cache instance
+var globalCache = NewCache()
+
 // Cache contains list of cached catalogs
 type Cache struct {
 	DropTimeout time.Duration
@@ -53,6 +56,7 @@ func NewCache() *Cache {
 }
 
 // Get gets existing catalog from cache.
+// return `nil` if no catalog found!
 func (cc *Cache) Get(path string) *Catalog {
 	cc.Lock()
 	defer cc.Unlock()

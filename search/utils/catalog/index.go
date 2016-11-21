@@ -257,7 +257,7 @@ type IndexItem struct {
 	Offset    uint64
 	Length    uint64
 	Shift     int
-	Fuzziness uint8
+	Fuzziness int32
 
 	DataFile string
 	DataPos  uint64

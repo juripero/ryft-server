@@ -38,7 +38,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/index"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -58,6 +58,12 @@ var DefaultDataDelimiter string
 
 // default temp directory
 var DefaultTempDirectory string = "/tmp/"
+
+// SetDefaultCacheDropTimeout sets default cache drop-timeout
+func SetDefaultCacheDropTimeout(timeout time.Duration) {
+	DefaultCacheDropTimeout = timeout
+	globalCache.DropTimeout = timeout
+}
 
 // Catalog struct contains catalog related meta-data.
 type Catalog struct {
@@ -476,14 +482,14 @@ func (cat *Catalog) getDataFiles() ([]string, error) {
 }
 
 // get list of parts (synchronized)
-func (cat *Catalog) GetSearchIndexFile() (map[string]*search.IndexFile, error) {
+func (cat *Catalog) GetSearchIndexFile() (map[string]*index.IndexFile, error) {
 	f, err := cat.getSearchIndexFileSync()
 	if err != nil {
 		return nil, err
 	}
 
 	// convert to absolute path
-	res := make(map[string]*search.IndexFile)
+	res := make(map[string]*index.IndexFile)
 	dir, _ := filepath.Split(cat.path)
 	for n, i := range f {
 		full := filepath.Join(dir, n)
@@ -494,7 +500,7 @@ func (cat *Catalog) GetSearchIndexFile() (map[string]*search.IndexFile, error) {
 }
 
 // get list of parts (synchronized)
-func (cat *Catalog) getSearchIndexFileSync() (map[string]*search.IndexFile, error) {
+func (cat *Catalog) getSearchIndexFileSync() (map[string]*index.IndexFile, error) {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()
 
@@ -502,7 +508,7 @@ func (cat *Catalog) getSearchIndexFileSync() (map[string]*search.IndexFile, erro
 }
 
 // get list of parts (unsynchronized)
-func (cat *Catalog) getSearchIndexFile() (map[string]*search.IndexFile, error) {
+func (cat *Catalog) getSearchIndexFile() (map[string]*index.IndexFile, error) {
 	rows, err := cat.db.Query(`
 SELECT p.name, p.pos, p.len, p.d_pos, d.file, d.s_w, d.delim
 FROM parts AS p
@@ -513,7 +519,7 @@ ORDER BY p.d_pos`)
 	}
 	defer rows.Close()
 
-	res := make(map[string]*search.IndexFile)
+	res := make(map[string]*index.IndexFile)
 	for rows.Next() {
 		var file, data string
 		var offset, length, data_pos uint64
@@ -524,7 +530,7 @@ ORDER BY p.d_pos`)
 		}
 		f := res[data]
 		if f == nil {
-			f = search.NewIndexFile(delim.String, width)
+			f = index.NewIndexFile(delim.String, width)
 			res[data] = f
 		}
 

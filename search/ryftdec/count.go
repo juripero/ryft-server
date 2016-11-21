@@ -82,7 +82,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 && hasCatalogs == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
 		updateConfig(cfg, task.queries)
-		return engine.Backend.Count(cfg)
+		return engine.Backend.Search(cfg) /*Count*/
 	}
 
 	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
@@ -104,7 +104,7 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 		defer task.result.Drop(engine.KeepResultFiles)
 
 		res, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Count, mux, false)
+			engine.Backend.Search /*Count*/, mux, false)
 		mux.Stat = res.Stat
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
