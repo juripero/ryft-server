@@ -369,7 +369,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Map of files and directories deleted",
+            "description": "Map of files and directories uploaded",
             "schema": {
               "$ref": "#/definitions/FilesResponse"
             }

@@ -247,9 +247,10 @@ func TestQueries(t *testing.T) {
 
 	testQueryTree(t, `(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`,
 		`[IPv6]: (RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))`)
-}
 
-func TestBugfix(t *testing.T) {
+	testQueryTree(t, `(RECORD CONTAINS FHS("hello", DIST=1))`,
+		`[fhs-1/0-false]: (RECORD CONTAINS "hello")`)
+
 	testQueryTree(t, `((RECORD.doc.text_entry CONTAINS FEDS("To", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("be", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("or", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("not", DIST=1)) AND(RECORD.doc.text_entry CONTAINS FEDS("to", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("tht",DIST=1)))`,
 		`[ AND]:
   [feds-0/0-false]: (RECORD.doc.text_entry CONTAINS "To") AND (RECORD.doc.text_entry CONTAINS "be") AND (RECORD.doc.text_entry CONTAINS "or")
@@ -310,4 +311,10 @@ OR
 		`[ AND]:
   [es-0/0-false]: (RECORD.doc.play_name NOT_CONTAINS "King Lear")
   [feds-2/0-false]: (RECORD.doc.text_entry CONTAINS "my lrd") AND (RECORD.doc.speaker CONTAINS "PONIUS") OR (RECORD.doc.text_entry CONTAINS "my lrd") AND (RECORD.doc.speaker CONTAINS "Mesenger") OR (RECORD.doc.speaker CONTAINS "PONIUS") AND (RECORD.doc.speaker CONTAINS "Mesenger")`)
+}
+
+func TestBugfix(t *testing.T) {
+	testQueryTree(t, `( RECORD.block CONTAINS FHS(""?"INDIANA"?"",CS=true,DIST=0,WIDTH=0) )`,
+		`[fhs-0/0-true]: (RECORD.block CONTAINS ""?"INDIANA"?"")`)
+
 }

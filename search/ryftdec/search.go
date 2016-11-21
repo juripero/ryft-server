@@ -151,6 +151,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// check input data-set for catalogs
 	var hasCatalogs int
+	oldCfgFiles := cfg.Files
 	hasCatalogs, cfg.Files, err = checksForCatalog(task.result, cfg.Files, filepath.Join(mountPoint, homeDir))
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
@@ -165,7 +166,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return engine.Backend.Search(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
+	// use source list of files to detect extensions
+	// some catalogs data files contains malformed filenames so this procedure may fail
+	task.extension, err = detectExtension(oldCfgFiles, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)

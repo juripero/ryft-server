@@ -91,7 +91,7 @@ func TestDetectExtension(t *testing.T) {
 		{[]string{"a.dat", "b.dat"}, "", ".dat", false},
 		{[]string{"a.txt", "b.dat"}, "", "", true},
 		{[]string{"a.txt", "b.dat"}, "c.jpeg", "", true},
-		{[]string{}, "", "", true},
+		{[]string{}, "", "", false},
 		{[]string{"foo/a.txt", "my.test/b.txt"}, "", ".txt", false},
 		{[]string{"foo/a.txt", "my.test/b.txt"}, "data.txt", ".txt", false},
 		{[]string{"foo/*.txt", "my.test/*txt"}, "", ".txt", false},
@@ -103,7 +103,7 @@ func TestDetectExtension(t *testing.T) {
 	for _, d := range data {
 		ext, err := detectExtension(d.fileNames, d.dataOut)
 		if d.expectedErr {
-			assert.Error(t, err)
+			assert.Error(t, err, "data:%s out:%s", d.fileNames, d.dataOut)
 		} else {
 			assert.NoError(t, err)
 			assert.Equal(t, d.expectedExt, ext)
