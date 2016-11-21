@@ -103,7 +103,7 @@ func (p *Parser) parseQuery0() Query {
 		if lex := p.scanIgnoreSpace(); lex.IsOr() {
 			arg := p.parseQuery1() // second arguments...
 			if !strings.EqualFold(res.Operator, lex.literal) {
-				tmp := Query{Operator: lex.literal}
+				tmp := Query{Operator: strings.ToUpper(lex.literal)}
 				tmp.Arguments = append(tmp.Arguments, res)
 				res = tmp
 			}
@@ -122,7 +122,7 @@ func (p *Parser) parseQuery1() Query {
 		if lex := p.scanIgnoreSpace(); lex.IsXor() {
 			arg := p.parseQuery2() // second arguments
 			if !strings.EqualFold(res.Operator, lex.literal) {
-				tmp := Query{Operator: lex.literal}
+				tmp := Query{Operator: strings.ToUpper(lex.literal)}
 				tmp.Arguments = append(tmp.Arguments, res)
 				res = tmp
 			}
@@ -141,7 +141,7 @@ func (p *Parser) parseQuery2() Query {
 		if lex := p.scanIgnoreSpace(); lex.IsAnd() {
 			arg := p.parseQuery3() // second arguments
 			if !strings.EqualFold(res.Operator, lex.literal) {
-				tmp := Query{Operator: lex.literal}
+				tmp := Query{Operator: strings.ToUpper(lex.literal)}
 				tmp.Arguments = append(tmp.Arguments, res)
 				res = tmp
 			}
@@ -196,12 +196,12 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	// input specifier (RAW_TEXT or RECORD)
 	switch lex := p.scanIgnoreSpace(); {
 	case lex.IsRawText():
-		input = lex.literal
+		input = strings.ToUpper(lex.literal)
 
 	case lex.IsRecord():
 		res.Structured = true
 		var buf bytes.Buffer
-		buf.WriteString(lex.literal)
+		buf.WriteString(strings.ToUpper(lex.literal))
 		for {
 			if dot := p.scan(); dot.token == PERIOD {
 				if lex := p.scan(); lex.token == IDENT {
@@ -248,7 +248,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		switch lex := p.scanIgnoreSpace(); {
 		case lex.IsContains(), lex.IsNotContains(),
 			lex.IsEquals(), lex.IsNotEquals():
-			operator = lex.literal
+			operator = strings.ToUpper(lex.literal)
 
 		default:
 			panic(fmt.Errorf("found %q, expected CONTAINS or EQUALS", lex))

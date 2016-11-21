@@ -364,7 +364,7 @@ func TestParserParse(t *testing.T) {
 		`P{(RAW_TEXT CONTAINS "CURRENCY()")[es]}`)
 
 	testParserParse(t, false,
-		`  (RAW_TEXT CONTAINS "REGEX()")`,
+		`  (raw_text contains "REGEX()")`,
 		`P{(RAW_TEXT CONTAINS "REGEX()")[es]}`)
 
 	testParserParse(t, false,
@@ -385,11 +385,11 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`(( record.city EQUALS "Rockville" ) AND ( record.state EQUALS "MD" ))`,
-		`P{AND{P{(record.city EQUALS "Rockville")[es]}, P{(record.state EQUALS "MD")[es]}}}`)
+		`P{AND{P{(RECORD.city EQUALS "Rockville")[es]}, P{(RECORD.state EQUALS "MD")[es]}}}`)
 
 	testParserParse(t, true,
 		`(( ( record.city EQUALS "Rockville" ) OR ( record.city EQUALS "Gaithersburg" ) ) AND ( record.state EQUALS "MD" ))`,
-		`P{AND{P{OR{P{(record.city EQUALS "Rockville")[es]}, P{(record.city EQUALS "Gaithersburg")[es]}}}, P{(record.state EQUALS "MD")[es]}}}`)
+		`P{AND{P{OR{P{(RECORD.city EQUALS "Rockville")[es]}, P{(RECORD.city EQUALS "Gaithersburg")[es]}}}, P{(RECORD.state EQUALS "MD")[es]}}}`)
 
 	testParserParse(t, false,
 		`(RAW_TEXT CONTAINS DATE(MM/DD/YY > 02/28/12))`,
