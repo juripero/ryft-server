@@ -36,7 +36,7 @@ import (
 	"sync/atomic"
 
 	//codec "github.com/getryft/ryft-server/rest/codec/json"
-	codec "github.com/getryft/ryft-server/rest/codec/msgpack.v2"
+	codec "github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 )

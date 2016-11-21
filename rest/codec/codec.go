@@ -36,7 +36,7 @@ import (
 	"strings"
 
 	"github.com/getryft/ryft-server/rest/codec/json"
-	"github.com/getryft/ryft-server/rest/codec/msgpack.v2"
+	"github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 )
 
 const (
