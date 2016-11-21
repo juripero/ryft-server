@@ -164,14 +164,14 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 				res.ReportError(fmt.Errorf("failed to decode statistics: %s", err))
 				return // failed
 			} else {
-				task.log().WithField("stat", res.Stat).
-					Debugf("[%s]: statistics received", TAG)
 				res.Stat = format.ToStat(stat)
+				// task.log().WithField("stat", res.Stat).Debugf("[%s]: statistics received", TAG) // FIXME: DEBUG
 				// continue
 			}
 
 		default:
 			task.log().WithField("tag", tag).Errorf("[%s]: unknown tag", TAG)
+			res.ReportError(fmt.Errorf("unknown data tag received: %v", tag))
 			return // failed, no sense to continue processing
 		}
 	}

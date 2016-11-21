@@ -88,5 +88,11 @@ func (engine *Engine) doFiles(task *Task, req *http.Request) (*search.DirInfo, e
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
 
+	if dec.More() {
+		task.log().Errorf("failed to decode response: extra data")
+		return nil, fmt.Errorf("failed to decode response: extra data", err)
+	}
+
+	task.log().WithField("result", res).Infof("response")
 	return res, nil // OK
 }

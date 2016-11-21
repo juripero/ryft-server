@@ -176,7 +176,7 @@ func (task *Task) log() *logrus.Entry {
 func factory(opts map[string]interface{}) (search.Engine, error) {
 	engine, err := NewEngine(opts)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create %s engine: %s", TAG, err)
+		return nil, fmt.Errorf("failed to create %s engine: %s", TAG, err)
 	}
 	return engine, nil
 }

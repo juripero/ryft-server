@@ -1,11 +1,86 @@
 package ryfthttp
 
 import (
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/tylerb/graceful.v1"
 )
+
+var (
+	testLogLevel = "debug"
+	testFakePort = ":12345"
+)
+
+// fake server to generate random data
+type fakeServer struct {
+	Host string
+
+	// report to /search
+	RecordsToReport int
+	ErrorsToReport  int
+	//ErrorForSearch  error
+	ReportLatency time.Duration
+	BadTagCase    bool
+	BadUnkTagCase bool
+	BadRecordCase bool
+	BadErrorCase  bool
+	BadStatCase   bool
+
+	// report to /files
+	FilesToReport []string
+	DirsToReport  []string
+	//ErrorForFiles error
+	FilesPrefix string
+	FilesSuffix string
+
+	server *graceful.Server
+}
+
+// create new fake server
+func newFake(records, errors int) *fakeServer {
+	mux := http.NewServeMux()
+	fs := &fakeServer{
+		RecordsToReport: records,
+		ErrorsToReport:  errors,
+		server: &graceful.Server{
+			Timeout: 100 * time.Millisecond,
+			Server: &http.Server{
+				Addr:    testFakePort,
+				Handler: mux,
+			},
+		},
+	}
+
+	mux.HandleFunc("/search", fs.doSearch)
+	mux.HandleFunc("/count", fs.doCount)
+	mux.HandleFunc("/files", fs.doFiles)
+
+	return fs
+}
+
+// create engine
+func TestEngineCreate(t *testing.T) {
+	// valid (usual case)
+	engine, err := factory(map[string]interface{}{
+		"server-url": "http://localhost:123",
+		"local-only": true,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, engine)
+
+	// bad case
+	engine, err = factory(map[string]interface{}{
+		"server-url": true,
+	})
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "failed to create")
+	}
+	assert.Nil(t, engine)
+}
 
 // test prepare search url
 func TestEnginePrepareSearchUrl(t *testing.T) {
