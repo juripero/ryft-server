@@ -49,7 +49,8 @@ func (o *Optimizer) Process(q Query) Query {
 // Optimize input query.
 func (o *Optimizer) process(q Query) Query {
 	if q.Operator == "B" { // special case for {...}
-		return o.combine(q)
+		q = o.combine(q)
+		q.boolOps = 2000000000 // prevent further combination!
 	} else if q.Operator != "" && len(q.Arguments) > 0 {
 		// oldBoolOps := q.Arguments[0].boolOps
 		a := o.process(q.Arguments[0])
