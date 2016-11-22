@@ -62,7 +62,7 @@ func NewEngine(backend search.Engine, genericLimit int, keepResults bool) (*Engi
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftDEC{backend:%s}", engine.Backend)
+	return fmt.Sprintf("ryftdec{backend:%s}", engine.Backend)
 	// TODO: other parameters?
 }
 
@@ -71,7 +71,7 @@ func (engine *Engine) Options() map[string]interface{} {
 	return engine.Backend.Options()
 }
 
-// Files starts synchronous "/files" with RyftDEC engine.
+// Files starts synchronous "/files" operation.
 func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	return engine.Backend.Files(path)
 }

@@ -130,3 +130,10 @@ func (q Query) IsStructured() bool {
 
 	return true
 }
+
+// check query is simple: no arguments, no operator
+func (q Query) IsSimple() bool {
+	return q.Simple != nil &&
+		q.Operator == "" &&
+		len(q.Arguments) == 0
+}

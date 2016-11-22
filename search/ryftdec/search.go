@@ -33,9 +33,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/getryft/ryft-server/search"
-	//"github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 )
@@ -44,14 +44,16 @@ import (
 func relativeToHome(home, path string) string {
 	if rel, err := filepath.Rel(home, path); err == nil {
 		return rel
+	} else {
+		log.WithError(err).Warnf("[%s]: failed to get relative path, fallback to absolute")
+		return path // fallback
 	}
-
-	return path // fallback
 }
 
 // check if input fileset contains any catalog
+// also populate the Post-Processing engine
 func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []string, error) {
-	new_files := make([]string, 0, len(files))
+	newFiles := make([]string, 0, len(files))
 	N_catalogs := 0
 
 	// check it dynamically: catalog or regular file
@@ -75,15 +77,15 @@ func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []
 			} /*else if strings.HasPrefix(info.Name(), ".") {
 			        log.WithField("path", filePath).Debugf("[%s]: hidden file, skipped", TAG)
 			        continue
-			}*/
+			} */
 
-			log.WithField("file", filePath).Debugf("checking catalog file...")
+			log.WithField("file", filePath).Debugf("[%s]: checking catalog file...", TAG)
 			cat, err := catalog.OpenCatalogReadOnly(filePath)
 			if err != nil {
 				if err == catalog.ErrNotACatalog {
 					// just a regular file, use it "as is"
-					log.WithField("file", filePath).Debugf("... just a regular file")
-					new_files = append(new_files, relativeToHome(home, filePath))
+					log.WithField("file", filePath).Debugf("[%s]: ... just a regular file", TAG)
+					newFiles = append(newFiles, relativeToHome(home, filePath))
 
 					continue // go to next match
 				}
@@ -91,7 +93,7 @@ func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []
 			}
 			defer cat.Close()
 
-			log.WithField("file", filePath).Debugf("... is a catalog")
+			log.WithField("file", filePath).Debugf("[%s]: ... is a catalog", TAG)
 			wcat.AddCatalog(cat)
 			N_catalogs += 1
 
@@ -101,7 +103,7 @@ func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []
 			} else {
 				// relative to home
 				for _, file := range dataFiles {
-					new_files = append(new_files, relativeToHome(home, file))
+					newFiles = append(newFiles, relativeToHome(home, file))
 				}
 			}
 		}
@@ -109,10 +111,10 @@ func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []
 
 	if N_catalogs == 0 {
 		// use source files "as is"
-		new_files = files
+		newFiles = files
 	}
 
-	return N_catalogs, new_files, nil // OK
+	return N_catalogs, newFiles, nil // OK
 }
 
 // convert search configuration to base Options
@@ -137,7 +139,6 @@ func configToOpts(cfg *search.Config) Options {
 // update search configuration with Options
 func updateConfig(cfg *search.Config, opts Options) {
 	// cfg.Mode = opts.Mode
-	// cfg.Query = node.Expression
 	cfg.Fuzziness = opts.Dist
 	cfg.Surrounding = opts.Width
 	// cfg.WholeLine = opts.Line
@@ -146,13 +147,29 @@ func updateConfig(cfg *search.Config, opts Options) {
 
 // Search starts asynchronous "/search" with RyftDEC engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
+	if cfg.ReportData && !cfg.ReportIndex {
+		return nil, fmt.Errorf("failed to report DATA without INDEX")
+		// or just be silent: cfg.ReportIndex = true
+	}
+
 	var err error
+	task := NewTask(cfg)
+	if cfg.ReportIndex {
+		task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
+	} else {
+		task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
+	}
+
+	// use source list of files to detect extensions
+	// some catalogs data files contains malformed filenames so this procedure may fail
+	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
+		return nil, fmt.Errorf("failed to detect extension: %s", err)
+	}
 
 	// split cfg.Query into several expressions
-	// opts := configToOpts(cfg)
-
-	task.rootQuery, err = ParseQuery(cfg.Query /*, opts*/)
+	task.rootQuery, err = ParseQueryOpt(cfg.Query, configToOpts(cfg))
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
@@ -172,75 +189,70 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to clear res catalog", TAG)
 		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
 	}
-	task.log().WithField("results", res1).Infof("[%s]: temporary result catalog", TAG)
+	task.log().WithField("results", res1).Debugf("[%s]: temporary result catalog", TAG)
 
 	// check input data-set for catalogs
 	var hasCatalogs int
-	oldCfgFiles := cfg.Files
 	hasCatalogs, cfg.Files, err = checksForCatalog(task.result, cfg.Files, filepath.Join(mountPoint, homeDir))
 	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
-		return nil, fmt.Errorf("failed to check for catalogs: %s", err)
+		task.log().WithError(err).Warnf("[%s]: failed to check catalogs", TAG)
+		return nil, fmt.Errorf("failed to check catalogs: %s", err)
 	}
-	_ = hasCatalogs
-	_ = oldCfgFiles
-	/*
-		// in simple cases when there is only one subquery
-		// we can pass this query directly to the backend
-		if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 && hasCatalogs == 0 {
-			task.result.Drop(false) // no sense to save empty working catalog
-			updateConfig(cfg, task.queries)
-			return engine.Backend.Search(cfg)
-		}
 
-		// use source list of files to detect extensions
-		// some catalogs data files contains malformed filenames so this procedure may fail
-		task.extension, err = detectExtension(oldCfgFiles, cfg.KeepDataAs)
+	// in simple cases when there is only one subquery
+	// we can pass this query directly to the backend
+	if task.rootQuery.IsSimple() && hasCatalogs == 0 {
+		task.result.Drop(false) // no sense to save empty working catalog
+		updateConfig(cfg, task.rootQuery.Simple.Options)
+		cfg.Query = task.rootQuery.Simple.GenericExpr
+		cfg.Mode = "" // generic!
+		return engine.Backend.Search(cfg)
+	}
+
+	task.log().WithFields(map[string]interface{}{
+		"input":  cfg.Query,
+		"output": task.rootQuery.GenericString(),
+	}).Infof("[%s]: decomposed as", TAG)
+
+	mux := search.NewResult()
+	keepDataAs := cfg.KeepDataAs
+	keepIndexAs := cfg.KeepIndexAs
+	delimiter := cfg.Delimiter
+
+	go func() {
+		// some futher cleanup
+		defer mux.Close()
+		defer mux.ReportDone()
+		defer task.result.Drop(engine.keepResultFiles)
+
+		res, err := engine.doSearch(task, task.rootQuery, cfg, mux)
+		mux.Stat = res.Stat
 		if err != nil {
-			task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
-			return nil, fmt.Errorf("failed to detect extension: %s", err)
-		}
-		task.log().Infof("[%s]: starting: %s as %s", TAG, cfg.Query, dumpTree(task.queries, 0))
-
-		mux := search.NewResult()
-		keepDataAs := task.config.KeepDataAs
-		keepIndexAs := task.config.KeepIndexAs
-		delimiter := task.config.Delimiter
-
-		go func() {
-			// some futher cleanup
-			defer mux.Close()
-			defer mux.ReportDone()
-			defer task.result.Drop(engine.KeepResultFiles)
-
-			res, err := engine.search(task, task.queries, task.config,
-				engine.Backend.Search, mux, false /*isLast - to use /count*/ /*)
-	mux.Stat = res.Stat
-	if err != nil {
-		task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
-		mux.ReportError(err)
-		return
-	}
-
-	if !engine.KeepResultFiles {
-		defer res.removeAll(mountPoint, homeDir)
-	}
-
-	// post-processing
-	task.log().WithField("data", res.Output).Infof("[%s]: final results", TAG)
-	for _, out := range res.Output {
-		if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
-			filepath.Join(mountPoint, homeDir, out.IndexFile),
-			out.Delimiter, out.Width, 1 /*final*/ /*); err != nil {
-			mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
+			task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
+			mux.ReportError(err)
 			return
 		}
-	}
 
-	err = task.result.DrainFinalResults(task, mux,
-		keepDataAs, keepIndexAs, delimiter,
-		filepath.Join(mountPoint, homeDir),
-		res.Output, true /*report records*/ /*)
+		if !engine.keepResultFiles {
+			defer res.removeAll(mountPoint, homeDir)
+		}
+
+		// post-processing
+		task.log().WithField("data", res.Output).Infof("[%s]: final results", TAG)
+		for _, out := range res.Output {
+			if err := task.result.AddRyftResults(
+				filepath.Join(mountPoint, homeDir, out.DataFile),
+				filepath.Join(mountPoint, homeDir, out.IndexFile),
+				out.Delimiter, out.Width, 1 /*final*/); err != nil {
+				mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
+				return
+			}
+		}
+
+		err = task.result.DrainFinalResults(task, mux,
+			keepDataAs, keepIndexAs, delimiter,
+			filepath.Join(mountPoint, homeDir),
+			res.Output, true /*report records*/)
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
 			mux.ReportError(err)
@@ -250,9 +262,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// TODO: handle task cancellation!!!
 	}()
 
-	//return mux, nil // OK for now
-	*/
-	return nil, fmt.Errorf("NOT IMPLEMENTED YET")
+	return mux, nil // OK for now
 }
 
 // get backend options
@@ -264,9 +274,6 @@ func (engine *Engine) getBackendOptions() (instanceName, homeDir, mountPoint str
 	return
 }
 
-// Backend search function. Search() or Count()
-type SearchFunc func(cfg *search.Config) (*search.Result, error)
-
 // one Ryft call result
 type RyftCall struct {
 	DataFile  string
@@ -277,7 +284,7 @@ type RyftCall struct {
 
 // get string
 func (rc RyftCall) String() string {
-	return fmt.Sprintf("RyftCall{data:%s, index:%s, delim:0x%x, width:%d}",
+	return fmt.Sprintf("RyftCall{data:%s, index:%s, delim:#%x, width:%d}",
 		rc.DataFile, rc.IndexFile, rc.Delimiter, rc.Width)
 }
 
@@ -315,202 +322,161 @@ func (res SearchResult) removeAll(mountPoint, homeDir string) {
 
 // process and wait all /search subtasks
 // returns number of matches and corresponding statistics
-func (engine *Engine) search(task *Task, query Query, cfg *search.Config, searchFunc SearchFunc, mux *search.Result, isLast bool) (SearchResult, error) {
-	var result SearchResult
+func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
+	task.subtaskId += 1 // next subtask
 
-	instanceName, homeDir, mountPoint := engine.getBackendOptions()
-	task.subtaskId += 1
-
-	_ = result
-	_ = instanceName
-	_ = homeDir
-	_ = mountPoint
-
-	/*
-		switch query.Type {
-		case QTYPE_SEARCH,
-			QTYPE_DATE,
-			QTYPE_TIME,
-			QTYPE_NUMERIC,
-			QTYPE_CURRENCY,
-			QTYPE_REGEX,
-			QTYPE_IPV4,
-			QTYPE_IPV6:
-			break // search later
-
-		case QTYPE_AND:
-			//if query.Left == nil || query.Right == nil {
-			if len(query.SubNodes) != 2 {
-				return result, fmt.Errorf("invalid format for AND operator")
-			}
-
-			task.log().Infof("[%s]/%d: running AND", TAG, task.subtaskId)
-			var res1, res2 SearchResult
-			var err1, err2 error
-
-			// left: save results to temporary file
-			tempCfg := *cfg
-			if strings.HasPrefix(strings.ToUpper(tempCfg.Query), "(RECORD") {
-				// no surrounding should be used for structured search
-				tempCfg.Surrounding = 0
-			}
-			tempCfg.Delimiter = catalog.DefaultDataDelimiter
-			// !!! use /count here, to disable INDEX&DATA processing on intermediate results
-			// !!! otherwise (sometimes) Ryft hardware may be crashed on the second call
-			res1, err1 = engine.search(task, query.SubNodes[0], &tempCfg,
-				engine.Backend.Search /*Count*/ /*, mux, isLast && false)
-	if err1 != nil {
-		return result, err1
+	if query.IsSimple() {
+		// OK, handle later...
+	} else if strings.EqualFold(query.Operator, "AND") {
+		return engine.doAnd(task, query, cfg, mux)
+	} else if strings.EqualFold(query.Operator, "OR") {
+		return engine.doOr(task, query, cfg, mux)
+	} else if strings.EqualFold(query.Operator, "XOR") {
+		return engine.doXor(task, query, cfg, mux)
+	} else {
+		return nil, fmt.Errorf("%q is unknown operator", query.Operator)
 	}
 
-	if res1.Matches() > 0 { // no sense to run search on empty input
-		//			err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, res1.IndexFiles[0]),
-		//				tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
-		//			if err != nil {
-		//				return result, fmt.Errorf("failed to unwind first intermediate indexes: %s", err)
-		//			}
+	// process simple query...
+	task.log().WithFields(map[string]interface{}{
+		"query": cfg.Query,
+		"files": cfg.Files,
+	}).Infof("[%s/%d]: running backend search", TAG, task.subtaskId)
+
+	instanceName, _, _ := engine.getBackendOptions()
+	dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d%s",
+		task.Identifier, task.subtaskId, task.extension))
+	idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d%s",
+		task.Identifier, task.subtaskId, ".txt"))
+
+	q := query.Simple
+	updateConfig(cfg, q.Options)
+	cfg.Query = q.GenericExpr
+	cfg.Mode = "" // generic!
+	cfg.KeepDataAs = dat1
+	cfg.KeepIndexAs = idx1
+	cfg.ReportIndex = false
+	cfg.ReportData = false
+
+	res, err := engine.Backend.Search(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var result SearchResult
+	result.Output = append(result.Output, RyftCall{
+		DataFile:  cfg.KeepDataAs,
+		IndexFile: cfg.KeepIndexAs,
+		Delimiter: cfg.Delimiter,
+		Width:     cfg.Surrounding,
+		// TODO: line options?
+	})
+
+	task.drainResults(mux, res, false)
+	result.Stat = res.Stat
+	task.log().WithField("output", result).Infof("Ryft call result")
+	return &result, nil // OK
+}
+
+// process and wait all AND subtasks
+func (engine *Engine) doAnd(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
+	task.log().Infof("[%s/%d]: running AND", TAG, task.subtaskId)
+	_, homeDir, mountPoint := engine.getBackendOptions()
+
+	tempCfg := *cfg
+	tempCfg.Delimiter = catalog.DefaultDataDelimiter
+	// !!! use /count here, to disable INDEX&DATA processing on intermediate results
+	// !!! otherwise (sometimes) Ryft hardware may be crashed on the second call
+	res1, err1 := engine.doSearch(task, query.Arguments[0], &tempCfg, mux)
+	if err1 != nil {
+		return nil, err1
+	}
+
+	var result SearchResult
+	result.Output = res1.Output
+	if res1.Stat != nil {
+		result.Stat = search.NewStat(res1.Stat.Host)
+		statCombine(result.Stat, res1.Stat)
+	}
+
+	// iterate over all remaining arguments
+	for i := 1; i < len(query.Arguments); i++ {
+		if res1.Matches() == 0 {
+			task.log().Infof("[%s/%d]: no matches - no sense to continue", TAG, task.subtaskId)
+			break // stop
+		}
 
 		defer res1.removeAll(mountPoint, homeDir)
+		// part of post-processing procedure:
 		if task.result != nil { // might be nil for /count operation
 			for _, out := range res1.Output {
-				if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
+				if err := task.result.AddRyftResults(
+					filepath.Join(mountPoint, homeDir, out.DataFile),
 					filepath.Join(mountPoint, homeDir, out.IndexFile),
-					out.Delimiter, out.Width, 0 /*intermediate*/ /*); err != nil {
-				return result, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
+					out.Delimiter, out.Width, 0 /*intermediate*/); err != nil {
+					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
+				}
 			}
+		}
+
+		// read input from temporary file
+		tempCfg.Files = res1.GetDataFiles()
+		if i+1 == len(query.Arguments) {
+			// for the last iteration use requested delimiter
+			tempCfg.Delimiter = cfg.Delimiter
+		}
+
+		res2, err2 := engine.doSearch(task, query.Arguments[i], &tempCfg, mux)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		// combined statistics
+		result.Output = res2.Output
+		if res2.Stat != nil {
+			statCombine(result.Stat, res2.Stat)
+			// keep the number of matches equal to the last stat
+			result.Stat.Matches = res2.Stat.Matches
+		}
+
+		res1 = res2 // next iteration
+	}
+
+	return &result, nil // OK
+}
+
+// process and wait all OR subtasks
+func (engine *Engine) doOr(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
+	task.log().Infof("[%s/%d]: running OR", TAG, task.subtaskId)
+
+	tempCfg := *cfg
+	// tempCfg.Delimiter
+
+	var result SearchResult
+
+	// iterate over all arguments
+	for i := 0; i < len(query.Arguments); i++ {
+		res1, err1 := engine.doSearch(task, query.Arguments[i], &tempCfg, mux)
+		if err1 != nil {
+			return nil, err1
+		}
+
+		// combined statistics
+		result.Output = append(result.Output, res1.Output...)
+		if res1.Stat != nil {
+			if result.Stat == nil {
+				result.Stat = search.NewStat(res1.Stat.Host)
+			}
+			statCombine(result.Stat, res1.Stat)
 		}
 	}
 
-	// right: read input from temporary file
-	tempCfg.Files = res1.GetDataFiles()
-	tempCfg.Delimiter = cfg.Delimiter
-	//			tempCfg.UnwindIndexesBasedOn = map[string]*search.IndexFile{
-	//				filepath.Join(mountPoint, homeDir, res1.DataFiles[0]): tempCfg.SaveUpdatedIndexesTo,
-	//			}
-	//			tempCfg.SaveUpdatedIndexesTo = cfg.SaveUpdatedIndexesTo
-	if !isLast { // intermediate result
-		// as for the first call - no sense to process INDEX&DATA
-		searchFunc = engine.Backend.Search /*Count*/ /*
-				}
-				res2, err2 = engine.search(task, query.SubNodes[1], &tempCfg,
-					searchFunc, mux, isLast && true)
-				if err2 != nil {
-					return result, err2
-				}
+	return &result, nil // OK
+}
 
-				// if !isLast && res2.Matches() > 0 && len(cfg.KeepIndexAs) > 0 && tempCfg.SaveUpdatedIndexesTo != nil {
-				//				err := task.parseAndUnwindIndexes(filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
-				//					tempCfg.UnwindIndexesBasedOn, tempCfg.SaveUpdatedIndexesTo, tempCfg.Surrounding)
-				//				if err != nil {
-				//					return result, fmt.Errorf("failed to unwind second intermediate indexes: %s", err)
-				//				}
-				// }
-
-				if isLast && len(cfg.KeepIndexAs) > 0 {
-					// TODO: save updated indexes back to text file!
-				}
-
-				// combined statistics
-				if res1.Stat != nil && res2.Stat != nil {
-					result.Stat = search.NewStat(res1.Stat.Host)
-					statCombine(result.Stat, res1.Stat)
-					statCombine(result.Stat, res2.Stat)
-					// keep the number of matches equal to the last stat
-					result.Stat.Matches = res2.Stat.Matches
-				}
-
-				result.Output = res2.Output
-				return result, nil // OK
-			}
-
-			return res1, nil // OK
-
-		case QTYPE_OR:
-			//if query.Left == nil || query.Right == nil {
-			if len(query.SubNodes) != 2 {
-				return result, fmt.Errorf("invalid format for OR operator")
-			}
-
-			task.log().Infof("[%s]/%d: running OR", TAG, task.subtaskId)
-			var res1, res2 SearchResult
-			var err1, err2 error
-
-			// left: save results to temporary file "A"
-			tempCfg := *cfg
-			// tempCfg.Delimiter
-			if !isLast { // intermediate result
-				// as for the AND call - no sense to process INDEX&DATA
-				searchFunc = engine.Backend.Search /*Count*/ /*
-				}
-				res1, err1 = engine.search(task, query.SubNodes[0], &tempCfg, searchFunc, mux, isLast && true)
-				if err1 != nil {
-					return result, err1
-				}
-
-				// right: save results to temporary file "B"
-				// tempCfg.Delimiter
-				res2, err2 = engine.search(task, query.SubNodes[1], &tempCfg, searchFunc, mux, isLast && true)
-				if err2 != nil {
-					return result, err2
-				}
-
-				// combined statistics
-				if res1.Stat != nil && res2.Stat != nil {
-					result.Stat = search.NewStat(res1.Stat.Host)
-					statCombine(result.Stat, res1.Stat)
-					statCombine(result.Stat, res2.Stat)
-				}
-
-				// combine two temporary DATA files into one
-				result.Output = append(result.Output, res1.Output...)
-				result.Output = append(result.Output, res2.Output...)
-				task.log().WithField("output-1", res1).WithField("output-2", res2).WithField("or-output", result).Infof("combined output")
-
-				return result, nil // OK
-
-			case QTYPE_XOR:
-				return result, fmt.Errorf("XOR is not implemented yet")
-
-			default:
-				return result, fmt.Errorf("%d is unknown query type", query.Type)
-			}
-
-		updateConfig(cfg, query)
-		task.log().WithFields(map[string]interface{}{
-			"mode":  cfg.Mode,
-			"query": cfg.Query,
-			"files": cfg.Files,
-		}).Infof("[%s]/%d: running backend search", TAG, task.subtaskId)
-
-		dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d%s",
-			task.Identifier, task.subtaskId, task.extension))
-		idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d%s",
-			task.Identifier, task.subtaskId, ".txt"))
-
-		cfg.KeepDataAs = dat1
-		cfg.KeepIndexAs = idx1
-		result.Output = []RyftCall{
-			{
-				DataFile:  cfg.KeepDataAs,
-				IndexFile: cfg.KeepIndexAs,
-				Delimiter: cfg.Delimiter,
-				Width:     cfg.Surrounding,
-			},
-		}
-
-		res, err := searchFunc(cfg)
-		if err != nil {
-			return result, err
-		}
-
-		task.drainResults(mux, res, isLast)
-		result.Stat = res.Stat
-		task.log().WithField("output", result).Infof("Ryft call result")
-		return result, nil // OK
-
-	*/
-
-	return SearchResult{}, fmt.Errorf("NOT IMPLEMENTED")
+// process and wait all XOR subtasks
+func (engine *Engine) doXor(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
+	return nil, fmt.Errorf("XOR is not implemented yet")
 }
 
 // combine statistics
@@ -547,14 +513,13 @@ func detectExtension(fileNames []string, dataOut string) (string, error) {
 
 	// output data file
 	if ext := filepath.Ext(dataOut); len(ext) != 0 {
-		extensions[ext] += 1
+		extensions[ext]++
 	}
 
 	// collect unique file extensions
 	for _, file := range fileNames {
-		ext := filepath.Ext(file)
-		if len(ext) != 0 {
-			extensions[ext] += 1
+		if ext := filepath.Ext(file); len(ext) != 0 {
+			extensions[ext]++
 		}
 	}
 
