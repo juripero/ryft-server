@@ -35,7 +35,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -252,7 +251,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 	for item := range items {
 		var rec search.Record
 		// trim mount point from file name! TODO: special option for this?
-		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
+		item.File = relativeToHome(mountPointAndHomeDir, item.File)
 
 		cf := files[item.DataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
@@ -435,7 +434,7 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 				return fmt.Errorf("failed to parse index: %s", err)
 			}
 
-			saveTo.AddIndex(*index)
+			saveTo.AddIndex(index)
 		}
 
 		if err != nil {
@@ -474,7 +473,7 @@ func (mpp *InMemoryPostProcessing) AddCatalog(base *catalog.Catalog) error {
 }
 
 // unwind index
-func (mpp *InMemoryPostProcessing) unwind(index search.Index) (search.Index, int) {
+func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, int) {
 	if f, ok := mpp.indexes[index.File]; ok && f != nil {
 		tmp, shift := f.Unwind(index)
 		// task.log().Debugf("unwind %s => %s", index, tmp)
@@ -506,7 +505,7 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 
 	type MemItem struct {
 		dataFile string
-		Index    search.Index
+		Index    *search.Index
 		dataPos  uint64
 		shift    int
 	}
@@ -597,9 +596,8 @@ BuildItems:
 
 	// handle all index items
 	for _, item := range items {
-		var rec search.Record
 		// trim mount point from file name! TODO: special option for this?
-		item.Index.File = strings.TrimPrefix(item.Index.File, mountPointAndHomeDir)
+		item.Index.File = relativeToHome(mountPointAndHomeDir, item.Index.File)
 
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
@@ -618,7 +616,7 @@ BuildItems:
 			}
 		}
 
-		var data []byte
+		var data, recRawData []byte
 		if cf != nil && (reportRecords || datFile != nil) {
 			// record's data read position in the file
 			rpos := int64(item.dataPos + uint64(item.shift))
@@ -661,8 +659,8 @@ BuildItems:
 				}
 			}
 
-			rec.RawData = make([]byte, item.Index.Length)
-			n, err := io.ReadFull(cf.rd, rec.RawData)
+			recRawData = make([]byte, item.Index.Length)
+			n, err := io.ReadFull(cf.rd, recRawData)
 			//task.log().WithFields(map[string]interface{}{
 			//	"read":      n,
 			//	"requested": item.Length,
@@ -673,7 +671,7 @@ BuildItems:
 			} else if uint64(n) != item.Index.Length {
 				mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Index.Length))
 			} else {
-				data = rec.RawData
+				data = recRawData
 			}
 		}
 
@@ -715,12 +713,11 @@ BuildItems:
 		}
 
 		if reportRecords {
-			rec.Index.File = item.Index.File
-			rec.Index.Offset = item.Index.Offset
-			rec.Index.Length = item.Index.Length
-			rec.Index.Fuzziness = item.Index.Fuzziness
+			idx := search.NewIndex(item.Index.File, item.Index.Offset, item.Index.Length)
+			idx.Fuzziness = item.Index.Fuzziness
 
-			mux.ReportRecord(&rec)
+			rec := search.NewRecord(idx, recRawData)
+			mux.ReportRecord(rec)
 		}
 	}
 

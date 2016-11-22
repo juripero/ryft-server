@@ -40,7 +40,7 @@ import (
 
 // base index item
 type baseIndex struct {
-	Index   search.Index
+	Index   *search.Index
 	DataBeg uint64 // begin of data
 	DataEnd uint64 // end of data (without delimiter)
 }
@@ -87,16 +87,12 @@ func (f *IndexFile) Add(file string, offset, length, data_pos uint64) {
 	f.Items = append(f.Items, baseIndex{
 		DataBeg: data_pos,
 		DataEnd: data_pos + length,
-		Index: search.Index{
-			File:   file,
-			Offset: offset,
-			Length: length,
-		},
+		Index:   search.NewIndex(file, offset, length),
 	})
 }
 
 // AddIndex adds base index to the list
-func (f *IndexFile) AddIndex(index search.Index) {
+func (f *IndexFile) AddIndex(index *search.Index) {
 	f.Items = append(f.Items, baseIndex{
 		//order:  i,
 		DataBeg: f.offset,
@@ -120,7 +116,7 @@ func (f *IndexFile) Find(offset uint64) int {
 }
 
 // Unwind unwinds the index
-func (f *IndexFile) Unwind(index search.Index) (search.Index, int) {
+func (f *IndexFile) Unwind(index *search.Index) (*search.Index, int) {
 	var n, shift int // item index, data shift
 
 	// we should take into account surrounding width.

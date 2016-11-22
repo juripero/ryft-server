@@ -36,22 +36,15 @@ import (
 
 // SimpleQuery contains one query (relational expression)
 type SimpleQuery struct {
-	Structured  bool    // true for structured search (RECORD), false for RAW_TEXT
-	Expression  string  // search expression (old format)
-	GenericExpr string  // search expression (generic format)
-	Options     Options // search options
+	Structured bool    // true for structured search (RECORD), false for RAW_TEXT
+	ExprOld    string  // search expression in old (compatibility) format
+	ExprNew    string  // search expression in new (generic) format
+	Options    Options // search options
 }
 
-// String gets simple query as string
+// String gets the string representation (generic format)
 func (s SimpleQuery) String() string {
-	return fmt.Sprintf("%s%s",
-		s.Expression, s.Options)
-}
-
-// GenericString gets simple query as string
-func (s SimpleQuery) GenericString() string {
-	return fmt.Sprintf("%s%s",
-		s.GenericExpr, s.Options)
+	return fmt.Sprintf("%s%s", s.ExprNew, s.Options)
 }
 
 // Query contains complex query with boolean operators
@@ -63,7 +56,7 @@ type Query struct {
 	boolOps int // number of boolean operations inside (optimizer)
 }
 
-// String gets query as a string.
+// String gets query as a string (generic format).
 func (q Query) String() string {
 	var buf bytes.Buffer
 	if len(q.Operator) != 0 {
@@ -80,30 +73,6 @@ func (q Query) String() string {
 				buf.WriteString(", ")
 			}
 			buf.WriteString(n.String())
-		}
-		buf.WriteString("}")
-	}
-
-	return buf.String()
-}
-
-// GenericString gets query as a string (generic format).
-func (q Query) GenericString() string {
-	var buf bytes.Buffer
-	if len(q.Operator) != 0 {
-		buf.WriteString(q.Operator)
-	}
-	if q.Simple != nil {
-		buf.WriteString(q.Simple.GenericString())
-	}
-
-	if len(q.Arguments) > 0 {
-		buf.WriteString("{")
-		for i, n := range q.Arguments {
-			if i != 0 {
-				buf.WriteString(", ")
-			}
-			buf.WriteString(n.GenericString())
 		}
 		buf.WriteString("}")
 	}

@@ -1,6 +1,8 @@
 package ryftdec
 
 import (
+	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,10 +15,10 @@ func TestParserParseSimpleQuery(t *testing.T) {
 		if p := NewParserString(data); assert.NotNil(t, p) {
 			if res := p.parseSimpleQuery(); assert.NotNil(t, res) {
 				if expectedOld != "" {
-					assert.Equal(t, expectedOld, res.String(), "old not expected (data:%s)", data)
+					assert.Equal(t, expectedOld, res.ExprOld+res.Options.String(), "old not expected (data:%s)", data)
 				}
 				if expectedNew != "" {
-					assert.Equal(t, expectedNew, res.GenericString(), "new not expected (data:%s)", data)
+					assert.Equal(t, expectedNew, res.ExprNew+res.Options.String(), "new not expected (data:%s)", data)
 				}
 				assert.Equal(t, structured, res.Structured, "unstructured (data:%s)", data)
 			}
@@ -134,11 +136,11 @@ func TestParserParseSimpleQuery(t *testing.T) {
 		`(RAW_TEXT CONTAINS TIME(HH:MM:SS != 00:11:22))[ts]`)
 	check(false,
 		` RAW_TEXT CONTAINS NUMBER(NUM != 0) `,
-		`(RAW_TEXT CONTAINS NUMBER(NUM != "0"))[ns]`,
+		`(RAW_TEXT CONTAINS NUMBER(NUM != "0", "", ""))[ns]`,
 		`(RAW_TEXT CONTAINS NUMBER(NUM != "0"))[ns]`)
 	check(false,
 		` RAW_TEXT CONTAINS CURRENCY(CUR != 0) `,
-		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0"))[cs]`,
+		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0", "", "", ""))[cs]`,
 		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0"))[cs]`)
 	check(false,
 		` RAW_TEXT CONTAINS IPv4(IP != "0.0.0.0") `,
@@ -155,11 +157,40 @@ func TestParserParseSimpleQuery(t *testing.T) {
 	bad(` RAW_TEXT CONTAINS 123 `, "is unexpected expression")
 }
 
+// String gets query as a string (generic format).
+func oldString(q Query) string {
+	var buf bytes.Buffer
+	if len(q.Operator) != 0 {
+		buf.WriteString(q.Operator)
+	}
+	if q.Simple != nil {
+		buf.WriteString(q.Simple.ExprOld)
+		buf.WriteString(q.Simple.Options.String())
+	}
+
+	if len(q.Arguments) > 0 {
+		buf.WriteString("{")
+		for i, n := range q.Arguments {
+			if i != 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(oldString(n))
+		}
+		buf.WriteString("}")
+	}
+
+	if q.boolOps != 0 {
+		buf.WriteString(fmt.Sprintf("x%d", q.boolOps))
+	}
+
+	return buf.String()
+}
+
 // test parser
 func testParserParse(t *testing.T, structured bool, data string, parsed string) {
 	res, err := ParseQuery(data)
 	assert.NoError(t, err, "valid query expected (data:%s)", data)
-	assert.Equal(t, parsed, res.String(), "not expected (data:%s)", data)
+	assert.Equal(t, parsed, oldString(res), "not expected (data:%s)", data)
 	assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
 }
 
@@ -167,7 +198,7 @@ func testParserParse(t *testing.T, structured bool, data string, parsed string) 
 func testParserParseG(t *testing.T, structured bool, data string, parsed string) {
 	res, err := ParseQuery(data)
 	assert.NoError(t, err, "valid query expected (data:%s)", data)
-	assert.Equal(t, parsed, res.GenericString(), "not expected (data:%s)", data)
+	assert.Equal(t, parsed, res.String(), "not expected (data:%s)", data)
 	assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
 }
 

@@ -41,6 +41,13 @@ type Optimizer struct {
 	CombineLimit   int            // `json:"limit" yaml:"limit,omitempty"`
 }
 
+// Optimize input query.
+// -1 for no limit.
+func Optimize(q Query, limit int) Query {
+	o := &Optimizer{CombineLimit: limit}
+	return o.Process(q)
+}
+
 // Process optimizes input query.
 func (o *Optimizer) Process(q Query) Query {
 	return o.process(q)
@@ -73,60 +80,60 @@ func (o *Optimizer) process(q Query) Query {
 					tmp.Simple.Options = DefaultOptions() // reset to default
 				}
 
-				var oldExpr bytes.Buffer
-				var newExpr bytes.Buffer
+				var exprOld bytes.Buffer
+				var exprNew bytes.Buffer
 
 				// print first argument
 				if a.boolOps > 0 && first {
-					oldExpr.WriteRune('(')
-					oldExpr.WriteString(a.Simple.Expression)
-					oldExpr.WriteRune(')')
+					exprOld.WriteRune('(')
+					exprOld.WriteString(a.Simple.ExprOld)
+					exprOld.WriteRune(')')
 
-					newExpr.WriteRune('(')
-					newExpr.WriteString(a.Simple.GenericExpr)
-					newExpr.WriteRune(')')
+					exprNew.WriteRune('(')
+					exprNew.WriteString(a.Simple.ExprNew)
+					exprNew.WriteRune(')')
 				} else { // as is
-					//oldExpr.WriteRune('(')
-					oldExpr.WriteString(a.Simple.Expression)
-					//oldExpr.WriteRune(')')
+					//exprOld.WriteRune('(')
+					exprOld.WriteString(a.Simple.ExprOld)
+					//exprOld.WriteRune(')')
 
-					//newExpr.WriteRune('(')
-					newExpr.WriteString(a.Simple.GenericExpr)
-					//newExpr.WriteRune(')')
+					//exprNew.WriteRune('(')
+					exprNew.WriteString(a.Simple.ExprNew)
+					//exprNew.WriteRune(')')
 				}
 
 				// print operator
 				if true {
-					oldExpr.WriteRune(' ')
-					oldExpr.WriteString(q.Operator)
-					oldExpr.WriteRune(' ')
+					exprOld.WriteRune(' ')
+					exprOld.WriteString(q.Operator)
+					exprOld.WriteRune(' ')
 
-					newExpr.WriteRune(' ')
-					newExpr.WriteString(q.Operator)
-					newExpr.WriteRune(' ')
+					exprNew.WriteRune(' ')
+					exprNew.WriteString(q.Operator)
+					exprNew.WriteRune(' ')
 				}
 
 				// print second argument
 				if b.boolOps > 0 {
-					oldExpr.WriteRune('(')
-					oldExpr.WriteString(b.Simple.Expression)
-					oldExpr.WriteRune(')')
+					exprOld.WriteRune('(')
+					exprOld.WriteString(b.Simple.ExprOld)
+					exprOld.WriteRune(')')
 
-					newExpr.WriteRune('(')
-					newExpr.WriteString(b.Simple.GenericExpr)
-					newExpr.WriteRune(')')
+					exprNew.WriteRune('(')
+					exprNew.WriteString(b.Simple.ExprNew)
+					exprNew.WriteRune(')')
 				} else { // as is
-					//oldExpr.WriteRune('(')
-					oldExpr.WriteString(b.Simple.Expression)
-					//oldExpr.WriteRune(')')
+					//exprOld.WriteRune('(')
+					exprOld.WriteString(b.Simple.ExprOld)
+					//exprOld.WriteRune(')')
 
-					//newExpr.WriteRune('(')
-					newExpr.WriteString(b.Simple.GenericExpr)
-					//newExpr.WriteRune(')')
+					//exprNew.WriteRune('(')
+					exprNew.WriteString(b.Simple.ExprNew)
+					//exprNew.WriteRune(')')
 				}
 
-				tmp.Simple.Expression = oldExpr.String()
-				tmp.Simple.GenericExpr = newExpr.String()
+				tmp.Simple.ExprOld = exprOld.String()
+				tmp.Simple.ExprNew = exprNew.String()
 
 				a, first = tmp, false // next iteration
 			} else {
@@ -157,8 +164,8 @@ func (o *Optimizer) combine(q Query) Query {
 		}
 
 		// combine all arguments
-		var oldExpr bytes.Buffer
-		var newExpr bytes.Buffer
+		var exprOld bytes.Buffer
+		var exprNew bytes.Buffer
 		opts := DefaultOptions()
 		structured := true
 		res := Query{
@@ -167,34 +174,34 @@ func (o *Optimizer) combine(q Query) Query {
 		for i := 0; i < len(q.Arguments); i++ {
 			// print operator
 			if i != 0 {
-				oldExpr.WriteRune(' ')
-				oldExpr.WriteString(q.Operator)
-				oldExpr.WriteRune(' ')
+				exprOld.WriteRune(' ')
+				exprOld.WriteString(q.Operator)
+				exprOld.WriteRune(' ')
 
-				newExpr.WriteRune(' ')
-				newExpr.WriteString(q.Operator)
-				newExpr.WriteRune(' ')
+				exprNew.WriteRune(' ')
+				exprNew.WriteString(q.Operator)
+				exprNew.WriteRune(' ')
 			}
 
 			// combine argument
 			a := o.combine(q.Arguments[i])
 			res.boolOps += a.boolOps
 			if a.boolOps > 0 {
-				oldExpr.WriteRune('(')
-				oldExpr.WriteString(a.Simple.Expression)
-				oldExpr.WriteRune(')')
+				exprOld.WriteRune('(')
+				exprOld.WriteString(a.Simple.ExprOld)
+				exprOld.WriteRune(')')
 
-				newExpr.WriteRune('(')
-				newExpr.WriteString(a.Simple.GenericExpr)
-				newExpr.WriteRune(')')
+				exprNew.WriteRune('(')
+				exprNew.WriteString(a.Simple.ExprNew)
+				exprNew.WriteRune(')')
 			} else { // as is
-				//oldExpr.WriteRune('(')
-				oldExpr.WriteString(a.Simple.Expression)
-				//oldExpr.WriteRune(')')
+				//exprOld.WriteRune('(')
+				exprOld.WriteString(a.Simple.ExprOld)
+				//exprOld.WriteRune(')')
 
-				//newExpr.WriteRune('(')
-				newExpr.WriteString(a.Simple.GenericExpr)
-				//newExpr.WriteRune(')')
+				//exprNew.WriteRune('(')
+				exprNew.WriteString(a.Simple.ExprNew)
+				//exprNew.WriteRune(')')
 			}
 
 			// keep options if they are equal
@@ -208,10 +215,10 @@ func (o *Optimizer) combine(q Query) Query {
 		}
 
 		res.Simple = &SimpleQuery{
-			Structured:  structured,
-			Expression:  oldExpr.String(),
-			GenericExpr: newExpr.String(),
-			Options:     opts,
+			Structured: structured,
+			ExprOld:    exprOld.String(),
+			ExprNew:    exprNew.String(),
+			Options:    opts,
 		}
 
 		return res

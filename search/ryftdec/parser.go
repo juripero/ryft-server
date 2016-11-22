@@ -380,23 +380,71 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		res.Options.Line = false
 	}
 
-	if len(oldExpr) != 0 {
-		res.Expression = fmt.Sprintf("(%s %s %s)", input, operator, oldExpr)
-	} else {
-		res.Expression = fmt.Sprintf("(%s %s %s)", input, operator, expression)
-	}
-	res.GenericExpr = fmt.Sprintf("(%s %s %s)", input, operator,
-		p.genericExpression(expression, res.Options))
+	res.ExprOld = fmt.Sprintf("(%s %s %s)", input,
+		operator, getExprOld(expression, res.Options))
+	res.ExprNew = fmt.Sprintf("(%s %s %s)", input,
+		operator, getExprNew(expression, res.Options))
 	return res // done
 }
 
-// get generic expression (search-type based)
-func (p *Parser) genericExpression(expression string, opts Options) string {
+// get search expression in old format.
+func getExprOld(expr string, opts Options) string {
 	switch opts.Mode {
 	// exact search
 	case "es":
-		args := []string{expression}
+		return expr // "as is"
 
+	// fuzzy hamming search
+	case "fhs":
+		return expr // "as is"
+
+	// fuzzy edit distance
+	case "feds":
+		return expr // "as is"
+
+	// date search
+	case "ds":
+		return fmt.Sprintf("DATE(%s)", expr)
+
+	// time search
+	case "ts":
+		return fmt.Sprintf("TIME(%s)", expr)
+
+	// number search
+	case "ns":
+		return fmt.Sprintf(`NUMBER(%s, "%s", "%s")`, expr,
+			opts.DigitSeparator, opts.DecimalPoint)
+
+	// currency search
+	case "cs":
+		return fmt.Sprintf(`CURRENCY(%s, "%s", "%s", "%s")`, expr,
+			opts.CurrencySymbol, opts.DigitSeparator, opts.DecimalPoint)
+
+	// IPv4 search
+	case "ipv4":
+		if opts.Octal {
+			return fmt.Sprintf("IPV4(%s, USE_OCTAL)", expr)
+		} else {
+			return fmt.Sprintf("IPV4(%s)", expr)
+		}
+
+	// IPv6 search
+	case "ipv6":
+		return fmt.Sprintf("IPV6(%s)", expr)
+
+	}
+
+	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
+	return expr // leave it "as is"
+}
+
+// get search expression in new (generic) format.
+func getExprNew(expr string, opts Options) string {
+	args := []string{expr}
+
+	switch opts.Mode {
+	// exact search
+	case "es":
 		if opts.Line { // LINE is mutual exclusive with WIDTH
 			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
 		} else if opts.Width != 0 {
@@ -411,8 +459,6 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// fuzzy hamming search
 	case "fhs":
-		args := []string{expression}
-
 		if opts.Dist != 0 {
 			args = append(args, fmt.Sprintf(`DISTANCE="%d"`, opts.Dist))
 		}
@@ -431,8 +477,6 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// fuzzy edit distance search
 	case "feds":
-		args := []string{expression}
-
 		if opts.Dist != 0 {
 			args = append(args, fmt.Sprintf(`DISTANCE="%d"`, opts.Dist))
 		}
@@ -455,8 +499,6 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// date search
 	case "ds":
-		args := []string{expression}
-
 		if opts.Line { // LINE is mutual exclusive with WIDTH
 			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
 		} else if opts.Width != 0 {
@@ -467,8 +509,6 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// time search
 	case "ts":
-		args := []string{expression}
-
 		if opts.Line { // LINE is mutual exclusive with WIDTH
 			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
 		} else if opts.Width != 0 {
@@ -479,8 +519,6 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// numeric search
 	case "ns":
-		args := []string{expression}
-
 		if opts.Line { // LINE is mutual exclusive with WIDTH
 			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
 		} else if opts.Width != 0 {
@@ -499,8 +537,6 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// currency search
 	case "cs":
-		args := []string{expression}
-
 		if opts.Line { // LINE is mutual exclusive with WIDTH
 			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
 		} else if opts.Width != 0 {
@@ -523,8 +559,6 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// IPv4 search
 	case "ipv4":
-		args := []string{expression}
-
 		if opts.Line { // LINE is mutual exclusive with WIDTH
 			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
 		} else if opts.Width != 0 {
@@ -539,8 +573,6 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 
 	// IPv6 search
 	case "ipv6":
-		args := []string{expression}
-
 		if opts.Line { // LINE is mutual exclusive with WIDTH
 			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
 		} else if opts.Width != 0 {
@@ -551,7 +583,7 @@ func (p *Parser) genericExpression(expression string, opts Options) string {
 	}
 
 	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
-	return expression // leave it "as is"
+	return expr // leave it "as is"
 }
 
 // parse expression in parentheses

@@ -204,14 +204,14 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
 		updateConfig(cfg, sq.Options)
-		cfg.Query = sq.GenericExpr
+		cfg.Query = sq.ExprNew
 		cfg.Mode = "" // generic!
 		return engine.Backend.Search(cfg)
 	}
 
 	task.log().WithFields(map[string]interface{}{
 		"input":  cfg.Query,
-		"output": task.rootQuery.GenericString(),
+		"output": task.rootQuery.String(),
 	}).Infof("[%s]: decomposed as", TAG)
 
 	mux := search.NewResult()
@@ -338,11 +338,6 @@ func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux 
 	}
 
 	// process simple query...
-	task.log().WithFields(map[string]interface{}{
-		"query": cfg.Query,
-		"files": cfg.Files,
-	}).Infof("[%s/%d]: running backend search", TAG, task.subtaskId)
-
 	instanceName, _, _ := engine.getBackendOptions()
 	dat1 := filepath.Join(instanceName, fmt.Sprintf(".temp-dat-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
@@ -351,12 +346,17 @@ func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux 
 
 	sq := query.Simple
 	updateConfig(cfg, sq.Options)
-	cfg.Query = sq.GenericExpr
+	cfg.Query = sq.ExprNew
 	cfg.Mode = "" // generic!
 	cfg.KeepDataAs = dat1
 	cfg.KeepIndexAs = idx1
 	cfg.ReportIndex = false
 	cfg.ReportData = false
+
+	task.log().WithFields(map[string]interface{}{
+		"query": cfg.Query,
+		"files": cfg.Files,
+	}).Infof("[%s/%d]: running backend search", TAG, task.subtaskId)
 
 	res, err := engine.Backend.Search(cfg)
 	if err != nil {

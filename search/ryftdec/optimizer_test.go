@@ -13,7 +13,7 @@ func TestOptimizerCombine(t *testing.T) {
 		if q, err := ParseQuery(data); assert.NoError(t, err) {
 			o := new(Optimizer)
 			res := o.combine(q)
-			assert.Equal(t, expected, res.GenericString())
+			assert.Equal(t, expected, res.String())
 			assert.Equal(t, structured, res.IsStructured())
 		}
 	}
@@ -155,27 +155,10 @@ func TestOptimizerCombine(t *testing.T) {
 func TestOptimizerLimits(t *testing.T) {
 	// check
 	check := func(limit int, structured bool, data string, expected string) {
-		limits := map[string]int{
-			"es":   limit,
-			"fhs":  limit,
-			"feds": limit,
-			"ds":   limit,
-			"ts":   limit,
-			"ns":   limit,
-			"cs":   limit,
-			"ipv4": limit,
-			"ipv6": limit,
-		}
-
-		o := &Optimizer{
-			OperatorLimits: limits,
-			CombineLimit:   limit,
-		}
-
 		q, err := ParseQuery(data)
 		if assert.NoError(t, err) {
-			res := o.Process(q)
-			assert.Equal(t, expected, res.GenericString())
+			res := Optimize(q, limit)
+			assert.Equal(t, expected, res.String())
 			assert.Equal(t, structured, res.IsStructured())
 		}
 	}
