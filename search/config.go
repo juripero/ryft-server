@@ -60,6 +60,7 @@ type Config struct {
 // NewEmptyConfig creates new empty search configuration.
 func NewEmptyConfig() *Config {
 	cfg := new(Config)
+	cfg.CaseSensitive = true
 	return cfg
 }
 
@@ -68,6 +69,7 @@ func NewConfig(query string, files ...string) *Config {
 	cfg := new(Config)
 	cfg.Query = query
 	cfg.Files = files
+	cfg.CaseSensitive = true
 	return cfg
 }
 
