@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	testLogLevel = "debug"
+	testLogLevel = "error"
 )
 
 // fake engine to generate random data

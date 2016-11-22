@@ -201,10 +201,10 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
-	if task.rootQuery.IsSimple() && hasCatalogs == 0 {
+	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
-		updateConfig(cfg, task.rootQuery.Simple.Options)
-		cfg.Query = task.rootQuery.Simple.GenericExpr
+		updateConfig(cfg, sq.Options)
+		cfg.Query = sq.GenericExpr
 		cfg.Mode = "" // generic!
 		return engine.Backend.Search(cfg)
 	}
@@ -226,12 +226,12 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		defer task.result.Drop(engine.keepResultFiles)
 
 		res, err := engine.doSearch(task, task.rootQuery, cfg, mux)
-		mux.Stat = res.Stat
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
 			mux.ReportError(err)
 			return
 		}
+		mux.Stat = res.Stat
 
 		if !engine.keepResultFiles {
 			defer res.removeAll(mountPoint, homeDir)
@@ -325,7 +325,7 @@ func (res SearchResult) removeAll(mountPoint, homeDir string) {
 func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.subtaskId += 1 // next subtask
 
-	if query.IsSimple() {
+	if query.Simple != nil {
 		// OK, handle later...
 	} else if strings.EqualFold(query.Operator, "AND") {
 		return engine.doAnd(task, query, cfg, mux)
@@ -349,9 +349,9 @@ func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux 
 	idx1 := filepath.Join(instanceName, fmt.Sprintf(".temp-idx-%s-%d%s",
 		task.Identifier, task.subtaskId, ".txt"))
 
-	q := query.Simple
-	updateConfig(cfg, q.Options)
-	cfg.Query = q.GenericExpr
+	sq := query.Simple
+	updateConfig(cfg, sq.Options)
+	cfg.Query = sq.GenericExpr
 	cfg.Mode = "" // generic!
 	cfg.KeepDataAs = dat1
 	cfg.KeepIndexAs = idx1

@@ -49,7 +49,7 @@ debian: install
 test_cover: test-cover
 test-cover:
 	@go test -tags "${GO_TAGS}" -cover ./search/ || true
-# go test -tags "${GO_TAGS}" -cover ./search/ryftdec/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/ryftdec/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/ryfthttp/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftmux/ || true
 # go test -tags "${GO_TAGS}" -cover ./search/ryftone/ || true
@@ -73,8 +73,7 @@ test-cover:
 # @go test -tags "${GO_TAGS}" -cover ./middleware/cors/ || true
 # @go test -tags "${GO_TAGS}" -cover ./middleware/gzip/ || true
 
-# need to build ryft-server executable before some tests
-test: all
+test:
 	go test -v ./...
 
 clean:

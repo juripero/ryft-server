@@ -233,6 +233,66 @@ func TestOptimizerLimits(t *testing.T) {
 	check(-1, true, // (A) (B) different options
 		`((RECORD CONTAINS FHS("A",d=1)) AND (RECORD CONTAINS FEDS("B",d=1)))`,
 		`(RECORD CONTAINS HAMMING("A", DISTANCE="1")) AND (RECORD CONTAINS EDIT_DISTANCE("B", DISTANCE="1"))x1`)
+
+	// real-life examples
+
+	check(-1, true,
+		`((RECORD.doc.text_entry CONTAINS FEDS("To", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("be", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("or", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("not", DIST=1)) AND(RECORD.doc.text_entry CONTAINS FEDS("to", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("tht",DIST=1)))`,
+		`(RECORD.doc.text_entry CONTAINS EXACT("To")) AND (RECORD.doc.text_entry CONTAINS EXACT("be")) AND (RECORD.doc.text_entry CONTAINS EXACT("or")) AND (RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("not", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS EXACT("to")) AND (RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("tht", DISTANCE="1"))x5`)
+
+	check(-1, true,
+		`((RECORD.doc.text_entry CONTAINS FHS("To", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("be", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("or", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("not", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("to", DIST=1)))`,
+		`(RECORD.doc.text_entry CONTAINS HAMMING("To", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS HAMMING("be", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS HAMMING("or", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS HAMMING("not", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS HAMMING("to", DISTANCE="1"))[fhs,d=1]x4`)
+
+	check(-1, true,
+		`((RECORD.doc.doc.text_entry CONTAINS FEDS("To", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("be", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("or", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("not", DIST=1)))`,
+		`(RECORD.doc.doc.text_entry CONTAINS EXACT("To")) AND (RECORD.doc.doc.text_entry CONTAINS EXACT("be")) AND (RECORD.doc.doc.text_entry CONTAINS EXACT("or")) AND (RECORD.doc.doc.text_entry CONTAINS EDIT_DISTANCE("not", DISTANCE="1"))x3`)
+
+	check(-1, true,
+		`
+(
+	(
+		(
+			(RECORD.doc.text_entry CONTAINS FEDS("Lrd", DIST=2))
+			AND
+			(RECORD.doc.text_entry CONTAINS FEDS("Halet", DIST=2))
+		)
+		AND
+		(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2))
+	)
+	OR
+	(
+		(
+			(RECORD.doc.text_entry CONTAINS FEDS("Lrd", DIST=2))
+			AND
+			(RECORD.doc.text_entry CONTAINS FEDS("Halet", DIST=2))
+		)
+		AND
+		(RECORD.doc.speaker CONTAINS FEDS("Hlet", DIST=2))
+	)
+	OR
+	(
+		(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2))
+		AND
+		(RECORD.doc.speaker CONTAINS FEDS("Hlet", DIST=2))
+	)
+)`,
+		`(((RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("Lrd", DISTANCE="2")) AND (RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("Halet", DISTANCE="2"))) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("PONIUS", DISTANCE="2"))) OR (((RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("Lrd", DISTANCE="2")) AND (RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("Halet", DISTANCE="2"))) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("Hlet", DISTANCE="2"))) OR ((RECORD.doc.speaker CONTAINS EDIT_DISTANCE("PONIUS", DISTANCE="2")) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("Hlet", DISTANCE="2")))[feds,d=2]x7`)
+
+	check(-1, true,
+		`((RECORD.doc.play_name NOT_CONTAINS "King Lear") AND
+(((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND
+(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2)))
+OR
+((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND
+(RECORD.doc.speaker CONTAINS FEDS("Mesenger", DIST=2))) OR
+((RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2)) AND
+(RECORD.doc.speaker CONTAINS FEDS("Mesenger", DIST=2)))))`,
+		`(RECORD.doc.play_name NOT_CONTAINS EXACT("King Lear")) AND (((RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("my lrd", DISTANCE="2")) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("PONIUS", DISTANCE="2"))) OR ((RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("my lrd", DISTANCE="2")) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("Mesenger", DISTANCE="2"))) OR ((RECORD.doc.speaker CONTAINS EDIT_DISTANCE("PONIUS", DISTANCE="2")) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("Mesenger", DISTANCE="2"))))x6`)
+
+	check(-1, true,
+		`( RECORD.block CONTAINS FHS(""?"INDIANA"?"",CS=true,DIST=0,WIDTH=0) )`,
+		`(RECORD.block CONTAINS EXACT(""?"INDIANA"?""))[es]`)
 }
 
 // test for get limit
@@ -273,203 +333,3 @@ func TestOptimizerGetLimit(t *testing.T) {
 			},
 		}))
 }
-
-/*
-// test optimizer
-func testOptimizerProcess(t *testing.T, o *Optimizer, structured bool, data string, optimized string) {
-	p := NewParserString(data)
-	if assert.NotNil(t, p, "no parser created (data:%s)", data) {
-		res, err := p.ParseQuery()
-		assert.NoError(t, err, "valid query (data:%s)", data)
-		// t.Logf("%s => %s", data, res)
-		res = o.Process(res)
-		assert.Equal(t, optimized, res.String(), "not expected (data:%s)", data)
-		assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
-	}
-}
-
-// test for optimization
-func TestOptimizerProcess(t *testing.T) {
-	limits := map[string]int{
-		"es":   1,
-		"fhs":  1,
-		"feds": 1,
-		"ds":   2,
-		"ts":   2,
-		"ns":   0,
-		"cs":   0,
-		"ipv4": 0,
-		"ipv6": 0,
-	}
-
-	o := testNewOptimizer(limits)
-
-	testOptimizerProcess(t, o, false,
-		`(RECORD.body CONTAINS FHS("100")) AND (RAW_TEXT CONTAINS FHS("200"))`,
-		`(RECORD.body CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100")) AND (RAW_TEXT CONTAINS FHS("200",DIST=0))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100")) AND (RAW_TEXT CONTAINS FHS("200",WIDTH=0))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100")) AND (RAW_TEXT CONTAINS FHS("200",DIST=0,WIDTH=0))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100",D=1)) AND (RAW_TEXT CONTAINS FHS("200",D=1))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[fhs,d=1]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2)) AND (RAW_TEXT CONTAINS FHS("200",D=1,W=2))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2,CS=true)) AND (RAW_TEXT CONTAINS FHS("200",DIST=1,WIDTH=2,CASE=true))`,
-		`(RAW_TEXT CONTAINS "100") AND (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100",D=1)) AND (RAW_TEXT CONTAINS FHS("200",D=2))`,
-		`AND{(RAW_TEXT CONTAINS "100")[fhs,d=1], (RAW_TEXT CONTAINS "200")[fhs,d=2]}`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2)) AND (RAW_TEXT CONTAINS FHS("200",D=1,W=3))`,
-		`AND{(RAW_TEXT CONTAINS "100")[fhs,d=1,w=2], (RAW_TEXT CONTAINS "200")[fhs,d=1,w=3]}`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS FHS("100",D=1,W=2,CS=false)) AND (RAW_TEXT CONTAINS FHS("200",D=1,W=2))`,
-		`AND{(RAW_TEXT CONTAINS "100")[fhs,d=1,w=2,!cs], (RAW_TEXT CONTAINS "200")[fhs,d=1,w=2]}`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")`,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`(RAW_TEXT CONTAINS "100") OR ((RAW_TEXT CONTAINS "200"))`,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`((RAW_TEXT CONTAINS "100")) OR (RAW_TEXT CONTAINS "200")`,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")[es]`)
-
-	testOptimizerProcess(t, o, false,
-		`((RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200"))`,
-		`(RAW_TEXT CONTAINS "100") OR (RAW_TEXT CONTAINS "200")[es]`)
-
-	//		testOptimizerProcess(t, o,false,
-	//			`((RAW_TEXT CONTAINS "100")) OR ((RAW_TEXT CONTAINS "200"))`,
-	//			`OR{(RAW_TEXT CONTAINS "100"), (RAW_TEXT CONTAINS "200")}`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) OR (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0001))`,
-		`(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) OR (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0001))[ds]`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) OR (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0001)))`,
-		`(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) OR (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0001))[ds]`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) OR (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0001))OR(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0002))`,
-		`(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) OR (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0001)) OR (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0002))[ds]`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))AND(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001))OR(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0002)))`,
-		`(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001)) OR (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0002))[ds]`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))AND(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001))OR(RECORD.id CONTAINS TIME(HH:MM:SS != 20:03:01)))`,
-		`OR{(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001))[ds], (RECORD.id CONTAINS TIME(HH:MM:SS != 20:03:01))[ts]}`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01)) OR (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:02))`,
-		`(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01)) OR (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:02))[ts]`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01)) OR (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:02)))`,
-		`(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01)) OR (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:02))[ts]`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01)) OR (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:02))OR(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:03))`,
-		`(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01)) OR (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:02)) OR (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:03))[ts]`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.date CONTAINS NUMBER("00" < NUM < "11")) OR (RECORD.date CONTAINS NUMBER("11" > NUM > "22"))`,
-		`OR{(RECORD.date CONTAINS NUMBER("00" < NUM < "11"))[ns], (RECORD.date CONTAINS NUMBER("22" < NUM < "11"))[ns]}`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.date CONTAINS CURRENCY("00" < CUR < "11")) OR (RECORD.date CONTAINS CURRENCY("11" > CUR > "22"))`,
-		`OR{(RECORD.date CONTAINS CURRENCY("00" < CUR < "11"))[cs], (RECORD.date CONTAINS CURRENCY("22" < CUR < "11"))[cs]}`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))`,
-		`(RECORD.price CONTAINS CURRENCY("$450" < CUR < "$10,100.50", "$", ",", "."))[cs,sym="$",sep=",",dot="."]`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000))`,
-		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.id CONTAINS "1003")OR(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01))`,
-		`OR{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01))[ts]}`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000))AND(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01))`,
-		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds], (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01))[ts]}`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000))OR(RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01))`,
-		`OR{AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}, (RECORD.date CONTAINS TIME(HH:MM:SS != 20:03:01))[ts]}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000)))`,
-		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS "1003") AND (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) OR (RECORD.id CONTAINS "2003"))`,
-		`OR{AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}, (RECORD.id CONTAINS "2003")[es]}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS "1003")AND(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))AND(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001)))`,
-		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001))[ds]}`)
-
-	testOptimizerProcess(t, o, true,
-		`(((RECORD.id CONTAINS "1003")AND(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)))AND(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001)))`,
-		`AND{AND{(RECORD.id CONTAINS "1003")[es], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}, (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001))[ds]}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001))AND(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))OR(RECORD.id CONTAINS "200301"))`,
-		`OR{(RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001)) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds], (RECORD.id CONTAINS "200301")[es]}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS TIME(HH:MM:SS != 20:03:01)) AND (RECORD.id CONTAINS TIME(HH:MM:SS != 20:03:02)) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001)))`,
-		`AND{(RECORD.id CONTAINS TIME(HH:MM:SS != 20:03:01)) AND (RECORD.id CONTAINS TIME(HH:MM:SS != 20:03:02))[ts], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0001))[ds]}`)
-
-	testOptimizerProcess(t, o, true,
-		`(RECORD.id CONTAINS "1003")AND(RECORD.date CONTAINS NUMBER(NUM < 7))`,
-		`AND{(RECORD.id CONTAINS "1003")[es], (RECORD.date CONTAINS NUMBER(NUM < "7"))[ns]}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS NUMBER(NUM < 7)) AND (RECORD.id CONTAINS NUMBER(NUM < 8)))`,
-		`AND{(RECORD.id CONTAINS NUMBER(NUM < "7"))[ns], (RECORD.id CONTAINS NUMBER(NUM < "8"))[ns]}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS FHS("test"))AND(RECORD.id CONTAINS FEDS("123", CS=true, D=1, W=2)))`,
-		`AND{(RECORD.id CONTAINS "test")[es], (RECORD.id CONTAINS "123")[feds,d=1]}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS FHS("test"))AND(RECORD.id CONTAINS FEDS("123", D=2, CS=true)) OR (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)))`,
-		`OR{AND{(RECORD.id CONTAINS "test")[es], (RECORD.id CONTAINS "123")[feds,d=2]}, (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}`)
-
-	testOptimizerProcess(t, o, false,
-		`(RECORD.body CONTAINS FEDS("test",cs=false,d=10,w=100)) AND ((RAW_TEXT CONTAINS FHS("text")) OR (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000)))`,
-		`AND{(RECORD.body CONTAINS "test")[feds,d=10,!cs], OR{(RAW_TEXT CONTAINS "text")[es], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}}`)
-
-	testOptimizerProcess(t, o, true,
-		`((RECORD.id CONTAINS FHS("test"))AND((RECORD.id CONTAINS FEDS("123")) AND (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))))`,
-		`AND{(RECORD.id CONTAINS "test")[es], AND{(RECORD.id CONTAINS "123")[es], (RECORD.id CONTAINS DATE(DD/MM/YYYY != 00/00/0000))[ds]}}`)
-}
-*/
