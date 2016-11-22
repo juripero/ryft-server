@@ -51,7 +51,6 @@ func NewParser(r io.Reader) *Parser {
 
 	// default options
 	p.baseOpts = DefaultOptions()
-	p.baseOpts.Mode = "es"
 
 	return p
 }
@@ -63,13 +62,24 @@ func NewParserString(data string) *Parser {
 
 // ParseQuery parses a query from input string.
 func ParseQuery(query string) (res Query, err error) {
+	return ParseQueryOpt(query, DefaultOptions())
+}
+
+// ParseQueryOpt parses a query from input string using non-default base options.
+func ParseQueryOpt(query string, opts Options) (res Query, err error) {
 	p := NewParserString(query)
+	p.SetBaseOptions(opts)
 	res, err = p.ParseQuery()
 	if err == nil && !p.EOF() {
 		// check all data parsed, no more queries expected
 		err = fmt.Errorf("not fully parsed, no EOF found")
 	}
 	return
+}
+
+// SetBaseOptions sets the parser's base options
+func (p *Parser) SetBaseOptions(opts Options) {
+	p.baseOpts = opts
 }
 
 // scan returns the next token from the underlying scanner.
@@ -260,6 +270,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		input = "RAW_TEXT"
 		operator = "CONTAINS"
 		expression = p.parseStringExpr(lex) // plain simple query
+		res.Options.SetMode("es")
 
 	case lex.token == IDENT,
 		lex.token == INT,
@@ -267,6 +278,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		input = "RAW_TEXT"
 		operator = "CONTAINS"
 		expression = fmt.Sprintf(`"%s"`, lex) // plain simple query
+		res.Options.SetMode("es")
 
 	default:
 		panic(fmt.Errorf("found %q, expected RAW_TEXT or RECORD", lex))
@@ -354,6 +366,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		case lex.token == STRING,
 			lex.token == WCARD:
 			expression = p.parseStringExpr(lex)
+			res.Options.SetMode("es")
 
 		default:
 			panic(fmt.Errorf("%q is unexpected expression", lex))
