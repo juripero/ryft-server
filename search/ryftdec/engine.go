@@ -27,7 +27,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
-
 package ryftdec
 
 import (
@@ -47,17 +46,17 @@ var (
 
 // RyftDEC engine uses abstract engine as backend.
 type Engine struct {
-	Backend               search.Engine
-	BooleansPerExpression map[string]int
-	KeepResultFiles       bool // false by default
+	Backend         search.Engine
+	optimizer       *Optimizer
+	keepResultFiles bool // false by default
 }
 
 // NewEngine creates new RyftDEC search engine.
-func NewEngine(backend search.Engine, booleansLimit map[string]int, keepResults bool) (*Engine, error) {
+func NewEngine(backend search.Engine, genericLimit int, keepResults bool) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backend = backend
-	engine.BooleansPerExpression = booleansLimit
-	engine.KeepResultFiles = keepResults
+	engine.optimizer = &Optimizer{CombineLimit: genericLimit}
+	engine.keepResultFiles = keepResults
 	return engine, nil
 }
 
@@ -72,6 +71,11 @@ func (engine *Engine) Options() map[string]interface{} {
 	return engine.Backend.Options()
 }
 
+// Files starts synchronous "/files" with RyftDEC engine.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	return engine.Backend.Files(path)
+}
+
 // SetLogLevelString changes global module log level.
 func SetLogLevelString(level string) error {
 	ll, err := logrus.ParseLevel(level)
@@ -79,7 +83,7 @@ func SetLogLevelString(level string) error {
 		return err
 	}
 
-	log.Level = ll
+	SetLogLevel(ll)
 	return nil // OK
 }
 
@@ -111,6 +115,7 @@ func factory(opts map[string]interface{}) (search.Engine, error) {
 */
 
 // package initialization
+/*
 func init() {
 	// should be created manually!
 	// search.RegisterEngine(TAG, factory)
@@ -118,3 +123,4 @@ func init() {
 	// be silent by default
 	// log.Level = logrus.WarnLevel
 }
+*/

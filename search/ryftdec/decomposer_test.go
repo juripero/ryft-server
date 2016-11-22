@@ -1,5 +1,6 @@
 package ryftdec
 
+/*
 import (
 	"testing"
 
@@ -273,7 +274,7 @@ func TestQueries(t *testing.T) {
 	(
 		(
 			(RECORD.doc.text_entry CONTAINS FEDS("Lrd", DIST=2))
-			AND 
+			AND
 			(RECORD.doc.text_entry CONTAINS FEDS("Halet", DIST=2))
 		)
 		AND
@@ -283,16 +284,16 @@ func TestQueries(t *testing.T) {
 	(
 		(
 			(RECORD.doc.text_entry CONTAINS FEDS("Lrd", DIST=2))
-			AND 
+			AND
 			(RECORD.doc.text_entry CONTAINS FEDS("Halet", DIST=2))
 		)
-		AND 
+		AND
 		(RECORD.doc.speaker CONTAINS FEDS("Hlet", DIST=2))
 	)
-	OR 
+	OR
 	(
 		(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2))
-		AND 
+		AND
 		(RECORD.doc.speaker CONTAINS FEDS("Hlet", DIST=2))
 	)
 )`,
@@ -300,13 +301,13 @@ func TestQueries(t *testing.T) {
   [feds-2/0-false]: (RECORD.doc.text_entry CONTAINS "Lrd") AND (RECORD.doc.text_entry CONTAINS "Halet") AND (RECORD.doc.speaker CONTAINS "PONIUS")
   [feds-2/0-false]: (RECORD.doc.text_entry CONTAINS "Lrd") AND (RECORD.doc.text_entry CONTAINS "Halet") AND (RECORD.doc.speaker CONTAINS "Hlet") OR (RECORD.doc.speaker CONTAINS "PONIUS") AND (RECORD.doc.speaker CONTAINS "Hlet")`)
 
-	testQueryTree(t, `((RECORD.doc.play_name NOT_CONTAINS "King Lear") AND 
-(((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND 
-(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2))) 
-OR 
-((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND 
-(RECORD.doc.speaker CONTAINS FEDS("Mesenger", DIST=2))) OR 
-((RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2)) AND 
+	testQueryTree(t, `((RECORD.doc.play_name NOT_CONTAINS "King Lear") AND
+(((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND
+(RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2)))
+OR
+((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND
+(RECORD.doc.speaker CONTAINS FEDS("Mesenger", DIST=2))) OR
+((RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2)) AND
 (RECORD.doc.speaker CONTAINS FEDS("Mesenger", DIST=2)))))`,
 		`[ AND]:
   [es-0/0-false]: (RECORD.doc.play_name NOT_CONTAINS "King Lear")
@@ -318,3 +319,4 @@ func TestBugfix(t *testing.T) {
 		`[fhs-0/0-true]: (RECORD.block CONTAINS ""?"INDIANA"?"")`)
 
 }
+*/

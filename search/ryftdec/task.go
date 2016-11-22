@@ -27,7 +27,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
-
 package ryftdec
 
 import (
@@ -55,10 +54,10 @@ type Task struct {
 	Identifier string // unique
 	subtaskId  int
 
-	config    *search.Config
-	queries   *Node // root query
-	extension string
+	rootQuery Query
+	extension string // used for intermediate results, may be empty
 
+	config *search.Config
 	result PostProcessing
 }
 
@@ -68,34 +67,9 @@ func NewTask(config *search.Config) *Task {
 
 	task := new(Task)
 	task.Identifier = fmt.Sprintf("dec-%08x", id)
+
 	task.config = config
-
 	return task
-}
-
-// get search mode based on query type
-func getSearchMode(query QueryType, opts Options) string {
-	switch query {
-	case QTYPE_SEARCH:
-		if opts.Dist == 0 {
-			return "es" // exact_search if fuzziness is zero
-		}
-		return opts.Mode
-	case QTYPE_DATE:
-		return "ds" // date_search
-	case QTYPE_TIME:
-		return "ts" // time_search
-	case QTYPE_NUMERIC, QTYPE_CURRENCY:
-		return "ns" // numeric_search
-	case QTYPE_REGEX:
-		return "rs" // regex_search
-	case QTYPE_IPV4:
-		return "ipv4" // IPv4 search
-	case QTYPE_IPV6:
-		return "ipv6" // IPv6 search
-	}
-
-	return opts.Mode
 }
 
 // Drain all records/errors from 'res' to 'mux'
