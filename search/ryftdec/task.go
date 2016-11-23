@@ -128,6 +128,7 @@ type PostProcessing interface {
 		reportRecords bool) error
 }
 
+/*
 // post-processing SQLite-based
 type CatalogPostProcessing struct {
 	cat *catalog.Catalog
@@ -290,7 +291,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 					"new":  rpos,
 				}).Debugf("[%s]: reset buffered file read", TAG)
 
-				_, err = cf.f.Seek(rpos, 0 /*os.SeekBegin*/)
+				_, err = cf.f.Seek(rpos, 0 /*os.SeekBegin*/ /*)
 				if err != nil {
 					mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
 					continue
@@ -378,6 +379,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 
 	return nil // OK
 }
+*/
 
 // in-memory based post-processing
 type InMemoryPostProcessing struct {

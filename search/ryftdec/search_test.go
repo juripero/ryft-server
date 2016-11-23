@@ -79,6 +79,15 @@ func (fe *fakeEngine) Search(cfg *search.Config) (*search.Result, error) {
 					break
 				}
 
+				if info, err := os.Stat(file); err != nil {
+					res.ReportError(fmt.Errorf("failed to stat: %s", err))
+					continue
+				} else if info.IsDir() {
+					continue // skip dirs
+				} else if info.Size() == 0 {
+					continue // skip empty files
+				}
+
 				f, err := os.Open(file)
 				if err != nil {
 					res.ReportError(fmt.Errorf("failed to open: %s", err))
@@ -232,12 +241,14 @@ func TestEngineSearchBypass(t *testing.T) {
 44444-hello-44444
 55555-hello-55555
 `), 0644)
+	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "2.txt"), []byte{}, 0644)
+	os.Mkdir(filepath.Join(f1.MountPoint, f1.HomeDir, "3.txt"), 0755)
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (usual case)
 	engine, err := NewEngine(f1, -1, false)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
-		cfg := search.NewConfig("hello", "1.txt")
+		cfg := search.NewConfig("hello", "*.txt")
 		cfg.Surrounding = 3
 		cfg.ReportIndex = true
 		cfg.ReportData = true
@@ -253,7 +264,7 @@ func TestEngineSearchBypass(t *testing.T) {
 			}
 			sort.Strings(strRecords)
 
-			assert.EqualValues(t, 0, len(errors))
+			assert.Empty(t, errors)
 			assert.EqualValues(t, []string{
 				`Record{{/tmp/ryft-test/1.txt#22, len:11, d:0}, data:"22-hello-22"}`,
 				`Record{{/tmp/ryft-test/1.txt#4, len:11, d:0}, data:"11-hello-11"}`,
@@ -263,7 +274,7 @@ func TestEngineSearchBypass(t *testing.T) {
 			}, strRecords)
 
 			if assert.EqualValues(t, 1, len(f1.searchDone)) {
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:"", keep-index:"", delim:"", index:true, data:true}`, f1.searchDone[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:"", keep-index:"", delim:"", index:true, data:true}`, f1.searchDone[0].String())
 			}
 		}
 	}
@@ -306,7 +317,7 @@ func TestEngineSearchAnd3(t *testing.T) {
 			}
 			sort.Strings(strRecords)
 
-			assert.EqualValues(t, 0, len(errors))
+			assert.Empty(t, errors)
 			assert.EqualValues(t, []string{
 				`Record{{1.txt#22, len:8, d:0}, data:"22-hello"}`,
 				`Record{{1.txt#4, len:8, d:0}, data:"11-hello"}`,
@@ -361,7 +372,7 @@ func TestEngineSearchOr3(t *testing.T) {
 			}
 			sort.Strings(strRecords)
 
-			assert.EqualValues(t, 0, len(errors))
+			assert.Empty(t, errors)
 			assert.EqualValues(t, []string{
 				`Record{{1.txt#22, len:10, d:0}, data:"22-hello-2"}`,
 				`Record{{1.txt#22, len:11, d:0}, data:"22-hello-22"}`,
