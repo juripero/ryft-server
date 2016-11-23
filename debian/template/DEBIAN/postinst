@@ -33,6 +33,7 @@ chown "$target_uid:$target_gid" -f /var/log/ryft
 chown "$target_uid:$target_gid" -f -R /var/ryft
 
 # backward compatibility
+chmod 0755 -f /ryftone/.rest-*
 chown "$target_uid:$target_gid" -f -R /ryftone/.rest-*
 chown "$target_uid:$target_gid" -f /var/log/ryft/server.log
 
