@@ -230,7 +230,13 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	var input string
 	var operator string
 	var expression string
-	var oldExpr string // TODO: remove this
+
+	// get search mode for plain text queries
+	plainMode := "es" // by default
+	switch mode := res.Options.Mode; mode {
+	case "es", "fhs", "feds":
+		plainMode = mode
+	}
 
 	// input specifier (RAW_TEXT or RECORD)
 	switch lex := p.scanIgnoreSpace(); {
@@ -270,7 +276,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		input = "RAW_TEXT"
 		operator = "CONTAINS"
 		expression = p.parseStringExpr(lex) // plain simple query
-		res.Options.SetMode("es")
+		res.Options.SetMode(plainMode)
 
 	case lex.token == IDENT,
 		lex.token == INT,
@@ -278,7 +284,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		input = "RAW_TEXT"
 		operator = "CONTAINS"
 		expression = fmt.Sprintf(`"%s"`, lex) // plain simple query
-		res.Options.SetMode("es")
+		res.Options.SetMode(plainMode)
 
 	default:
 		panic(fmt.Errorf("found %q, expected RAW_TEXT or RECORD", lex))
@@ -313,60 +319,33 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 
 		case lex.IsDate(): // DATE + options
 			expression, res.Options = p.parseDateExpr(res.Options)
-			oldExpr = fmt.Sprintf("DATE(%s)", expression)
 			res.Options.SetMode("ds")
 
 		case lex.IsTime(): // TIME + options
 			expression, res.Options = p.parseTimeExpr(res.Options)
-			oldExpr = fmt.Sprintf("TIME(%s)", expression)
 			res.Options.SetMode("ts")
 
 		case lex.IsNumber(): // NUMBER + options
 			expression, res.Options = p.parseNumberExpr(res.Options)
-			oldExpr = fmt.Sprintf("NUMBER(%s", expression)
-			if res.Options.DigitSeparator != "" {
-				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.DigitSeparator)
-			}
-			if res.Options.DecimalPoint != "" {
-				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.DecimalPoint)
-			}
-			oldExpr += ")"
 			res.Options.SetMode("ns")
 
 		case lex.IsCurrency(): // CURRENCY + options
 			expression, res.Options = p.parseCurrencyExpr(res.Options)
-			oldExpr = fmt.Sprintf("CURRENCY(%s", expression)
-			if res.Options.CurrencySymbol != "" {
-				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.CurrencySymbol)
-			}
-			if res.Options.DigitSeparator != "" {
-				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.DigitSeparator)
-			}
-			if res.Options.DecimalPoint != "" {
-				oldExpr += fmt.Sprintf(`, "%s"`, res.Options.DecimalPoint)
-			}
-			oldExpr += ")"
 			res.Options.SetMode("cs")
 
 		case lex.IsIPv4(): // IPv4 + options
 			expression, res.Options = p.parseIPv4Expr(res.Options)
-			oldExpr = fmt.Sprintf("IPV4(%s", expression)
-			if res.Options.Octal {
-				oldExpr += ", USE_OCTAL"
-			}
-			oldExpr += ")"
 			res.Options.SetMode("ipv4")
 
 		case lex.IsIPv6(): // IPv6 + options
 			expression, res.Options = p.parseIPv6Expr(res.Options)
-			oldExpr = fmt.Sprintf("IPV6(%s)", expression)
 			res.Options.SetMode("ipv6")
 
 		// consume all continous strings and wildcards
 		case lex.token == STRING,
 			lex.token == WCARD:
 			expression = p.parseStringExpr(lex)
-			res.Options.SetMode("es")
+			res.Options.SetMode(plainMode)
 
 		default:
 			panic(fmt.Errorf("%q is unexpected expression", lex))

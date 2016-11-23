@@ -22,6 +22,7 @@ func TestParserParseSimpleQuery(t *testing.T) {
 				}
 				assert.Equal(t, structured, res.Structured, "unstructured (data:%s)", data)
 			}
+			assert.True(t, p.EOF())
 		}
 	}
 
@@ -197,6 +198,14 @@ func testParserParse(t *testing.T, structured bool, data string, parsed string) 
 // test parser (generic)
 func testParserParseG(t *testing.T, structured bool, data string, parsed string) {
 	res, err := ParseQuery(data)
+	assert.NoError(t, err, "valid query expected (data:%s)", data)
+	assert.Equal(t, parsed, res.String(), "not expected (data:%s)", data)
+	assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
+}
+
+// test parser (generic)
+func testParserParseOpts(t *testing.T, structured bool, baseOpts Options, data string, parsed string) {
+	res, err := ParseQueryOpt(data, baseOpts)
 	assert.NoError(t, err, "valid query expected (data:%s)", data)
 	assert.Equal(t, parsed, res.String(), "not expected (data:%s)", data)
 	assert.Equal(t, structured, res.IsStructured(), "unstructured (data:%s)", data)
@@ -509,6 +518,40 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t, false,
 		`((RECORD.body CONTAINS "DATE()") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY!=04/15/2015)))`,
 		`P{AND{P{(RECORD.body CONTAINS "DATE()")[es]}, P{(RAW_TEXT CONTAINS DATE(MM/DD/YYYY != 04/15/2015))[ds]}}}`)
+}
+
+// test for valid queries
+func TestParserParseWithOptions(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Mode = "fhs"
+	opts.Dist = 1
+	opts.Width = 2
+
+	testParserParseOpts(t, false, opts,
+		`                            A`,
+		`(RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2]`)
+	testParserParseOpts(t, false, opts,
+		`                           "A"`,
+		`(RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2]`)
+	testParserParseOpts(t, false, opts,
+		`                            1`,
+		`(RAW_TEXT CONTAINS HAMMING("1", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2]`)
+	testParserParseOpts(t, false, opts,
+		`                            1.23`,
+		`(RAW_TEXT CONTAINS HAMMING("1.23", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2]`)
+
+	testParserParseOpts(t, false, opts,
+		`A AND (B OR C)`,
+		`AND{(RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2], P{OR{(RAW_TEXT CONTAINS HAMMING("B", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2], (RAW_TEXT CONTAINS HAMMING("C", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2]}}}`)
+
+	testParserParseOpts(t, false, opts,
+		`A AND RAW_TEXT CONTAINS EXACT("B")`,
+		`AND{(RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2], (RAW_TEXT CONTAINS EXACT("B", WIDTH="2"))[es,w=2]}`)
+
+	opts.Mode = "ds" // fallback to EXACT
+	testParserParseOpts(t, false, opts,
+		`                            A`,
+		`(RAW_TEXT CONTAINS EXACT("A", WIDTH="2"))[es,w=2]`)
 }
 
 // test for EXACT (generic queries)

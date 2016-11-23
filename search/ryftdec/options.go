@@ -54,6 +54,7 @@ type Options struct {
 // Case sensitivity is set by default
 func DefaultOptions() Options {
 	return Options{
+		// Mode: "es",
 		Case: true,
 	}
 }
