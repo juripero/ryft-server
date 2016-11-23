@@ -64,7 +64,7 @@ func detectExtension(fileNames []string, dataOut string) (string, error) {
 		extensions[ext] += 1
 	}
 
-	// collect unique extensions
+	// collect unique file extensions
 	for _, file := range fileNames {
 		ext := filepath.Ext(file)
 		if len(ext) != 0 {
@@ -72,11 +72,13 @@ func detectExtension(fileNames []string, dataOut string) (string, error) {
 		}
 	}
 
-	if len(extensions) == 1 {
+	if len(extensions) <= 1 {
 		// return the first extension
 		for k, _ := range extensions {
 			return k, nil // OK
 		}
+
+		return "", nil // OK, no extension
 	}
 
 	return "", fmt.Errorf("unable to detect extension from %v", extensions)

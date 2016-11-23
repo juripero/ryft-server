@@ -10,7 +10,7 @@
 #
 tailLines="-40"
 ryftoneLog=/var/log/ryft/ryftone.log
-ryft_server_dLog=~ryftuser/ryft-server-d-start.log
+ryft_server_dLog=/var/log/ryft/server.log
 ryftwebapidemoLog=/tmp/apidemo.log
 ryftodbcdLog=/usr/local/ryft/bin/x8664/ryftone_server.log
 consulLog=/var/log/consul
@@ -62,7 +62,7 @@ ryft_app_logs() {
 	
 	# generate a list of log files
 	rm -f $tarList
-	for i in /var/log/ryft/ryftone.log /home/ryftuser/ryft-server-d-start.log /tmp/apidemo.log /usr/local/ryft/bin/x8664/ryftone_server.log /usr/local/ryft/bin/x8664/ryftone_server*.log /var/log/consul /looney/balooney
+	for i in /var/log/ryft/ryftone.log /var/log/ryft/server.log /tmp/apidemo.log /usr/local/ryft/bin/x8664/ryftone_server.log /usr/local/ryft/bin/x8664/ryftone_server*.log /var/log/consul /looney/balooney
 	do
 		if [ -e $i ] 
 		then

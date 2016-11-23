@@ -148,6 +148,42 @@ Just pass `--local-only` command line argument:
 There is also no any load balancing enabled in local mode.
 
 
+## Logging
+
+There is special parameter in configuration file `logging` and related section
+`logging-options`. The `logging-options` contains a sets of logging configurations.
+Actually `logging` is a key in that set.
+
+```{.yaml}
+logging: debug
+logging-options:
+  custom:
+    core: debug
+    core/catalogs: debug
+    core/pending-jobs: debug
+  debug:
+    core: debug
+    core/catalogs: debug
+    core/pending-jobs: debug
+    core/busyness: debug
+    search/ryftprim: debug
+    search/ryftone: debug
+    search/ryfthttp: debug
+    search/ryftmux: debug
+    search/ryftdec: debug
+  release:
+    core: info
+```
+
+Changing the `logging` option it is possible to quickly change the full logging
+configuration. There is special command line argument `--logging` which also
+could be used to change logging configuration.
+
+The logging configuration itself consists of logger names and corresponding
+logging levels. By default all loggers have "info" level. It is very easy to
+create any logging configuration with fine-tunes logging levels.
+
+
 ## Keeping search results
 
 `ryft-server` uses dedicated instance directory on `/ryftone` volume to keep temporary files.
@@ -354,6 +390,39 @@ define these `insecure-*` options in production.
 See [authentication](./auth.md) document for more details.
 
 
+### Catalog configuration
+
+Some catalog related options can be customized via the following configuration
+section:
+
+```{.yaml}
+catalogs:
+  max-data-file-size: 64MB       # data file size limit: KB, MB, GB, TB
+  cache-drop-timeout: 10s        # internal cache lifetime
+  default-data-delim: "\n\f\n"   # default data delimiter
+  temp-dir: /tmp/ryft/catalogs   # for temporary files
+```
+
+It's possible to customize catalog data size limit via `max-data-file-size`
+option. If there is no more space in current catalog's data file, then new one
+will be started. It's possible to use various units, for example `MB` for
+megabytes (1024*1024) and `GB` for gigabytes (1024*1024*1024).
+
+There is an internal catalog cache. Each catalog entry has it's own drop timeout
+or lifetime. By default it's 10 seconds but can be changed via
+`cache-drop-timeout` option. There is also possible to use various units,
+for example `h` for hours or `ms` for milliseconds.
+
+Data delimiter is used to separate different small files inside a bigger data file.
+If delimiter is non empty, it will be placed each time a new file part is written
+to catalog. The main purpose of this delimiter is to separate RAW text to avoid
+possible collisions on the file boundaries. For structured data the data delimiter
+is not so important. Anyway it can be customized via `default-data-delim` option.
+
+Sometimes catalog need to save file content into temporary file. These
+temporary files are placed in `temp-dir` directory.
+
+
 # Debian package
 
 Having Debian package `ryft-server-$version.deb` it's possible to install it to any compatible machine:
@@ -384,10 +453,10 @@ sudo dpkg -r ryft-server
 
 ## Log file
 
-You can find log file of the `ryft-server-d` service that called `ryft-server-d-start.log` inside home directory of `ryftuser`.
+You can find log file of the `ryft-server-d` service at `/var/log/ryft/server.log`.
 
 To view logs in real-time:
 
 ```{.sh}
-tail -f ~/ryft-server-d-start.log
+tail -f /var/log/ryft/server.log
 ```

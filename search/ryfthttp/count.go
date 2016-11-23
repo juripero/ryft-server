@@ -35,7 +35,7 @@ import (
 	"fmt"
 	"net/http"
 
-	format "github.com/getryft/ryft-server/format/raw"
+	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 )
 

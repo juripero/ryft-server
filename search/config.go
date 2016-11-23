@@ -38,7 +38,7 @@ import (
 // Contains all query related parameters.
 type Config struct {
 	Query         string   // search criteria
-	Files         []string // input file set
+	Files         []string // input file set: regular files
 	Mode          string   // es, fhs, feds, ds, ts...
 	Surrounding   uint     // surrounding width
 	Fuzziness     uint     // fuzziness distance
@@ -47,8 +47,10 @@ type Config struct {
 	Limit         uint     // limit  the number of records
 
 	// if not empty keep the INDEX and/or DATA file
+	// delimiter is used between records in DATA file
 	KeepDataAs  string
 	KeepIndexAs string
+	Delimiter   string
 }
 
 // NewEmptyConfig creates new empty search configuration.

@@ -40,14 +40,6 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/utils"
-)
-
-var (
-	// package logger instance
-	log = logrus.New()
-
-	TAG = "ryftone"
 )
 
 // RyftOne engine uses `ryftone` library as a backend.
@@ -72,18 +64,6 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 	err := engine.update(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse options: %s", err)
-	}
-
-	// update package log level
-	if v, ok := opts["log-level"]; ok {
-		s, err := utils.AsString(v)
-		if err != nil {
-			return nil, fmt.Errorf(`failed to convert "log-level" option: %s`, err)
-		}
-
-		if err := SetLogLevel(s); err != nil {
-			return nil, fmt.Errorf("failed to update log level: %s", err)
-		}
 	}
 
 	return engine, nil // OK
@@ -140,17 +120,6 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	return info, nil // OK
 }
 
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
-	ll, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
-	}
-
-	log.Level = ll
-	return nil // OK
-}
-
 // log returns task related log entry.
 func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
@@ -170,5 +139,5 @@ func init() {
 	search.RegisterEngine(TAG, factory)
 
 	// be silent by default
-	log.Level = logrus.WarnLevel
+	// log.Level = logrus.WarnLevel
 }

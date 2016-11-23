@@ -32,21 +32,12 @@ package ryftprim
 
 import (
 	"fmt"
-	"math"
-	"strconv"
-	"strings"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/utils"
 )
-
-// parseIndex parses Index record from custom line.
-func parseIndex(buf []byte) (index search.Index, err error) {
-	return ryftone.ParseIndex(buf)
-}
 
 // ParseStat parses statistics from ryftprim output.
 func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
@@ -72,7 +63,7 @@ func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
 
 	// Total Bytes
 	if x, ok := v["Total Bytes"]; ok {
-		stat.TotalBytes, err = parseBytes(x)
+		stat.TotalBytes, err = utils.ParseDataSize(x)
 		if err != nil {
 			return nil, fmt.Errorf(`failed to parse "Total Bytes" stat: %s`, err)
 		}
@@ -96,7 +87,7 @@ func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
 		if err != nil {
 			return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat: %s`, err)
 		}
-		stat.FabricDataRate, err = parseDataRate(fdr)
+		stat.FabricDataRate, err = utils.ParseDataRateMbps(fdr)
 		if err != nil {
 			return nil, fmt.Errorf(`failed to parse "Fabric Data Rate" stat from %q: %s`, fdr, err)
 		}
@@ -118,7 +109,7 @@ func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
 		if err != nil {
 			return nil, fmt.Errorf(`failed to parse "Data Rate" stat: %s`, err)
 		}
-		stat.DataRate, err = parseDataRate(dr)
+		stat.DataRate, err = utils.ParseDataRateMbps(dr)
 		if err != nil {
 			return nil, fmt.Errorf(`failed to parse "Data Rate" stat from %q: %s`, dr, err)
 		}
@@ -134,113 +125,4 @@ func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
 	}
 
 	return stat, nil // OK
-}
-
-// parse data rate in MB/s
-// "inf" actually means that duration is zero (dataRate=length/duration)
-// NOTE: need to sync all units with ryftprim!
-func parseDataRate(s string) (float64, error) {
-	s = strings.TrimSpace(s)
-	s = strings.ToLower(s) // case insensitive
-
-	// trim suffix: KB, MB or GB
-	scale := 1.0
-	if t := strings.TrimSuffix(s, "kb/sec"); t != s {
-		scale /= 1024
-		s = t
-	}
-	if t := strings.TrimSuffix(s, "mb/sec"); t != s {
-		// scale = 1.0
-		s = t
-	}
-	if t := strings.TrimSuffix(s, "gb/sec"); t != s {
-		scale *= 1024
-		s = t
-	}
-	if t := strings.TrimSuffix(s, "tb/sec"); t != s {
-		scale *= 1024 * 1024
-		s = t
-	}
-
-	// parse data rate ("inf" is parsed as +Inf)
-	s = strings.TrimSpace(s)
-	r, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0.0, err
-	}
-
-	// filter out any of +Int, -Inf, NaN
-	if math.IsInf(r, 0) || math.IsNaN(r) {
-		return 0.0, nil // report as zero!
-	}
-
-	return r * scale, nil // OK
-}
-
-// parse total bytes
-// "inf" on "nan" mean zero
-// NOTE: need to sync all units with ryftprim!
-func parseBytes(x interface{}) (uint64, error) {
-	// first try to parse as an integer
-	tb, err := utils.AsUint64(x)
-	if err == nil {
-		return tb, nil // OK
-	}
-
-	// then try to parse as a string
-	s, err := utils.AsString(x)
-	if err != nil {
-		return 0, err
-	}
-	s = strings.TrimSpace(s)
-	s = strings.ToLower(s) // case insensitive
-
-	// trim suffix: KB, MB or GB
-	scale := uint64(1)
-	if t := strings.TrimSuffix(s, "bytes"); t != s {
-		// scale = 1
-		s = t
-	}
-	if t := strings.TrimSuffix(s, "kb"); t != s {
-		scale *= 1024
-		s = t
-	}
-	if t := strings.TrimSuffix(s, "mb"); t != s {
-		scale *= 1024 * 1024
-		s = t
-	}
-	if t := strings.TrimSuffix(s, "gb"); t != s {
-		scale *= 1024 * 1024
-		scale *= 1024
-		s = t
-	}
-	if t := strings.TrimSuffix(s, "tb"); t != s {
-		scale *= 1024 * 1024
-		scale *= 1024 * 1024
-		s = t
-	}
-
-	s = strings.TrimSpace(s)
-	if strings.ContainsAny(s, ".,e") {
-		// value is float, parse as float64 ("inf" is parsed as +Inf)
-		r, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			return 0, err
-		}
-
-		// filter out any of +Int, -Inf, NaN
-		if math.IsInf(r, 0) || math.IsNaN(r) {
-			return 0, nil // report as zero!
-		}
-
-		return uint64(r * float64(scale)), nil // OK
-	}
-
-	// value is integer, parse as uint64!
-	r, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return r * scale, nil // OK
 }

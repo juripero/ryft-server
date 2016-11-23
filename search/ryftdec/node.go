@@ -59,7 +59,7 @@ func parseExpression(expression string, baseOpts Options) (cleanedExpression str
 	opts = baseOpts // just a copy by default
 	cleanedExpression = expression
 
-	regex := regexp.MustCompile(`\(?(.+) (FHS|FEDS)\(([\"\'].+?[\"\']),?(.+?)?\)\)?`)
+	regex := regexp.MustCompile(`\s*\(?(.+)\s+(FHS|FEDS)\s*\((.*)\)\s*\)?\s*`)
 	matches := regex.FindAllStringSubmatch(expression, -1)
 
 	if len(matches) > 0 {
@@ -67,9 +67,9 @@ func parseExpression(expression string, baseOpts Options) (cleanedExpression str
 
 		op := strings.TrimSpace(match[1])
 		mode := strings.TrimSpace(match[2])
-		expr := strings.TrimSpace(match[3])
-		argsString := strings.TrimSpace(match[4])
-		args := parseArgs(argsString)
+		argsString := strings.Split(strings.TrimSpace(match[3]), ",")
+		expr := argsString[0]
+		args := parseArgs(strings.Join(argsString[1:], ","))
 
 		opts.Mode = strings.ToLower(mode) // FHS or FEDS
 

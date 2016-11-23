@@ -51,6 +51,8 @@ func TestValidQueries(t *testing.T) {
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY >= 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS >= 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY != 04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS != 11:59:00)))`,
 		`((RECORD.Date CONTAINS DATE(MM/DD/YYYY!=04/15/2015))AND(RECORD.Date CONTAINS TIME(HH:MM:SS!=11:59:00)))`,
+		`(RECORD.doc.play_name NOT_CONTAINS "King Lear")`,
+		`(RAW_TEXT NOT_EQUALS "?")`,
 		`(RAW_TEXT CONTAINS "?")`,
 		`(RAW_TEXT CONTAINS ?)`,
 		`(RAW_TEXT CONTAINS "he"??"o")`,
@@ -89,7 +91,7 @@ func TestDetectExtension(t *testing.T) {
 		{[]string{"a.dat", "b.dat"}, "", ".dat", false},
 		{[]string{"a.txt", "b.dat"}, "", "", true},
 		{[]string{"a.txt", "b.dat"}, "c.jpeg", "", true},
-		{[]string{}, "", "", true},
+		{[]string{}, "", "", false},
 		{[]string{"foo/a.txt", "my.test/b.txt"}, "", ".txt", false},
 		{[]string{"foo/a.txt", "my.test/b.txt"}, "data.txt", ".txt", false},
 		{[]string{"foo/*.txt", "my.test/*txt"}, "", ".txt", false},
@@ -101,7 +103,7 @@ func TestDetectExtension(t *testing.T) {
 	for _, d := range data {
 		ext, err := detectExtension(d.fileNames, d.dataOut)
 		if d.expectedErr {
-			assert.Error(t, err)
+			assert.Error(t, err, "data:%s out:%s", d.fileNames, d.dataOut)
 		} else {
 			assert.NoError(t, err)
 			assert.Equal(t, d.expectedExt, ext)

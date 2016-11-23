@@ -79,8 +79,9 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
 
-	// disable data separator
-	args = append(args, "-e", "")
+	// data separator
+	args = append(args, "-e", cfg.Delimiter)
+	task.Delimiter = cfg.Delimiter
 
 	// enable verbose mode to grab statistics
 	args = append(args, "-v")
@@ -101,6 +102,7 @@ func (engine *Engine) prepare(task *Task, cfg *search.Config) error {
 	}
 
 	// optional surrounding
+	task.Surrounding = cfg.Surrounding
 	if cfg.Surrounding > 0 {
 		args = append(args, "-w", fmt.Sprintf("%d", cfg.Surrounding))
 	}
@@ -174,6 +176,22 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
+	minimizeLatency := engine.MinimizeLatency // from configuration
+	// if output DATA or INDEX files already exist
+	// we cannot minimize latency - need to postpone processing until ryftprim is finished
+	if minimizeLatency && len(task.IndexFileName) != 0 {
+		if _, err := os.Stat(filepath.Join(engine.MountPoint, task.IndexFileName)); !os.IsNotExist(err) {
+			task.log().WithField("path", task.IndexFileName).Warnf("[%s]: INDEX file already exists, postpone processing", TAG)
+			minimizeLatency = false
+		}
+	}
+	if minimizeLatency && len(task.DataFileName) != 0 {
+		if _, err := os.Stat(filepath.Join(engine.MountPoint, task.DataFileName)); !os.IsNotExist(err) {
+			task.log().WithField("path", task.DataFileName).Warnf("[%s]: DATA file already exists, postpone processing", TAG)
+			minimizeLatency = false
+		}
+	}
+
 	task.log().WithField("args", task.tool_args).Infof("[%s]: executing tool", TAG)
 	cmd := exec.Command(engine.ExecPath, task.tool_args...)
 
@@ -190,14 +208,14 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.tool_cmd = cmd
 
 	// do processing in background
-	go engine.process(task, res)
+	go engine.process(task, res, minimizeLatency)
 
 	return nil // OK for now
 }
 
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
-func (engine *Engine) process(task *Task, res *search.Result) {
+func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bool) {
 	defer task.log().WithField("result", res).Debugf("[%s]: end TASK processing", TAG)
 	task.log().Debugf("[%s]: start TASK processing...", TAG)
 
@@ -217,8 +235,10 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 		}
 	}()
 
-	// start INDEX&DATA processing
-	if task.enableDataProcessing {
+	// start INDEX&DATA processing (if latency is minimized)
+	// otherwise wait until ryftprim tool is finished
+	if minimizeLatency && task.enableDataProcessing {
+		task.dataProcessingEnabled = true
 		task.prepareProcessing()
 
 		task.subtasks.Add(2)
@@ -230,12 +250,21 @@ func (engine *Engine) process(task *Task, res *search.Result) {
 	// TODO: overall execution timeout?
 
 	case err := <-cmd_done: // process done
+		// start INDEX&DATA processing (if latency is NOT minimized)
+		if !minimizeLatency && task.enableDataProcessing && err == nil {
+			task.dataProcessingEnabled = true
+			task.prepareProcessing()
+
+			task.subtasks.Add(2)
+			go engine.processIndex(task, res)
+			go engine.processData(task, res)
+		}
 		engine.finish(err, task, res)
 
 	case <-res.CancelChan: // client wants to stop all processing
 		task.log().Warnf("[%s]: cancelling by client", TAG)
 
-		if task.enableDataProcessing {
+		if task.dataProcessingEnabled {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
 			task.cancelData()
@@ -307,7 +336,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	}
 
 	// stop subtasks if processing enabled
-	if task.enableDataProcessing {
+	if task.dataProcessingEnabled {
 		if err != nil || error_suppressed {
 			task.log().Debugf("[%s]: cancelling INDEX&DATA processing...", TAG)
 			task.cancelIndex()
@@ -335,7 +364,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 			case <-res.CancelChan: // client wants to stop all processing
 				task.log().Warnf("[%s]: ***cancelling by client", TAG)
-				if task.enableDataProcessing {
+				if task.dataProcessingEnabled {
 					task.log().Debugf("[%s]: ***cancelling INDEX&DATA processing...", TAG)
 					task.cancelIndex()
 					task.cancelData()
@@ -420,7 +449,7 @@ func (engine *Engine) processIndex(task *Task, res *search.Result) {
 			// task.log().WithField("line", string(bytes.TrimSpace(line))).
 			// 	Debugf("[%s]: new INDEX line read", TAG) // FIXME: DEBUG
 
-			index, err := parseIndex(line)
+			index, err := search.ParseIndex(line)
 			if err != nil {
 				task.log().WithError(err).Warnf("failed to parse index from %q", bytes.TrimSpace(line))
 				res.ReportError(fmt.Errorf("failed to parse index: %s", err))
@@ -491,7 +520,10 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 	// try to process all INDEX records
 	r := bufio.NewReader(file)
+	offset := uint64(0)
 	for index := range task.indexChan {
+		dataLen := index.Length
+
 		// trim mount point from file name! TODO: special option for this?
 		index.File = strings.TrimPrefix(index.File,
 			filepath.Join(engine.MountPoint, engine.HomeDir))
@@ -500,7 +532,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		rec.Index = index
 
 		// try to read data: if operation is cancelled `data` is nil
-		rec.Data, err = task.readDataFile(r, index.Length,
+		rec.Data, err = task.readDataFile(r, dataLen,
 			engine.ReadFilePollTimeout,
 			engine.ReadFilePollLimit)
 		if err != nil {
@@ -524,6 +556,7 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 		// task.log().WithField("rec", rec).Debugf("[%s]: new record", TAG) // FIXME: DEBUG
 		rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 		res.ReportRecord(rec)
+		offset += dataLen
 
 		if task.Limit > 0 && res.RecordsReported() >= task.Limit {
 			task.log().WithField("limit", task.Limit).Infof("[%s]: DATA processing stopped by limit", TAG)
@@ -533,13 +566,47 @@ func (engine *Engine) processData(task *Task, res *search.Result) {
 
 			return // stop processing
 		}
+
+		// read and check delimiter
+		if len(task.Delimiter) > 0 {
+			tmp, err := task.readDataFile(r,
+				uint64(len(task.Delimiter)),
+				engine.ReadFilePollTimeout,
+				engine.ReadFilePollLimit)
+
+			if err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to read DATA delimiter", TAG)
+				res.ReportError(fmt.Errorf("failed to read DATA delimiter: %s", err))
+			}
+			if string(tmp) != task.Delimiter {
+				task.log().WithField("actual", tmp).WithField("expected", task.Delimiter).
+					Warnf("unexpected delimiter found at %d", offset)
+				tmp = nil // force to cancel futher processing
+			}
+
+			if err != nil || tmp == nil {
+				task.log().Debugf("[%s]: DATA processing cancelled", TAG)
+
+				// just in case, also stop INDEX processing
+				task.cancelIndex()
+
+				return // no sense to continue processing
+			}
+
+			offset += uint64(len(task.Delimiter))
+		}
 	}
 }
 
 // make path relative to mountpoint
 func (engine *Engine) relativeToMountPoint(path string) string {
 	full := filepath.Join(engine.MountPoint, path) // full path
-	rel, err := filepath.Rel(engine.MountPoint, full)
+	return engine.relativeToMountPointAbs(full)
+}
+
+// make path relative to mountpoint (path is already absolute)
+func (engine *Engine) relativeToMountPointAbs(path string) string {
+	rel, err := filepath.Rel(engine.MountPoint, path)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to get relative path", TAG)
 		return path // "as is"

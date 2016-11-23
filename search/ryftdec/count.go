@@ -32,6 +32,7 @@ package ryftdec
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftone"
@@ -44,38 +45,101 @@ func (engine *Engine) Count(cfg *search.Config) (*search.Result, error) {
 
 	// split cfg.Query into several expressions
 	cfg.Query = ryftone.PrepareQuery(cfg.Query)
-	task.queries, err = Decompose(cfg.Query, configToOpts(cfg))
+	opts := configToOpts(cfg)
+	opts.BooleansPerExpression = engine.BooleansPerExpression
+
+	task.queries, err = Decompose(cfg.Query, opts)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
 
+	instanceName, homeDir, mountPoint := engine.getBackendOptions()
+	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
+		task.Identifier, task.subtaskId, task.extension))
+	task.result, err = NewInMemoryPostProcessing(filepath.Join(mountPoint, homeDir, res1)) // NewCatalogPostProcessing
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to create res catalog", TAG)
+		return nil, fmt.Errorf("failed to create res catalog: %s", err)
+	}
+	err = task.result.ClearAll()
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to clear res catalog", TAG)
+		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
+	}
+	task.log().WithField("results", res1).Infof("[%s]: temporary result catalog", TAG)
+
+	// check input data-set for catalogs
+	var hasCatalogs int
+	oldCfgFiles := cfg.Files
+	hasCatalogs, cfg.Files, err = checksForCatalog(task.result, cfg.Files, filepath.Join(mountPoint, homeDir))
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
+		return nil, fmt.Errorf("failed to check for catalogs: %s", err)
+	}
+
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
-	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 {
+	if task.queries.Type.IsSearch() && len(task.queries.SubNodes) == 0 && hasCatalogs == 0 {
+		task.result.Drop(false) // no sense to save empty working catalog
 		updateConfig(cfg, task.queries)
 		return engine.Backend.Count(cfg)
 	}
 
-	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
+	// use source list of files to detect extensions
+	// some catalogs data files contains malformed filenames so this procedure may fail
+	task.extension, err = detectExtension(oldCfgFiles, cfg.KeepDataAs)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
 		return nil, fmt.Errorf("failed to detect extension: %s", err)
 	}
-	log.Infof("[%s]: starting: %s", TAG, cfg.Query)
+	task.log().Infof("[%s]: starting: %s as %s", TAG, cfg.Query, dumpTree(task.queries, 0))
 
 	mux := search.NewResult()
+	keepDataAs := task.config.KeepDataAs
+	keepIndexAs := task.config.KeepIndexAs
+	delimiter := task.config.Delimiter
+
 	go func() {
 		// some futher cleanup
 		defer mux.Close()
 		defer mux.ReportDone()
+		defer task.result.Drop(engine.KeepResultFiles)
 
-		_, stat, err := engine.search(task, task.queries, task.config,
-			engine.Backend.Count, mux, true)
-		mux.Stat = stat
+		res, err := engine.search(task, task.queries, task.config,
+			engine.Backend.Count, mux, false)
+		mux.Stat = res.Stat
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to do count", TAG)
 			mux.ReportError(err)
+			return
+		}
+
+		if !engine.KeepResultFiles {
+			defer res.removeAll(mountPoint, homeDir)
+		}
+
+		// post-processing (if DATA or INDEX file is requested)
+		if len(keepDataAs) > 0 || len(keepIndexAs) > 0 {
+			task.log().WithField("data", res.Output).Infof("final results")
+			for _, out := range res.Output {
+				if err := task.result.AddRyftResults(filepath.Join(mountPoint, homeDir, out.DataFile),
+					filepath.Join(mountPoint, homeDir, out.IndexFile),
+					out.Delimiter, out.Width, 1 /*final*/); err != nil {
+					mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
+					return
+				}
+			}
+
+			err = task.result.DrainFinalResults(task, mux,
+				keepDataAs, keepIndexAs, delimiter,
+				filepath.Join(mountPoint, homeDir),
+				res.Output, false /*report records*/)
+			if err != nil {
+				task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
+				mux.ReportError(err)
+				return
+			}
 		}
 
 		// TODO: handle task cancellation!!!

@@ -72,8 +72,8 @@ func (engine *Engine) Options() map[string]interface{} {
 	return engine.Backend.Options()
 }
 
-// SetLogLevel changes global module log level.
-func SetLogLevel(level string) error {
+// SetLogLevelString changes global module log level.
+func SetLogLevelString(level string) error {
 	ll, err := logrus.ParseLevel(level)
 	if err != nil {
 		return err
@@ -81,6 +81,16 @@ func SetLogLevel(level string) error {
 
 	log.Level = ll
 	return nil // OK
+}
+
+// SetLogLevel changes global module log level.
+func SetLogLevel(level logrus.Level) {
+	log.Level = level
+}
+
+// GetLogLevel gets global module log level.
+func GetLogLevel() logrus.Level {
+	return log.Level
 }
 
 // log returns task related logger.
@@ -106,5 +116,5 @@ func init() {
 	// search.RegisterEngine(TAG, factory)
 
 	// be silent by default
-	log.Level = logrus.WarnLevel
+	// log.Level = logrus.WarnLevel
 }
