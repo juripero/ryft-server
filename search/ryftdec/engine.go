@@ -27,6 +27,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
+
 package ryftdec
 
 import (
@@ -44,7 +45,7 @@ var (
 	TAG = "ryftdec"
 )
 
-// RyftDEC engine uses abstract engine as backend.
+// Engine is decomposition engine that uses an abstract engine as backend.
 type Engine struct {
 	Backend         search.Engine
 	optimizer       *Optimizer

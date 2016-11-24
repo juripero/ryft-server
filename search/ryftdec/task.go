@@ -27,6 +27,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
+
 package ryftdec
 
 import (
@@ -48,7 +49,7 @@ var (
 	taskId = uint64(0 * time.Now().UnixNano())
 )
 
-// RyftDEC task related data.
+// Task - task related data.
 type Task struct {
 	Identifier string // unique
 	subtaskId  int
@@ -112,7 +113,7 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 	}
 }
 
-// general post-processing interface
+// PostProcessing general post-processing interface
 type PostProcessing interface {
 	ClearAll() error // prepare work - clear all data
 	Drop(keep bool)  // finish work
@@ -381,7 +382,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 }
 */
 
-// in-memory based post-processing
+// InMemoryPostProcessing in-memory based post-processing
 type InMemoryPostProcessing struct {
 	indexes map[string]*index.IndexFile // [datafile] -> indexes
 }

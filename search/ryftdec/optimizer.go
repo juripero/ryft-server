@@ -27,6 +27,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
+
 package ryftdec
 
 import (
@@ -245,13 +246,13 @@ func (o *Optimizer) canCombine(a Query, b Query) bool {
 // get the bool operations limit
 func (o *Optimizer) getLimit(a Query, b Query) int {
 	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
-		if false && aa.Options.EqualsTo(bb.Options) {
+		/*if aa.Options.EqualsTo(bb.Options) {
 			// both simple queries are the same type!
 			return o.getModeLimit(aa.Options.Mode)
-		} else {
-			// type or options are different
-			return o.CombineLimit
-		}
+		}*/
+
+		// type or options are different
+		return o.CombineLimit
 	}
 
 	return 0 // not found

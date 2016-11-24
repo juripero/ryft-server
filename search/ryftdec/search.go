@@ -27,6 +27,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * ============
  */
+
 package ryftdec
 
 import (
@@ -54,7 +55,7 @@ func relativeToHome(home, path string) string {
 // also populate the Post-Processing engine
 func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []string, error) {
 	newFiles := make([]string, 0, len(files))
-	N_catalogs := 0
+	NoCatalogs := 0
 
 	// check it dynamically: catalog or regular file
 	for _, mask := range files {
@@ -95,7 +96,7 @@ func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []
 
 			log.WithField("file", filePath).Debugf("[%s]: ... is a catalog", TAG)
 			wcat.AddCatalog(cat)
-			N_catalogs += 1
+			NoCatalogs++
 
 			// data files (absolute path)
 			if dataFiles, err := cat.GetDataFiles(); err != nil {
@@ -109,12 +110,12 @@ func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []
 		}
 	}
 
-	if N_catalogs == 0 {
+	if NoCatalogs == 0 {
 		// use source files "as is"
 		newFiles = files
 	}
 
-	return N_catalogs, newFiles, nil // OK
+	return NoCatalogs, newFiles, nil // OK
 }
 
 // convert search configuration to base Options
@@ -274,7 +275,7 @@ func (engine *Engine) getBackendOptions() (instanceName, homeDir, mountPoint str
 	return
 }
 
-// one Ryft call result
+// RyftCall - one Ryft call result
 type RyftCall struct {
 	DataFile  string
 	IndexFile string
@@ -288,13 +289,13 @@ func (rc RyftCall) String() string {
 		rc.DataFile, rc.IndexFile, rc.Delimiter, rc.Width)
 }
 
-// intermediate search results
+// SearchResult - intermediate search results
 type SearchResult struct {
 	Stat   *search.Stat
 	Output []RyftCall // list of data/index files
 }
 
-// get number of matches
+// Matches gets the number of matches
 func (res SearchResult) Matches() uint64 {
 	if res.Stat != nil {
 		return res.Stat.Matches
@@ -303,7 +304,7 @@ func (res SearchResult) Matches() uint64 {
 	return 0 // no stat yet
 }
 
-// get list of data files
+// GetDataFiles gets the list of data files
 func (res SearchResult) GetDataFiles() []string {
 	dat := make([]string, 0, len(res.Output))
 	for _, out := range res.Output {
@@ -323,7 +324,7 @@ func (res SearchResult) removeAll(mountPoint, homeDir string) {
 // process and wait all /search subtasks
 // returns number of matches and corresponding statistics
 func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
-	task.subtaskId += 1 // next subtask
+	task.subtaskId++ // next subtask
 
 	if query.Simple != nil {
 		// OK, handle later...
@@ -525,7 +526,7 @@ func detectExtension(fileNames []string, dataOut string) (string, error) {
 
 	if len(extensions) <= 1 {
 		// return the first extension
-		for k, _ := range extensions {
+		for k := range extensions {
 			return k, nil // OK
 		}
 
