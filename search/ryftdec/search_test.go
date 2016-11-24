@@ -57,8 +57,7 @@ func (fe *fakeEngine) Search(cfg *search.Config) (*search.Result, error) {
 		res.Stat = search.NewStat(fe.Host)
 		started := time.Now()
 		defer func() {
-			now := time.Now()
-			res.Stat.Duration = uint64(now.Sub(started).Nanoseconds() / 1000)
+			res.Stat.Duration = uint64(time.Since(started).Nanoseconds() / 1000)
 			res.Stat.FabricDuration = res.Stat.Duration / 2
 		}()
 
