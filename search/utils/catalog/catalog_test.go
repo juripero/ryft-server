@@ -102,7 +102,10 @@ func TestCatalogAddFilePart(t *testing.T) {
 
 	start := time.Now()
 	log.Debugf("starting %d catalog upload tests", count)
-	defer func() { log.Debugf("end upload tests in %s", time.Since(start)) }()
+	defer func() {
+		dt := time.Since(start)
+		log.Debugf("end upload tests in %s (%s per file part)", dt, dt/time.Duration(count))
+	}()
 
 	// add file part to catalog
 	upload := func(filename string, offset, length int64, expectedError string) addFilePartResult {

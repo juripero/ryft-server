@@ -38,20 +38,9 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// base index item
-type baseIndex struct {
-	Index   *search.Index
-	DataBeg uint64 // begin of data
-	DataEnd uint64 // end of data (without delimiter)
-}
-
-func (i baseIndex) String() string {
-	return fmt.Sprintf("{%s#%d [%d..%d)}", i.Index.File, i.Index.Offset, i.DataBeg, i.DataEnd)
-}
-
 // IndexFile contains base indexes
 type IndexFile struct {
-	Items []baseIndex
+	Items []*search.Index
 	Opt   uint32 // custom option
 
 	delim  string // data delimiter
@@ -63,20 +52,21 @@ type IndexFile struct {
 // data delimiter is used to adjust data offsets
 func NewIndexFile(delimiter string, width uint) *IndexFile {
 	f := new(IndexFile)
-	f.Items = make([]baseIndex, 0, 1024) // TODO: initial capacity
+	f.Items = make([]*search.Index, 0, 1024) // TODO: initial capacity
 	f.delim = delimiter
 	f.width = width
 	f.offset = 0
 	return f
 }
 
+// get as string
 func (f *IndexFile) String() string {
 	buf := bytes.Buffer{}
 
 	buf.WriteString(fmt.Sprintf("delim:%q, offset:%d\n", f.delim, f.offset))
 	for _, i := range f.Items {
-		buf.WriteString(i.String())
-		buf.WriteRune('\n')
+		buf.WriteString(fmt.Sprintf("{%s#%d [%d..%d)}\n", i.File,
+			i.Offset, i.DataPos, i.DataPos+i.Length))
 	}
 
 	return buf.String()
@@ -84,22 +74,15 @@ func (f *IndexFile) String() string {
 
 // AddIndex adds base index to the list
 func (f *IndexFile) Add(file string, offset, length, data_pos uint64) {
-	f.Items = append(f.Items, baseIndex{
-		DataBeg: data_pos,
-		DataEnd: data_pos + length,
-		Index:   search.NewIndex(file, offset, length),
-	})
+	idx := search.NewIndex(file, offset, length)
+	idx.DataPos = data_pos
+	f.Items = append(f.Items, idx)
 }
 
 // AddIndex adds base index to the list
 func (f *IndexFile) AddIndex(index *search.Index) {
-	f.Items = append(f.Items, baseIndex{
-		//order:  i,
-		DataBeg: f.offset,
-		DataEnd: f.offset + index.Length,
-		Index:   index,
-	})
-
+	index.DataPos = f.offset
+	f.Items = append(f.Items, index)
 	f.offset += index.Length + uint64(len(f.delim))
 }
 
@@ -111,7 +94,9 @@ func (f *IndexFile) Len() int {
 // Find base item index for specific offset
 func (f *IndexFile) Find(offset uint64) int {
 	return sort.Search(len(f.Items), func(i int) bool {
-		return offset < f.Items[i].DataEnd
+		idx := f.Items[i]
+		end := idx.DataPos + idx.Length
+		return offset < end
 	})
 }
 
@@ -136,28 +121,38 @@ func (f *IndexFile) Unwind(index *search.Index) (*search.Index, int) {
 
 	if n < len(f.Items) {
 		base := f.Items[n]
-		index.File = base.Index.File
+		index.File = base.File
 
 		// found data [beg..end)
 		beg := index.Offset
 		end := index.Offset + index.Length
-		if base.DataBeg <= beg {
+		if base.DataPos <= beg {
 			// data offset is within our base
 			// need to adjust just offset
-			index.Offset = base.Index.Offset + (beg - base.DataBeg)
+			index.Offset = base.Offset + (beg - base.DataPos)
 		} else {
 			// data offset before our base
 			// need to truncate "begin" surrounding part
-			index.Offset = base.Index.Offset
-			index.Length -= (base.DataBeg - beg)
-			shift = int(base.DataBeg - beg)
+			index.Offset = base.Offset
+			index.Length -= (base.DataPos - beg)
+			shift = int(base.DataPos - beg)
 		}
-		if end > base.DataEnd {
+		base_end := base.DataPos + base.Length
+		if end > base_end {
 			// end of data after our base
 			// need to truncate "end" surrounding part
-			index.Length -= (end - base.DataEnd)
+			index.Length -= (end - base_end)
 		}
 	}
 
 	return index, shift
+}
+
+// release all indexes
+func (f *IndexFile) Clear() {
+	for _, idx := range f.Items {
+		idx.Release()
+	}
+	f.Items = f.Items[0:0]
+	f.offset = 0
 }

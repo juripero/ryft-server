@@ -503,7 +503,6 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 	type MemItem struct {
 		dataFile string
 		Index    *search.Index
-		dataPos  uint64
 		shift    int
 	}
 
@@ -516,16 +515,15 @@ BuildItems:
 
 		for _, item := range f.Items {
 			// do recursive unwinding!
-			idx, shift := mpp.unwind(item.Index)
-			if shift != 0 || idx.Length != item.Index.Length {
+			idx, shift := mpp.unwind(item)
+			if shift != 0 || idx.Length != item.Length {
 				simple = false
 			}
 
-			// put item to futher processing
+			// put item to further processing
 			items = append(items, MemItem{
 				dataFile: itemDataFile,
 				Index:    idx,
-				dataPos:  item.DataBeg,
 				shift:    shift,
 			})
 
@@ -616,7 +614,7 @@ BuildItems:
 		var data, recRawData []byte
 		if cf != nil && (reportRecords || datFile != nil) {
 			// record's data read position in the file
-			rpos := int64(item.dataPos + uint64(item.shift))
+			rpos := int64(item.Index.DataPos + uint64(item.shift))
 
 			//task.log().WithFields(map[string]interface{}{
 			//	"cache-pos": cf.pos,

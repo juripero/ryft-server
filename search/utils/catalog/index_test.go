@@ -57,6 +57,11 @@ func TestCatalogGetIndex(t *testing.T) {
 `, files[d2].String())
 		}
 
+		// clear all indexes
+		for _, idx := range files {
+			idx.Clear()
+		}
+
 		assert.True(t, cat.DropFromCache())
 		assert.NoError(t, cat.Close())
 	}

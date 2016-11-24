@@ -44,11 +44,16 @@ var idxPool = &sync.Pool{
 
 // Index is INDEX meta-data.
 type Index struct {
-	File      string `json:"file" msgpack:"file"`                     // filename
-	Offset    uint64 `json:"offset" msgpack:"offset"`                 // data offset
-	Length    uint64 `json:"length" msgpack:"length"`                 // length of data
-	Fuzziness int32  `json:"fuzziness" msgpack:"fuzziness"`           // fuzziness distance
-	Host      string `json:"host,omitempty" msgpack:"host,omitempty"` // optional host address (used in cluster mode)
+	File      string `json:"file" msgpack:"file"`           // filename
+	Offset    uint64 `json:"offset" msgpack:"offset"`       // data offset in 'File'
+	Length    uint64 `json:"length" msgpack:"length"`       // length of data
+	Fuzziness int32  `json:"fuzziness" msgpack:"fuzziness"` // fuzziness distance
+
+	// optional host address (used in cluster mode)
+	Host string `json:"host,omitempty" msgpack:"host,omitempty"`
+
+	// position in Ryft data file
+	DataPos uint64 `json:"datapos,omitempty" msgpack:"datapos,omitempty"`
 }
 
 // NewIndex creates a new Index object.
