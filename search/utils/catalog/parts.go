@@ -86,6 +86,15 @@ AND ? BETWEEN p.pos AND p.pos+p.len-1;`, filename, offset)
 			p_beg, p_end := p_pos, p_pos+p_len
 			if p_beg <= beg && beg < p_end && p_beg <= end && end < p_end {
 				// no delimiter should be provided since we write into the mid of file part!
+
+				cat.log().WithFields(map[string]interface{}{
+					"filename":  filename,
+					"offset":    offset,
+					"length":    length,
+					"data-file": d_file,
+					"data-pos":  d_pos + (beg - p_beg),
+				}).Debugf("[%s]: use existing file part", TAG)
+
 				return d_file, d_pos + (beg - p_beg), "", nil // use this part
 			}
 
@@ -95,7 +104,7 @@ AND ? BETWEEN p.pos AND p.pos+p.len-1;`, filename, offset)
 			return "", 0, "", fmt.Errorf("failed to find existing part: %s", err)
 		} /* else
 		sql.ErrNoRows means no existing file part found
-		we can continue out processing...
+		we can continue our processing...
 		*/
 	}
 
@@ -134,6 +143,13 @@ VALUES (?,?,?,?,?)`, filename, offset, length, d_id, d_pos)
 		return "", 0, "", fmt.Errorf("failed to commit transaction: %s", err)
 	}
 
+	cat.log().WithFields(map[string]interface{}{
+		"filename":  filename,
+		"offset":    offset,
+		"length":    length,
+		"data-file": d_file,
+		"data-pos":  d_pos,
+	}).Debugf("[%s]: add new file part", TAG)
 	return d_file, d_pos, delim, nil // OK
 }
 

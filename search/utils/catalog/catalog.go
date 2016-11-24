@@ -37,7 +37,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -58,13 +57,24 @@ var DefaultDataSizeLimit uint64 = 64 * 1024 * 1024 // 64 MB by default
 var DefaultCacheDropTimeout time.Duration = 10 * time.Second
 
 // default data delimiter
-var DefaultDataDelimiter string
+var DefaultDataDelimiter string = ""
 
 // default temp directory
 var DefaultTempDirectory string = "/tmp/"
 
 // ErrNotACatalog is used to indicate the file is not a catalog meta-data file.
 var ErrNotACatalog = errors.New("not a catalog")
+
+// SetLogLevelString changes global module log level.
+func SetLogLevelString(level string) error {
+	ll, err := logrus.ParseLevel(level)
+	if err != nil {
+		return err
+	}
+
+	SetLogLevel(ll)
+	return nil // OK
+}
 
 // SetLogLevel changes global module log level.
 func SetLogLevel(level logrus.Level) {
@@ -81,20 +91,19 @@ func SetDefaultCacheDropTimeout(timeout time.Duration) {
 	DefaultCacheDropTimeout = timeout
 	globalCache.DropTimeout = timeout
 
-	log.WithField("timeout", timeout).Debugf("[%s]: default cache-drop timeout has changed")
+	log.WithField("timeout", timeout).Debugf("[%s]: default cache-drop timeout has changed", TAG)
 }
 
 // Catalog struct contains catalog related meta-data.
 type Catalog struct {
-	DataSizeLimit    uint64 // data file size limit, bytes. 0 to disable limit
-	CacheDropTimeout time.Duration
-
-	UseAbsoluteDataPath bool
-
 	db    *sql.DB    // database connection
 	path  string     // absolute path to db file
 	mutex sync.Mutex // to synchronize access to catalog
 
+	DataSizeLimit       uint64 // data file size limit, bytes. 0 to disable limit
+	UseAbsoluteDataPath bool
+
+	// cache related fields
 	cache     *Cache      // nil or cache binded
 	cacheRef  int32       // number of references from cache
 	cacheDrop *time.Timer // pending drop from cache
@@ -110,7 +119,7 @@ func OpenCatalog(path string) (*Catalog, error) {
 
 	// update database scheme
 	if !cached {
-		log.WithField("path", path).Debugf("[%s]: updating scheme...", TAG)
+		cat.log().Debugf("[%s]: updating scheme...", TAG)
 		if err := cat.updateSchemeSync(); err != nil {
 			cat.Close()
 			return nil, err
@@ -139,7 +148,7 @@ func OpenCatalogNoCache(path string) (*Catalog, error) {
 	}
 
 	// update database scheme
-	log.WithField("path", path).Debugf("[%s]: updating scheme...")
+	cat.log().Debugf("[%s]: updating scheme...", TAG)
 	if err := cat.updateSchemeSync(); err != nil {
 		cat.Close()
 		return nil, err
@@ -170,7 +179,6 @@ func getCatalog(path string, readOnly bool) (*Catalog, bool, error) {
 	cat, err := openCatalog(path)
 	if err == nil && cat != nil {
 		globalCache.put(path, cat)
-		cat.cacheAddRef()
 	}
 
 	return cat, false, err
@@ -199,8 +207,8 @@ func openCatalog(path string) (*Catalog, error) {
 
 // Close closes catalog file.
 func (cat *Catalog) Close() error {
-	if cat.cache != nil {
-		cat.cacheRelease()
+	if cc := cat.cache; cc != nil {
+		cc.release(cat)
 		return nil
 	}
 
@@ -217,7 +225,6 @@ func (cat *Catalog) Close() error {
 // DropFromCache force remove catalog from cache.
 func (cat *Catalog) DropFromCache() bool {
 	if cc := cat.cache; cc != nil {
-		cat.cache = nil
 		cat.log().Debugf("[%s]: drop from cache", TAG)
 		cc.Drop(cat.path)
 		return true
@@ -229,55 +236,4 @@ func (cat *Catalog) DropFromCache() bool {
 // Get catalog's path
 func (cat *Catalog) GetPath() string {
 	return cat.path
-}
-
-// cache: add reference
-func (cat *Catalog) cacheAddRef() {
-	ref := atomic.AddInt32(&cat.cacheRef, +1)
-	cat.log().WithField("ref", ref).Debugf("[%s]: add reference", TAG) // FIXME: DEBUG
-	if ref == 1 {
-		cat.stopDropTimerSync() // just in case
-	}
-}
-
-// cache: release
-func (cat *Catalog) cacheRelease() {
-	ref := atomic.AddInt32(&cat.cacheRef, -1)
-	cat.log().WithField("ref", ref).Debugf("[%s]: release reference", TAG) // FIXME: DEBUG
-	if ref == 0 {
-		// for the last reference start the drop timer
-		cat.startDropTimerSync(cat.CacheDropTimeout)
-	}
-}
-
-// start drop timer (synchronized)
-func (cat *Catalog) startDropTimerSync(timeout time.Duration) {
-	cat.mutex.Lock()
-	defer cat.mutex.Unlock()
-
-	if cat.cacheDrop != nil && cat.cacheDrop.Reset(timeout) {
-		// timer is updated
-		cat.log().Debugf("[%s]: refresh drop-timer", TAG) // FIXME: DEBUG
-	} else {
-		cat.cacheDrop = time.AfterFunc(timeout, func() {
-			cat.log().Debugf("[%s]: drop-timeout is expired...", TAG)
-			if cat.DropFromCache() {
-				cat.Close()
-			}
-		})
-		cat.log().WithField("timeout", timeout).Debugf("[%s]: start drop-timer", TAG) // FIXME: DEBUG
-	}
-}
-
-// stop drop timer if any (synchronized)
-func (cat *Catalog) stopDropTimerSync() {
-	cat.mutex.Lock()
-	defer cat.mutex.Unlock()
-
-	if cd := cat.cacheDrop; cd != nil {
-		cat.cacheDrop = nil
-		if cd.Stop() {
-			cat.log().Debugf("[%s]: stop drop-timer", TAG) // FIXME: DEBUG
-		}
-	}
 }

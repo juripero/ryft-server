@@ -13,188 +13,193 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// add file to catalog
-func testFileUpload(t *testing.T, id int, catalog string, filename string, length int64) (string, int64) {
-	// open catalog
-	cf, err := OpenCatalog(catalog)
-	if assert.NoError(t, err, "run-id:%d", id) && assert.NotNil(t, cf, "run-id:%d", id) {
-		defer cf.Close()
+var (
+	testLogLevel = "debug"
+)
 
-		// update catalog atomically
-		// TODO: check unknown length (length <= 0)!
-		data_path, data_pos, _, err := cf.AddFilePart(filename, 0, length, nil)
-		assert.NoError(t, err, "failed to add file to catalog %s run-id:%d", catalog, id)
+// check common catalog tasks
+func TestCatalogCommon(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+	assert.EqualValues(t, testLogLevel, GetLogLevel().String())
+	SetDefaultCacheDropTimeout(100 * time.Millisecond)
 
-		return data_path, data_pos
+	os.MkdirAll("/tmp/ryft/", 0755)
+	defer os.RemoveAll("/tmp/ryft/")
+
+	// open missing catalog
+	log.Debugf("[test]: check open read-only missing/bad catalogs")
+	_, err := OpenCatalogReadOnly("/tmp/ryft/foo.catalog")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "not a catalog")
 	}
 
-	return "", 0 // bad case
+	// bad catalog file
+	ioutil.WriteFile("/tmp/ryft/bad.catalog", []byte("hello"), 0644)
+	os.MkdirAll(getDataDir("/tmp/ryft/bad.catalog"), 0755) // fake data dir
+	cat, err := OpenCatalogReadOnly("/tmp/ryft/bad.catalog")
+	if assert.NoError(t, err) && assert.NotNil(t, cat) {
+		// assert.Contains(t, err.Error(), "not a catalog")
+		assert.False(t, cat.CheckScheme())
+		assert.True(t, cat.DropFromCache())
+		assert.NoError(t, cat.Close())
+	}
+
+	// open catalog
+	log.Debugf("[test]: open catalog and check scheme")
+	cat, err = OpenCatalog("/tmp/ryft/foo.txt")
+	if assert.NoError(t, err) && assert.NotNil(t, cat) {
+		assert.True(t, cat.CheckScheme())
+		assert.EqualValues(t, "/tmp/ryft/.foo.txt.catalog", cat.GetDataDir())
+		if files, err := cat.GetDataFiles(); assert.NoError(t, err) {
+			assert.Empty(t, files)
+		}
+		assert.True(t, cat.DropFromCache())
+		assert.NoError(t, cat.Close())
+	}
+
+	// time.Sleep(2 * DefaultCacheDropTimeout)
+	assert.Empty(t, globalCache.cached)
 }
 
-type FileUploadResult struct {
-	Path string
-	Part FileUploadPart
+// result of Catalog.AddFilePart
+type addFilePartResult struct {
+	Path  string
+	Delim string
+	Part  addFilePart
 }
 
-type FileUploadPart struct {
-	Pos uint64
-	Len uint64
+// file part reference
+type addFilePart struct {
+	Pos int64 // data position
+	Len int64 // length
 }
 
-type FileUploadParts []FileUploadPart
+// set of parts
+type addFileParts []addFilePart
 
-func (p FileUploadParts) Len() int           { return len(p) }
-func (p FileUploadParts) Less(i, j int) bool { return p[i].Pos < p[j].Pos }
-func (p FileUploadParts) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p addFileParts) Len() int           { return len(p) }
+func (p addFileParts) Less(i, j int) bool { return p[i].Pos < p[j].Pos }
+func (p addFileParts) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // check multiple adds
-func TestFileUpload(t *testing.T) {
-	catalog := "/tmp/catalog.db"
-	os.RemoveAll(catalog)
+func TestCatalogAddFilePart(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+	SetDefaultCacheDropTimeout(100 * time.Millisecond)
+	DefaultDataDelimiter = "\n\f\n"
+	DefaultDataSizeLimit = 10 * 1024
 
-	res_ch := make(chan FileUploadResult)
-	count := 100
+	os.MkdirAll("/tmp/ryft/", 0755)
+	defer os.RemoveAll("/tmp/ryft/")
 
-	expected_len := uint64(0)
-	actual_len := uint64(0)
+	catalog := "/tmp/ryft/foo.txt"
+	os.RemoveAll(catalog) // just in case
+
+	resCh := make(chan addFilePartResult)
+	count := 1000
+
+	expectedLen := int64(0)
+	actualLen := int64(0)
 
 	start := time.Now()
-	log.Printf("starting %d upload tests", count)
-	defer func() { log.Printf("end upload tests in %s", time.Since(start)) }()
+	log.Debugf("starting %d catalog upload tests", count)
+	defer func() { log.Debugf("end upload tests in %s", time.Since(start)) }()
+
+	// add file part to catalog
+	upload := func(filename string, offset, length int64, expectedError string) addFilePartResult {
+		// open catalog
+		cat, err := OpenCatalog(catalog)
+		if assert.NoError(t, err) && assert.NotNil(t, cat) {
+			defer cat.Close()
+
+			// update catalog atomically
+			// TODO: check unknown length (length <= 0)!
+			dataPath, dataPos, delim, err := cat.AddFilePart(filename, offset, length, nil)
+			if len(expectedError) != 0 {
+				if assert.Error(t, err) {
+					assert.Contains(t, err.Error(), expectedError)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+
+			return addFilePartResult{
+				Path:  dataPath,
+				Delim: delim,
+				Part:  addFilePart{dataPos, length},
+			}
+		}
+
+		return addFilePartResult{} // bad case
+	}
 
 	// do requests simultaneously
 	for i := 0; i < count; i++ {
 		go func(id int) {
 			filename := fmt.Sprintf("%010d.txt", id)
-			length := rand.Int63n(1 * 1024)
-			atomic.AddUint64(&expected_len, uint64(length))
+			length := 100 + rand.Int63n(1*1024)
 
-			path, pos := testFileUpload(t, id, catalog, filename, length)
-			res_ch <- FileUploadResult{path, FileUploadPart{uint64(pos), uint64(length)}}
+			atomic.AddInt64(&expectedLen, length)
+			p1 := upload(filename, -1 /*automatic*/, length, "")
+			resCh <- p1
+
+			// check part with the same offset
+			p2 := upload(filename, 20, length-40, "")
+			assert.EqualValues(t, p1.Path, p2.Path)
+			assert.Empty(t, p2.Delim) // should be empty because we will write to the middle of part!
+			assert.EqualValues(t, p1.Part.Pos+20, p2.Part.Pos)
+			assert.EqualValues(t, p1.Part.Len-40, p2.Part.Len)
+
+			atomic.AddInt64(&expectedLen, length*2)
+			resCh <- upload(filename, -1 /*automatic*/, length*2, "")
+
+			_ = upload(filename, length-20, length, "part will override existing part")
 		}(i)
 	}
 
 	// wait for all results
-	data_files := make(map[string]FileUploadParts)
-	for i := 0; i < count; i++ {
-		res := <-res_ch
-		if len(res.Path) > 0 {
-			data_files[res.Path] = append(data_files[res.Path], res.Part)
+	dataFiles := make(map[string]addFileParts)
+	for i := 0; i < 2*count; i++ {
+		if res := <-resCh; len(res.Path) > 0 {
+			dataFiles[res.Path] = append(dataFiles[res.Path], res.Part)
+			assert.EqualValues(t, res.Delim, DefaultDataDelimiter)
 		} // omit empty files (errors)
 	}
 
 	// check all data files
-	for data, parts := range data_files {
+	dataFileList := make([]string, 0, len(dataFiles))
+	for data, parts := range dataFiles {
+		dataFileList = append(dataFileList, data)
 		sort.Sort(parts)
 
 		// check all parts
 		a := parts[0]
-		assert.Equal(t, uint64(0), a.Pos, "%s: unexpected first part offset %v", data, a)
+		assert.EqualValues(t, 0, a.Pos) // first part offset should be zero
+		atomic.AddInt64(&actualLen, a.Len)
 		for i := 1; i < len(parts); i++ {
 			b := parts[i]
 
-			assert.Equal(t, b.Pos, a.Pos+a.Len, "%s: unexpected part %v..%v", data, a, b)
+			assert.EqualValues(t, b.Pos, a.Pos+a.Len+int64(len(DefaultDataDelimiter)))
+			atomic.AddInt64(&actualLen, b.Len)
 			a = b // next iteration
 		}
-
-		atomic.AddUint64(&actual_len, a.Pos+a.Len)
-		t.Logf("%s: %d bytes", data, a.Pos+a.Len)
 	}
 
-	assert.Equal(t, expected_len, actual_len, "invalid total data length")
-
-	//assert.True(t, IsCatalog(catalog))
-	//assert.False(t, IsCatalog(catalog+".missing"))
-	ioutil.WriteFile("/tmp/catalog.db.bad", []byte("hello"), 0644)
-	//assert.False(t, IsCatalog(catalog+".bad"))
-
-	time.Sleep(20 * time.Second)
-}
-
-// check multi catalogs
-func _TestUnwind(t *testing.T) {
-	catalog := "/tmp/catalog.tmp.db"
-	workcat := "/tmp/catalog.work.db"
-	os.RemoveAll(catalog)
-	os.RemoveAll(workcat)
-
-	var data_file string
+	assert.EqualValues(t, expectedLen, actualLen, "invalid total data length")
 	cat, err := OpenCatalog(catalog)
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
-		defer cat.Close()
-		delim := "\n"
+		files, err := cat.GetDataFiles()
+		if assert.NoError(t, err) {
+			sort.Strings(files)
+			sort.Strings(dataFileList)
+			assert.EqualValues(t, dataFileList, files)
+		}
 
-		_, _, _, err = cat.AddFilePart("1.txt", 0, 17, &delim)
-		_, _, _, err = cat.AddFilePart("2.txt", 0, 17, &delim)
-		_, _, _, err = cat.AddFilePart("3.txt", 0, 17, &delim)
-		_, _, _, err = cat.AddFilePart("1.txt", 17, 17, &delim)
-		_, _, _, err = cat.AddFilePart("2.txt", 17, 17, &delim)
-		data_file, _, _, err = cat.AddFilePart("3.txt", 17, 17, &delim)
-		assert.NoError(t, err)
+		assert.NoError(t, cat.ClearAll())
+
+		assert.True(t, cat.DropFromCache())
+		assert.NoError(t, cat.Close())
 	}
 
-	wcat, err := OpenCatalog(workcat)
-	if assert.NoError(t, err) && assert.NotNil(t, wcat) {
-		defer wcat.Close()
-
-		err = wcat.CopyFrom(cat)
-		assert.NoError(t, err, "failed to copy catalog")
-	}
-
-	// create first index file: find "hello,w=2"
-	idx1, err := os.Create("/tmp/index1.txt")
-	if assert.NoError(t, err) && assert.NotNil(t, idx1) {
-		idx1.WriteString(fmt.Sprintf("%s,4,9,0\n", data_file))
-		idx1.WriteString(fmt.Sprintf("%s,22,9,0\n", data_file))
-		idx1.WriteString(fmt.Sprintf("%s,40,9,0\n", data_file))
-		idx1.WriteString(fmt.Sprintf("%s,58,9,0\n", data_file))
-		idx1.WriteString(fmt.Sprintf("%s,76,9,0\n", data_file))
-		idx1.WriteString(fmt.Sprintf("%s,94,9,0\n", data_file))
-		idx1.WriteString(fmt.Sprintf("%s,4,9,0\n", "4.txt"))
-		idx1.WriteString(fmt.Sprintf("%s,5,9,0\n", "5.txt"))
-		idx1.Sync()
-		idx1.Close()
-
-		data_file = "/tmp/data-1.bin"
-		err = wcat.AddRyftResults(data_file, "/tmp/index1.txt", "\r\n", 2, 0)
-		assert.NoError(t, err, "failed to add Ryft results")
-	}
-
-	// create second index file, find:"hello,w=0"
-	idx2, err := os.Create("/tmp/index2.txt")
-	if assert.NoError(t, err) && assert.NotNil(t, idx2) {
-		idx2.WriteString(fmt.Sprintf("%s,2,5,0\n", data_file))
-		idx2.WriteString(fmt.Sprintf("%s,13,5,0\n", data_file))
-		idx2.WriteString(fmt.Sprintf("%s,24,5,0\n", data_file))
-		idx2.WriteString(fmt.Sprintf("%s,35,5,0\n", data_file))
-		idx2.WriteString(fmt.Sprintf("%s,46,5,0\n", data_file))
-		idx2.WriteString(fmt.Sprintf("%s,57,5,0\n", data_file))
-		idx2.WriteString(fmt.Sprintf("%s,68,5,0\n", data_file))
-		idx2.WriteString(fmt.Sprintf("%s,79,5,0\n", data_file))
-		idx2.Sync()
-		idx2.Close()
-
-		data_file = "/tmp/data-2.bin"
-		err = wcat.AddRyftResults(data_file, "/tmp/index2.txt", "\n", 0, 0)
-		assert.NoError(t, err, "failed to add Ryft results")
-	}
-
-	// create third index file, find:"ell,w=2"
-	idx3, err := os.Create("/tmp/index3.txt")
-	if assert.NoError(t, err) && assert.NotNil(t, idx3) {
-		idx3.WriteString(fmt.Sprintf("%s,0,6,1\n", data_file))
-		idx3.WriteString(fmt.Sprintf("%s,5,6,1\n", data_file))
-		idx3.WriteString(fmt.Sprintf("%s,11,6,1\n", data_file))
-		idx3.WriteString(fmt.Sprintf("%s,17,6,1\n", data_file))
-		idx3.WriteString(fmt.Sprintf("%s,23,6,1\n", data_file))
-		idx3.WriteString(fmt.Sprintf("%s,29,6,1\n", data_file))
-		idx3.WriteString(fmt.Sprintf("%s,35,6,1\n", data_file))
-		idx3.WriteString(fmt.Sprintf("%s,41,5,1\n", data_file))
-		idx3.Sync()
-		idx3.Close()
-
-		data_file = "/tmp/data-3.bin"
-		err = wcat.AddRyftResults(data_file, "/tmp/index3.txt", "\f", 2, 0)
-		assert.NoError(t, err, "failed to add Ryft results")
-	}
+	// time.Sleep(2 * DefaultCacheDropTimeout)
+	assert.Empty(t, globalCache.cached)
 }

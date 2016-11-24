@@ -32,6 +32,7 @@ package catalog
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -68,7 +69,7 @@ func (cc *Cache) Get(path string) *Catalog {
 func (cc *Cache) get(path string) *Catalog {
 	// try to get existing catalog
 	if cat, ok := cc.cached[path]; ok && cat != nil {
-		cat.cacheAddRef()
+		cc.cacheAddRef(cat)
 		return cat
 	}
 
@@ -88,10 +89,10 @@ func (cc *Cache) put(path string, cat *Catalog) {
 	if cat.cache != nil {
 		panic("catalog is already used")
 	}
-	cat.CacheDropTimeout = cc.DropTimeout
-	cat.cache = cc
 
 	cc.cached[path] = cat
+	cc.cacheAddRef(cat)
+	cat.cache = cc
 }
 
 // Drop removes the catalog from cache.
@@ -107,8 +108,68 @@ func (cc *Cache) drop(path string) bool {
 	// try to drop existing catalog
 	if cat, ok := cc.cached[path]; ok && cat != nil {
 		delete(cc.cached, path)
+		cat.cache = nil
+
+		atomic.StoreInt32(&cat.cacheRef, 0)
+		cc.stopDropTimerSync(cat)
 		return true
 	}
 
 	return false // does not exist
+}
+
+// release catalog reference
+func (cc *Cache) release(cat *Catalog) {
+	cc.cacheRelease(cat)
+}
+
+// cache: add reference
+func (cc *Cache) cacheAddRef(cat *Catalog) {
+	ref := atomic.AddInt32(&cat.cacheRef, +1)
+	//cat.log().WithField("ref", ref).Debugf("[%s]: reference++", TAG) // FIXME: DEBUG
+	if ref == 1 {
+		cc.stopDropTimerSync(cat) // just in case
+	}
+}
+
+// cache: release
+func (cc *Cache) cacheRelease(cat *Catalog) {
+	ref := atomic.AddInt32(&cat.cacheRef, -1)
+	//cat.log().WithField("ref", ref).Debugf("[%s]: reference--", TAG) // FIXME: DEBUG
+	if ref <= 0 {
+		// for the last reference start the drop timer
+		cc.startDropTimerSync(cat, cc.DropTimeout)
+	}
+}
+
+// start drop timer (synchronized)
+func (cc *Cache) startDropTimerSync(cat *Catalog, timeout time.Duration) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	if cat.cacheDrop != nil && cat.cacheDrop.Reset(timeout) {
+		// timer is updated
+		cat.log().Debugf("[%s]: refresh drop-timer", TAG) // FIXME: DEBUG
+	} else {
+		cat.cacheDrop = time.AfterFunc(timeout, func() {
+			cat.log().Debugf("[%s]: drop-timeout is expired...", TAG)
+			if cat.DropFromCache() {
+				cat.Close()
+			}
+		})
+		cat.log().WithField("timeout", timeout).Debugf("[%s]: start drop-timer", TAG) // FIXME: DEBUG
+	}
+}
+
+// stop drop timer if any (synchronized)
+func (cc *Cache) stopDropTimerSync(cat *Catalog) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	if cd := cat.cacheDrop; cd != nil {
+		cat.cacheDrop = nil
+		if cd.Stop() {
+			cat.log().Debugf("[%s]: stop drop-timer", TAG) // FIXME: DEBUG
+		}
+	}
 }

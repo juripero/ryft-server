@@ -63,9 +63,14 @@ func (cat *Catalog) checkScheme() (bool, error) {
 	// get current scheme version
 	row := cat.db.QueryRow("PRAGMA user_version;")
 	if err := row.Scan(&version); err != nil {
+		// cat.log().WithError(err).Warnf("[%s]: failed to get scheme version", TAG)
 		return false, fmt.Errorf("failed to get scheme version: %s", err)
 	}
 
+	cat.log().WithFields(map[string]interface{}{
+		"expected": dbSchemeVersion,
+		"version":  version,
+	}).Debugf("[%s]: scheme version", TAG)
 	return version >= dbSchemeVersion, nil // OK
 }
 
@@ -84,6 +89,7 @@ func (cat *Catalog) updateScheme() error {
 	// get current scheme version
 	row := cat.db.QueryRow("PRAGMA user_version;")
 	if err := row.Scan(&version); err != nil {
+		// cat.log().WithError(err).Warnf("[%s]: failed to get scheme version", TAG)
 		return fmt.Errorf("failed to get scheme version: %s", err)
 	}
 
@@ -94,6 +100,7 @@ func (cat *Catalog) updateScheme() error {
 	// need to update scheme, should be done under exclusive transaction
 	tx, err := cat.db.Begin()
 	if err != nil {
+		// cat.log().WithError(err).Warnf("[%s]: failed to begin update scheme transaction", TAG)
 		return fmt.Errorf("failed to begin update scheme transaction: %s", err)
 	}
 	defer tx.Rollback() // just in case
@@ -101,19 +108,22 @@ func (cat *Catalog) updateScheme() error {
 	// 0 => 1
 	if version <= 0 {
 		if err := cat.updateSchemeToVersion1(tx); err != nil {
-			return fmt.Errorf("failed to update to version 1: %s", err)
+			// cat.log().WithError(err).Warnf("[%s]: failed to update scheme to version 1", TAG)
+			return fmt.Errorf("failed to update scheme to version 1: %s", err)
 		}
 	}
 
 	// 1 => 2 (example)
-	if false && version <= 1 {
+	/* if version <= 1 {
 		if err := cat.updateSchemeToVersion2(tx); err != nil {
+			cat.log().WithError(err).Warnf("[%s]: failed to update scheme to version 2", TAG)
 			return fmt.Errorf("failed to update to version 2: %s", err)
 		}
-	}
+	} */
 
 	// commit changes
 	if err := tx.Commit(); err != nil {
+		// cat.log().WithError(err).Warnf("[%s]: failed to commit update scheme transaction", TAG)
 		return fmt.Errorf("failed to commit update scheme transaction: %s", err)
 	}
 
@@ -172,6 +182,7 @@ PRAGMA user_version = 1;
 }
 
 // version2: update tables (example)
+/*
 func (cat *Catalog) updateSchemeToVersion2(tx *sql.Tx) error {
 	SCRIPT := ` -- just an example
 ALTER TABLE data ADD COLUMN foo INTEGER;
@@ -187,3 +198,4 @@ PRAGMA user_version = 2;
 
 	return nil // OK
 }
+*/
