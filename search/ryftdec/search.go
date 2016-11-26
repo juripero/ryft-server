@@ -123,12 +123,11 @@ func configToOpts(cfg *search.Config) Options {
 	opts := DefaultOptions()
 
 	opts.Mode = cfg.Mode
-	opts.Dist = cfg.Fuzziness
-	opts.Width = cfg.Surrounding
-	// TODO: opts.Line  = cfg.
-	opts.Case = cfg.CaseSensitive
+	opts.Dist = cfg.Dist
+	opts.Width = cfg.Width
+	opts.Case = cfg.Case
+	opts.Reduce = cfg.Reduce
 
-	// opts.Reduce =
 	// opts.Octal =
 	// opts.CurrencySymbol =
 	// opts.DigitSeparator =
@@ -140,10 +139,10 @@ func configToOpts(cfg *search.Config) Options {
 // update search configuration with Options
 func updateConfig(cfg *search.Config, opts Options) {
 	// cfg.Mode = opts.Mode
-	cfg.Fuzziness = opts.Dist
-	cfg.Surrounding = opts.Width
-	// cfg.WholeLine = opts.Line
-	cfg.CaseSensitive = opts.Case
+	cfg.Dist = opts.Dist
+	cfg.Width = opts.Width
+	cfg.Case = opts.Case
+	cfg.Reduce = opts.Reduce
 }
 
 // Search starts asynchronous "/search" with RyftDEC engine.
@@ -369,7 +368,7 @@ func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux 
 		DataFile:  cfg.KeepDataAs,
 		IndexFile: cfg.KeepIndexAs,
 		Delimiter: cfg.Delimiter,
-		Width:     cfg.Surrounding,
+		Width:     uint(cfg.Width),
 		// TODO: line options?
 	})
 

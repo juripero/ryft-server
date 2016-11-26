@@ -111,8 +111,8 @@ func (fe *fakeEngine) Search(cfg *search.Config) (*search.Result, error) {
 					start += n + 1 // find next
 					res.Stat.Matches++
 
-					d_beg := start - 1 - int(cfg.Surrounding)
-					d_len := len(text) + 2*int(cfg.Surrounding)
+					d_beg := start - 1 - int(cfg.Width)
+					d_len := len(text) + 2*int(cfg.Width)
 					if d_beg < 0 {
 						d_len += d_beg
 						d_beg = 0
@@ -248,7 +248,7 @@ func TestEngineSearchBypass(t *testing.T) {
 	engine, err := NewEngine(f1, -1, false)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		cfg := search.NewConfig("hello", "*.txt")
-		cfg.Surrounding = 3
+		cfg.Width = 3
 		cfg.ReportIndex = true
 		cfg.ReportData = true
 
@@ -301,7 +301,7 @@ func TestEngineSearchAnd3(t *testing.T) {
 	engine, err := NewEngine(f1, -1, false)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		cfg := search.NewConfig("hello AND hell AND he", "1.txt")
-		cfg.Surrounding = 3
+		cfg.Width = 3
 		cfg.ReportIndex = true
 		cfg.ReportData = true
 
@@ -356,7 +356,7 @@ func TestEngineSearchOr3(t *testing.T) {
 	engine, err := NewEngine(f1, -1, false)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		cfg := search.NewConfig("hello OR hell OR he", "1.txt")
-		cfg.Surrounding = 3
+		cfg.Width = 3
 		cfg.ReportIndex = true
 		cfg.ReportData = true
 

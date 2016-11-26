@@ -39,8 +39,7 @@ import (
 type Options struct {
 	Mode  string // Search mode: es, fhs, feds, date, time, etc.
 	Dist  uint   // Fuzziness distance (FHS, FEDS)
-	Width uint   // Surrounding width
-	Line  bool   // Surrounding: entire line. If `true` Width is ignored.
+	Width int    // Surrounding width, -1 for "line"
 	Case  bool   // Case sensitivity flag (ES, FHS, FEDS)
 
 	Reduce bool // Reduce duplicates flag (FEDS)
@@ -72,13 +71,8 @@ func (o Options) EqualsTo(p Options) bool {
 		return false
 	}
 
-	// surrounding width
+	// surrounding width (entire line)
 	if o.Width != p.Width {
-		return false
-	}
-
-	// surrounding: entire line
-	if o.Line != p.Line {
 		return false
 	}
 
@@ -130,12 +124,12 @@ func (o Options) String() string {
 	}
 
 	// surrounding width
-	if o.Width != 0 {
+	if o.Width > 0 {
 		args = append(args, fmt.Sprintf("w=%d", o.Width))
 	}
 
 	// surrounding: entire line
-	if o.Line {
+	if o.Width < 0 {
 		args = append(args, "line")
 	}
 
@@ -229,7 +223,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.Dist = 0
 		//o.Width = 0
 		//o.Line = false
-		//o.Case = true
+		o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
@@ -241,7 +235,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.Dist = 0
 		//o.Width = 0
 		//o.Line = false
-		//o.Case = true
+		o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
@@ -253,7 +247,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.Dist = 0 // no these options for NUMBER search!
 		//o.Width = 0
 		//o.Line = false
-		//o.Case = true
+		o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
@@ -265,7 +259,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.Dist = 0
 		//o.Width = 0
 		//o.Line = false
-		//o.Case = true
+		o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		//o.CurrencySymbol = ""
@@ -277,7 +271,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.Dist = 0
 		//o.Width = 0
 		//o.Line = false
-		//o.Case = true
+		o.Case = true
 		o.Reduce = false
 		//o.Octal = false
 		o.CurrencySymbol = ""
@@ -289,7 +283,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.Dist = 0
 		//o.Width = 0
 		//o.Line = false
-		//o.Case = true
+		o.Case = true
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
@@ -368,13 +362,11 @@ func (o *Options) Set(option string, positonalName string) (bool, error) {
 		strings.EqualFold(opt, "W"):
 		if not {
 			o.Width = 0
-			o.Line = false // mutual exclusive
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 			if v, err := p.parseIntVal(0, 64*1024-1); err != nil {
 				return named, err
 			} else {
-				o.Width = uint(v)
-				o.Line = false // mutual exclusive
+				o.Width = int(v)
 			}
 		} else {
 			return named, fmt.Errorf("%q found instead of =", eq)
@@ -384,19 +376,18 @@ func (o *Options) Set(option string, positonalName string) (bool, error) {
 	case strings.EqualFold(opt, "LINE"),
 		strings.EqualFold(opt, "L"):
 		if not {
-			o.Line = false
-			o.Width = 0 // mutual exclusive
+			o.Width = 0
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
 			if v, err := p.parseBoolVal(); err != nil {
 				return named, err
+			} else if v {
+				o.Width = -1
 			} else {
-				o.Line = v
-				o.Width = 0 // mutual exclusive
+				o.Width = 0
 			}
 		} else {
 			p.unscan(eq) // return fmt.Errorf("%q found instead of =", eq)
-			o.Line = true
-			o.Width = 0 // mutual exclusive
+			o.Width = -1
 		}
 
 	// case sensitivity flag

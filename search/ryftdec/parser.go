@@ -357,7 +357,6 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		// no surrounding width should be used
 		// for structured search!
 		res.Options.Width = 0
-		res.Options.Line = false
 	}
 
 	res.ExprOld = fmt.Sprintf("(%s %s %s)", input,
@@ -425,9 +424,9 @@ func getExprNew(expr string, opts Options) string {
 	switch opts.Mode {
 	// exact search
 	case "es":
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
@@ -443,9 +442,9 @@ func getExprNew(expr string, opts Options) string {
 			args = append(args, fmt.Sprintf(`DISTANCE="%d"`, opts.Dist))
 		}
 
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
@@ -461,9 +460,9 @@ func getExprNew(expr string, opts Options) string {
 			args = append(args, fmt.Sprintf(`DISTANCE="%d"`, opts.Dist))
 		}
 
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
@@ -479,9 +478,9 @@ func getExprNew(expr string, opts Options) string {
 
 	// date search
 	case "ds":
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
@@ -489,9 +488,9 @@ func getExprNew(expr string, opts Options) string {
 
 	// time search
 	case "ts":
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
@@ -499,9 +498,9 @@ func getExprNew(expr string, opts Options) string {
 
 	// numeric search
 	case "ns":
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
@@ -517,9 +516,9 @@ func getExprNew(expr string, opts Options) string {
 
 	// currency search
 	case "cs":
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
@@ -539,9 +538,9 @@ func getExprNew(expr string, opts Options) string {
 
 	// IPv4 search
 	case "ipv4":
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
@@ -553,9 +552,9 @@ func getExprNew(expr string, opts Options) string {
 
 	// IPv6 search
 	case "ipv6":
-		if opts.Line { // LINE is mutual exclusive with WIDTH
-			args = append(args, fmt.Sprintf(`LINE="%t"`, opts.Line))
-		} else if opts.Width != 0 {
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 

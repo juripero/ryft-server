@@ -15,7 +15,7 @@ func TestOptionsEqual(t *testing.T) {
 	assert.False(t, Options{}.EqualsTo(Options{Octal: true}))
 	assert.False(t, Options{}.EqualsTo(Options{Reduce: true}))
 	assert.False(t, Options{}.EqualsTo(Options{Case: true}))
-	assert.False(t, Options{}.EqualsTo(Options{Line: true}))
+	assert.False(t, Options{}.EqualsTo(Options{Width: -1}))
 	assert.False(t, Options{}.EqualsTo(Options{Width: 1}))
 	assert.False(t, Options{}.EqualsTo(Options{Dist: 1}))
 	assert.False(t, Options{}.EqualsTo(Options{Mode: "es"}))
@@ -58,12 +58,12 @@ func TestOptionsSetMode(t *testing.T) {
 	assert.Equal(t, `[es,w=1,!cs]`, fake(0).SetMode("fhs").String())
 	assert.Equal(t, `[feds,d=1,w=1,!cs,reduce]`, fake(1).SetMode("feds").String())
 	assert.Equal(t, `[es,w=1,!cs]`, fake(0).SetMode("feds").String())
-	assert.Equal(t, `[ds,w=1,!cs]`, fake(1).SetMode("ds").String())
-	assert.Equal(t, `[ts,w=1,!cs]`, fake(1).SetMode("ts").String())
-	assert.Equal(t, `[ns,w=1,!cs,sep=",",dot="."]`, fake(1).SetMode("ns").String())
-	assert.Equal(t, `[cs,w=1,!cs,sym="$",sep=",",dot="."]`, fake(1).SetMode("cs").String())
-	assert.Equal(t, `[ipv4,w=1,!cs,octal]`, fake(1).SetMode("ipv4").String())
-	assert.Equal(t, `[ipv6,w=1,!cs]`, fake(1).SetMode("ipv6").String())
+	assert.Equal(t, `[ds,w=1]`, fake(1).SetMode("ds").String())
+	assert.Equal(t, `[ts,w=1]`, fake(1).SetMode("ts").String())
+	assert.Equal(t, `[ns,w=1,sep=",",dot="."]`, fake(1).SetMode("ns").String())
+	assert.Equal(t, `[cs,w=1,sym="$",sep=",",dot="."]`, fake(1).SetMode("cs").String())
+	assert.Equal(t, `[ipv4,w=1,octal]`, fake(1).SetMode("ipv4").String())
+	assert.Equal(t, `[ipv6,w=1]`, fake(1).SetMode("ipv6").String())
 }
 
 // test for set options

@@ -135,9 +135,9 @@ func TestEngineUsual(t *testing.T) {
 	check := func(mode string) {
 		cfg := search.NewConfig("hello", "1.txt", "2.txt")
 		cfg.Mode = mode
-		cfg.Surrounding = 10
-		cfg.CaseSensitive = false
-		cfg.Fuzziness = 1
+		cfg.Width = 10
+		cfg.Case = false
+		cfg.Dist = 1
 		cfg.KeepIndexAs = "ryftprim-index" // NO ".txt" extension
 		cfg.KeepDataAs = "ryftprim-data.bin"
 		cfg.Delimiter = "\r\n\f"
@@ -295,9 +295,9 @@ func TestEngineUsualNoOutput(t *testing.T) {
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.Mode = "fhs"
-	cfg.Surrounding = 10
-	cfg.CaseSensitive = false
-	cfg.Fuzziness = 1
+	cfg.Width = 10
+	cfg.Case = false
+	cfg.Dist = 1
 	//cfg.KeepIndexAs = "ryftprim-index.txt"
 	//cfg.KeepDataAs = "ryftprim-data.bin"
 	cfg.Delimiter = "\r\n\f"

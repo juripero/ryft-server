@@ -86,17 +86,19 @@ func (engine *Engine) prepare(task *Task) error {
 		args = append(args, "-q", cfg.Query)
 
 		// optional surrounding width
-		if cfg.Surrounding > 0 {
-			args = append(args, "-w", fmt.Sprintf("%d", cfg.Surrounding))
+		if cfg.Width < 0 {
+			args = append(args, "--line")
+		} else if cfg.Width > 0 {
+			args = append(args, "-w", fmt.Sprintf("%d", cfg.Width))
 		}
 
 		// optional fuzziness distance
-		if cfg.Fuzziness > 0 {
-			args = append(args, "-d", fmt.Sprintf("%d", cfg.Fuzziness))
+		if cfg.Dist > 0 {
+			args = append(args, "-d", fmt.Sprintf("%d", cfg.Dist))
 		}
 
 		// case sensitivity
-		if !cfg.CaseSensitive {
+		if !cfg.Case {
 			args = append(args, "-i")
 		}
 	} else {

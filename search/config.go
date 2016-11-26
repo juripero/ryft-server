@@ -37,14 +37,15 @@ import (
 // Config is a search configuration.
 // Contains all query related parameters.
 type Config struct {
-	Query         string   // search criteria
-	Files         []string // input file set: regular files or catalogs
-	Mode          string   // es, fhs, feds, ds, ts...
-	Surrounding   uint     // surrounding width
-	Fuzziness     uint     // fuzziness distance
-	CaseSensitive bool     // case sensitive flag
-	Nodes         uint     // number of hardware nodes to use (0..4)
-	Limit         uint     // limit  the number of records (0 - no limit)
+	Query  string   // search criteria
+	Files  []string // input file set: regular files or catalogs
+	Mode   string   // es, fhs, feds, ds, ts... "" for general syntax
+	Width  int      // surrounding width, -1 for "line"
+	Case   bool     // case sensitive flag (ES, FHS, FEDS)
+	Dist   uint     // fuzziness distance (FHS, FEDS)
+	Reduce bool     // reduce for FEDS
+	Nodes  uint     // number of hardware nodes to use (0..4)
+	Limit  uint     // limit  the number of records (0 - no limit)
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
@@ -54,13 +55,13 @@ type Config struct {
 
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)
-	ReportData  bool // if false, just indexes will be read
+	ReportData  bool // if false, just indexes will be read (format=null)
 }
 
 // NewEmptyConfig creates new empty search configuration.
 func NewEmptyConfig() *Config {
 	cfg := new(Config)
-	cfg.CaseSensitive = true
+	cfg.Case = true // by default
 	return cfg
 }
 
@@ -69,7 +70,7 @@ func NewConfig(query string, files ...string) *Config {
 	cfg := new(Config)
 	cfg.Query = query
 	cfg.Files = files
-	cfg.CaseSensitive = true
+	cfg.Case = true
 	return cfg
 }
 
@@ -86,6 +87,6 @@ func (cfg *Config) AddFiles(files []string) {
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
 	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, width:%d, dist:%d, cs:%t, nodes:%d, limit:%d, keep-data:%q, keep-index:%q, delim:%q, index:%t, data:%t}",
-		cfg.Query, cfg.Files, cfg.Mode, cfg.Surrounding, cfg.Fuzziness, cfg.CaseSensitive, cfg.Nodes,
-		cfg.Limit, cfg.KeepDataAs, cfg.KeepIndexAs, cfg.Delimiter, cfg.ReportIndex, cfg.ReportData)
+		cfg.Query, cfg.Files, cfg.Mode, cfg.Width, cfg.Dist, cfg.Case, cfg.Nodes, cfg.Limit,
+		cfg.KeepDataAs, cfg.KeepIndexAs, cfg.Delimiter, cfg.ReportIndex, cfg.ReportData)
 }

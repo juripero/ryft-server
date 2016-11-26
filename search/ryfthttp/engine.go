@@ -101,12 +101,14 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	if len(cfg.Mode) != 0 {
 		q.Set("mode", cfg.Mode)
 	}
-	q.Set("cs", fmt.Sprintf("%t", cfg.CaseSensitive))
-	if cfg.Surrounding > 0 {
-		q.Set("surrounding", fmt.Sprintf("%d", cfg.Surrounding))
+	q.Set("cs", fmt.Sprintf("%t", cfg.Case))
+	if cfg.Width < 0 {
+		q.Set("surrounding", "line")
+	} else if cfg.Width > 0 {
+		q.Set("surrounding", fmt.Sprintf("%d", cfg.Width))
 	}
-	if cfg.Fuzziness > 0 {
-		q.Set("fuzziness", fmt.Sprintf("%d", cfg.Fuzziness))
+	if cfg.Dist > 0 {
+		q.Set("fuzziness", fmt.Sprintf("%d", cfg.Dist))
 	}
 	if cfg.Nodes > 0 {
 		q.Set("nodes", fmt.Sprintf("%d", cfg.Nodes))
