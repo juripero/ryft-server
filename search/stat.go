@@ -50,12 +50,16 @@ type Stat struct {
 
 	Details []*Stat `json:"details,omitempty" msgpack:"details,omitempty"` // all statistics merged (cluster mode or query decomposition)
 	Host    string  `json:"host,omitempty" msgpack:"host,omitempty"`       // optional host address (used in cluster mode)
+
+	// some extra information (request, performance stats, etc)
+	Extra map[string]interface{} `json:"extra,omitempty" msgpack:"extra,omitempty"`
 }
 
 // NewStat creates empty statistics.
 func NewStat(host string) *Stat {
 	stat := new(Stat)
 	stat.Host = host
+	stat.Extra = make(map[string]interface{})
 	return stat
 }
 

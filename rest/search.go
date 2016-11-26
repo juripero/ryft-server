@@ -46,25 +46,25 @@ import (
 // for the /search endpoint.
 type SearchParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
-	OldFiles      []string `form:"files" json:"files"` // obsolete: will be deleted
-	Files         []string `form:"file" json:"file"`
-	Catalogs      []string `form:"catalog" json:"catalogs"`
-	Mode          string   `form:"mode" json:"mode"`
-	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
-	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
+	OldFiles      []string `form:"files" json:"old-files,omitempty"` // obsolete: will be deleted
+	Files         []string `form:"file" json:"files,omitempty"`
+	Catalogs      []string `form:"catalog" json:"catalogs,omitempty"`
+	Mode          string   `form:"mode" json:"mode,omitempty"`
+	Surrounding   uint16   `form:"surrounding" json:"surrounding,omitempty"`
+	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness,omitempty"`
 	Format        string   `form:"format" json:"format"`
-	CaseSensitive bool     `form:"cs" json:"cs"`
-	Fields        string   `form:"fields" json:"fields"`
-	Nodes         uint8    `form:"nodes" json:"nodes"`
-	Local         bool     `form:"local" json:"local"`
-	Stats         bool     `form:"stats" json:"stats"`
-	Stream        bool     `form:"stream" json:"stream"`
-	Spark         bool     `form:"spark" json:"spark"`
-	ErrorPrefix   bool     `form:"ep" json:"ep"`
-	KeepDataAs    string   `form:"data" json:"data"`
-	KeepIndexAs   string   `form:"index" json:"index"`
-	Delimiter     string   `form:"delimiter" json:"delimiter"`
-	Limit         int      `form:"limit" json:"limit"`
+	CaseSensitive bool     `form:"cs" json:"cs,omitempty"`
+	Fields        string   `form:"fields" json:"fields,omitempty"`
+	Nodes         uint8    `form:"nodes" json:"nodes,omitempty"`
+	Local         bool     `form:"local" json:"local,omitempty"`
+	Stats         bool     `form:"stats" json:"stats,omitempty"`
+	Stream        bool     `form:"stream" json:"stream,omitempty"`
+	Spark         bool     `form:"spark" json:"spark,omitempty"`
+	ErrorPrefix   bool     `form:"ep" json:"ep,omitempty"`
+	KeepDataAs    string   `form:"data" json:"data,omitempty"`
+	KeepIndexAs   string   `form:"index" json:"index,omitempty"`
+	Delimiter     string   `form:"delimiter" json:"delimiter,omitempty"`
+	Limit         int      `form:"limit" json:"limit,omitempty"`
 }
 
 // Handle /search endpoint.
@@ -83,7 +83,9 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 
 	// backward compatibility (old files name)
 	params.Files = append(params.Files, params.OldFiles...)
+	params.OldFiles = nil
 	params.Files = append(params.Files, params.Catalogs...)
+	params.Catalogs = nil
 	if len(params.Files) == 0 {
 		panic(NewServerError(http.StatusBadRequest,
 			"no any file or catalog provided"))
@@ -264,6 +266,9 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 			}
 
 			if params.Stats && res.Stat != nil {
+				if s.Config.ExtraRequest {
+					res.Stat.Extra["request"] = &params
+				}
 				xstat := tcode.FromStat(res.Stat)
 				err := enc.EncodeStat(xstat)
 				if err != nil {

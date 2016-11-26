@@ -13,24 +13,18 @@ import (
 // CountParams is a parameters for matches count endpoint
 type CountParams struct {
 	Query         string   `form:"query" json:"query" binding:"required"`
-	OldFiles      []string `form:"files" json:"files"` // obsolete: will be deleted
-	Files         []string `form:"file" json:"file"`
-	Catalogs      []string `form:"catalog" json:"catalogs"`
-	Mode          string   `form:"mode" json:"mode"`
-	Surrounding   uint16   `form:"surrounding" json:"surrounding"`
-	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness"`
-	CaseSensitive bool     `form:"cs" json:"cs"`
-	Nodes         uint8    `form:"nodes" json:"nodes"`
-	Local         bool     `form:"local" json:"local"`
-	KeepDataAs    string   `form:"data" json:"data"`
-	KeepIndexAs   string   `form:"index" json:"index"`
-	Delimiter     string   `form:"delimiter" json:"delimiter"`
-}
-
-// CountResponse returnes matches for query
-//
-type CountResponse struct {
-	Mathces uint64 `json:"matches, string"`
+	OldFiles      []string `form:"files" json:"old-files,omitempty"` // obsolete: will be deleted
+	Files         []string `form:"file" json:"files,omitempty"`
+	Catalogs      []string `form:"catalog" json:"catalogs,omitempty"`
+	Mode          string   `form:"mode" json:"mode,omitempty"`
+	Surrounding   uint16   `form:"surrounding" json:"surrounding,omitempty"`
+	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness,omitempty"`
+	CaseSensitive bool     `form:"cs" json:"cs,omitempty"`
+	Nodes         uint8    `form:"nodes" json:"nodes,omitempty"`
+	Local         bool     `form:"local" json:"local,omitempty"`
+	KeepDataAs    string   `form:"data" json:"data,omitempty"`
+	KeepIndexAs   string   `form:"index" json:"index,omitempty"`
+	Delimiter     string   `form:"delimiter" json:"delimiter,omitempty"`
 }
 
 // Handle /count endpoint.
@@ -49,7 +43,9 @@ func (s *Server) DoCount(ctx *gin.Context) {
 
 	// backward compatibility (old files name)
 	params.Files = append(params.Files, params.OldFiles...)
+	params.OldFiles = nil
 	params.Files = append(params.Files, params.Catalogs...)
+	params.Catalogs = nil
 	if len(params.Files) == 0 {
 		panic(NewServerError(http.StatusBadRequest,
 			"no any file or catalog provided"))
@@ -140,6 +136,9 @@ func (s *Server) DoCount(ctx *gin.Context) {
 
 		case <-res.DoneChan:
 			if res.Stat != nil {
+				if s.Config.ExtraRequest {
+					res.Stat.Extra["request"] = &params
+				}
 				stat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, stat)
 			} else {
