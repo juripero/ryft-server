@@ -38,7 +38,6 @@ import (
 	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
-	"github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 
@@ -80,7 +79,6 @@ func (server *Server) DoLoggingLevel(ctx *gin.Context) {
 		"core/pending-jobs": jobsLog.Level.String(),
 		"core/busyness":     busyLog.Level.String(),
 		"search/ryftprim":   ryftprim.GetLogLevel().String(),
-		"search/ryftone":    ryftone.GetLogLevel().String(),
 		"search/ryfthttp":   ryfthttp.GetLogLevel().String(),
 		"search/ryftmux":    ryftmux.GetLogLevel().String(),
 		"search/ryftdec":    ryftdec.GetLogLevel().String(),
@@ -110,8 +108,6 @@ func setLoggingLevel(logger string, level string) error {
 		// TODO: more core loggers
 	case "search/ryftprim":
 		ryftprim.SetLogLevel(ll)
-	case "search/ryftone":
-		ryftone.SetLogLevel(ll)
 	case "search/ryfthttp":
 		ryfthttp.SetLogLevel(ll)
 	case "search/ryftmux":

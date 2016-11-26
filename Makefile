@@ -2,11 +2,6 @@ GOBINDATA = ${GOPATH}/bin/go-bindata
 ASSETS = bindata.go
 BINARIES = ryft-server
 
-# disable ryftone search engine by default
-ifeq (${GO_TAGS},)
-  GO_TAGS=noryftone
-endif
-
 all: $(ASSETS) build
 
 ifeq (${VERSION},)

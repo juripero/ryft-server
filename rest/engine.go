@@ -37,7 +37,6 @@ import (
 	"github.com/getryft/ryft-server/search/ryftdec"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
-	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils"
 )

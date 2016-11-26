@@ -77,13 +77,13 @@ Automatic version number based on build and git:
 
 ```{.sh}
 $ make debian
-go install -ldflags "-X main.Version=0.7.0-9-g168b8c1 -X main.GitHash=168b8c1fceabe70333d5b855b9a27df219ebeb34" -tags "noryftone"
+go install -ldflags "-X main.Version=0.7.0-9-g168b8c1 -X main.GitHash=168b8c1fceabe70333d5b855b9a27df219ebeb34"
 ```
 Override automatic version number based on branch/release build requirements
 
 ```{.sh}
 $ make debian VERSION=0.18.44
-go install -ldflags "-X main.Version=0.18.44 -X main.GitHash=168b8c1fceabe70333d5b855b9a27df219ebeb34" -tags "noryftone"
+go install -ldflags "-X main.Version=0.18.44 -X main.GitHash=168b8c1fceabe70333d5b855b9a27df219ebeb34"
 ```
 
 ## Build tags
