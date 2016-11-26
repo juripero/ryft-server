@@ -34,36 +34,47 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
-	"strings"
-
-	"github.com/gin-gonic/gin"
 
 	"github.com/getryft/ryft-server/rest/codec"
+	"github.com/gin-gonic/gin"
 )
 
-type ServerError struct {
-	Status  int
-	Message string
-	Details string
+// Error contains HTTP status and error message.
+type Error struct {
+	Status  int    `json:"status" msgpack:"status"`                       // HTTP status
+	Message string `json:"message,omitempty" msgpack:"message,omitempty"` // error message
+	Details string `json:"details,omitempty" msgpack:"details,omitempty"` // error details
 }
 
-func (err *ServerError) Error() string {
+// NewError creates new server error using status and message.
+func NewError(status int, message string) *Error {
+	return &Error{
+		Status:  status,
+		Message: message,
+	}
+}
+
+// Error get the error as a string.
+func (err *Error) Error() string {
+	if len(err.Details) != 0 {
+		return fmt.Sprintf("%d %s (%s)", err.Status, err.Message, err.Details)
+	}
+
 	return fmt.Sprintf("%d %s", err.Status, err.Message)
 }
 
-func NewServerError(status int, message string) *ServerError {
-	return &ServerError{status, message, ""}
+// WithDetails adds additional details to the error.
+func (err *Error) WithDetails(details string) *Error {
+	err.Details = details
+	return err
 }
 
-func NewServerErrorWithDetails(status int, message string, details string) *ServerError {
-	return &ServerError{status, message, details}
-}
-
-func RecoverFromPanic(c *gin.Context) {
+// RecoverFromPanic checks panics and report them via HTTP response.
+func RecoverFromPanic(ctx *gin.Context) {
 	// check for specific encoder
 	reportEncoderError := func(err error) bool {
 		// check for specific encoder
-		if encI, ok := c.Get("encoder"); ok {
+		if encI, ok := ctx.Get("encoder"); ok {
 			if enc, ok := encI.(codec.Encoder); ok {
 				_ = enc.EncodeError(err)
 				_ = enc.Close()
@@ -74,36 +85,33 @@ func RecoverFromPanic(c *gin.Context) {
 		return false
 	}
 
+	// check for panic
 	if r := recover(); r != nil {
-		log.Debugf("stack trace:\n%s", debug.Stack())
+		var err *Error
 
-		if err, ok := r.(*ServerError); ok {
-			log.WithField("status", err.Status).WithError(err).Warnf("Panic recovered server error")
+		switch v := r.(type) {
+		case *Error:
+			log.WithError(v).Warnf("Panic recover: server error")
+			err = v // report "as is"
 
-			if reportEncoderError(err) {
-				return
-			}
+		case error:
+			log.WithError(v).Warnf("Panic recover: error")
+			log.Debugf("stack trace:\n%s", debug.Stack())
+			err = NewError(http.StatusInternalServerError, v.Error())
 
-			if len(err.Details) > 0 {
-				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status, "details": err.Details})
-			} else {
-				c.IndentedJSON(err.Status, gin.H{"message": fmt.Sprintf("%s", strings.Replace(err.Message, "\n", " ", -1)), "status": err.Status})
-			}
+		default:
+			log.WithField("error", r).Warnf("Panic recover: object")
+			log.Debugf("stack trace:\n%s", debug.Stack())
+			err = NewError(http.StatusInternalServerError, fmt.Sprintf("%+v", r))
+		}
 
+		// first try to report via encoder...
+		if reportEncoderError(err) {
 			return
 		}
 
-		if err, ok := r.(error); ok {
-			log.WithError(err).Warnf("Panic recovered unknown error")
-
-			if reportEncoderError(err) {
-				return
-			}
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%v", err.Error()), "status": http.StatusInternalServerError})
-			return
-		}
-
-		log.WithField("error", r).Warnf("Panic recovered with object")
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("%+v", r), "status": http.StatusInternalServerError})
+		// report as JSON body
+		// err.Message = strings.Replace(err.Message, "\n", " ", -1)
+		ctx.IndentedJSON(err.Status, err)
 	}
 }

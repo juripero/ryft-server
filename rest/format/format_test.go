@@ -9,10 +9,11 @@ import (
 // test format
 func TestFormat(t *testing.T) {
 	// create valid format
-	check := func(name string, opts map[string]interface{}) {
+	check := func(name string, opts map[string]interface{}, isNull bool) {
 		fmt, err := New(name, opts)
 		assert.NoError(t, err)
 		assert.NotNil(t, fmt)
+		assert.EqualValues(t, isNull, IsNull(name))
 	}
 
 	// create bad format
@@ -23,13 +24,13 @@ func TestFormat(t *testing.T) {
 		}
 	}
 
-	check("json", nil)
-	check("utf-8", nil)
-	check("utf8", nil)
-	check("null", nil)
-	check("none", nil)
-	check("raw", nil)
-	check("xml", nil)
+	check("json", nil, false)
+	check("utf-8", nil, false)
+	check("utf8", nil, false)
+	check("null", nil, true)
+	check("none", nil, true)
+	check("raw", nil, false)
+	check("xml", nil, false)
 
 	bad("bad", nil, "is unsupported format")
 }

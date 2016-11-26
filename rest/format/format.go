@@ -68,7 +68,7 @@ type Format interface {
 }
 
 // New creates new formatter instance.
-// XML format supports some options.
+// XML and JSON formats supports some options.
 func New(format string, opts map[string]interface{}) (Format, error) {
 	switch strings.ToLower(format) {
 	case JSON:
@@ -84,4 +84,14 @@ func New(format string, opts map[string]interface{}) (Format, error) {
 	}
 
 	return nil, fmt.Errorf("%q is unsupported format", format)
+}
+
+// IsNull checks the format skipsthe Data field
+func IsNull(format string) bool {
+	switch strings.ToLower(format) {
+	case NULL, "none":
+		return true
+	}
+
+	return false
 }

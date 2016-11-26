@@ -33,7 +33,7 @@ package rest
 import (
 	"fmt"
 	"net/http"
-	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/getryft/ryft-server/rest/codec"
@@ -42,77 +42,74 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SearchParams contains all the bound parameters
-// for the /search endpoint.
+// SearchParams contains all the bound parameters for the /search endpoint.
 type SearchParams struct {
-	Query         string   `form:"query" json:"query" binding:"required"`
-	OldFiles      []string `form:"files" json:"old-files,omitempty"` // obsolete: will be deleted
-	Files         []string `form:"file" json:"files,omitempty"`
-	Catalogs      []string `form:"catalog" json:"catalogs,omitempty"`
-	Mode          string   `form:"mode" json:"mode,omitempty"`
-	Surrounding   uint16   `form:"surrounding" json:"surrounding,omitempty"`
-	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness,omitempty"`
-	Format        string   `form:"format" json:"format"`
-	CaseSensitive bool     `form:"cs" json:"cs,omitempty"`
-	Fields        string   `form:"fields" json:"fields,omitempty"`
-	Nodes         uint8    `form:"nodes" json:"nodes,omitempty"`
-	Local         bool     `form:"local" json:"local,omitempty"`
-	Stats         bool     `form:"stats" json:"stats,omitempty"`
-	Stream        bool     `form:"stream" json:"stream,omitempty"`
-	Spark         bool     `form:"spark" json:"spark,omitempty"`
-	ErrorPrefix   bool     `form:"ep" json:"ep,omitempty"`
-	KeepDataAs    string   `form:"data" json:"data,omitempty"`
-	KeepIndexAs   string   `form:"index" json:"index,omitempty"`
-	Delimiter     string   `form:"delimiter" json:"delimiter,omitempty"`
-	Limit         int      `form:"limit" json:"limit,omitempty"`
+	Query    string   `form:"query" json:"query" msgpack:"query" binding:"required"`
+	OldFiles []string `form:"files" json:"-" msgpack:"-"`   // obsolete: will be deleted
+	Catalogs []string `form:"catalog" json:"-" msgpack:"-"` // obsolete: will be deleted
+	Files    []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
+
+	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`          // optional, "" for generic mode
+	Width  string `form:"surrounding" json:"width,omitempty" msgpack:"width,omitempty"` // surrounding width or "line"
+	Dist   uint8  `form:"fuzziness" json:"dist,omitempty" msgpack:"dist,omitempty"`     // fuzziness distance
+	Case   bool   `form:"cs" json:"case,omitempty" msgpack:"case,omitempty"`            // case sensitivity flag, ES, FHS, FEDS
+	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`    // FEDS only
+	Nodes  uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
+
+	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
+	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
+	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
+	Limit       int    `form:"limit" json:"limit,omitempty" msgpack:"limite,omitempty"`
+
+	Format      string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
+	Fields      string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
+	Stats       bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
+	Stream      bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
+	ErrorPrefix bool   `form:"ep" json:"ep,omitempty" msgpack:"ep,omitempty"` // include host prefixes for error messages
+
+	Local bool `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
 }
 
 // Handle /search endpoint.
-func (s *Server) DoSearch(ctx *gin.Context) {
+func (server *Server) DoSearch(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
 	var err error
 
 	// parse request parameters
-	params := SearchParams{Format: format.RAW}
+	params := SearchParams{
+		Format: format.RAW,
+		Case:   true,
+	}
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to parse request parameters"))
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request parameters"))
 	}
 
-	// backward compatibility (old files name)
+	// backward compatibility old files and catalogs (just aliases)
 	params.Files = append(params.Files, params.OldFiles...)
-	params.OldFiles = nil
+	params.OldFiles = nil // reset
 	params.Files = append(params.Files, params.Catalogs...)
-	params.Catalogs = nil
+	params.Catalogs = nil // reset
 	if len(params.Files) == 0 {
-		panic(NewServerError(http.StatusBadRequest,
+		panic(NewError(http.StatusBadRequest,
 			"no any file or catalog provided"))
 	}
 
-	// TODO: can cause problems when query is kind of: `(RAW_TEXT CONTAINS "RECORD")`
-	if params.Format == format.XML && !strings.Contains(params.Query, "RECORD") {
-		panic(NewServerError(http.StatusBadRequest,
-			"format=xml could not be used without RECORD query"))
-	}
-	if params.Format == format.JSON && !strings.Contains(params.Query, "RECORD") {
-		panic(NewServerError(http.StatusBadRequest,
-			"format=json could not be used without RECORD query"))
-	}
 	// setting up transcoder to convert raw data
+	// XML and JSON support additional fields filtration
 	var tcode format.Format
 	tcode_opts := map[string]interface{}{
 		"fields": params.Fields,
 	}
 	if tcode, err = format.New(params.Format, tcode_opts); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to get transcoder"))
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to get transcoder"))
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
+	if accept == "" { // default to JSON
 		accept = codec.MIME_JSON
 	}
 	ctx.Header("Content-Type", accept)
@@ -120,54 +117,53 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 	// setting up encoder to respond with requested format
 	// we can use two formats:
 	// - with tags to report data records and the statistics in one stream
-	// - without tags to report just data records (this format is used by Spark)
 	enc, err := codec.NewEncoder(ctx.Writer, accept, params.Stream)
 	if err != nil {
-		panic(NewServerError(http.StatusBadRequest, err.Error()))
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to get encoder"))
 	}
 	ctx.Set("encoder", enc) // to recover from panic in appropriate format
 
 	// get search engine
-	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
+	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
+	engine, err := server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
 	if err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-			err.Error(), "failed to get search engine"))
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get search engine"))
 	}
 
-	// search configuration
-	cfg := search.NewEmptyConfig()
-	if q, err := url.QueryUnescape(params.Query); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to unescape query"))
-	} else {
-		cfg.Query = q
-	}
-	cfg.AddFiles(params.Files) // TODO: unescape?
+	// prepare search configuration
+	cfg := search.NewConfig(params.Query, params.Files...)
 	cfg.Mode = params.Mode
-	cfg.Surrounding = uint(params.Surrounding)
-	cfg.Fuzziness = uint(params.Fuzziness)
-	cfg.CaseSensitive = params.CaseSensitive
+	if strings.EqualFold(params.Width, "line") {
+		cfg.Width = -1
+	} else if v, err := strconv.ParseUint(params.Width, 10, 16); err == nil {
+		cfg.Width = int(v)
+	} else {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse surrounding width"))
+	}
+	cfg.Dist = uint(params.Dist)
+	cfg.Case = params.Case
+	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
-	cfg.Limit = uint(params.Limit)
-	if d, err := url.QueryUnescape(params.Delimiter); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to unescape delimiter"))
-	} else {
-		cfg.Delimiter = d
-	}
+	cfg.Delimiter = params.Delimiter
 	cfg.ReportIndex = true // /search
-	cfg.ReportData = true  // TODO: format != null
+	cfg.ReportData = !format.IsNull(params.Format)
+	cfg.Limit = uint(params.Limit)
 
-	log.WithField("config", cfg).WithField("user", userName).
-		WithField("home", homeDir).WithField("cluster", userTag).
-		Infof("start /search")
+	log.WithFields(map[string]interface{}{
+		"config":  cfg,
+		"user":    userName,
+		"home":    homeDir,
+		"cluster": userTag,
+	}).Infof("start /search")
 	res, err := engine.Search(cfg)
 	if err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-			err.Error(), "failed to start search"))
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to start search"))
 	}
 	defer log.WithField("result", res).Infof("/search done")
 
@@ -175,24 +171,21 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 	// we need to cancel search request
 	// to prevent resource leaks
 	defer func() {
-		if !res.IsDone() {
-			errors, records := res.Cancel() // cancel processing
-			if errors > 0 || records > 0 {
-				log.WithField("errors", errors).WithField("records", records).
-					Debugf("***some errors/records are ignored")
+		if !res.IsDone() { // cancel processing
+			if errors, records := res.Cancel(); errors > 0 || records > 0 {
+				log.WithFields(map[string]interface{}{
+					"errors":  errors,
+					"records": records,
+				}).Debugf("some errors/records are ignored (panic recover)")
 			}
 		}
 	}()
 
-	s.onSearchStarted(cfg)
-	defer s.onSearchStopped(cfg)
+	server.onSearchStarted(cfg)
+	defer server.onSearchStopped(cfg)
 
 	// ctx.Stream() logic
-	writer := ctx.Writer
-	gone := writer.CloseNotify()
-	var last_error error
-	num_records := 0
-	num_errors := 0
+	var lastError error
 
 	// error prefix
 	var errorPrefix string
@@ -211,9 +204,9 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 		if err != nil {
 			panic(err)
 		}
-		last_error = err_
-		num_errors += 1
+		lastError = err_
 	}
+
 	// put record to stream
 	putRec := func(rec *search.Record) {
 		xrec := tcode.FromRecord(rec)
@@ -222,22 +215,22 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 			if err != nil {
 				panic(err)
 			}
-			num_records += 1
-			writer.Flush() // TODO: check performance!!!
+			// ctx.Writer.Flush() // TODO: check performance!!!
 		}
 	}
 
 	// process results!
 	for {
 		select {
-		case <-gone:
+		case <-ctx.Writer.CloseNotify(): // cancel processing
 			log.Warnf("cancelling by user (connection is gone)...")
-			errors, records := res.Cancel() // cancel processing
-			if errors > 0 || records > 0 {
-				log.WithField("errors", errors).WithField("records", records).
-					Debugf("some errors/records are ignored")
+			if errors, records := res.Cancel(); errors > 0 || records > 0 {
+				log.WithFields(map[string]interface{}{
+					"errors":  errors,
+					"records": records,
+				}).Debugf("some errors/records are ignored")
 			}
-			return
+			return // cancelled
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
@@ -250,23 +243,25 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 			}
 
 		case <-res.DoneChan:
-			// drain the channels
+			// drain the records
 			for rec := range res.RecordChan {
 				putRec(rec)
 			}
+
+			// ... and errors
 			for err := range res.ErrorChan {
 				putErr(err)
 			}
 
 			// special case: if no records and no stats were received
 			// but just an error, we panic to return 500 status code
-			if num_records == 0 && res.Stat == nil &&
-				num_errors == 1 && last_error != nil {
-				panic(last_error)
+			if res.RecordsReported() == 0 && res.Stat == nil &&
+				res.ErrorsReported() == 1 && lastError != nil {
+				panic(lastError)
 			}
 
 			if params.Stats && res.Stat != nil {
-				if s.Config.ExtraRequest {
+				if server.Config.ExtraRequest {
 					res.Stat.Extra["request"] = &params
 				}
 				xstat := tcode.FromStat(res.Stat)
@@ -282,7 +277,7 @@ func (s *Server) DoSearch(ctx *gin.Context) {
 				panic(err)
 			}
 
-			return // stop
+			return // done
 		}
 	}
 }

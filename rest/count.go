@@ -2,7 +2,8 @@ package rest
 
 import (
 	"net/http"
-	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	format "github.com/getryft/ryft-server/rest/format/raw"
@@ -10,44 +11,50 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CountParams is a parameters for matches count endpoint
+// CountParams contains all the bound parameters for the /count endpoint.
 type CountParams struct {
-	Query         string   `form:"query" json:"query" binding:"required"`
-	OldFiles      []string `form:"files" json:"old-files,omitempty"` // obsolete: will be deleted
-	Files         []string `form:"file" json:"files,omitempty"`
-	Catalogs      []string `form:"catalog" json:"catalogs,omitempty"`
-	Mode          string   `form:"mode" json:"mode,omitempty"`
-	Surrounding   uint16   `form:"surrounding" json:"surrounding,omitempty"`
-	Fuzziness     uint8    `form:"fuzziness" json:"fuzziness,omitempty"`
-	CaseSensitive bool     `form:"cs" json:"cs,omitempty"`
-	Nodes         uint8    `form:"nodes" json:"nodes,omitempty"`
-	Local         bool     `form:"local" json:"local,omitempty"`
-	KeepDataAs    string   `form:"data" json:"data,omitempty"`
-	KeepIndexAs   string   `form:"index" json:"index,omitempty"`
-	Delimiter     string   `form:"delimiter" json:"delimiter,omitempty"`
+	Query    string   `form:"query" json:"query" msgpack:"query" binding:"required"`
+	OldFiles []string `form:"files" json:"-" msgpack:"-"`   // obsolete: will be deleted
+	Catalogs []string `form:"catalog" json:"-" msgpack:"-"` // obsolete: will be deleted
+	Files    []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
+
+	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`          // optional, "" for generic mode
+	Width  string `form:"surrounding" json:"width,omitempty" msgpack:"width,omitempty"` // surrounding width or "line"
+	Dist   uint8  `form:"fuzziness" json:"dist,omitempty" msgpack:"dist,omitempty"`     // fuzziness distance
+	Case   bool   `form:"cs" json:"case,omitempty" msgpack:"case,omitempty"`            // case sensitivity flag, ES, FHS, FEDS
+	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`    // FEDS only
+	Nodes  uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
+
+	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
+	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
+	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
+
+	Local bool `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
 }
 
 // Handle /count endpoint.
-func (s *Server) DoCount(ctx *gin.Context) {
+func (server *Server) DoCount(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
 	var err error
 
 	// parse request parameters
-	params := CountParams{}
+	params := CountParams{
+		Case: true,
+	}
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to parse request parameters"))
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request parameters"))
 	}
 
-	// backward compatibility (old files name)
+	// backward compatibility old files and catalogs (just aliases)
 	params.Files = append(params.Files, params.OldFiles...)
-	params.OldFiles = nil
+	params.OldFiles = nil // reset
 	params.Files = append(params.Files, params.Catalogs...)
-	params.Catalogs = nil
+	params.Catalogs = nil // reset
 	if len(params.Files) == 0 {
-		panic(NewServerError(http.StatusBadRequest,
+		panic(NewError(http.StatusBadRequest,
 			"no any file or catalog provided"))
 	}
 
@@ -57,50 +64,50 @@ func (s *Server) DoCount(ctx *gin.Context) {
 		accept = codec.MIME_JSON
 	}
 	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
-		panic(NewServerError(http.StatusUnsupportedMediaType,
+		panic(NewError(http.StatusUnsupportedMediaType,
 			"Only JSON format is supported for now"))
 	}
 
 	// get search engine
-	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	engine, err := s.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
+	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
+	engine, err := server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
 	if err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-			err.Error(), "failed to get search engine"))
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get search engine"))
 	}
 
-	// search configuration
-	cfg := search.NewEmptyConfig()
-	if q, err := url.QueryUnescape(params.Query); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to unescape query"))
-	} else {
-		cfg.Query = q
-	}
-	cfg.AddFiles(params.Files) // TODO: unescape?
+	// prepare search configuration
+	cfg := search.NewConfig(params.Query, params.Files...)
 	cfg.Mode = params.Mode
-	cfg.Surrounding = uint(params.Surrounding)
-	cfg.Fuzziness = uint(params.Fuzziness)
-	cfg.CaseSensitive = params.CaseSensitive
+	if strings.EqualFold(params.Width, "line") {
+		cfg.Width = -1
+	} else if v, err := strconv.ParseUint(params.Width, 10, 16); err == nil {
+		cfg.Width = int(v)
+	} else {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse surrounding width"))
+	}
+	cfg.Dist = uint(params.Dist)
+	cfg.Case = params.Case
+	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
-	if d, err := url.QueryUnescape(params.Delimiter); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to unescape delimiter"))
-	} else {
-		cfg.Delimiter = d
-	}
+	cfg.Delimiter = params.Delimiter
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
+	// cfg.Limit = 0
 
-	log.WithField("config", cfg).WithField("user", userName).
-		WithField("home", homeDir).WithField("cluster", userTag).
-		Infof("start /count")
+	log.WithFields(map[string]interface{}{
+		"config":  cfg,
+		"user":    userName,
+		"home":    homeDir,
+		"cluster": userTag,
+	}).Infof("start /count")
 	res, err := engine.Search(cfg)
 	if err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-			err.Error(), "failed to start search"))
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to start search"))
 	}
 	defer log.WithField("result", res).Infof("/count done")
 
@@ -108,45 +115,69 @@ func (s *Server) DoCount(ctx *gin.Context) {
 	// we need to cancel search request
 	// to prevent resource leaks
 	defer func() {
-		if !res.IsDone() {
-			errors, records := res.Cancel() // cancel processing
-			if errors > 0 || records > 0 {
-				log.WithField("errors", errors).WithField("records", records).
-					Debugf("***some errors/records are ignored")
+		if !res.IsDone() { // cancel processing
+			if errors, records := res.Cancel(); errors > 0 || records > 0 {
+				log.WithFields(map[string]interface{}{
+					"errors":  errors,
+					"records": records,
+				}).Debugf("some errors/records are ignored (panic recover)")
 			}
 		}
 	}()
 
-	s.onSearchStarted(cfg)
-	defer s.onSearchStopped(cfg)
+	server.onSearchStarted(cfg)
+	defer server.onSearchStopped(cfg)
 
+	// process results!
 	for {
 		select {
+		case <-ctx.Writer.CloseNotify(): // cancel processing
+			log.Warnf("cancelling by user (connection is gone)...")
+			if errors, records := res.Cancel(); errors > 0 || records > 0 {
+				log.WithFields(map[string]interface{}{
+					"errors":  errors,
+					"records": records,
+				}).Debugf("some errors/records are ignored")
+			}
+			return // cancelled
+
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				log.WithField("record", rec).Debugf("record ignored")
-				// ignore records
+				// log.WithField("record", rec).Debugf("record ignored") // FIXME: DEBUG
+				_ = rec // ignore records
 			}
 
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
-				log.WithField("error", err).Debugf("error ignored")
-				// TODO: report error
+				// log.WithField("error", err).Debugf("error ignored") // FIXME: DEBUG
+				panic(err) // TODO: check this?
 			}
 
 		case <-res.DoneChan:
+			// drain the records
+			for rec := range res.RecordChan {
+				// log.WithField("record", rec).Debugf("*** record ignored") // FIXME: DEBUG
+				_ = rec // ignore records
+			}
+
+			// ... and errors
+			for err := range res.ErrorChan {
+				// log.WithField("error", err).Debugf("error ignored") // FIXME: DEBUG
+				panic(err) // TODO: check this?
+			}
+
 			if res.Stat != nil {
-				if s.Config.ExtraRequest {
+				if server.Config.ExtraRequest {
 					res.Stat.Extra["request"] = &params
 				}
-				stat := format.FromStat(res.Stat)
-				ctx.JSON(http.StatusOK, stat)
+				xstat := format.FromStat(res.Stat)
+				ctx.IndentedJSON(http.StatusOK, xstat)
 			} else {
-				panic(NewServerError(http.StatusInternalServerError,
+				panic(NewError(http.StatusInternalServerError,
 					"no search statistics available"))
 			}
 
-			return
+			return // done
 		}
 	}
 }

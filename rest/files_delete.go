@@ -46,8 +46,8 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 	// parse request parameters
 	params := DeleteFilesParams{}
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to parse request parameters"))
+		panic(NewError(http.StatusBadRequest,
+			err.Error()).WithDetails("failed to parse request parameters"))
 	}
 	params.Files = append(params.Files, params.Catalogs...)
 	params.Files = append(params.Files, params.Dirs...)
@@ -57,8 +57,8 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-			err.Error(), "failed to get mount point"))
+		panic(NewError(http.StatusInternalServerError,
+			err.Error()).WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
@@ -77,8 +77,8 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 	if !params.Local && !s.Config.LocalOnly && !params.isEmpty() {
 		services, tags, err := s.getConsulInfoForFiles(userTag, params.Files)
 		if err != nil || len(tags) != len(params.Files) {
-			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-				err.Error(), "failed to map files to tags"))
+			panic(NewError(http.StatusInternalServerError,
+				err.Error()).WithDetails("failed to map files to tags"))
 		}
 
 		type Node struct {

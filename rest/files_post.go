@@ -54,8 +54,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	params.Offset = -1 // mark as "unspecified"
 	params.Length = -1
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to parse request parameters"))
+		panic(NewError(http.StatusBadRequest,
+			err.Error()).WithDetails("failed to parse request parameters"))
 	}
 
 	// if delimiter is provided this value will be NOT NIL
@@ -67,15 +67,15 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	}
 
 	if len(params.File) == 0 {
-		panic(NewServerError(http.StatusBadRequest,
+		panic(NewError(http.StatusBadRequest,
 			"no valid filename provided"))
 	}
 
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-			err.Error(), "failed to get mount point"))
+		panic(NewError(http.StatusInternalServerError,
+			err.Error()).WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
@@ -86,8 +86,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	case "multipart/form-data":
 		f, _, err := ctx.Request.FormFile("file")
 		if err != nil {
-			panic(NewServerErrorWithDetails(http.StatusBadRequest,
-				err.Error(), `no "file" form data provided`))
+			panic(NewError(http.StatusBadRequest,
+				err.Error()).WithDetails(`no "file" form data provided`))
 		}
 		defer f.Close()
 		file = f
@@ -101,14 +101,14 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		log.Debugf("saving octet-stream...")
 
 	default:
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			contentType, "unexpected content type"))
+		panic(NewError(http.StatusBadRequest,
+			contentType).WithDetails("unexpected content type"))
 	}
 
 	if len(params.Lifetime) > 0 {
 		if params.lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
-			panic(NewServerErrorWithDetails(http.StatusBadRequest,
-				err.Error(), "failed to parse lifetime"))
+			panic(NewError(http.StatusBadRequest,
+				err.Error()).WithDetails("failed to parse lifetime"))
 		}
 	}
 
@@ -127,8 +127,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 		services, tags, err := s.getConsulInfoForFiles(userTag, files)
 		if err != nil || len(tags) != len(files) {
-			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-				err.Error(), "failed to map files to tags"))
+			panic(NewError(http.StatusInternalServerError,
+				err.Error()).WithDetails("failed to map files to tags"))
 		}
 		log.WithField("tags", tags[0]).Debugf("related tags")
 

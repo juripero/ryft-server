@@ -21,16 +21,16 @@ func (s *Server) DoGetFiles(ctx *gin.Context) {
 	// parse request parameters
 	params := GetFilesParams{}
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to parse request parameters"))
+		panic(NewError(http.StatusBadRequest,
+			err.Error()).WithDetails("failed to parse request parameters"))
 	}
 
 	// get search engine
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	engine, err := s.getSearchEngine(params.Local, nil /*no files*/, authToken, homeDir, userTag)
 	if err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-			err.Error(), "failed to get search engine"))
+		panic(NewError(http.StatusInternalServerError,
+			err.Error()).WithDetails("failed to get search engine"))
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
@@ -39,7 +39,7 @@ func (s *Server) DoGetFiles(ctx *gin.Context) {
 		accept = codec.MIME_JSON
 	}
 	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
-		panic(NewServerError(http.StatusUnsupportedMediaType,
+		panic(NewError(http.StatusUnsupportedMediaType,
 			"Only JSON format is supported for now"))
 	}
 
@@ -49,7 +49,7 @@ func (s *Server) DoGetFiles(ctx *gin.Context) {
 	info, err := engine.Files(params.Dir)
 	if err != nil {
 		// TODO: detail description?
-		panic(NewServerError(http.StatusNotFound, err.Error()))
+		panic(NewError(http.StatusNotFound, err.Error()))
 	}
 
 	// TODO: if params.Sort {
