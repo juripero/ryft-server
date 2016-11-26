@@ -97,6 +97,9 @@ type ServerConfig struct {
 	HttpTimeout_ TimeDuration  `yaml:"http-timeout,omitempty"`
 	HttpTimeout  time.Duration `yaml:"-"`
 
+	ShutdownTimeout_ TimeDuration  `yaml:"shutdown-timeout,omitempty"`
+	ShutdownTimeout  time.Duration `yaml:"-"`
+
 	TLS struct {
 		Enabled       bool   `yaml:"enabled,omitempty"`
 		ListenAddress string `yaml:"address,omitempty"`
@@ -170,6 +173,8 @@ func NewServer() *Server {
 	s.Config.Busyness.UpdateLatency_ = NewTimeDuration(&s.Config.Busyness.UpdateLatency)
 	s.Config.HttpTimeout = 1 * time.Hour
 	s.Config.HttpTimeout_ = NewTimeDuration(&s.Config.HttpTimeout)
+	s.Config.ShutdownTimeout = 10 * time.Minute
+	s.Config.ShutdownTimeout_ = NewTimeDuration(&s.Config.ShutdownTimeout)
 	s.Config.Catalogs.CacheDropTimeout = 10 * time.Second
 	s.Config.Catalogs.CacheDropTimeout_ = NewTimeDuration(&s.Config.Catalogs.CacheDropTimeout)
 	s.Config.SettingsPath = "/var/ryft/server.settings"

@@ -45,6 +45,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/tylerb/graceful.v1"
 )
 
 var (
@@ -290,8 +291,13 @@ func main() {
 		ep.WriteTimeout = server.Config.HttpTimeout
 
 		go func() {
-			if err := ep.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
-				log.WithError(err).WithField("addr", tls.ListenAddress).Fatal("failed to listen HTTPS")
+			worker := &graceful.Server{
+				Timeout: server.Config.ShutdownTimeout,
+				Server:  ep,
+			}
+
+			if err := worker.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
+				log.WithError(err).WithField("address", tls.ListenAddress).Fatal("failed to listen HTTPS")
 			}
 		}()
 	}
@@ -301,8 +307,14 @@ func main() {
 		ep := &http.Server{Addr: addr, Handler: router}
 		ep.ReadTimeout = server.Config.HttpTimeout
 		ep.WriteTimeout = server.Config.HttpTimeout
-		if err := ep.ListenAndServe(); err != nil {
-			log.WithError(err).WithField("addr", addr).Fatal("failed to listen HTTP")
+
+		worker := &graceful.Server{
+			Timeout: server.Config.ShutdownTimeout,
+			Server:  ep,
+		}
+
+		if err := worker.ListenAndServe(); err != nil {
+			log.WithError(err).WithField("address", addr).Fatal("failed to listen HTTP")
 		}
 	}
 }
