@@ -2,8 +2,6 @@ package rest
 
 import (
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	format "github.com/getryft/ryft-server/rest/format/raw"
@@ -79,14 +77,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
 	cfg.Mode = params.Mode
-	if strings.EqualFold(params.Width, "line") {
-		cfg.Width = -1
-	} else if v, err := strconv.ParseUint(params.Width, 10, 16); err == nil {
-		cfg.Width = int(v)
-	} else {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to parse surrounding width"))
-	}
+	cfg.Width = mustParseWidth(params.Width)
 	cfg.Dist = uint(params.Dist)
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
@@ -171,7 +162,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					res.Stat.Extra["request"] = &params
 				}
 				xstat := format.FromStat(res.Stat)
-				ctx.IndentedJSON(http.StatusOK, xstat)
+				ctx.JSON(http.StatusOK, xstat)
 			} else {
 				panic(NewError(http.StatusInternalServerError,
 					"no search statistics available"))

@@ -135,14 +135,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
 	cfg.Mode = params.Mode
-	if strings.EqualFold(params.Width, "line") {
-		cfg.Width = -1
-	} else if v, err := strconv.ParseUint(params.Width, 10, 16); err == nil {
-		cfg.Width = int(v)
-	} else {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to parse surrounding width"))
-	}
+	cfg.Width = mustParseWidth(params.Width)
 	cfg.Dist = uint(params.Dist)
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
@@ -279,5 +272,28 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 
 			return // done
 		}
+	}
+}
+
+// parse surrounding width from a string
+func mustParseWidth(str string) int {
+	str = strings.TrimSpace(str)
+
+	// empty means zero (default)
+	if len(str) == 0 {
+		return 0
+	}
+
+	// check for "line=true"
+	if strings.EqualFold(str, "line") {
+		return -1
+	}
+
+	// try to parse
+	if v, err := strconv.ParseUint(str, 10, 16); err == nil {
+		return int(v)
+	} else {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse surrounding width"))
 	}
 }
