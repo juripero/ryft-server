@@ -64,7 +64,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	}
 	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
 		panic(NewError(http.StatusUnsupportedMediaType,
-			"Only JSON format is supported for now"))
+			"only JSON format is supported for now"))
 	}
 
 	// get search engine
@@ -95,7 +95,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 		"user":    userName,
 		"home":    homeDir,
 		"cluster": userTag,
-	}).Infof("[%s]: start /count", CORE)
+	}).Infof("[%s]: start GET /count", CORE)
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).

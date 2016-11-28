@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -134,6 +135,18 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["files-report-error"]; ok {
 		str, _ := utils.AsString(v)
 		engine.FilesReportError = fmt.Errorf("%s", str)
+	}
+
+	// files-report-files
+	if v, ok := opts["files-report-files"]; ok {
+		str, _ := utils.AsString(v)
+		engine.FilesReportFiles = strings.Split(str, ";")
+	}
+
+	// files-report-dirs
+	if v, ok := opts["files-report-dirs"]; ok {
+		str, _ := utils.AsString(v)
+		engine.FilesReportDirs = strings.Split(str, ";")
 	}
 
 	return nil // OK

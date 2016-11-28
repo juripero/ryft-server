@@ -154,7 +154,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 		"user":    userName,
 		"home":    homeDir,
 		"cluster": userTag,
-	}).Infof("[%s]: start /search", CORE)
+	}).Infof("[%s]: start GET /search", CORE)
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
@@ -229,7 +229,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			}
 
 		case <-res.DoneChan:
-			// drain the records
+			// drain the records...
 			for rec := range res.RecordChan {
 				putRec(rec)
 			}

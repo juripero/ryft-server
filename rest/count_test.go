@@ -56,7 +56,7 @@ func TestCountUsual(t *testing.T) {
 			"no any file or catalog provided")
 
 		check("/count?query=hello&file=*.txt", "application/msgpack", 0,
-			http.StatusUnsupportedMediaType, "Only JSON format is supported for now")
+			http.StatusUnsupportedMediaType, "only JSON format is supported for now")
 
 		check("/count?query=hello&file=*.txt&surrounding=bad", "", 0,
 			http.StatusBadRequest, "failed to parse surrounding width", "invalid syntax")

@@ -40,25 +40,25 @@ func (p DeleteFilesParams) isEmpty() bool {
 /* to test method:
 curl -X DELETE -s "http://localhost:8765/files?file=p*.txt" | jq .
 */
-func (s *Server) DoDeleteFiles(ctx *gin.Context) {
+func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 
 	// parse request parameters
 	params := DeleteFilesParams{}
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewError(http.StatusBadRequest,
-			err.Error()).WithDetails("failed to parse request parameters"))
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request parameters"))
 	}
 	params.Files = append(params.Files, params.Catalogs...)
+	params.Catalogs = nil // reset
 	params.Files = append(params.Files, params.Dirs...)
-	params.Catalogs = nil
-	params.Dirs = nil
+	params.Dirs = nil // reset
 
-	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	mountPoint, err := s.getMountPoint(homeDir)
+	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
+	mountPoint, err := server.getMountPoint(homeDir)
 	if err != nil {
-		panic(NewError(http.StatusInternalServerError,
-			err.Error()).WithDetails("failed to get mount point"))
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
@@ -66,7 +66,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 		"files": params.Files,
 		"user":  userName,
 		"home":  homeDir,
-	}).Info("deleting...")
+	}).Info("[%s]: deleting...", CORE)
 
 	// for each requested file|dir|catalog get list of tags from consul KV/partition.
 	// based of these tags determine the list of nodes having such file|dir|catalog.
@@ -74,11 +74,11 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 	// list of files whose tags are matched.
 
 	result := make(map[string]interface{})
-	if !params.Local && !s.Config.LocalOnly && !params.isEmpty() {
-		services, tags, err := s.getConsulInfoForFiles(userTag, params.Files)
+	if !params.Local && !server.Config.LocalOnly && !params.isEmpty() {
+		services, tags, err := server.getConsulInfoForFiles(userTag, params.Files)
 		if err != nil || len(tags) != len(params.Files) {
-			panic(NewError(http.StatusInternalServerError,
-				err.Error()).WithDetails("failed to map files to tags"))
+			panic(NewError(http.StatusInternalServerError, err.Error()).
+				WithDetails("failed to map files to tags"))
 		}
 
 		type Node struct {
@@ -103,7 +103,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
 				// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
 			}
-			node.IsLocal = s.isLocalService(service)
+			node.IsLocal = server.isLocalService(service)
 			node.Name = service.Node
 			node.Params.Local = true
 
@@ -134,13 +134,13 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 				defer wg.Done()
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("deleting on local node")
-					node.Result, node.Error = s.deleteLocalFiles(mountPoint, node.Params), nil
+					node.Result, node.Error = server.deleteLocalFiles(mountPoint, node.Params), nil
 				} else {
 					log.WithField("what", node.Params).
 						WithField("node", node.Name).
 						WithField("addr", node.Address).
 						Debugf("deleting on remote node")
-					node.Result, node.Error = s.deleteRemoteFiles(node.Address, authToken, node.Params)
+					node.Result, node.Error = server.deleteRemoteFiles(node.Address, authToken, node.Params)
 				}
 			}(node)
 		}
@@ -162,7 +162,7 @@ func (s *Server) DoDeleteFiles(ctx *gin.Context) {
 		}
 
 	} else {
-		result = s.deleteLocalFiles(mountPoint, params)
+		result = server.deleteLocalFiles(mountPoint, params)
 	}
 
 	ctx.JSON(http.StatusOK, result)

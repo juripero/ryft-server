@@ -15,41 +15,45 @@ type GetFilesParams struct {
 }
 
 // GET /files method
-func (s *Server) DoGetFiles(ctx *gin.Context) {
+func (server *Server) DoGetFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 
 	// parse request parameters
 	params := GetFilesParams{}
 	if err := ctx.Bind(&params); err != nil {
-		panic(NewError(http.StatusBadRequest,
-			err.Error()).WithDetails("failed to parse request parameters"))
-	}
-
-	// get search engine
-	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	engine, err := s.getSearchEngine(params.Local, nil /*no files*/, authToken, homeDir, userTag)
-	if err != nil {
-		panic(NewError(http.StatusInternalServerError,
-			err.Error()).WithDetails("failed to get search engine"))
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request parameters"))
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
 	// default to JSON
 	if accept == "" {
 		accept = codec.MIME_JSON
+		// log.Debugf("[%s]: Content-Type changed to %s", CORE, accept)
 	}
 	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
 		panic(NewError(http.StatusUnsupportedMediaType,
-			"Only JSON format is supported for now"))
+			"only JSON format is supported for now"))
 	}
 
-	log.WithField("dir", params.Dir).WithField("user", userName).
-		WithField("home", homeDir).WithField("cluster", userTag).
-		Infof("start /files")
+	// get search engine
+	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
+	engine, err := server.getSearchEngine(params.Local, nil /*no files*/, authToken, homeDir, userTag)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get search engine"))
+	}
+
+	log.WithFields(map[string]interface{}{
+		"dir":     params.Dir,
+		"user":    userName,
+		"home":    homeDir,
+		"cluster": userTag,
+	}).Infof("[%s]: start GET /files", CORE)
 	info, err := engine.Files(params.Dir)
 	if err != nil {
-		// TODO: detail description?
-		panic(NewError(http.StatusNotFound, err.Error()))
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get files"))
 	}
 
 	// TODO: if params.Sort {
