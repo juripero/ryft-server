@@ -28,31 +28,44 @@
  * ============
  */
 
-package ryftmux
+package testfake
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
 )
 
-// Search starts asynchronous "/search" or "/count" operation.
-func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask(cfg)
-	mux := search.NewResult()
-
-	// prepare requests
-	for _, backend := range engine.Backends {
-		res, err := backend.Search(cfg)
-		if err != nil {
-			task.log().WithError(err).Warnf("[%s]: failed to start /search backend", TAG)
-			mux.ReportError(fmt.Errorf("failed to start /search backend: %s", err))
-			continue
-		}
-
-		task.add(res)
+// Files starts synchronous "/files" operation.
+func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+	// report pre-defined error?
+	if engine.FilesReportError != nil {
+		return nil, engine.FilesReportError
 	}
 
-	go engine.run(task, mux)
-	return mux, nil // OK for now
+	// report pre-defined set of dirs/files?
+	if len(engine.FilesReportDirs)+len(engine.FilesReportFiles) > 0 {
+		info := search.NewDirInfo(path + engine.FilesPathSuffix)
+		info.AddFile(engine.FilesReportFiles...)
+		info.AddDir(engine.FilesReportDirs...)
+		return info, nil
+	}
+
+	// read a directory content...
+	home := filepath.Join(engine.MountPoint, engine.HomeDir)
+	log.WithFields(map[string]interface{}{
+		"home": home,
+		"path": path,
+	}).Infof("[%s]: start /files", TAG)
+
+	// read directory content
+	info, err := search.ReadDir(home, path)
+	if err != nil {
+		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
+		return nil, fmt.Errorf("failed to read directory content: %s", err)
+	}
+
+	log.WithField("info", info).Debugf("[%s] done /files", TAG)
+	return info, nil // OK
 }

@@ -1,75 +1,21 @@
 package ryftdec
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"testing"
-	"time"
 
-	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/testfake"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	testLogLevel = "debug"
+	testLogLevel = "error"
 )
 
-// fake engine to generate random data
-type fakeEngine struct {
-	Host       string
-	MountPoint string
-	HomeDir    string
-	Instance   string
-
-	// report to /search
-	ErrorForSearch error
-	ReportLatency  time.Duration
-
-	// list of search done
-	searchDone []*search.Config
-
-	// report to /files
-	FilesToReport []string
-	DirsToReport  []string
-	ErrorForFiles error
-}
-
 // create new fake engine
-func newFake(records, errors int) *fakeEngine {
-	return &fakeEngine{
-		MountPoint: "/tmp",
-		HomeDir:    "/ryft-test/",
-		Instance:   ".work",
-	}
-}
-
-// get string
-func (fe fakeEngine) String() string {
-	return fmt.Sprintf("fake{}")
-}
-
-// Get current engine options.
-func (fe *fakeEngine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"instance-name": fe.Instance,
-		"home-dir":      fe.HomeDir,
-		"ryftone-mount": fe.MountPoint,
-	}
-}
-
-// Run *synchronous* "/files" operation.
-func (fe *fakeEngine) Files(path string) (*search.DirInfo, error) {
-	info := search.NewDirInfo(path)
-	info.AddFile(fe.FilesToReport...)
-	info.AddDir(fe.DirsToReport...)
-	return info, fe.ErrorForFiles
-}
-
-// cleanup all working directories
-func (fe *fakeEngine) cleanup() {
-	os.RemoveAll(filepath.Join(fe.MountPoint, fe.HomeDir))
+func newFake(records, errors int) *testfake.Engine {
+	engine, _ := testfake.NewEngine("/tmp", "/ryft")
+	return engine
 }
 
 // Check multiplexing of files and directories
@@ -77,8 +23,8 @@ func TestEngineFiles(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	f1 := newFake(0, 0)
-	f1.FilesToReport = []string{"1.txt", "2.txt"}
-	f1.DirsToReport = []string{"a", "b"}
+	f1.FilesReportFiles = []string{"1.txt", "2.txt"}
+	f1.FilesReportDirs = []string{"a", "b"}
 
 	// valid (usual case)
 	engine, err := NewEngine(f1, -1, false)
@@ -105,11 +51,12 @@ func TestEngineOptions(t *testing.T) {
 	engine, err := NewEngine(newFake(1, 0), -1, false)
 	assert.NoError(t, err)
 	if assert.NotNil(t, engine) {
-		assert.EqualValues(t, "ryftdec{backend:fake{}}", engine.String())
+		assert.EqualValues(t, "ryftdec{backend:fake{home:/tmp/ryft}}", engine.String())
 		assert.EqualValues(t, map[string]interface{}{
 			"instance-name": ".work",
-			"home-dir":      "/ryft-test/",
+			"home-dir":      "/ryft",
 			"ryftone-mount": "/tmp",
+			"host-name":     "",
 		}, engine.Options())
 	}
 }

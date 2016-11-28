@@ -11,35 +11,9 @@ import (
 	codec "github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/testfake"
 	"github.com/stretchr/testify/assert"
 )
-
-// drain the results
-func drain(res *search.Result) (records int, errors int) {
-	for {
-		select {
-		case err, ok := <-res.ErrorChan:
-			if ok && err != nil {
-				errors++
-			}
-
-		case rec, ok := <-res.RecordChan:
-			if ok && rec != nil {
-				records++
-			}
-
-		case <-res.DoneChan:
-			for _ = range res.ErrorChan {
-				errors++
-			}
-			for _ = range res.RecordChan {
-				records++
-			}
-
-			return
-		}
-	}
-}
 
 // do fake GET /search
 func (fs *fakeServer) doSearch(w http.ResponseWriter, req *http.Request) {
@@ -159,12 +133,12 @@ func TestEngineSearchUsual(t *testing.T) {
 
 		res, err := engine.Search(cfg)
 		if assert.NoError(t, err) && assert.NotNil(t, res) {
-			records, errors := drain(res)
+			records, errors := testfake.Drain(res)
 
 			assert.EqualValues(t, fs.RecordsToReport, res.RecordsReported())
 			assert.EqualValues(t, fs.ErrorsToReport, res.ErrorsReported())
-			assert.EqualValues(t, fs.RecordsToReport, records)
-			assert.EqualValues(t, fs.ErrorsToReport, errors)
+			assert.EqualValues(t, fs.RecordsToReport, len(records))
+			assert.EqualValues(t, fs.ErrorsToReport, len(errors))
 		}
 	}
 
@@ -386,7 +360,7 @@ func TestEngineSearchCancel(t *testing.T) {
 				log.Infof("[%s/test]: cancelling request!", TAG)
 				res.Cancel() // cancel in 1 second
 			}()
-			_, _ = drain(res)
+			_, _ = testfake.Drain(res)
 
 			assert.True(t, res.IsCancelled())
 			assert.True(t, res.IsDone())

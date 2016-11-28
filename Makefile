@@ -14,7 +14,7 @@ endif
 .PHONY: version
 version:
 	@echo "Version: ${VERSION}"
-	@echo "githash: ${GITHASH}"
+	@echo "GitHash: ${GITHASH}"
 
 $(GOBINDATA):
 	go get -u github.com/jteeuwen/go-bindata/...
@@ -47,10 +47,9 @@ test-cover:
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftdec/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/ryfthttp/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftmux/ || true
-# go test -tags "${GO_TAGS}" -cover ./search/ryftone/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftprim/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/utils/ || true
-# go test -tags "${GO_TAGS}" -cover ./search/utils/catalog/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/catalog/ || true
 
 	@go test -tags "${GO_TAGS}" -cover ./rest/codec/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/codec/json/ || true
@@ -62,7 +61,7 @@ test-cover:
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/json/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/xml/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/ || true
-# go test -tags "${GO_TAGS}" -cover ./rest/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/ || true
 
 # @go test -tags "${GO_TAGS}" -cover ./middleware/auth/ || true
 # @go test -tags "${GO_TAGS}" -cover ./middleware/cors/ || true
