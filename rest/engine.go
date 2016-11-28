@@ -183,7 +183,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 
 		// index-host
 		if _, ok := opts["index-host"]; !ok {
-			opts["index-host"] = getHostName()
+			opts["index-host"] = s.Config.HostName
 		}
 	}
 
@@ -213,4 +213,16 @@ func (s *Server) getMountPoint(homeDir string) (string, error) {
 
 	opts := engine.Options()
 	return utils.AsString(opts["ryftone-mount"])
+}
+
+// cancels results if not done
+func cancelIfNotDone(res *search.Result) {
+	if !res.IsDone() { // cancel processing
+		if errors, records := res.Cancel(); errors > 0 || records > 0 {
+			log.WithFields(map[string]interface{}{
+				"errors":  errors,
+				"records": records,
+			}).Debugf("[%s]: some errors/records are ignored (panic recover)", CORE)
+		}
+	}
 }

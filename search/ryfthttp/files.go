@@ -67,7 +67,7 @@ func (engine *Engine) doFiles(task *Task, req *http.Request) (*search.DirInfo, e
 	// do HTTP request
 	resp, err := engine.httpClient.Do(req)
 	if err != nil {
-		task.log().WithError(err).Errorf("failed to send request")
+		task.log().WithError(err).Warnf("failed to send request")
 		return nil, fmt.Errorf("failed to send request: %s", err)
 	}
 
@@ -75,7 +75,7 @@ func (engine *Engine) doFiles(task *Task, req *http.Request) (*search.DirInfo, e
 
 	// check status code
 	if resp.StatusCode != http.StatusOK {
-		task.log().WithField("status", resp.StatusCode).Errorf("invalid response status")
+		task.log().WithField("status", resp.StatusCode).Warnf("invalid response status")
 		return nil, fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
@@ -84,12 +84,12 @@ func (engine *Engine) doFiles(task *Task, req *http.Request) (*search.DirInfo, e
 	dec := json.NewDecoder(resp.Body)
 	err = dec.Decode(res)
 	if err != nil {
-		task.log().WithError(err).Errorf("failed to decode response")
+		task.log().WithError(err).Warnf("failed to decode response")
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
 
 	if dec.More() {
-		task.log().Errorf("failed to decode response: extra data")
+		task.log().Warnf("failed to decode response: extra data")
 		return nil, fmt.Errorf("failed to decode response: extra data", err)
 	}
 

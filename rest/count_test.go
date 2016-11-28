@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// /search tests
-func TestSearchUsual(t *testing.T) {
+// /count tests
+func TestCountUsual(t *testing.T) {
 	for k, v := range makeDefaultLoggingOptions(testLogLevel) {
 		setLoggingLevel(k, v)
 	}
@@ -28,7 +28,8 @@ func TestSearchUsual(t *testing.T) {
 	}()
 
 	// test case
-	check := func(url, accept string, cancelIn time.Duration, expectedStatus int, expectedErrors ...string) {
+	check := func(url, accept string, cancelIn time.Duration,
+		expectedStatus int, expectedErrors ...string) {
 		body, status, err := fs.get(url, accept, cancelIn)
 		if err != nil {
 			for _, msg := range expectedErrors {
@@ -45,81 +46,66 @@ func TestSearchUsual(t *testing.T) {
 	all := true // false
 
 	if all {
-		check("/search1", "", 0, http.StatusNotFound, "page not found")
+		check("/count1", "", 0, http.StatusNotFound, "page not found")
 
-		check("/search", "", 0, http.StatusBadRequest,
+		check("/count", "", 0, http.StatusBadRequest,
 			"Field validation for 'Query' failed on the 'required' tag",
 			"failed to parse request parameters")
 
-		check("/search?query=hello", "", 0, http.StatusBadRequest,
+		check("/count?query=hello", "", 0, http.StatusBadRequest,
 			"no any file or catalog provided")
 
-		check("/search?query=hello&file=*.txt&format=bad", "application/json", 0,
-			http.StatusBadRequest, "is unsupported format", "failed to get transcoder")
+		check("/count?query=hello&file=*.txt", "application/msgpack", 0,
+			http.StatusUnsupportedMediaType, "Only JSON format is supported for now")
 
-		//check("/search?query=hello&file=*.txt", "application/octet-stream",
-		//	0, http.StatusBadRequest, "failed to get encoder")
-
-		check("/search?query=hello&file=*.txt&surrounding=bad", "", 0,
+		check("/count?query=hello&file=*.txt&surrounding=bad", "", 0,
 			http.StatusBadRequest, "failed to parse surrounding width", "invalid syntax")
 	}
 
 	if oldSearchBackend := fs.server.Config.SearchBackend; all {
 		fs.server.Config.SearchBackend = "bad"
-		check("/search?query=hello&file=*.txt", "application/json", 0,
+		check("/count?query=hello&file=*.txt", "application/json", 0,
 			http.StatusInternalServerError, "failed to get search engine", "unknown search engine")
 		fs.server.Config.SearchBackend = oldSearchBackend
 	}
 
 	if all {
 		fs.server.Config.BackendOptions["search-report-error"] = "simulated-error"
-		check("/search?query=hello&file=*.txt&surrounding=line", "application/json",
+		check("/count?query=hello&file=*.txt&surrounding=line", "application/octet-stream", // should be changed to JSON
 			0, http.StatusInternalServerError, "failed to start search", "simulated-error")
 		delete(fs.server.Config.BackendOptions, "search-report-error")
 	}
 
 	if all {
-		fs.server.Config.BackendOptions["search-report-records"] = 0
-		fs.server.Config.BackendOptions["search-report-errors"] = 1
-		check("/search?query=hello&file=*.txt&surrounding=0&ep=true", "application/octet-stream", // should be changed to application/json
-			0, http.StatusOK, `"results":[]`, `"errors":["[node-1]: error-1"]`)
-		delete(fs.server.Config.BackendOptions, "search-report-records")
-		delete(fs.server.Config.BackendOptions, "search-report-errors")
-	}
-
-	if all {
-		fs.server.Config.BackendOptions["search-report-records"] = 0
-		fs.server.Config.BackendOptions["search-report-errors"] = 1
 		fs.server.Config.BackendOptions["search-no-stat"] = true
-		check("/search?query=hello&file=*.txt&surrounding=0&ep=true", "",
-			0, http.StatusInternalServerError, `[node-1]: error-1`)
-		delete(fs.server.Config.BackendOptions, "search-report-records")
-		delete(fs.server.Config.BackendOptions, "search-report-errors")
+		check("/count?query=hello&file=*.txt&surrounding=line", "", 0,
+			http.StatusInternalServerError, "no search statistics available")
 		delete(fs.server.Config.BackendOptions, "search-no-stat")
 	}
 
 	if all {
-		fs.server.Config.BackendOptions["search-report-records"] = 1
-		fs.server.Config.BackendOptions["search-report-errors"] = 0
-		check("/search?query=hello&file=*.txt&stats=true", "application/json",
-			0, http.StatusOK, `"file":"file-1.txt"`)
+		fs.server.Config.BackendOptions["search-report-records"] = 0
+		fs.server.Config.BackendOptions["search-report-errors"] = 1
+		check("/count?query=hello&file=*.txt&surrounding=0", "application/json",
+			0, http.StatusInternalServerError, `"message": "error-1"`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}
 
 	if all {
 		fs.server.Config.BackendOptions["search-report-records"] = 100000
-		fs.server.Config.BackendOptions["search-report-errors"] = 100
-		check("/search?query=hello&file=*.txt&stats=true", "application/json", 0, http.StatusOK)
+		fs.server.Config.BackendOptions["search-report-errors"] = 0
+		check("/count?query=hello&file=*.txt&stats=true", "application/json",
+			0, http.StatusOK, `"matches":100000`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}
 
 	if all {
 		fs.server.Config.BackendOptions["search-report-records"] = 10000
-		fs.server.Config.BackendOptions["search-report-latency"] = "10ms"
+		fs.server.Config.BackendOptions["search-report-latency"] = "100ms"
 		fs.server.Config.BackendOptions["search-report-errors"] = 0
-		check("/search?query=hello&file=*.txt&stats=true", "application/json",
+		check("/count?query=hello&file=*.txt&stats=true", "application/json",
 			time.Second, http.StatusOK, `request canceled`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")

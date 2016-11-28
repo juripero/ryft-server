@@ -170,7 +170,7 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 			}
 
 		default:
-			task.log().WithField("tag", tag).Errorf("[%s]: unknown tag", TAG)
+			task.log().WithField("tag", tag).Warnf("[%s]: unknown tag", TAG)
 			res.ReportError(fmt.Errorf("unknown data tag received: %v", tag))
 			return // failed, no sense to continue processing
 		}

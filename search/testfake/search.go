@@ -86,11 +86,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				}
 			}
 
-			res.Stat = search.NewStat(engine.HostName)
-			res.Stat.Matches = uint64(engine.SearchReportRecords)
-			res.Stat.TotalBytes = uint64(rand.Int63n(1000000000) + 1)
-			res.Stat.Duration = uint64(rand.Int63n(1000) + 1)
-			res.Stat.FabricDuration = res.Stat.Duration / 2
+			if !engine.SearchNoStat {
+				res.Stat = search.NewStat(engine.HostName)
+				res.Stat.Matches = uint64(engine.SearchReportRecords)
+				res.Stat.TotalBytes = uint64(rand.Int63n(1000000000) + 1)
+				res.Stat.Duration = uint64(rand.Int63n(1000) + 1)
+				res.Stat.FabricDuration = res.Stat.Duration / 2
+			}
 		}()
 
 		return res, nil // OK for now
@@ -135,6 +137,10 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		defer func() {
 			res.Stat.Duration = uint64(time.Since(started).Nanoseconds() / 1000)
 			res.Stat.FabricDuration = res.Stat.Duration / 2
+
+			if engine.SearchNoStat {
+				res.Stat = nil // reset
+			}
 		}()
 
 		for _, f := range cfg.Files {

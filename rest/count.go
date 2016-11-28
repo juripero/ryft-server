@@ -60,6 +60,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	// default to JSON
 	if accept == "" {
 		accept = codec.MIME_JSON
+		// log.Debugf("[%s]: Content-Type changed to %s", CORE, accept)
 	}
 	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
 		panic(NewError(http.StatusUnsupportedMediaType,
@@ -94,27 +95,18 @@ func (server *Server) DoCount(ctx *gin.Context) {
 		"user":    userName,
 		"home":    homeDir,
 		"cluster": userTag,
-	}).Infof("start /count")
+	}).Infof("[%s]: start /count", CORE)
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to start search"))
 	}
-	defer log.WithField("result", res).Infof("/count done")
+	defer log.WithField("result", res).Infof("[%s]: /count done", CORE)
 
 	// in case of unexpected panic
 	// we need to cancel search request
 	// to prevent resource leaks
-	defer func() {
-		if !res.IsDone() { // cancel processing
-			if errors, records := res.Cancel(); errors > 0 || records > 0 {
-				log.WithFields(map[string]interface{}{
-					"errors":  errors,
-					"records": records,
-				}).Debugf("some errors/records are ignored (panic recover)")
-			}
-		}
-	}()
+	defer cancelIfNotDone(res)
 
 	server.onSearchStarted(cfg)
 	defer server.onSearchStopped(cfg)
@@ -123,42 +115,43 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Writer.CloseNotify(): // cancel processing
-			log.Warnf("cancelling by user (connection is gone)...")
+			log.Warnf("[%s]: cancelling by user (connection is gone)...", CORE)
 			if errors, records := res.Cancel(); errors > 0 || records > 0 {
 				log.WithFields(map[string]interface{}{
 					"errors":  errors,
 					"records": records,
-				}).Debugf("some errors/records are ignored")
+				}).Debugf("[%s]: some errors/records are ignored", CORE)
 			}
 			return // cancelled
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				// log.WithField("record", rec).Debugf("record ignored") // FIXME: DEBUG
-				_ = rec // ignore records
+				// log.WithField("record", rec).Debugf("[%s]: record received", CORE) // FIXME: DEBUG
+				_ = rec // ignore record
 			}
 
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
-				// log.WithField("error", err).Debugf("error ignored") // FIXME: DEBUG
-				panic(err) // TODO: check this?
+				// log.WithField("error", err).Debugf("[%s]: error received", CORE) // FIXME: DEBUG
+				panic(err) // TODO: check this? no other ways to report errors
 			}
 
 		case <-res.DoneChan:
 			// drain the records
 			for rec := range res.RecordChan {
-				// log.WithField("record", rec).Debugf("*** record ignored") // FIXME: DEBUG
-				_ = rec // ignore records
+				// log.WithField("record", rec).Debugf("[%s]: *** record received", CORE) // FIXME: DEBUG
+				_ = rec // ignore record
 			}
 
 			// ... and errors
 			for err := range res.ErrorChan {
-				// log.WithField("error", err).Debugf("error ignored") // FIXME: DEBUG
-				panic(err) // TODO: check this?
+				// log.WithField("error", err).Debugf("[%s]: error received", CORE) // FIXME: DEBUG
+				panic(err) // TODO: check this? no other ways to report errors
 			}
 
 			if res.Stat != nil {
 				if server.Config.ExtraRequest {
+					// save request parameters in "extra"
 					res.Stat.Extra["request"] = &params
 				}
 				xstat := format.FromStat(res.Stat)

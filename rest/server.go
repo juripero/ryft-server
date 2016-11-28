@@ -139,6 +139,7 @@ type ServerConfig struct {
 	} `yaml:"catalogs,omitempty"`
 
 	SettingsPath string `yaml:"settings-path,omitempty"`
+	HostName     string `yaml:"hostname,omitempty"`
 }
 
 // Server instance
@@ -231,6 +232,15 @@ func (s *Server) Prepare() (err error) {
 		return fmt.Errorf("failed to open settings: %s", err)
 	}
 
+	// hostname
+	if len(s.Config.HostName) == 0 {
+		if h, err := os.Hostname(); err != nil {
+			return fmt.Errorf("failed to get hostname: %s", err)
+		} else {
+			s.Config.HostName = h
+		}
+	}
+
 	// automatic debug mode
 	if len(s.Config.Logging) == 0 && s.Config.DebugMode {
 		s.Config.Logging = "debug"
@@ -282,10 +292,4 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 	}
 
 	return
-}
-
-// get local host name
-func getHostName() string {
-	hostName, _ := os.Hostname()
-	return hostName
 }

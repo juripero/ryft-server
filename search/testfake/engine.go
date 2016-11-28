@@ -59,6 +59,7 @@ type Engine struct {
 	SearchReportRecords int
 	SearchReportErrors  int
 	SearchCancelDelay   int
+	SearchNoStat        bool
 	SearchReportLatency time.Duration
 	SearchCfgLogTrace   []search.Config
 

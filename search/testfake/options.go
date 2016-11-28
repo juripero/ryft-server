@@ -92,12 +92,48 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		return fmt.Errorf("failed to create working directory: %s", err)
 	}
 
-	// index host
-	if v, ok := opts["index-host"]; ok {
+	// host name
+	if v, ok := opts["host-name"]; ok {
 		engine.HostName, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to parse "index-host" option: %s`, err)
+			return fmt.Errorf(`failed to parse "host-name" option: %s`, err)
 		}
+	}
+
+	// search-report-error
+	if v, ok := opts["search-report-error"]; ok {
+		str, _ := utils.AsString(v)
+		engine.SearchReportError = fmt.Errorf("%s", str)
+	}
+
+	// search-report-records
+	if v, ok := opts["search-report-records"]; ok {
+		vv, _ := utils.AsUint64(v)
+		engine.SearchReportRecords = int(vv)
+	}
+
+	// search-report-errors
+	if v, ok := opts["search-report-errors"]; ok {
+		vv, _ := utils.AsUint64(v)
+		engine.SearchReportErrors = int(vv)
+	}
+
+	// search-report-latency
+	if v, ok := opts["search-report-latency"]; ok {
+		vv, _ := utils.AsDuration(v)
+		engine.SearchReportLatency = vv
+	}
+
+	// search-no-stat
+	if v, ok := opts["search-no-stat"]; ok {
+		vv, _ := utils.AsBool(v)
+		engine.SearchNoStat = vv
+	}
+
+	// files-report-error
+	if v, ok := opts["files-report-error"]; ok {
+		str, _ := utils.AsString(v)
+		engine.FilesReportError = fmt.Errorf("%s", str)
 	}
 
 	return nil // OK

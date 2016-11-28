@@ -106,7 +106,8 @@ func RecoverFromPanic(ctx *gin.Context) {
 		}
 
 		// first try to report via encoder...
-		if reportEncoderError(err) {
+		// (skip the first attempt and report full error)
+		if ctx.Writer.Written() && reportEncoderError(err) {
 			return
 		}
 

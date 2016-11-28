@@ -189,7 +189,6 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to clear res catalog", TAG)
 		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
 	}
-	task.log().WithField("results", res1).Debugf("[%s]: temporary result catalog", TAG)
 
 	// check input data-set for catalogs
 	var hasCatalogs int
@@ -213,6 +212,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		"input":  cfg.Query,
 		"output": task.rootQuery.String(),
 	}).Infof("[%s]: decomposed as", TAG)
+
+	task.log().WithField("results", res1).Debugf("[%s]: temporary result catalog", TAG)
 
 	mux := search.NewResult()
 	keepDataAs := cfg.KeepDataAs

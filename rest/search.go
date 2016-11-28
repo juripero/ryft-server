@@ -111,12 +111,14 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
 	if accept == "" { // default to JSON
 		accept = codec.MIME_JSON
+		// log.Debugf("[%s]: Content-Type changed to %s", CORE, accept)
 	}
 	ctx.Header("Content-Type", accept)
 
 	// setting up encoder to respond with requested format
 	// we can use two formats:
-	// - with tags to report data records and the statistics in one stream
+	// - single JSON value (not appropriate for large data set)
+	// - with tags to report data records and the statistics in a stream
 	enc, err := codec.NewEncoder(ctx.Writer, accept, params.Stream)
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
@@ -152,27 +154,18 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 		"user":    userName,
 		"home":    homeDir,
 		"cluster": userTag,
-	}).Infof("start /search")
+	}).Infof("[%s]: start /search", CORE)
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to start search"))
 	}
-	defer log.WithField("result", res).Infof("/search done")
+	defer log.WithField("result", res).Infof("[%s]: /search done", CORE)
 
 	// in case of unexpected panic
 	// we need to cancel search request
 	// to prevent resource leaks
-	defer func() {
-		if !res.IsDone() { // cancel processing
-			if errors, records := res.Cancel(); errors > 0 || records > 0 {
-				log.WithFields(map[string]interface{}{
-					"errors":  errors,
-					"records": records,
-				}).Debugf("some errors/records are ignored (panic recover)")
-			}
-		}
-	}()
+	defer cancelIfNotDone(res)
 
 	server.onSearchStarted(cfg)
 	defer server.onSearchStopped(cfg)
@@ -183,7 +176,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	// error prefix
 	var errorPrefix string
 	if params.ErrorPrefix {
-		errorPrefix = getHostName()
+		errorPrefix = server.Config.HostName
 	}
 
 	// put error to stream
@@ -216,12 +209,12 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	for {
 		select {
 		case <-ctx.Writer.CloseNotify(): // cancel processing
-			log.Warnf("cancelling by user (connection is gone)...")
+			log.Warnf("[%s]: cancelling by user (connection is gone)...", CORE)
 			if errors, records := res.Cancel(); errors > 0 || records > 0 {
 				log.WithFields(map[string]interface{}{
 					"errors":  errors,
 					"records": records,
-				}).Debugf("some errors/records are ignored")
+				}).Debugf("[%s]: some errors/records are ignored", CORE)
 			}
 			return // cancelled
 

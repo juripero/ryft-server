@@ -128,7 +128,6 @@ func makeDefaultLoggingOptions(level string) map[string]string {
 		"core/pending-jobs": level,
 		"core/busyness":     level,
 		"search/ryftprim":   level,
-		"search/ryftone":    level,
 		"search/ryfthttp":   level,
 		"search/ryftmux":    level,
 		"search/ryftdec":    level,
