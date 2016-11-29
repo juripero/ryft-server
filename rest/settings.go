@@ -168,11 +168,11 @@ func (ss *ServerSettings) updateScheme() error {
 	}
 
 	// 1 => 2 (example)
-	if false && version <= 1 {
+	/*if version <= 1 {
 		if err := ss.updateSchemeToVersion2(tx); err != nil {
 			return fmt.Errorf("failed to update to version 2: %s", err)
 		}
-	}
+	}*/
 
 	// commit changes
 	if err := tx.Commit(); err != nil {
@@ -204,7 +204,7 @@ PRAGMA user_version = 1;`
 }
 
 // version2: update tables (example)
-func (ss *ServerSettings) updateSchemeToVersion2(tx *sql.Tx) error {
+/*func (ss *ServerSettings) updateSchemeToVersion2(tx *sql.Tx) error {
 	SCRIPT := ` -- just an example
 ALTER TABLE jobs ADD COLUMN foo INTEGER;
 
@@ -216,16 +216,16 @@ PRAGMA user_version = 2;`
 	}
 
 	return nil // OK
-}
+}*/
 
 // AddJob adds a new or update existing job.
-func (ss *ServerSettings) AddJob(cmd, args string, when time.Time) error {
+func (ss *ServerSettings) AddJob(cmd, args string, when time.Time) (int64, error) {
 	// TODO: several attempts if DB is locked
 	return ss.addJobSync(cmd, args, when)
 }
 
 // adds job (synchronized).
-func (ss *ServerSettings) addJobSync(cmd, args string, when time.Time) error {
+func (ss *ServerSettings) addJobSync(cmd, args string, when time.Time) (int64, error) {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
 
@@ -233,28 +233,32 @@ func (ss *ServerSettings) addJobSync(cmd, args string, when time.Time) error {
 }
 
 // adds job (unsynchronized).
-func (ss *ServerSettings) addJob(cmd, args string, when time.Time) error {
+func (ss *ServerSettings) addJob(cmd, args string, when time.Time) (int64, error) {
 	// should be done under exclusive transaction
 	tx, err := ss.db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %s", err)
+		return 0, fmt.Errorf("failed to begin transaction: %s", err)
 	}
 	defer tx.Rollback() // just in case
 
 	// insert new job
-	_, err = tx.Exec(`INSERT OR REPLACE
+	res, err := tx.Exec(`INSERT OR REPLACE
 INTO jobs(cmd,args,whenToRun)
 VALUES (?,?,?)`, cmd, args, when.UTC().Format(jobTimeFormat))
 	if err != nil {
-		return fmt.Errorf("failed to insert job: %s", err)
+		return 0, fmt.Errorf("failed to insert job: %s", err)
+	}
+	var id int64
+	if id, err = res.LastInsertId(); err != nil {
+		return 0, fmt.Errorf("failed to get job id: %s", err)
 	}
 
 	// commit transaction
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %s", err)
+		return 0, fmt.Errorf("failed to commit transaction: %s", err)
 	}
 
-	return nil // OK
+	return id, nil // OK
 }
 
 // DelJob removes existing jobs.
@@ -318,8 +322,14 @@ type SettingsJobItem struct {
 	When string
 }
 
+// get job as string
+func (job SettingsJobItem) String() string {
+	return fmt.Sprintf("#%d [%s %s] at %s", job.Id,
+		job.Cmd, job.Args, job.When)
+}
+
 // query all unfinished jobs
-func (ss *ServerSettings) QueryAllJobs(now time.Time) (chan SettingsJobItem, error) {
+func (ss *ServerSettings) QueryAllJobs(now time.Time) (<-chan SettingsJobItem, error) {
 	rows, err := ss.db.Query(`
 SELECT id,cmd,args,whenToRun FROM jobs
 WHERE datetime(whenToRun) <= datetime(?);`, now.UTC().Format(jobTimeFormat))
@@ -337,7 +347,7 @@ WHERE datetime(whenToRun) <= datetime(?);`, now.UTC().Format(jobTimeFormat))
 			var item SettingsJobItem
 			err := rows.Scan(&item.Id, &item.Cmd, &item.Args, &item.When)
 			if err != nil {
-				log.WithError(err).Warnf("failed to scan job")
+				jobsLog.WithError(err).Warnf("[%s]: failed to scan job", JOBS)
 				// TODO: report error
 				break
 			}
