@@ -243,7 +243,7 @@ backend-options:
                               # server instance directory will be: $ryftone-mount/$instance-name
 ```
 
-More information about search engines can be found [here](./search.md)
+More information about search engines can be found [here](./search/engine.md)
 
 ### Server configuration
 

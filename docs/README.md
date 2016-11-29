@@ -16,5 +16,5 @@ related to authentication schemes supported by ryft server.
 [Cluster](./cluster.md) document contains some information
 related to cluster mode.
 
-[Search engines](./search.md) document contains detailed description
+[Search engines](./search/engine.md) document contains detailed description
 of some ryft-server internals.
