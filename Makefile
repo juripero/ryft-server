@@ -68,7 +68,7 @@ test-cover:
 # @go test -tags "${GO_TAGS}" -cover ./middleware/gzip/ || true
 
 test:
-	go test -v ./...
+	go test -tags "${GO_TAGS}" ./...
 
 clean:
 	rm -f $(ASSETS)

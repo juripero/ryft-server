@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	testLogLevel = "debug"
+	testLogLevel = "error"
 	testFakePort = ":12345"
 )
 

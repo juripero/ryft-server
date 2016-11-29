@@ -161,14 +161,13 @@ func main() {
 		"settings-path": server.Config.SettingsPath,
 	}).Info("main configuration")
 	log.WithFields(map[string]interface{}{
-		"search-backend":          server.Config.SearchBackend,
-		"backend-options":         server.Config.BackendOptions,
-		"http-timeout":            server.Config.HttpTimeout,
-		"tls-enabled":             server.Config.TLS.Enabled,
-		"tls-address":             server.Config.TLS.ListenAddress,
-		"auth-type":               server.Config.AuthType,
-		"busyness-tolerance":      server.Config.Busyness.Tolerance,
-		"booleans-per-expression": server.Config.BooleansPerExpression,
+		"search-backend":     server.Config.SearchBackend,
+		"backend-options":    server.Config.BackendOptions,
+		"http-timeout":       server.Config.HttpTimeout,
+		"tls-enabled":        server.Config.TLS.Enabled,
+		"tls-address":        server.Config.TLS.ListenAddress,
+		"auth-type":          server.Config.AuthType,
+		"busyness-tolerance": server.Config.Busyness.Tolerance,
 	}).Debug("other configuration")
 
 	// be quiet and efficient in production

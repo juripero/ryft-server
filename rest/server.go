@@ -127,8 +127,6 @@ type ServerConfig struct {
 		UpdateLatency  time.Duration `yaml:"-"`
 	} `yaml:"busyness,omitempty"`
 
-	BooleansPerExpression map[string]int `yaml:"booleans-per-expression"`
-
 	// catalogs related options
 	Catalogs struct {
 		MaxDataFileSize   string        `yaml:"max-data-file-size"`

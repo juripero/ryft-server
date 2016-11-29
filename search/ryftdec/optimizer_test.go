@@ -280,31 +280,12 @@ OR
 
 // test for get limit
 func TestOptimizerGetLimit(t *testing.T) {
-	limits := map[string]int{
-		"es":   1,
-		"fhs":  2,
-		"feds": 3,
-		"ds":   5,
-		"ts":   6,
-		"ns":   4,
-		"cs":   4,
-		"ipv4": 8,
-		"ipv6": 9,
-	}
-	o := &Optimizer{
-		OperatorLimits: limits,
-	}
-
-	assert.Equal(t, 0, o.getModeLimit("bad"))         // invalid mode
-	assert.Equal(t, limits["es"], o.getModeLimit("")) // default to ES
-	for k, v := range limits {
-		assert.Equal(t, v, o.getModeLimit(k))
-	}
+	o := &Optimizer{CombineLimit: 1}
 
 	assert.Equal(t, 0, o.getLimit( // bad queries
 		Query{},
 		Query{}))
-	assert.Equal(t, 0, o.getLimit( // diff options
+	assert.Equal(t, 1, o.getLimit( // diff options
 		Query{
 			Simple: &SimpleQuery{
 				Options: Options{Mode: "fhs"},

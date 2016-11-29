@@ -38,8 +38,9 @@ import (
 // Optimizer contains some optimizer options.
 type Optimizer struct {
 	// number of boolean operators per search type
-	OperatorLimits map[string]int // `json:"limits,omitempty" yaml:"limits,omitempty"`
-	CombineLimit   int            // `json:"limit" yaml:"limit,omitempty"`
+	//OperatorLimits map[string]int // `json:"limits,omitempty" yaml:"limits,omitempty"`
+
+	CombineLimit int // `json:"limit" yaml:"limit,omitempty"`
 }
 
 // Optimize input query.
@@ -246,23 +247,9 @@ func (o *Optimizer) canCombine(a Query, b Query) bool {
 // get the bool operations limit
 func (o *Optimizer) getLimit(a Query, b Query) int {
 	if aa, bb := a.Simple, b.Simple; aa != nil && bb != nil {
-		/*if aa.Options.EqualsTo(bb.Options) {
-			// both simple queries are the same type!
-			return o.getModeLimit(aa.Options.Mode)
-		}*/
-
 		// type or options are different
 		return o.CombineLimit
 	}
 
 	return 0 // not found
-}
-
-// get the bool operations limit
-func (o *Optimizer) getModeLimit(mode string) int {
-	if len(mode) == 0 {
-		mode = "es" // "es" by default
-	}
-
-	return o.OperatorLimits[mode]
 }
