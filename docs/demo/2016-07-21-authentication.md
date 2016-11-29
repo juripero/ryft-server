@@ -30,8 +30,8 @@ To run ryft server with authentication enabled just use the following command:
 ryft-server --auth=file --users-file=users.yaml
 ```
 
-Now we can access [/search](./rest/search.md#search), [/count](./rest/search.md#count)
-and [/files](./rest/files.md) endpoints only if we provide valid user
+Now we can access [/search](../rest/search.md#search), [/count](../rest/search.md#count)
+and [/files](../rest/files.md) endpoints only if we provide valid user
 credentials. Otherwise `401 Unauthorized` HTTP status will be reported:
 
 ```{.sh}
@@ -116,7 +116,7 @@ The output will be different:
 Please note the file path in the `_index`. The filename is relative to user's home
 directory. `John` knows nothing about `test`, and `test` knows nothing about `John`'s files.
 
-We can also check [/files](./rest/files.md) endpoint to get directory content for each user:
+We can also check [/files](../rest/files.md) endpoint to get directory content for each user:
 
 ```{.sh}
 curl -s -u 'test:test' "http://localhost:8765/files" | jq .

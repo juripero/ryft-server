@@ -95,7 +95,7 @@ This information is extremelly useful for bug reporting.
 See [REST API](./docs/rest/README.md) document for more details.
 
 Some endpoints are protected. See [authentication](./docs/auth.md) document
-and [corresponding demo](./docs/demo-2016-07-21.md).
+and [corresponding demo](./docs/demo/2016-07-21-authentication.md).
 
 
 # Command line tools
@@ -129,4 +129,4 @@ ryftrest -q '((RECORD.Date CONTAINS TIME(11:50:00 < HH:MM:SS <= 11:55:00)) \
 ```
 
 For more detailed examples see:
-[ryftrest sample 1](./docs/demo-2016-04-28.md) and [ryftrest sample 2](./docs/demo-2016-05-12.md)
+[ryftrest sample 1](./docs/demo/2016-04-28-ryftrest.md) and [ryftrest sample 2](./docs/demo/2016-05-12-ryftrest.md)
