@@ -68,6 +68,10 @@ func TestOptimizerCombine(t *testing.T) {
 		`({RECORD CONTAINS       "hello"})`,
 		`(RECORD CONTAINS EXACT("hello"))[es]`)
 
+	check(true,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be, or not to be", DIST=1))`,
+		`(RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("To be, or not to be", DISTANCE="1"))[feds,d=1]`)
+
 	// the same bool operator
 	check(false,
 		`(RAW_TEXT EQUALS       "100")  AND (RAW_TEXT EQUALS       "200")`,
