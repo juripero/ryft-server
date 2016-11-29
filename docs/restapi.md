@@ -62,7 +62,7 @@ query=(RECORD.AlterEgo CONTAINS "The Batman")
 ```
 
 Depending on [search mode](#search-mode-parameter) exact search query format may differ.
-Check corresponding Ryft Open API or [short reference](./searchsyntax.md)
+Check corresponding Ryft Open API or [short reference](./search/README.md)
 for more details on search expressions.
 
 `ryft-server` supports simple plain queries - without any keywords.
@@ -139,7 +139,7 @@ Date, time and numeric search modes will be detected automatically by correspond
 
 NOTE: The fuzzy edit distance search mode removes duplicates by default (`-r` option of ryftprim).
 
-Check corresponding Ryft Open API or [short reference](./searchsyntax.md)
+Check corresponding Ryft Open API or [short reference](./search/README.md)
 for more details on search expressions.
 
 

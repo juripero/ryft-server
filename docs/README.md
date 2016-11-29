@@ -7,7 +7,7 @@ how to build ryft server and run it with various parameters.
 REST API endpoints such as [/search](./restapi.md#search)
 and [/version](./restapi.md#version)
 
-[Search syntax](./searchsyntax.md) document contains description and
+[Search syntax](./search/README.md) document contains description and
 examples  of various search types supported.
 
 [Authentication](./auth.md) document contains information
