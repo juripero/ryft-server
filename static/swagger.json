@@ -45,13 +45,10 @@
           },
           {
             "in": "query",
-            "type": "integer",
-            "format": "uint32",
-            "maximum": 262144,
-            "minimum": 0,
+            "type": "string",
             "name": "surrounding",
             "x-go-name": "Surrounding",
-            "description": "Number of characters before the match and after the match that will be returned. This parameter is used with RAW text search"
+            "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
           },
           {
             "in": "query",
@@ -77,6 +74,13 @@
             "name": "cs",
             "x-go-name": "CaseSensitive",
             "description": "Case sensitive flag"
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "reduce",
+            "x-go-name": "Reduce",
+            "description": "Reduce flag for fuzzy edit distance search"
           },
           {
             "in": "query",
@@ -195,13 +199,10 @@
           },
           {
             "in": "query",
-            "type": "integer",
-            "format": "uint32",
-            "maximum": 262144,
-            "minimum": 0,
+            "type": "string",
             "name": "surrounding",
             "x-go-name": "Surrounding",
-            "description": "Number of characters before the match and after the match that will be returned. This parameter is used with RAW text search"
+            "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
           },
           {
             "in": "query",
@@ -219,6 +220,13 @@
             "name": "cs",
             "x-go-name": "CaseSensitive",
             "description": "Case sensitive flag"
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "reduce",
+            "x-go-name": "Reduce",
+            "description": "Reduce flag for fuzzy edit distance search"
           },
           {
             "in": "query",
