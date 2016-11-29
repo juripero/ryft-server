@@ -68,14 +68,22 @@ func parseExpression(expression string, baseOpts Options) (cleanedExpression str
 		op := strings.TrimSpace(match[1])
 		mode := strings.TrimSpace(match[2])
 		argsString := strings.Split(strings.TrimSpace(match[3]), ",")
-		expr := argsString[0]
-		args := parseArgs(strings.Join(argsString[1:], ","))
 
-		opts.Mode = strings.ToLower(mode) // FHS or FEDS
+		n := 0
+		for ; n < len(argsString); n++ {
+			parsed := parseArgs(argsString[n])
+			if len(parsed) != 0 { // find first option
+				break
+			}
+		}
 
+		expr := strings.Join(argsString[0:n], ",")
+		args := parseArgs(strings.Join(argsString[n:], ","))
 		for name, value := range args {
 			opts = SetOption(opts, name, value)
 		}
+
+		opts.Mode = strings.ToLower(mode) // FHS or FEDS
 
 		// remove all embedded options from search expression
 		cleanedExpression = fmt.Sprintf("%s %s", op, expr)

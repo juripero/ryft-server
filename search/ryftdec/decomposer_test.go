@@ -314,6 +314,42 @@ OR
 }
 
 func TestBugfix(t *testing.T) {
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be, or not to be", DIST=1))`,
+		`[feds-1/0-false]: (RECORD.doc.text_entry CONTAINS "To be, or not to be")`)
+
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be, or not, to be", DIST=1))`,
+		`[feds-1/0-false]: (RECORD.doc.text_entry CONTAINS "To be, or not, to be")`)
+
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be or not to be", DIST=1))`,
+		`[feds-1/0-false]: (RECORD.doc.text_entry CONTAINS "To be or not to be")`)
+
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be, or not to be", DIST=1, CS=true))`,
+		`[feds-1/0-true]: (RECORD.doc.text_entry CONTAINS "To be, or not to be")`)
+
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be, or not, to be", DIST=1, CS=true))`,
+		`[feds-1/0-true]: (RECORD.doc.text_entry CONTAINS "To be, or not, to be")`)
+
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be or not to be", DIST=1, CS=true))`,
+		`[feds-1/0-true]: (RECORD.doc.text_entry CONTAINS "To be or not to be")`)
+
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be, or not to be"))`,
+		`[feds-0/0-false]: (RECORD.doc.text_entry CONTAINS "To be, or not to be")`)
+
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be, or not, to be"))`,
+		`[feds-0/0-false]: (RECORD.doc.text_entry CONTAINS "To be, or not, to be")`)
+
+	testQueryTree(t,
+		`(RECORD.doc.text_entry CONTAINS FEDS("To be or not to be"))`,
+		`[feds-0/0-false]: (RECORD.doc.text_entry CONTAINS "To be or not to be")`)
+
 	testQueryTree(t, `( RECORD.block CONTAINS FHS(""?"INDIANA"?"",CS=true,DIST=0,WIDTH=0) )`,
 		`[fhs-0/0-true]: (RECORD.block CONTAINS ""?"INDIANA"?"")`)
 
