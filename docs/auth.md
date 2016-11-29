@@ -9,9 +9,9 @@ To verify user credentials the LDAP service or simple file may be used.
 
 The following endpoints are protected:
 
-- [/search](./restapi.md#search)
-- [/count](./restapi.md#count)
-- [/files](./restapi.md#files)
+- [/search](./rest/search.md#search)
+- [/count](./rest/search.md#count)
+- [/files](./rest/files.md)
 
 
 # Authentication

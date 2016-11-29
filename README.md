@@ -43,10 +43,10 @@ implementation and [authnetication](./docs/auth.md).
 
 `ryft-server` supports a few REST endpoints:
 
-  - [/version](./docs/restapi.md#version)
-  - [/search](./docs/restapi.md#search)
-  - [/count](./docs/restapi.md#count)
-  - [/files](./docs/restapi.md#files)
+  - [/version](./docs/rest/README.md#version)
+  - [/search](./docs/rest/search.md#search)
+  - [/count](./docs/rest/search.md#count)
+  - [/files](./docs/rest/files.md)
 
 All examples assume the `ryft-server` host name is `ryftone-777`.
 
@@ -92,7 +92,7 @@ This request prints current server version and corresponding git hash number.
 This information is extremelly useful for bug reporting.
 
 
-See [REST API](./docs/restapi.md) document for more details.
+See [REST API](./docs/rest/README.md) document for more details.
 
 Some endpoints are protected. See [authentication](./docs/auth.md) document
 and [corresponding demo](./docs/demo-2016-07-21.md).

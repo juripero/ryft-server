@@ -19,9 +19,9 @@ type Engine interface {
 ```
 
 Most of the methods are related to the corresponding REST API endpoints:
-[/search](./restapi.md#search), [/count](./restapi.md#count) and [/files](./restapi.md#files).
+[/search](../rest/search.md#search), [/count](../rest/search.md#count) and [/files](../rest/files.md).
 The `Options()` method is used to get search engine's internal options which initially could be
-customized via [search configuration file](./buildandrun.md#search-configuration).
+customized via [search configuration file](../buildandrun.md#search-configuration).
 
 The `ryft-server` uses this abstract search engine in its main code
 so we can easily change actual search engine implementation.
@@ -98,7 +98,7 @@ parses generated index and data files.
 ## `ryftprim` options
 
 The `ryftprim` search engine supports the following options (they can be customized
-via [search configuration file](./buildandrun.md#search-configuration)):
+via [search configuration file](../buildandrun.md#search-configuration)):
 
 - `instance-name` - the search engine instance name. This name is used to distinguish different instances.
 - `ryftprim-exec` - path to the `ryftprim` tool. By default it is `/usr/bin/ryftprim`.
@@ -111,7 +111,7 @@ via [search configuration file](./buildandrun.md#search-configuration)):
 - `read-limit` - the limit of read attempts. By default it is "100".
   After 100 read fails the engine will stop reading and return an error.
 - `keep-files` - keep intermediate data and index files in order to implement server's
-  [--keep option](./buildandrun.md#keeping-search-results).
+  [--keep option](../buildandrun.md#keeping-search-results).
 - `index-host` - cluster's node name. Engine marks all found record indexes with
   cluster node's name. This feature let user distinguish where record come from.
 
@@ -160,7 +160,7 @@ The `ryfthttp` search engine supports the following options:
   by the local search engine (`ryftprim` or `ryftone`).
 
 Usually these options are filled by the `ryft-server` automatically when cluster configuration is built.
-But it's also possible to customize them via [search configuration file](./buildandrun.md#search-configuration).
+But it's also possible to customize them via [search configuration file](../buildandrun.md#search-configuration).
 
 
 # `ryftmux` search engine
@@ -177,7 +177,7 @@ The `ryftdec` search engine is a kind of filter. It uses backend for its work - 
 The main purpose of `ryftdec` is to decompose complex search query into several simple sub-queries.
 These simple sub-queries are forwarded to backend and the results are properly combined.
 
-For example let's process this complex [search query](./restapi.md#search-query-parameter):
+For example let's process this complex [search query](../rest/search.md#search-query-parameter):
 
 ```
 (RECORD.id CONTAINS "10030") AND (RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/13/2015)) AND (RECORD.date CONTAINS TIME(HH:MM:SS > 11:20:00))

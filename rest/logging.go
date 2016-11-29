@@ -56,34 +56,35 @@ var (
 const (
 	CORE = "core"
 	JOBS = "jobs"
-	BUSY = "busyness"
+	BUSY = "busy"
 )
 
 // handle /logging/level endpoint: change logger's level
 func (server *Server) DoLoggingLevel(ctx *gin.Context) {
+	defer RecoverFromPanic(ctx)
+
 	// try to set levels from query
 	for key, vals := range ctx.Request.URL.Query() {
 		for _, level := range vals { // usually one item
 			if err := setLoggingLevel(key, level); err != nil {
-				ctx.IndentedJSON(http.StatusBadRequest,
-					map[string]interface{}{"error": err.Error()})
-				return
+				panic(NewError(http.StatusBadRequest, err.Error()).
+					WithDetails("failed to change logging level"))
 			}
 		}
 	}
 
 	// print current levels
 	info := map[string]interface{}{
-		"core":              log.Level.String(),
-		"core/catalogs":     catalog.GetLogLevel().String(),
-		"core/pending-jobs": jobsLog.Level.String(),
-		"core/busyness":     busyLog.Level.String(),
-		"search/ryftprim":   ryftprim.GetLogLevel().String(),
-		"search/ryfthttp":   ryfthttp.GetLogLevel().String(),
-		"search/ryftmux":    ryftmux.GetLogLevel().String(),
-		"search/ryftdec":    ryftdec.GetLogLevel().String(),
+		"core":            log.Level.String(),
+		"core/catalogs":   catalog.GetLogLevel().String(),
+		"core/jobs":       jobsLog.Level.String(),
+		"core/busy":       busyLog.Level.String(),
+		"search/ryftprim": ryftprim.GetLogLevel().String(),
+		"search/ryfthttp": ryfthttp.GetLogLevel().String(),
+		"search/ryftmux":  ryftmux.GetLogLevel().String(),
+		"search/ryftdec":  ryftdec.GetLogLevel().String(),
 
-		// TODO: more core loggers, see setLoggingLevel() function
+		// TODO: more loggers, see setLoggingLevel() function
 	}
 
 	ctx.IndentedJSON(http.StatusOK, info)
@@ -101,9 +102,9 @@ func setLoggingLevel(logger string, level string) error {
 		log.Level = ll
 	case "core/catalogs":
 		catalog.SetLogLevel(ll)
-	case "core/pending-jobs":
+	case "core/jobs":
 		jobsLog.Level = ll
-	case "core/busyness":
+	case "core/busy":
 		busyLog.Level = ll
 		// TODO: more core loggers
 	case "search/ryftprim":
@@ -121,15 +122,16 @@ func setLoggingLevel(logger string, level string) error {
 	return nil // OK
 }
 
+// make logging options with the same level
 func makeDefaultLoggingOptions(level string) map[string]string {
 	return map[string]string{
-		"core":              level,
-		"core/catalogs":     level,
-		"core/pending-jobs": level,
-		"core/busyness":     level,
-		"search/ryftprim":   level,
-		"search/ryfthttp":   level,
-		"search/ryftmux":    level,
-		"search/ryftdec":    level,
+		"core":            level,
+		"core/catalogs":   level,
+		"core/jobs":       level,
+		"core/busy":       level,
+		"search/ryftprim": level,
+		"search/ryfthttp": level,
+		"search/ryftmux":  level,
+		"search/ryftdec":  level,
 	}
 }

@@ -1,23 +1,18 @@
-This document contains information about REST API.
+There are two REST API endpoints related to search:
 
-`ryft-server` supports the following API endpoints:
-
-- [/version](#version)
 - [/search](#search)
 - [/count](#count)
-- [/files](#files)
 
-The main API endpoints are `/search` and `/count`.
+First one reports the data found. The seconds one reports
+just search statistics, no any data.
 
-If authentication is enabled, there are also a few endpoints related to
-[JWT](./auth.md#JWT-login).
 
 # Search
 
 The GET `/search` endpoint is used to search data on Ryft boxes.
 
 Note, this endpoint is protected and user should provide valid credentials.
-See [authentication](./auth.md) for more details.
+See [authentication](../auth.md) for more details.
 
 ## Search query parameters
 
@@ -26,12 +21,13 @@ The list of supported query parameters are the following (check detailed descrip
 | Parameter     | Type    | Description |
 | ------------- | ------- | ----------- |
 | `query`       | string  | **Required**. [The search expression](#search-query-parameter). |
-| `file`        | string  | **Required**. [The set of files to search](#search-file-parameter). |
+| `file`        | string  | **Required**. [The set of files or catalogs to search](#search-file-parameter). |
 | `mode`        | string  | [The search mode](#search-mode-parameter). |
-| `surrounding` | uint16  | [The data surrounding width](#search-surrounding-parameter). |
+| `surrounding` | string  | [The data surrounding width](#search-surrounding-parameter). |
 | `fuzziness`   | uint8   | [The fuzziness distance](#search-fuzziness-parameter). |
 | `format`      | string  | [The structured search format](#search-format-parameter). |
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
+| `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
@@ -40,8 +36,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
 | `limit`       | int     | [Limit the total number of records reported](#search-limit-parameter). |
-| `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-and-spark-parameters). |
-| `spark`       | boolean | **Internal** [The spark output format flag](#search-stream-and-spark--parameters). |
+| `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-parameters). |
 | `ep`          | boolean | **Internal** [The error prefix flag](#search-ep-parameter). |
 
 ### Search `query` parameter
@@ -62,27 +57,25 @@ query=(RECORD.AlterEgo CONTAINS "The Batman")
 ```
 
 Depending on [search mode](#search-mode-parameter) exact search query format may differ.
-Check corresponding Ryft Open API or [short reference](./search/README.md)
+Check corresponding Ryft Open API or [short reference](../search/README.md)
 for more details on search expressions.
 
 `ryft-server` supports simple plain queries - without any keywords.
 The `query=Batman` will be automatically converted to `query=(RAW_TEXT CONTAINS "Batman")`.
 NOTE: This only works for text search; it is not appropriate for structured search.
-(Actually, the query will be `query=(RAW_TEXT CONTAINS "\x42\x61\x74\x6d\x61\x6e")`,
-`ryft-server` uses hex encoding to avoid any possible escaping problems).
 
 `ryft-server` also supports complex queries containing several search expressions of different types.
-For example `(RECORD.id CONTAINS "100") AND (RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
+For example `(RECORD.id CONTAINS "100") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
 This complex query contains two search expression: first one uses text search and the second one uses date search.
 `ryft-server` will split this expression into two separate queries:
-`(RECORD.id CONTAINS "100")` and `(RECORD.date CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
+`(RECORD.id CONTAINS "100")` and `(RAW_TEXT CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
 It then calls Ryft hardware two times: the results of the first call are used as the input for the second call.
 
 Multiple `AND` and `OR` operators are supported by the `ryft-server` within complex search queries.
 Expression tree is built and each node is passed to the Ryft hardware. Then results are properly combined.
 
-NOTE: If search query contains two or more expressions of the same type (text, date, time, numeric) that query
-will not be split into subqueries because the Ryft hardware supports those type of queries directly.
+NOTE: If search query contains two or more RECORD-based expressions (of any types text, date, time, numeric...)
+that query will not be split into subqueries because the Ryft hardware supports those type of queries directly.
 
 There is also possible to use advanced text search queries to customize some parameters within search expression.
 For example: `(RAW_TEXT CONTAINS FHS("555",CS=true,DIST=1,WIDTH=2)) AND (RAW_TEXT CONTAINS FEDS("777",CS=true,DIST=1,WIDTH=4))`.
@@ -91,12 +84,14 @@ The ryft server splits this expressions into two Ryft calls:
 - `(RAW_TEXT CONTAINS "777")` with `feds` search mode, `fuzziness=1` and `surrounding=4`
 
 This advanced search query syntax overrides the following global parameters:
-- search type: `FHS` or `FEDS` (exact search is used if fuzziness is zero)
+- search type: `ES`, `FHS` or `FEDS` (exact search is used if fuzziness is zero)
 - case sensitivity `CS=`
 - fuzziness distance `DIST=`
 - surrounding width `WIDTH=`
 
-If nothing provided the global options are used by default. Any option can be omitted: `(RAW_TEXT CONTAINS FHS("555")) AND (RAW_TEXT CONTAINS FEDS("777",CS=false))`.
+If nothing provided the global options are used by default. Any option can be omitted:
+`(RAW_TEXT CONTAINS FHS("555")) AND (RAW_TEXT CONTAINS FEDS("777",CS=false))`.
+See [short reference](../search/README.md) for more details.
 
 
 ### Search `file` parameter
@@ -111,6 +106,7 @@ Multiple files can be provided as:
 
 It's possible to provide catalog name as a `file` parameter. Ryft server
 automatically detects catalogs and does appropriate substitutions.
+Also the `catalog=` alias is supported.
 
 Note, for backward compatibility the `files=` parameter is also supported.
 
@@ -124,20 +120,18 @@ Note, for backward compatibility the `files=` parameter is also supported.
 - `feds` for fuzzy edit distance search
 - `ds` for date search
 - `ts` for time search
-- `ns` for numeric or currency search
-- `rs` for regex search
+- `ns` for numeric search
+- `cs` for currency search
 - `ipv4` for IPv4 search
 - `ipv6` for IPv6 search
 
-If no search mode is specified, fuzzy hamming search is used **by default** for simple queries.
+If no search mode is specified, exact search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
 keyword then date search will be used. It's the same when `TIME` keyword is used for time search,
-and `NUMBER` or `CURRENCY` for numeric search.
+and so on.
 
 In case of complex search queries, the mode specified is used for text or structured search only.
 Date, time and numeric search modes will be detected automatically by corresponding keywords.
-
-NOTE: The fuzzy edit distance search mode removes duplicates by default (`-r` option of ryftprim).
 
 Check corresponding Ryft Open API or [short reference](./search/README.md)
 for more details on search expressions.
@@ -145,16 +139,19 @@ for more details on search expressions.
 
 ### Search `surrounding` parameter
 
-The number of characters in bytes up to a maximum of `262144` before the match
+The number of characters in bytes up to a maximum of `64000` before the match
 and after the match that will be returned when the text search is used.
 For anything other than raw text, this parameter is ignored.
+
+The `surrounding=line` should be provided for whole line surrounding.
+This option is very useful for CVS files.
 
 `surrounding=0` is used **by default**.
 
 
 ### Search `fuzziness` parameter
 
-The fuzziness of the search up to a maximum of `255` when using a fuzzy search function.
+The fuzziness distance of the search up to a maximum of `255` when using a fuzzy search function.
 For fuzzy hamming search, fuzziness is measured as the maximum Hamming distance allowed
 in order to declare a match. For fuzzy edit distance search, fuzziness is measured
 as the number of insertions, deletions or replacements required to declare a match.
@@ -214,6 +211,15 @@ case is ignored entirely and all possible capitalizations of the text will be fo
 `cs=false` is used **by default**.
 
 
+### Search `reduce` parameter
+
+The search `reduce` boolean flag is used for fuzzy edit distance searches only.
+The `reduce=true` tells engine to remove duplicates.
+See [reduce option](../search/EDIT_DIST.md#reduce-option) for more details.
+
+`reduce=false` is used **by default**.
+
+
 ### Search `fields` parameter
 
 The comma-separated list of fields for structured search. If omitted, all fields are used.
@@ -231,7 +237,7 @@ In order to preserve results thereby allowing for the ability to subsequently
 "search in the previous results", two query parameters are available: `data=` and `index=`.
 
 Using the first parameter, `data=output.dat` creates the search results on the Ryft server under `/ryftone/output.dat`.
-It is possible to use that file as an input for the subsequent search call `files=output.dat`.
+It is possible to use that file as an input for the subsequent search call `file=output.dat`.
 
 NOTE: It is important to use consistent file extension for the structured search
 in order to let Ryft use appropriate RDF scheme!
@@ -246,7 +252,7 @@ NOTE: According to Ryft API documentation, an index file should always have `.tx
 ### Search `delimiter` parameter
 
 To customize output format the `delimiter=` parameter may be used. This optional
-string will be used to separate found records in the output file.
+string will be used to separate found records in the output data file.
 
 By default there is no any delimiter. To use Windows newline
 just pass url-encoded `delimiter=%0D%0A`.
@@ -281,7 +287,7 @@ This parameter is used to limit the total number of records reported.
 There is no any limit **by default** or when `limit=0`.
 
 
-### Search `stream` and `spark` parameters
+### Search `stream` parameter
 
 `ryft-server` reports results in several formats. **By default** the simple JSON object
 with "results" array and "stats" object is reported. That format is used by Web-UI:
@@ -341,23 +347,6 @@ to be able to decode input data on the fly:
 "end"
 ```
 
-"spark" format is even shorter than "stream". It reports sequence of records (one by one):
-
-```{.json}
-{
-  "Date": "04/15/2015 11:59:00 PM",
-  "ID": "10034183",
-  "_index": {}
-}
-{
-  "Date": "04/15/2015 11:59:00 PM",
-  "ID": "10034184",
-  "_index": {}
-}
-```
-
-The "spark" format is obsolete for now and will be removed soon.
-
 
 ### Search `ep` parameter
 
@@ -391,7 +380,7 @@ To let user know which cluster node reports error `ryft-server` adds node's host
 The following request:
 
 ```
-/search?query=10&files=passengers.txt&surrounding=10&fuzziness=0&stats=true&local=true
+/search?query=10&files=passengers.txt&surrounding=10&stats=true&local=true
 ```
 
 will produce the following output:
@@ -421,7 +410,7 @@ will produce the following output:
 The following request:
 
 ```
-/search?query=(RECORD.id CONTAINS "1003100")&files=/*.pcrime&fuzziness=0&format=xml&fields=ID,Date&stats=true&local=true
+/search?query=(RECORD.id CONTAINS "1003100")&files=*.pcrime&format=xml&fields=ID,Date&stats=true&local=true
 ```
 
 will produce the following output:
@@ -448,7 +437,7 @@ However, it does not transfer all found data, it will just print
 the number of matches and associated performance numbers.
 
 Note, this endpoint is protected and user should provide valid credentials.
-See [authentication](./auth.md) for more details.
+See [authentication](../auth.md) for more details.
 
 ## Count query parameters
 
@@ -457,11 +446,12 @@ The list of supported query parameters are the following:
 | Parameter     | Type    | Description |
 | ------------- | ------- | ----------- |
 | `query`       | string  | **Required**. [The search expression](#search-query-parameter). |
-| `file`        | string  | **Required**. [The set of files to search](#search-file-parameter). |
+| `file`        | string  | **Required**. [The set of files or catalogs to search](#search-file-parameter). |
 | `mode`        | string  | [The search mode](#search-mode-parameter). |
 | `surrounding` | uint16  | [The data surrounding width](#search-surrounding-parameter). |
 | `fuzziness`   | uint8   | [The fuzziness distance](#search-fuzziness-parameter). |
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
+| `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
@@ -489,207 +479,5 @@ will report the following output:
   "duration": 689,
   "dataRate": 9.554209660722487,
   "fabricDataRate": 9.55421
-}
-```
-
-
-# Files
-
-The GET `/files` endpoint is used to get Ryft box directory content.
-The name of all subdirectories and files are reported.
-
-The POST `/files` endpoint is used to upload a file to Ryft box.
-The catalog feature is supported to upload a bunch of small files.
-
-To delete any file, directory ot catalog the DELETE `/files` endpoint is used.
-
-Note, these endpoints are protected and user should provide valid credentials.
-See [authentication](./auth.md) for more details.
-
-
-## Files query parameters
-
-The list of supported query parameters for the GET endpoint are the following:
-
-| Parameter | Type    | Description |
-| --------- | ------- | ----------- |
-| `dir`     | string  | [The directory to get content of](#get-files-dir-parameter). |
-| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
-
-The list of supported query parameters for the POST standalone files are the following:
-
-| Parameter | Type    | Description |
-| --------- | ------- | ----------- |
-| `file`    | string  | [The filename to upload](#post-files-file-parameter). |
-| `offset`  | integer | [The optional position of uploaded chunk](#post-files-offset-parameter). |
-| `length`  | integer | [The optional length of uploaded chunk](#post-files-length-parameter). |
-| `lifetime`| string  | [The optional lifetime of the uploaded file](#post-files-lifetime-parameter). |
-| `local`   | boolean | [The optional local/cluster flag](#search-local-parameter). |
-
-The list of supported query parameters for the POST files to catalog:
-
-| Parameter | Type    | Description |
-| --------- | ------- | ----------- |
-| `catalog` | string  | [The catalog name to upload to](#post-files-catalog-parameter). |
-| `delimiter`| string | [The data delimiter to use](#post-files-delimiter-parameter). |
-| `file`    | string  | [The filename to upload](#post-files-file-parameter). |
-| `offset`  | integer | [The position of uploaded chunk](#post-files-offset-parameter). |
-| `length`  | integer | [The length of uploaded chunk](#post-files-length-parameter). |
-| `lifetime`| string  | [The optional lifetime of the uploaded file](#post-files-lifetime-parameter). |
-| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
-
-The list of supported query parameters for the DELETE endpoint are the following:
-
-| Parameter | Type    | Description |
-| --------- | ------- | ----------- |
-| `dir`     | string  | [The directory to delete](#delete-files-parameters). |
-| `file`    | string  | [The standalone file to delete](#delete-files-parameters). |
-| `catalog` | string  | [The catalog to delete](#delete-files-parameters). |
-| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
-
-
-### GET files `dir` parameter
-
-The directory to get content of. Root directory `dir=/` is used **by default**.
-
-The directory name should be relative to the Ryft volume and user's home.
-The `dir=/foo` request will report content of `/ryftone/test/foo` directory on the Ryft box.
-
-
-### POST files content
-
-To upload a file the content should be provided.
-There are two supported `Content-Type` headers:
-
-- `application/octet-stream`
-- `multipart/form-data` - actual file content should be provided via `file` key.
-
-
-### POST files `catalog` parameter
-
-If `catalog` parameter is provided then file will be appended to that catalog
-file instead of standalone file uploading. This feature is used to upload a
-bunch of small files to a bigger catalog data file.
-
-The `catalog` parameter contains full catalog's path.
-All non-existsing sub-directories will be created automatically.
-
-Special keyword `{{random}}` can be used to generate unique catalog names.
-This keyword will be replaced with some unique hexadecimal string.
-For example, `catalog=foo-{{random}}.catalog` will be replaced to something like
-`foo-aabbccddeeff.catalog`. Anyway the actual catalog name will be reported in
-the response body.
-
-### POST files `delimiter` parameter
-
-Data delimiter is used in catalog files as a separator between different file
-parts. It is very important specially for RAW text files to use something like `delimiter=%0a`.
-Otherwise unexpected text matches can be found on file part boundaries.
-
-If no delimiter is provided the default value will be used.
-The default delimiter can be customized via ryft-server's
-[configuration file](./buildandrun.md#catalog-configuration).
-
-Once provided the delimiter cannot be changed for the same catalog.
-
-
-### POST files `file` parameter
-
-To upload a file the `file` parameter should be provided.
-It contains full path of the uploaded data content. For example, if `file=bar/foo.txt`
-then the data will be saved under `/ryftone/test/bar/foo.txt` (assuming user's
-home directory is `test`).
-
-If `catalog` parameter is not specified the `file` parameter contains full path.
-All non-existsing sub-directories will be created automatically.
-
-Special keyword `{{random}}` can be used to generate unique filenames.
-This keyword will be replaced with some unique hexadecimal string.
-For example, `file=foo-{{random}}.txt` will be replaced to something like
-`foo-aabbccddeeff.txt`. Anyway the actual filename will be reported in
-the response body.
-
-
-### POST files `offset` parameter
-
-It's possible to upload just a part of file. If `offset` query parameter is
-present then the data will be saved using this offset as write position in
-destination file.
-
-Using this parameter it's possible to continue upload of failed data.
-Or just split file and upload it in chunks.
-
-
-### POST files `length` parameter
-
-This optional parameters is used to specify uploading data length in bytes.
-This parameter can help ryft server to avoid extra data copy. So if it's
-possible this parameter should be provided.
-
-
-### POST files `lifetime` parameter
-
-This optional parameters is used to specify lifetime of the uploaded data.
-If this parameter is provided the file or catalog will be deleted after
-specified amount of time. For example if `lifetime=1h` is provided the file
-will be availeble during a hour and then will be automatically removed.
-
-
-### DELETE files parameters
-
-It's possible to specify file, directory or catalog to delete.
-Multiple parameters can be used together.
-
-Also wildcards are supported. To delete all JSON files just pass `file=*.json`.
-
-All the names should be relative to the Ryft volume and user's home.
-The `file=bar/foo.txt` request will delete `/ryftone/test/bar/foo.txt` on the Ryft box
-(assuming user's home directory is *test*).
-
-
-## Files example
-
-The following request:
-
-```
-GET /files?dir=/&local=true
-```
-
-will print the root `/ryftone` content:
-
-```{.json}
-{
-  "dir": "/",
-  "files": [
-    "chicago.pcrime",
-    "passengers.txt"
-  ],
-  "folders": [
-    "demo",
-    "regression",
-    "test"
-  ]
-}
-```
-
-The following request:
-
-```
-DELETE /files?dir=demo&file=*.pcrime&file=p*.txt&local=true
-```
-
-will delete specified nodes.
-
-
-# Version
-
-The GET `/version` endpoint is used to check current `ryft-server` version.
-
-It has no parameters, output looks like:
-
-```{.json}
-{
-  "git-hash": "35c358378f7c214069333004d01841f9066b8f15",
-  "version": "1.2.3"
 }
 ```

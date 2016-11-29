@@ -3,9 +3,9 @@ This directory contains documentation related to ryft server.
 [Build and Run](./buildandrun.md) document contains detailed instructions
 how to build ryft server and run it with various parameters.
 
-[REST API](./restapi.md) document contains detailed description of exported
-REST API endpoints such as [/search](./restapi.md#search)
-and [/version](./restapi.md#version)
+[REST API](./rest/README.md) document contains detailed description of exported
+REST API endpoints such as [/search](./rest/search.md#search)
+and [/version](./rest/README.md#version)
 
 [Search syntax](./search/README.md) document contains description and
 examples  of various search types supported.
