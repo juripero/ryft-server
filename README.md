@@ -33,7 +33,7 @@ make debian
 ```
 
 Most of the options can be customized via configuration file.
-See [build and run](./docs/buildandrun.md) document for more details.
+See [build](./docs/build.md) document for more details.
 
 There is also some information about [search engine](./docs/search/engine.md)
 implementation and [authnetication](./docs/auth.md).

@@ -91,7 +91,7 @@ Otherwise unexpected text matches can be found on file part boundaries.
 
 If no delimiter is provided the default value will be used.
 The default delimiter can be customized via ryft-server's
-[configuration file](../buildandrun.md#catalog-configuration).
+[configuration file](../run.md#catalog-configuration).
 
 Once provided the delimiter cannot be changed for the same catalog.
 

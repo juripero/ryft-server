@@ -1,7 +1,7 @@
 This directory contains documentation related to ryft server.
 
-[Build and Run](./buildandrun.md) document contains detailed instructions
-how to build ryft server and run it with various parameters.
+[Build](./build.md) document contains detailed instructions
+how to build ryft server and [Run](./run.md) it with various parameters.
 
 [REST API](./rest/README.md) document contains detailed description of exported
 REST API endpoints such as [/search](./rest/search.md#search)
