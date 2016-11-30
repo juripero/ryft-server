@@ -550,7 +550,7 @@ BuildItems:
 				simple = false
 			}
 
-			// put item to futher processing
+			// put item to further processing
 			items = append(items, MemItem{
 				dataFile: itemDataFile,
 				Index:    idx,
@@ -581,7 +581,7 @@ BuildItems:
 				}).Infof("[%s]: use DATA file from last Ryft call", TAG)
 			}
 		}(keepDataAs)
-		keepDataAs = "" // prevent futher processing
+		keepDataAs = "" // prevent further processing
 	}
 
 	// output DATA file
@@ -623,8 +623,6 @@ BuildItems:
 	// handle all index items
 	for _, item := range items {
 		var rec search.Record
-		// trim mount point from file name! TODO: special option for this?
-		item.Index.File = strings.TrimPrefix(item.Index.File, mountPointAndHomeDir)
 
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
@@ -740,6 +738,9 @@ BuildItems:
 		}
 
 		if reportRecords {
+			// trim mount point from file name! TODO: special option for this?
+			item.Index.File = strings.TrimPrefix(item.Index.File, mountPointAndHomeDir)
+
 			rec.Index.File = item.Index.File
 			rec.Index.Offset = item.Index.Offset
 			rec.Index.Length = item.Index.Length
