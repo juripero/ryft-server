@@ -207,7 +207,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 				}).Infof("[%s]: use DATA file from last Ryft call", TAG)
 			}
 		}(keepDataAs)
-		keepDataAs = "" // prevent futher processing
+		keepDataAs = "" // prevent further processing
 	}
 
 	// output DATA file
@@ -550,7 +550,7 @@ BuildItems:
 				}).Infof("[%s]: use DATA file from last Ryft call", TAG)
 			}
 		}(keepDataAs)
-		keepDataAs = "" // prevent futher processing
+		keepDataAs = "" // prevent further processing
 	}
 
 	// output DATA file
@@ -591,9 +591,6 @@ BuildItems:
 
 	// handle all index items
 	for _, item := range items {
-		// trim mount point from file name! TODO: special option for this?
-		item.Index.File = relativeToHome(mountPointAndHomeDir, item.Index.File)
-
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
 			f, err := os.Open(item.dataFile)
@@ -708,6 +705,9 @@ BuildItems:
 		}
 
 		if reportRecords {
+			// trim mount point from file name! TODO: special option for this?
+			item.Index.File = relativeToHome(mountPointAndHomeDir, item.Index.File)
+
 			idx := search.NewIndex(item.Index.File, item.Index.Offset, item.Index.Length)
 			idx.Fuzziness = item.Index.Fuzziness
 
