@@ -103,7 +103,7 @@ func (engine *Engine) prepare(task *Task) error {
 		}
 	} else {
 		// generic search
-		args = append(args, "-g", cfg.Query)
+		args = append(args, "-p", "g", "-q", cfg.Query)
 	}
 
 	// files
