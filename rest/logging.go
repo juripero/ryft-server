@@ -75,14 +75,14 @@ func (server *Server) DoLoggingLevel(ctx *gin.Context) {
 
 	// print current levels
 	info := map[string]interface{}{
-		"core":            log.Level.String(),
-		"core/catalogs":   catalog.GetLogLevel().String(),
-		"core/jobs":       jobsLog.Level.String(),
-		"core/busy":       busyLog.Level.String(),
-		"search/ryftprim": ryftprim.GetLogLevel().String(),
-		"search/ryfthttp": ryfthttp.GetLogLevel().String(),
-		"search/ryftmux":  ryftmux.GetLogLevel().String(),
-		"search/ryftdec":  ryftdec.GetLogLevel().String(),
+		"core":              log.Level.String(),
+		"core/catalogs":     catalog.GetLogLevel().String(),
+		"core/pending-jobs": jobsLog.Level.String(),
+		"core/busyness":     busyLog.Level.String(),
+		"search/ryftprim":   ryftprim.GetLogLevel().String(),
+		"search/ryfthttp":   ryfthttp.GetLogLevel().String(),
+		"search/ryftmux":    ryftmux.GetLogLevel().String(),
+		"search/ryftdec":    ryftdec.GetLogLevel().String(),
 
 		// TODO: more loggers, see setLoggingLevel() function
 	}
@@ -102,9 +102,9 @@ func setLoggingLevel(logger string, level string) error {
 		log.Level = ll
 	case "core/catalogs":
 		catalog.SetLogLevel(ll)
-	case "core/jobs":
+	case "core/pending-jobs":
 		jobsLog.Level = ll
-	case "core/busy":
+	case "core/busyness":
 		busyLog.Level = ll
 		// TODO: more core loggers
 	case "search/ryftprim":
@@ -125,13 +125,13 @@ func setLoggingLevel(logger string, level string) error {
 // make logging options with the same level
 func makeDefaultLoggingOptions(level string) map[string]string {
 	return map[string]string{
-		"core":            level,
-		"core/catalogs":   level,
-		"core/jobs":       level,
-		"core/busy":       level,
-		"search/ryftprim": level,
-		"search/ryfthttp": level,
-		"search/ryftmux":  level,
-		"search/ryftdec":  level,
+		"core":              level,
+		"core/catalogs":     level,
+		"core/pending-jobs": level,
+		"core/busyness":     level,
+		"search/ryftprim":   level,
+		"search/ryfthttp":   level,
+		"search/ryftmux":    level,
+		"search/ryftdec":    level,
 	}
 }

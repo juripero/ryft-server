@@ -11,7 +11,7 @@ import (
 
 // test settings and jobs
 func TestSettingsJobs(t *testing.T) {
-	setLoggingLevel("core/jobs", testLogLevel)
+	setLoggingLevel("core/pending-jobs", testLogLevel)
 
 	path := "/tmp/ryft-test.settings"
 	os.RemoveAll(path)
