@@ -101,3 +101,29 @@ To disable this behaviour just pass empty tag:
 ```{.sh}
 make GO_TAGS=
 ```
+
+
+# Releasing
+
+This section describes steps how to make a release build.
+
+Before make a release please ensure:
+- static/swagger.json is updated:
+   - has appropriate `info.version`
+   - most of clients API are correct (Go, Python, JavaScript)
+- 3rd party dependencies are updated: `make update`
+- all tests are OK: `make test`
+
+Switch to `master` branch and merge all development code.
+On [GitHub Releases](https://github.com/getryft/ryft-server/releases) page
+push the "Draft a new Release" button, select target branch as `master` and
+set the next release tag. Enter short description. For "alpha" versions
+check "This is a pre-prelease" checkbox.
+
+Once release tag is created build the corresponding Debian package:
+
+```{.sh}
+git checkout master
+git pull
+make debian
+```
