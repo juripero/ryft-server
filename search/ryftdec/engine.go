@@ -47,17 +47,20 @@ var (
 
 // Engine is decomposition engine that uses an abstract engine as backend.
 type Engine struct {
-	Backend         search.Engine
-	optimizer       *Optimizer
-	keepResultFiles bool // false by default
+	Backend   search.Engine
+	optimizer *Optimizer
+
+	KeepResultFiles bool // false by default
+	CompatMode      bool // false by default
 }
 
 // NewEngine creates new RyftDEC search engine.
-func NewEngine(backend search.Engine, genericLimit int, keepResults bool) (*Engine, error) {
+func NewEngine(backend search.Engine, genericLimit int, keepResults bool, compatMode bool) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backend = backend
 	engine.optimizer = &Optimizer{CombineLimit: genericLimit}
-	engine.keepResultFiles = keepResults
+	engine.KeepResultFiles = keepResults
+	engine.CompatMode = compatMode
 	return engine, nil
 }
 

@@ -87,6 +87,7 @@ type ServerConfig struct {
 	LocalOnly      bool                   `yaml:"local-only,omitempty"`
 	DebugMode      bool                   `yaml:"debug-mode,omitempty"`
 	KeepResults    bool                   `yaml:"keep-results,omitempty"`
+	CompatMode     bool                   `yaml:"compatibility-mode,omitempty"`
 	ExtraRequest   bool                   `yaml:"extra-request,omitempty"`
 
 	Logging        string                       `yaml:"logging,omitempty"`

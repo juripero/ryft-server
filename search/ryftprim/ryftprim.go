@@ -54,36 +54,43 @@ func (engine *Engine) prepare(task *Task) error {
 	args := []string{}
 	cfg := task.config
 
-	// generic or compatibility mode
-	if len(cfg.Mode) != 0 {
-		// select search mode
-		switch strings.ToLower(cfg.Mode) {
-		case "es", "exact", "exact_search":
-			args = append(args, "-p", "es")
-		case "fhs", "hamming", "fuzzy_hamming", "fuzzy_hamming_search":
-			args = append(args, "-p", "fhs")
-		case "feds", "edit_distance", "fuzzy_edit_distance", "fuzzy_edit_distance_search":
-			args = append(args, "-p", "feds")
-			args = append(args, "-r") // (!) automatic de-duplication
-		case "ds", "date", "date_search":
-			args = append(args, "-p", "ds")
-		case "ts", "time", "time_search":
-			args = append(args, "-p", "ts")
-		case "ns", "num", "number_search":
-			args = append(args, "-p", "ns")
-		case "cs", "currency", "currency_search":
-			// currency is a kind of numeric search!
-			args = append(args, "-p", "ns")
-		case "ipv4", "ipv4_search":
-			args = append(args, "-p", "ipv4")
-		case "ipv6", "ipv6_search":
-			args = append(args, "-p", "ipv6")
-		default:
-			return fmt.Errorf("%q is unknown search mode", cfg.Mode)
-		}
+	// select search mode
+	genericMode := false
+	switch strings.ToLower(cfg.Mode) {
+	case "", "g", "generic":
+		args = append(args, "-p", "g")
+		genericMode = true
+	case "es", "exact", "exact_search":
+		args = append(args, "-p", "es")
+	case "fhs", "hamming", "fuzzy_hamming", "fuzzy_hamming_search":
+		args = append(args, "-p", "fhs")
+	case "feds", "edit_distance", "fuzzy_edit_distance", "fuzzy_edit_distance_search":
+		args = append(args, "-p", "feds")
+	case "ds", "date", "date_search":
+		args = append(args, "-p", "ds")
+	case "ts", "time", "time_search":
+		args = append(args, "-p", "ts")
+	case "ns", "num", "number_search":
+		args = append(args, "-p", "ns")
+	case "cs", "currency", "currency_search":
+		// currency is a kind of numeric search!
+		args = append(args, "-p", "ns")
+	case "ipv4", "ipv4_search":
+		args = append(args, "-p", "ipv4")
+	case "ipv6", "ipv6_search":
+		args = append(args, "-p", "ipv6")
+	default:
+		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
+	}
 
-		// search query
-		args = append(args, "-q", cfg.Query)
+	// search query
+	args = append(args, "-q", cfg.Query)
+
+	if !genericMode {
+		// reduce duplicates (FEDS)
+		if cfg.Reduce {
+			args = append(args, "-r")
+		}
 
 		// optional surrounding width
 		if cfg.Width < 0 {
@@ -101,9 +108,6 @@ func (engine *Engine) prepare(task *Task) error {
 		if !cfg.Case {
 			args = append(args, "-i")
 		}
-	} else {
-		// generic search
-		args = append(args, "-p", "g", "-q", cfg.Query)
 	}
 
 	// files

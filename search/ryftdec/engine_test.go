@@ -27,7 +27,7 @@ func TestEngineFiles(t *testing.T) {
 	f1.FilesReportDirs = []string{"a", "b"}
 
 	// valid (usual case)
-	engine, err := NewEngine(f1, -1, false)
+	engine, err := NewEngine(f1, -1, false, false)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		info, err := engine.Files("foo")
 		if assert.NoError(t, err) && assert.NotNil(t, info) {
@@ -48,7 +48,7 @@ func TestEngineOptions(t *testing.T) {
 
 	assert.EqualValues(t, testLogLevel, GetLogLevel().String())
 
-	engine, err := NewEngine(newFake(1, 0), -1, false)
+	engine, err := NewEngine(newFake(1, 0), -1, false, false)
 	assert.NoError(t, err)
 	if assert.NotNil(t, engine) {
 		assert.EqualValues(t, "ryftdec{backend:fake{home:/tmp/ryft}}", engine.String())

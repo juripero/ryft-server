@@ -138,7 +138,7 @@ func configToOpts(cfg *search.Config) Options {
 
 // update search configuration with Options
 func updateConfig(cfg *search.Config, opts Options) {
-	// cfg.Mode = opts.Mode
+	cfg.Mode = opts.Mode
 	cfg.Dist = opts.Dist
 	cfg.Width = opts.Width
 	cfg.Case = opts.Case
@@ -203,8 +203,12 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
 		updateConfig(cfg, sq.Options)
-		cfg.Query = sq.ExprNew
-		cfg.Mode = "" // generic!
+		if engine.CompatMode {
+			cfg.Query = sq.ExprOld
+		} else {
+			cfg.Query = sq.ExprNew
+			cfg.Mode = "g" // generic!
+		}
 		return engine.Backend.Search(cfg)
 	}
 
@@ -224,7 +228,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// some futher cleanup
 		defer mux.Close()
 		defer mux.ReportDone()
-		defer task.result.Drop(engine.keepResultFiles)
+		defer task.result.Drop(engine.KeepResultFiles)
 
 		res, err := engine.doSearch(task, task.rootQuery, cfg, mux)
 		if err != nil {
@@ -234,7 +238,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		}
 		mux.Stat = res.Stat
 
-		if !engine.keepResultFiles {
+		if !engine.KeepResultFiles {
 			defer res.removeAll(mountPoint, homeDir)
 		}
 
@@ -347,8 +351,12 @@ func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux 
 
 	sq := query.Simple
 	updateConfig(cfg, sq.Options)
-	cfg.Query = sq.ExprNew
-	cfg.Mode = "" // generic!
+	if engine.CompatMode {
+		cfg.Query = sq.ExprOld
+	} else {
+		cfg.Query = sq.ExprNew
+		cfg.Mode = "g" // generic!
+	}
 	cfg.KeepDataAs = dat1
 	cfg.KeepIndexAs = idx1
 	cfg.ReportIndex = false

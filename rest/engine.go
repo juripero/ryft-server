@@ -192,7 +192,8 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 		return backend, err
 	}
 
-	return ryftdec.NewEngine(backend /*s.Config.BooleansPerExpression*/, -1, s.Config.KeepResults)
+	return ryftdec.NewEngine(backend, -1, /*no limit*/
+		s.Config.KeepResults, s.Config.CompatMode)
 }
 
 // deep copy of backend options
