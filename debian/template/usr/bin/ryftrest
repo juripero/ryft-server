@@ -10,21 +10,22 @@ Usage: $0 [options]
 Search specific:
 -h|--help          Prints this short help message.
 -p|--mode=<mode>   Specifies the search mode to run, which can be one of:
-                     - exact_search (or es)
-                     - fuzzy_hamming_search (or fhs) (used by default)
+                     - exact_search (or es) (used by default)
+                     - fuzzy_hamming_search (or fhs)
                      - fuzzy_edit_distance_search (or feds)
                      - date_search (or ds)
                      - time_search (or ts)
                      - numeric_search (or ns) also used for currency
-                     - regex_search (or rs)
                      - ipv4_search (or ipv4)
                      - ipv6_search (or ipv6)
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
+-r|--reduce        Reduce the duplicates for FEDS
 -n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use (default is 4).
 -d|--fuzziness=<D> Specifies the fuzzy search distance.
 -w|--width=<W>     Specifies the surrounding width.
+--line             Specifies the surrounding whole line (the same as -w=line).
 -e|--delimiter=<E> Specifies the delimiter used between found records.
                    For example pass Windows new line as -e $'\r\n'.
 -s|-q=<query>      Specifies the search/query expression to use.
@@ -85,7 +86,8 @@ fail() {
 MODE=
 FILES=
 CATALOGS=
-CASE_INSENS=
+CASE=
+REDUCE=
 NODES=
 FUZZINESS=
 SURROUNDING=
@@ -190,7 +192,11 @@ while [[ $# > 0 ]]; do
 		shift 2
 		;;
 	-i)
-		CASE_INSENS="true"
+		CASE="false"
+		shift
+		;;
+	-r|--reduce)
+		REDUCE="true"
 		shift
 		;;
 	-n=*|--nodes=*)
@@ -216,6 +222,10 @@ while [[ $# > 0 ]]; do
 	-w|--width)
 		SURROUNDING="$2"
 		shift 2
+		;;
+	--line)
+		SURROUNDING="line"
+		shift
 		;;
 	-e=*|--delimiter=*)
 		DELIMITER="${1#*=}"
@@ -365,7 +375,8 @@ IFS=':' read -r -a catalogs <<< "$CATALOGS"
 for catalog in "${catalogs[@]}"; do
 	[[ ! -z $catalog ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "catalog=$catalog")
 done
-[[ -z "$CASE_INSENS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=true") # inverted!
+[[ -z "$CASE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=$CASE")
+[[ -z "$REDUCE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "reduce=$REDUCE")
 [[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")
 [[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
