@@ -551,7 +551,7 @@ func TestParserParseWithOptions(t *testing.T) {
 	opts.Mode = "ds" // fallback to EXACT
 	testParserParseOpts(t, false, opts,
 		`                            A`,
-		`(RAW_TEXT CONTAINS EXACT("A", WIDTH="2"))[es,w=2]`)
+		`(RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1", WIDTH="2"))[fhs,d=1,w=2]`)
 }
 
 // test for EXACT (generic queries)

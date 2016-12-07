@@ -29,7 +29,7 @@ func TestEngineFiles(t *testing.T) {
 	// valid (usual case)
 	engine, err := NewEngine(f1, -1, false, false)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
-		info, err := engine.Files("foo")
+		info, err := engine.Files("foo", false)
 		if assert.NoError(t, err) && assert.NotNil(t, info) {
 			assert.EqualValues(t, "foo", info.Path)
 

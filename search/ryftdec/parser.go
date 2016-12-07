@@ -233,7 +233,10 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	var expression string
 
 	// get search mode for plain text queries
-	plainMode := "es" // by default
+	plainMode := "es" // by default (dist==0)
+	if res.Options.Dist != 0 {
+		plainMode = "fhs" // by default (dist!=0)
+	}
 	switch mode := res.Options.Mode; mode {
 	case "es", "fhs", "feds":
 		plainMode = mode
