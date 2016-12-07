@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 
 	"github.com/gin-gonic/gin"
@@ -61,6 +62,14 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 			WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
+
+	// checks all the input filenames are relative to home
+	for _, path := range params.Files {
+		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, path)) {
+			panic(NewError(http.StatusBadRequest,
+				fmt.Sprintf("path %q is not relative to home", path)))
+		}
+	}
 
 	log.WithFields(map[string]interface{}{
 		"files": params.Files,

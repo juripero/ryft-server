@@ -32,6 +32,7 @@ package search
 
 import (
 	"fmt"
+	"path/filepath"
 )
 
 // Config is a search configuration.
@@ -89,4 +90,26 @@ func (cfg Config) String() string {
 	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, width:%d, dist:%d, cs:%t, nodes:%d, limit:%d, keep-data:%q, keep-index:%q, delim:%q, index:%t, data:%t}",
 		cfg.Query, cfg.Files, cfg.Mode, cfg.Width, cfg.Dist, cfg.Case, cfg.Nodes, cfg.Limit,
 		cfg.KeepDataAs, cfg.KeepIndexAs, cfg.Delimiter, cfg.ReportIndex, cfg.ReportData)
+}
+
+// CheckRelativeToHome checks all the input/output filenames are relative to home
+func (cfg *Config) CheckRelativeToHome(home string) error {
+	// all input file names
+	for _, path := range cfg.Files {
+		if !IsRelativeToHome(home, filepath.Join(home, path)) {
+			return fmt.Errorf("path %q is not relative to home", path)
+		}
+	}
+
+	// output INDEX file
+	if len(cfg.KeepIndexAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepIndexAs)) {
+		return fmt.Errorf("index %q is not relative to home", cfg.KeepIndexAs)
+	}
+
+	// output DATA file
+	if len(cfg.KeepDataAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepDataAs)) {
+		return fmt.Errorf("data %q is not relative to home", cfg.KeepDataAs)
+	}
+
+	return nil // OK
 }

@@ -94,29 +94,18 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// or just be silent: cfg.ReportIndex = true
 	}
 
-	// check file names are relative to home (without ..)
-	if home := filepath.Join(engine.MountPoint, engine.HomeDir); true {
-		// all input files
-		for _, path := range cfg.Files {
-			if !search.IsRelativeToHome(home, filepath.Join(home, path)) {
-				return nil, fmt.Errorf("%q is not relative to user's home", path)
-			}
-		}
-
-		// output DATA&INDEX files
-		if len(cfg.KeepIndexAs) != 0 && !search.IsRelativeToHome(home, filepath.Join(home, cfg.KeepIndexAs)) {
-			return nil, fmt.Errorf("index %q is not relative to user's home", cfg.KeepIndexAs)
-		}
-		if len(cfg.KeepDataAs) != 0 && !search.IsRelativeToHome(home, filepath.Join(home, cfg.KeepDataAs)) {
-			return nil, fmt.Errorf("data %q is not relative to user's home", cfg.KeepDataAs)
-		}
-	}
-
 	task := NewTask(cfg)
 	if cfg.ReportIndex {
 		task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
 	} else {
 		task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
+	}
+
+	// check file names are relative to home (without ..)
+	home := filepath.Join(engine.MountPoint, engine.HomeDir)
+	if err := cfg.CheckRelativeToHome(home); err != nil {
+		task.log().WithError(err).Warnf("[%s]: bad file names detected", TAG)
+		return nil, err
 	}
 
 	// prepare command line arguments

@@ -40,3 +40,34 @@ func TestConfigSimple(t *testing.T) {
 	cfg.ReportData = true
 	assert.Equal(t, `Config{query:hello, files:["a.txt" "b.txt" "c.txt" "d.txt"], mode:"fhs", width:0, dist:0, cs:true, nodes:0, limit:0, keep-data:"", keep-index:"", delim:"\r\n\f", index:true, data:true}`, cfg.String())
 }
+
+// test relative to home
+func TestConfigRelativeToHome(t *testing.T) {
+	cfg := NewConfig("hello", "../a.txt", "../b.txt")
+	cfg.KeepIndexAs = "../index.txt"
+	cfg.KeepDataAs = "../data.txt"
+
+	// input
+	if err := cfg.CheckRelativeToHome("/ryftone"); assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "path")
+		assert.Contains(t, err.Error(), "is not relative to home")
+	}
+	cfg.Files = nil
+
+	// index
+	if err := cfg.CheckRelativeToHome("/ryftone"); assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "index")
+		assert.Contains(t, err.Error(), "is not relative to home")
+	}
+	cfg.KeepIndexAs = ""
+
+	// data
+	if err := cfg.CheckRelativeToHome("/ryftone"); assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "data")
+		assert.Contains(t, err.Error(), "is not relative to home")
+	}
+	cfg.KeepDataAs = ""
+
+	// valid
+	assert.NoError(t, cfg.CheckRelativeToHome("/ryftone"))
+}

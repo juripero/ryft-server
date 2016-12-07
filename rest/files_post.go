@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
@@ -78,6 +79,19 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			err.Error()).WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
+
+	// checks all the input filenames are relative to home
+	if len(params.Catalog) != 0 {
+		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Catalog)) {
+			panic(NewError(http.StatusBadRequest,
+				fmt.Sprintf("catalog path %q is not relative to home", params.Catalog)))
+		}
+	} else {
+		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.File)) {
+			panic(NewError(http.StatusBadRequest,
+				fmt.Sprintf("path %q is not relative to home", params.File)))
+		}
+	}
 
 	var file io.Reader
 

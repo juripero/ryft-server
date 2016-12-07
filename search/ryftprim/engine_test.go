@@ -443,7 +443,7 @@ func TestEngineBadPath(t *testing.T) {
 	cfg.Files = []string{"../1.txt", "../2.txt"}
 	_, err = engine.Search(cfg)
 	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "is not relative to user's home")
+		assert.Contains(t, err.Error(), "is not relative to home")
 	}
 	cfg.Files = []string{"1.txt", "2.txt"}
 
@@ -451,7 +451,7 @@ func TestEngineBadPath(t *testing.T) {
 	cfg.KeepIndexAs = "../../etc/index.txt"
 	_, err = engine.Search(cfg)
 	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "is not relative to user's home")
+		assert.Contains(t, err.Error(), "is not relative to home")
 	}
 	cfg.KeepIndexAs = ""
 
@@ -459,7 +459,7 @@ func TestEngineBadPath(t *testing.T) {
 	cfg.KeepDataAs = "../data.txt"
 	_, err = engine.Search(cfg)
 	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "is not relative to user's home")
+		assert.Contains(t, err.Error(), "is not relative to home")
 	}
 	cfg.KeepDataAs = ""
 }

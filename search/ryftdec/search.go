@@ -160,6 +160,14 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithField("cfg", cfg).Infof("[%s]: start /count", TAG)
 	}
 
+	// check file names are relative to home (without ..)
+	instanceName, homeDir, mountPoint := engine.getBackendOptions()
+	home := filepath.Join(mountPoint, homeDir)
+	if err := cfg.CheckRelativeToHome(home); err != nil {
+		task.log().WithError(err).Warnf("[%s]: bad file names detected", TAG)
+		return nil, err
+	}
+
 	// use source list of files to detect extensions
 	// some catalogs data files contains malformed filenames so this procedure may fail
 	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
@@ -176,7 +184,6 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 	task.rootQuery = engine.optimizer.Process(task.rootQuery)
 
-	instanceName, homeDir, mountPoint := engine.getBackendOptions()
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
 	task.result, err = NewInMemoryPostProcessing(filepath.Join(mountPoint, homeDir, res1)) // NewCatalogPostProcessing
