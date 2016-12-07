@@ -41,3 +41,32 @@ func TestDirInfoReadBad(t *testing.T) {
 		assert.Nil(t, info)
 	}
 }
+
+// test relative to home
+func TestIsRelativeToHome(t *testing.T) {
+	assert.True(t, IsRelativeToHome("/ryftone", "/ryftone"))
+	assert.True(t, IsRelativeToHome("/ryftone", "/ryftone/"))
+	assert.True(t, IsRelativeToHome("/ryftone", "/ryftone/abc"))
+	assert.True(t, IsRelativeToHome("/ryftone", "/ryftone/abc.txt"))
+	assert.True(t, IsRelativeToHome("/ryftone", "/ryftone/foo/.."))
+	assert.True(t, IsRelativeToHome("/ryftone", "/ryftone/foo/../"))
+	assert.True(t, IsRelativeToHome("/ryftone", "/ryftone/foo/../abc.txt"))
+	assert.False(t, IsRelativeToHome("/ryftone", "/ryftone/.."))
+	assert.False(t, IsRelativeToHome("/ryftone", "/ryftone/../"))
+	assert.False(t, IsRelativeToHome("/ryftone", "/ryftone/../abc.txt"))
+	assert.False(t, IsRelativeToHome("/ryftone", "/home/abc.txt"))
+	assert.False(t, IsRelativeToHome("/ryftone", "home/abc.txt"))
+
+	assert.True(t, IsRelativeToHome("/ryftone/", "/ryftone"))
+	assert.True(t, IsRelativeToHome("/ryftone/", "/ryftone/"))
+	assert.True(t, IsRelativeToHome("/ryftone/", "/ryftone/abc"))
+	assert.True(t, IsRelativeToHome("/ryftone/", "/ryftone/abc.txt"))
+	assert.True(t, IsRelativeToHome("/ryftone/", "/ryftone/foo/.."))
+	assert.True(t, IsRelativeToHome("/ryftone/", "/ryftone/foo/../"))
+	assert.True(t, IsRelativeToHome("/ryftone/", "/ryftone/foo/../abc.txt"))
+	assert.False(t, IsRelativeToHome("/ryftone/", "/ryftone/.."))
+	assert.False(t, IsRelativeToHome("/ryftone/", "/ryftone/../"))
+	assert.False(t, IsRelativeToHome("/ryftone/", "/ryftone/../abc.txt"))
+	assert.False(t, IsRelativeToHome("/ryftone/", "/home/abc.txt"))
+	assert.False(t, IsRelativeToHome("/ryftone/", "home/abc.txt"))
+}

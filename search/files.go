@@ -110,3 +110,16 @@ func (dir *DirInfo) AddFile(file ...string) {
 func (dir *DirInfo) AddDir(subdir ...string) {
 	dir.Dirs = append(dir.Dirs, subdir...)
 }
+
+// check if path is relative to home
+func IsRelativeToHome(home string, path string) bool {
+	// home = filepath.Clean(home)
+	// path = filepath.Clean(path)
+	if relPath, err := filepath.Rel(home, path); err != nil {
+		return false
+	} else if strings.Contains(relPath, "..") {
+		return false
+	}
+
+	return true // OK
+}

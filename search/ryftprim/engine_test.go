@@ -113,10 +113,26 @@ func TestEngineFiles(t *testing.T) {
 	assert.NotEmpty(t, res.Dirs)
 	assert.NotEmpty(t, res.Files)
 
+	// fail on missing directory
 	_, err = engine.Files("missing-tmp-dir")
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "failed to read directory content")
 	}
+
+	// fail on bad file
+	_, err = engine.Files("../dir")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "is not relative to user's home")
+	}
+}
+
+// test log level
+func TestLogLevel(t *testing.T) {
+	if err := SetLogLevelString("bad-log-level"); assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "not a valid logrus Level")
+	}
+	SetLogLevelString(testLogLevel)
+	assert.EqualValues(t, testLogLevel, GetLogLevel().String())
 }
 
 // valid
@@ -295,8 +311,9 @@ func TestEngineUsualNoOutput(t *testing.T) {
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.Mode = "fhs"
-	cfg.Width = 10
+	cfg.Width = -1
 	cfg.Case = false
+	cfg.Reduce = true
 	cfg.Dist = 1
 	//cfg.KeepIndexAs = "ryftprim-index.txt"
 	//cfg.KeepDataAs = "ryftprim-data.bin"
@@ -392,6 +409,59 @@ func TestEngineBadSearchMode(t *testing.T) {
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "failed to report DATA without INDEX")
 	}
+}
+
+// failed to start (bad path)
+func TestEngineBadPath(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+
+	// prepare ryftprim emulation script
+	if err := testWriteScript("/tmp/ryftprim.sh",
+		testFakeRyftprimScript3); !assert.NoError(t, err) {
+		return
+	}
+	defer os.RemoveAll("/tmp/ryftprim.sh")
+
+	cfg := search.NewConfig("hello")
+	cfg.Mode = "fhs"
+
+	engine, err := factory(map[string]interface{}{
+		"instance-name":           ".test",
+		"ryftprim-exec":           "/tmp/ryftprim.sh",
+		"ryftprim-legacy":         true,
+		"ryftprim-kill-on-cancel": true,
+		"ryftone-mount":           "/tmp",
+		"home-dir":                "ryft",
+		"minimize-latency":        true,
+		"index-host":              "hozt",
+	})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// bad input
+	cfg.Files = []string{"../1.txt", "../2.txt"}
+	_, err = engine.Search(cfg)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "is not relative to user's home")
+	}
+	cfg.Files = []string{"1.txt", "2.txt"}
+
+	// bad index
+	cfg.KeepIndexAs = "../../etc/index.txt"
+	_, err = engine.Search(cfg)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "is not relative to user's home")
+	}
+	cfg.KeepIndexAs = ""
+
+	// bad data
+	cfg.KeepDataAs = "../data.txt"
+	_, err = engine.Search(cfg)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "is not relative to user's home")
+	}
+	cfg.KeepDataAs = ""
 }
 
 // failed to start tool
