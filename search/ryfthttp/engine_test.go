@@ -190,19 +190,19 @@ func TestEnginePrepareSearchUrl(t *testing.T) {
 
 // test prepare files url
 func TestEnginePrepareFilesUrl(t *testing.T) {
-	check := func(dir string, url string, local bool, expected string) {
+	check := func(dir string, url string, hidden bool, local bool, expected string) {
 		engine, err := NewEngine(map[string]interface{}{
 			"server-url": url,
 			"local-only": local,
 		})
 		if assert.NoError(t, err) {
-			url := engine.prepareFilesUrl(dir)
+			url := engine.prepareFilesUrl(dir, hidden)
 			assert.EqualValues(t, expected, url.String())
 		}
 	}
 
-	check("foo", "http://localhost:12345", false,
-		"http://localhost:12345/files?dir=foo&local=false")
-	check("foo", "http://localhost:12345", true,
-		"http://localhost:12345/files?dir=foo&local=true")
+	check("foo", "http://localhost:12345", true, false,
+		"http://localhost:12345/files?dir=foo&hidden=true&local=false")
+	check("foo", "http://localhost:12345", false, true,
+		"http://localhost:12345/files?dir=foo&hidden=false&local=true")
 }

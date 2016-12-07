@@ -27,7 +27,7 @@ func TestEngineFiles(t *testing.T) {
 	// valid (usual case)
 	engine, err := NewEngine(f1, f2, f3)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
-		info, err := engine.Files("foo")
+		info, err := engine.Files("foo", false)
 		if assert.NoError(t, err) && assert.NotNil(t, info) {
 			assert.EqualValues(t, "foo", info.Path)
 
@@ -42,7 +42,7 @@ func TestEngineFiles(t *testing.T) {
 	// one backend fail
 	f1.FilesReportError = fmt.Errorf("disabled")
 	if assert.Error(t, f1.FilesReportError) {
-		info, err := engine.Files("foo")
+		info, err := engine.Files("foo", false)
 		if assert.NoError(t, err) && assert.NotNil(t, info) {
 			assert.EqualValues(t, "foo", info.Path)
 
@@ -58,7 +58,7 @@ func TestEngineFiles(t *testing.T) {
 	// path inconsistency
 	f1.FilesPathSuffix = "-1"
 	if assert.NoError(t, f1.FilesReportError) {
-		info, err := engine.Files("foo")
+		info, err := engine.Files("foo", false)
 		if assert.Error(t, err) && assert.Nil(t, info) {
 			assert.Contains(t, err.Error(), "inconsistent path")
 		}

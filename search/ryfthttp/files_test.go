@@ -56,7 +56,7 @@ func TestFilesValid(t *testing.T) {
 		"local-only": true,
 	})
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
-		info, err := engine.Files("foo")
+		info, err := engine.Files("foo", false)
 		if assert.NoError(t, err) && assert.NotNil(t, info) {
 			assert.EqualValues(t, "foo", info.Path)
 
@@ -72,7 +72,7 @@ func TestFilesValid(t *testing.T) {
 	oldUrl := engine.ServerURL
 	engine.ServerURL = "bad-" + oldUrl
 	if assert.NotNil(t, engine) {
-		_, err := engine.Files("foo")
+		_, err := engine.Files("foo", false)
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "failed to send request")
 		}
@@ -83,7 +83,7 @@ func TestFilesValid(t *testing.T) {
 	oldUrl = engine.ServerURL
 	engine.ServerURL = oldUrl + "/bad"
 	if assert.NotNil(t, engine) {
-		_, err := engine.Files("foo")
+		_, err := engine.Files("foo", false)
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "invalid response status")
 		}
@@ -93,7 +93,7 @@ func TestFilesValid(t *testing.T) {
 	// bad case (failed to decode)
 	fs.FilesPrefix = "}"
 	if assert.NotNil(t, engine) {
-		_, err := engine.Files("foo")
+		_, err := engine.Files("foo", false)
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "failed to decode response")
 		}
@@ -103,7 +103,7 @@ func TestFilesValid(t *testing.T) {
 	// bad case (failed to decode - extra data)
 	fs.FilesSuffix = "{}"
 	if assert.NotNil(t, engine) {
-		_, err := engine.Files("foo")
+		_, err := engine.Files("foo", false)
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "failed to decode response")
 			assert.Contains(t, err.Error(), "extra data")

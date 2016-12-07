@@ -105,7 +105,7 @@ func TestEngineFiles(t *testing.T) {
 		return
 	}
 
-	res, err := engine.Files("/")
+	res, err := engine.Files("/", false)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -114,13 +114,13 @@ func TestEngineFiles(t *testing.T) {
 	assert.NotEmpty(t, res.Files)
 
 	// fail on missing directory
-	_, err = engine.Files("missing-tmp-dir")
+	_, err = engine.Files("missing-tmp-dir", false)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "failed to read directory content")
 	}
 
 	// fail on bad file
-	_, err = engine.Files("../dir")
+	_, err = engine.Files("../dir", false)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "is not relative to user's home")
 	}
