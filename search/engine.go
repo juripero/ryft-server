@@ -44,7 +44,7 @@ type Engine interface {
 	Search(cfg *Config) (*Result, error)
 
 	// Run *synchronous* "/files" operation.
-	Files(path string) (*DirInfo, error)
+	Files(path string, hidden bool) (*DirInfo, error)
 }
 
 // NewEngine creates new search engine by name.

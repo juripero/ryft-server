@@ -37,7 +37,7 @@ import (
 )
 
 // Files starts synchronous "/files" operation.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	task := NewTask(nil)
 
 	task.log().WithField("path", path).Infof("[%s]: start /files", TAG)
@@ -49,7 +49,7 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	for _, backend := range engine.Backends {
 		// get files in goroutine
 		go func(backend search.Engine) {
-			res, err := backend.Files(path)
+			res, err := backend.Files(path, hidden)
 			if err != nil {
 				task.log().WithError(err).Warnf("failed to start /files backend")
 				// TODO: report as multiplexed error?

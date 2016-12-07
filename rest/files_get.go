@@ -10,8 +10,9 @@ import (
 
 // GetFileParams query parameters for GET /files
 type GetFilesParams struct {
-	Dir   string `form:"dir" json:"dir"`
-	Local bool   `form:"local" json:"local"`
+	Dir    string `form:"dir" json:"dir"`       // directory to get content of
+	Hidden bool   `form:"hidden" json:"hidden"` // show hidden files/dirs
+	Local  bool   `form:"local" json:"local"`
 }
 
 // GET /files method
@@ -50,7 +51,7 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 		"home":    homeDir,
 		"cluster": userTag,
 	}).Infof("[%s]: start GET /files", CORE)
-	info, err := engine.Files(params.Dir)
+	info, err := engine.Files(params.Dir, params.Hidden)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get files"))

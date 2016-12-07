@@ -49,7 +49,8 @@ type DirInfo struct {
 }
 
 // ReadDir gets directory content from filesystem.
-func ReadDir(mountPoint, dirPath string) (*DirInfo, error) {
+// if hidden is `true` then all hidden files are also reported.
+func ReadDir(mountPoint, dirPath string, hidden bool) (*DirInfo, error) {
 	// read directory content
 	items, err := ioutil.ReadDir(filepath.Join(mountPoint, dirPath))
 	if err != nil {
@@ -61,9 +62,12 @@ func ReadDir(mountPoint, dirPath string) (*DirInfo, error) {
 	for _, item := range items {
 		name := item.Name()
 
-		// skip ".", ".." and all hidden files
-		if strings.HasPrefix(name, ".") {
-			continue
+		if hidden {
+			/*if name == "." || name == ".." {
+				continue // skip "." and ".."
+			}*/
+		} else if strings.HasPrefix(name, ".") {
+			continue // skip all hidden files
 		}
 
 		if item.IsDir() {

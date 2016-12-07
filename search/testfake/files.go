@@ -38,7 +38,7 @@ import (
 )
 
 // Files starts synchronous "/files" operation.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	// report pre-defined error?
 	if engine.FilesReportError != nil {
 		return nil, engine.FilesReportError
@@ -60,7 +60,7 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	}).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	info, err := search.ReadDir(home, path)
+	info, err := search.ReadDir(home, path, hidden)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)

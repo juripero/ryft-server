@@ -76,8 +76,8 @@ func (engine *Engine) Options() map[string]interface{} {
 }
 
 // Files starts synchronous "/files" operation.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
-	return engine.Backend.Files(path)
+func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
+	return engine.Backend.Files(path, hidden)
 }
 
 // SetLogLevelString changes global module log level.

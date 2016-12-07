@@ -133,7 +133,7 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 }
 
 // prepareFilesUrl formats proper /files URL based on directory name provided.
-func (engine *Engine) prepareFilesUrl(path string) *url.URL {
+func (engine *Engine) prepareFilesUrl(path string, hidden bool) *url.URL {
 	// server URL should be parsed in engine initialization
 	// so we can omit error checking here
 	u, _ := url.Parse(engine.ServerURL)
@@ -142,6 +142,7 @@ func (engine *Engine) prepareFilesUrl(path string) *url.URL {
 	// prepare query
 	q := url.Values{}
 	q.Set("dir", path)
+	q.Set("hidden", fmt.Sprintf("%t", hidden))
 	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
 
 	u.RawQuery = q.Encode()

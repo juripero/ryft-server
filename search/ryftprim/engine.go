@@ -125,7 +125,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 }
 
 // Files starts synchronous "/files" operation.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	home := filepath.Join(engine.MountPoint, engine.HomeDir)
 	if !search.IsRelativeToHome(home, filepath.Join(home, path)) {
 		return nil, fmt.Errorf("%q is not relative to user's home", path)
@@ -137,7 +137,7 @@ func (engine *Engine) Files(path string) (*search.DirInfo, error) {
 	}).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	info, err := search.ReadDir(home, path)
+	info, err := search.ReadDir(home, path, hidden)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)

@@ -39,9 +39,9 @@ import (
 )
 
 // Files starts synchronous "/files" operation.
-func (engine *Engine) Files(path string) (*search.DirInfo, error) {
+func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	task := NewTask(nil)
-	url := engine.prepareFilesUrl(path)
+	url := engine.prepareFilesUrl(path, hidden)
 
 	// prepare request
 	task.log().WithField("url", url.String()).Infof("[%s]: sending GET", TAG)
