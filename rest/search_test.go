@@ -125,3 +125,34 @@ func TestSearchUsual(t *testing.T) {
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}
 }
+
+// delimiter unescaping
+func TestParseDelim(t *testing.T) {
+	assert.EqualValues(t, "", mustParseDelim(""))
+	assert.EqualValues(t, " ", mustParseDelim(" "))
+
+	assert.EqualValues(t, "\t", mustParseDelim("\t"))
+	assert.EqualValues(t, "\t", mustParseDelim(`\t`))
+
+	assert.EqualValues(t, "\r", mustParseDelim("\r"))
+	assert.EqualValues(t, "\r", mustParseDelim(`\r`))
+	assert.EqualValues(t, "\r", mustParseDelim(`\x0d`))
+
+	assert.EqualValues(t, "\n", mustParseDelim("\n"))
+	assert.EqualValues(t, "\n", mustParseDelim(`\n`))
+	assert.EqualValues(t, "\n", mustParseDelim(`\x0a`))
+
+	assert.EqualValues(t, "\f", mustParseDelim("\f"))
+	assert.EqualValues(t, "\f", mustParseDelim(`\f`))
+	assert.EqualValues(t, "\f", mustParseDelim(`\x0c`))
+
+	assert.EqualValues(t, "\r\n", mustParseDelim("\r\n"))
+	assert.EqualValues(t, "\r\n", mustParseDelim(`\r\n`))
+	assert.EqualValues(t, "\r\n", mustParseDelim(`\x0D\x0A`))
+	assert.EqualValues(t, "\r\n", mustParseDelim(`\u000D\u000A`))
+
+	assert.EqualValues(t, "\r-\n", mustParseDelim("\r-\n"))
+	assert.EqualValues(t, "\r-\n", mustParseDelim(`\r-\n`))
+	assert.EqualValues(t, "\r-\n", mustParseDelim(`\x0D-\x0A`))
+	assert.EqualValues(t, "\r-\n", mustParseDelim(`\u000D-\u000A`))
+}

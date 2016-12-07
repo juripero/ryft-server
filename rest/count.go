@@ -85,7 +85,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
-	cfg.Delimiter = params.Delimiter
+	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
 	// cfg.Limit = 0

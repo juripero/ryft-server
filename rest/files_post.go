@@ -62,9 +62,11 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	// if delimiter is provided this value will be NOT NIL
 	var delim *string
 	if params.Delimiter != noDelim {
-		delim = &params.Delimiter
+		tmp := mustParseDelim(params.Delimiter)
+		delim = &tmp
 	} else {
 		params.Delimiter = ""
+		// delim is nil
 	}
 
 	if len(params.File) == 0 {

@@ -144,7 +144,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
-	cfg.Delimiter = params.Delimiter
+	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)
 	cfg.Limit = uint(params.Limit)
@@ -289,4 +289,17 @@ func mustParseWidth(str string) int {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse surrounding width"))
 	}
+}
+
+// parse delimiter from a string
+// supports hex unescaping \x0a -> \n
+func mustParseDelim(str string) string {
+	s := strings.Replace(str, "\n", `\x0A`, -1)
+	delim, err := strconv.Unquote(`"` + s + `"`)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails(fmt.Sprintf("failed to unescape delimiter: %q", str)))
+	}
+
+	return delim
 }
