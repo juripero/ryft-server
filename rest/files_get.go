@@ -6,6 +6,7 @@ import (
 
 	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // GetFileParams query parameters for GET /files
@@ -21,7 +22,8 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 
 	// parse request parameters
 	params := GetFilesParams{}
-	if err := ctx.Bind(&params); err != nil {
+	b := binding.Default(ctx.Request.Method, ctx.ContentType())
+	if err := b.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}

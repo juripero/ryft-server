@@ -44,7 +44,8 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	params := CountParams{
 		Case: true,
 	}
-	if err := ctx.Bind(&params); err != nil {
+	b := binding.Default(ctx.Request.Method, ctx.ContentType())
+	if err := b.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}

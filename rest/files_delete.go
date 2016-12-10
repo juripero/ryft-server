@@ -11,8 +11,8 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
-
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // DeleteFilesParams query parameters for DELETE /files
@@ -46,7 +46,8 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 
 	// parse request parameters
 	params := DeleteFilesParams{}
-	if err := ctx.Bind(&params); err != nil {
+	b := binding.Default(ctx.Request.Method, ctx.ContentType())
+	if err := b.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}

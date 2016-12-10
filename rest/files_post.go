@@ -19,6 +19,7 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // PostFilesParams query parameters for POST /files
@@ -50,11 +51,13 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 	// parse request parameters
 	noDelim := fmt.Sprintf("no-binding-%x", time.Now().UnixNano()) // use random marker!
-	params := PostFilesParams{}
-	params.Delimiter = noDelim
-	params.Offset = -1 // mark as "unspecified"
-	params.Length = -1
-	if err := ctx.Bind(&params); err != nil {
+	params := PostFilesParams{
+		Delimiter: noDelim,
+		Offset:    -1, // mark as "unspecified"
+		Length:    -1,
+	}
+	b := binding.Default(ctx.Request.Method, ctx.ContentType())
+	if err := b.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest,
 			err.Error()).WithDetails("failed to parse request parameters"))
 	}

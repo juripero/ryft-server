@@ -40,6 +40,7 @@ import (
 	"github.com/getryft/ryft-server/rest/format"
 	"github.com/getryft/ryft-server/search"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // SearchParams contains all the bound parameters for the /search endpoint.
@@ -82,7 +83,8 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 		Format: format.RAW,
 		Case:   true,
 	}
-	if err := ctx.Bind(&params); err != nil {
+	b := binding.Default(ctx.Request.Method, ctx.ContentType())
+	if err := b.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}
