@@ -2,11 +2,14 @@ package rest
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // CountParams contains all the bound parameters for the /count endpoint.
@@ -164,4 +167,178 @@ func (server *Server) DoCount(ctx *gin.Context) {
 			return // done
 		}
 	}
+}
+
+// Handle /count/dry-run endpoint.
+func (server *Server) DoCountDryRun(ctx *gin.Context) {
+	// recover from panics if any
+	defer RecoverFromPanic(ctx)
+
+	var err error
+
+	// parse request parameters
+	params := CountParams{
+		Case: true,
+	}
+	b := binding.Default(ctx.Request.Method, ctx.ContentType())
+	if err := b.Bind(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request parameters"))
+	}
+
+	// backward compatibility old files and catalogs (just aliases)
+	params.Files = append(params.Files, params.OldFiles...)
+	params.OldFiles = nil // reset
+	params.Files = append(params.Files, params.Catalogs...)
+	params.Catalogs = nil // reset
+	if len(params.Files) == 0 {
+		panic(NewError(http.StatusBadRequest,
+			"no any file or catalog provided"))
+	}
+
+	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
+	// default to JSON
+	if accept == "" {
+		accept = codec.MIME_JSON
+		// log.Debugf("[%s]: Content-Type changed to %s", CORE, accept)
+	}
+	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
+		panic(NewError(http.StatusUnsupportedMediaType,
+			"only JSON format is supported for now"))
+	}
+
+	// get search engine
+	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
+	engine, err := server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get search engine"))
+	}
+
+	// prepare search configuration
+	cfg := search.NewConfig(params.Query, params.Files...)
+	cfg.Mode = params.Mode
+	cfg.Width = mustParseWidth(params.Width)
+	cfg.Dist = uint(params.Dist)
+	cfg.Case = params.Case
+	cfg.Reduce = params.Reduce
+	cfg.Nodes = uint(params.Nodes)
+	cfg.KeepDataAs = params.KeepDataAs
+	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.Delimiter = mustParseDelim(params.Delimiter)
+	cfg.ReportIndex = false // /count
+	cfg.ReportData = false
+	// cfg.Limit = 0
+
+	log.WithFields(map[string]interface{}{
+		"config":  cfg,
+		"user":    userName,
+		"home":    homeDir,
+		"cluster": userTag,
+	}).Infof("[%s]: GET /count/dry-run", CORE)
+
+	// decompose query
+	q, err := ryftdec.ParseQueryOpt(cfg.Query, ryftdec.ConfigToOptions(cfg))
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse query"))
+	}
+
+	optimizer := &ryftdec.Optimizer{}
+	query := optimizer.Process(q)
+
+	// prepare result output
+	info := map[string]interface{}{
+		"request": &params,
+		"engine":  engine,
+		"parsed":  queryToJson(q),
+		"final":   queryToJson(query),
+	}
+
+	ctx.IndentedJSON(http.StatusOK, info)
+}
+
+// convert query to JSON value
+func queryToJson(q ryftdec.Query) map[string]interface{} {
+	if q.Simple != nil {
+		return map[string]interface{}{
+			"old-expr":   q.Simple.ExprOld,
+			"new-expr":   q.Simple.ExprNew,
+			"structured": q.Simple.Structured,
+			"options":    optionsToJson(q.Simple.Options),
+		}
+	} else if len(q.Arguments) > 0 {
+		var op string
+		switch strings.ToUpper(q.Operator) {
+		case "P":
+			op = "()"
+		case "B":
+			op = "{}"
+		default: // case "AND", "OR", "XOR":
+			op = strings.ToLower(q.Operator)
+		}
+
+		args := make([]interface{}, len(q.Arguments))
+		for i, n := range q.Arguments {
+			args[i] = queryToJson(n)
+		}
+
+		return map[string]interface{}{op: args}
+	}
+
+	return nil // bad query
+}
+
+// convert query options to JSON value
+func optionsToJson(opts ryftdec.Options) map[string]interface{} {
+	info := make(map[string]interface{})
+
+	// search mode
+	if opts.Mode != "" {
+		info["mode"] = opts.Mode
+	}
+
+	// fuzziness distance
+	if opts.Dist != 0 {
+		info["dist"] = opts.Dist
+	}
+
+	// surrounding width
+	if opts.Width < 0 {
+		info["width"] = "line"
+	} else if opts.Width > 0 {
+		info["width"] = opts.Width
+	}
+
+	// case sensitivity
+	//if !opts.Case {
+	info["case"] = opts.Case
+	//}
+
+	// reduce duplicates
+	if opts.Reduce {
+		info["reduce"] = opts.Reduce
+	}
+
+	// octal flag
+	if opts.Octal {
+		info["octal"] = opts.Octal
+	}
+
+	// currency symbol
+	if len(opts.CurrencySymbol) != 0 {
+		info["symbol"] = opts.CurrencySymbol
+	}
+
+	// digit separator
+	if len(opts.DigitSeparator) != 0 {
+		info["separator"] = opts.DigitSeparator
+	}
+
+	// decimal point
+	if len(opts.DecimalPoint) != 0 {
+		info["decimal"] = opts.DecimalPoint
+	}
+
+	return info
 }

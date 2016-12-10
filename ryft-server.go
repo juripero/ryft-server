@@ -266,6 +266,12 @@ func main() {
 		router.GET("/debug/stack", server.DoDebugStack)
 		router.GET("/logging/level", server.DoLoggingLevel)
 		router.POST("/logging/level", server.DoLoggingLevel)
+
+		// a few aliases for "dry-run"...
+		private.GET("/search/dry-run", server.DoCountDryRun)
+		private.GET("/count/dry-run", server.DoCountDryRun)
+		private.GET("/search/dryrun", server.DoCountDryRun)
+		private.GET("/count/dryrun", server.DoCountDryRun)
 	}
 
 	// static assets

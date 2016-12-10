@@ -118,8 +118,8 @@ func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []
 	return NoCatalogs, newFiles, nil // OK
 }
 
-// convert search configuration to base Options
-func configToOpts(cfg *search.Config) Options {
+// ConfigToOptions converts search configuration to base Options.
+func ConfigToOptions(cfg *search.Config) Options {
 	opts := DefaultOptions()
 
 	opts.Mode = cfg.Mode
@@ -177,7 +177,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	// split cfg.Query into several expressions
-	task.rootQuery, err = ParseQueryOpt(cfg.Query, configToOpts(cfg))
+	task.rootQuery, err = ParseQueryOpt(cfg.Query, ConfigToOptions(cfg))
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
