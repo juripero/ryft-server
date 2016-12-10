@@ -114,5 +114,7 @@ func RecoverFromPanic(ctx *gin.Context) {
 		// report as JSON body
 		// err.Message = strings.Replace(err.Message, "\n", " ", -1)
 		ctx.IndentedJSON(err.Status, err)
+		ctx.Error(err)
+		ctx.Abort()
 	}
 }

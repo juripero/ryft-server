@@ -190,7 +190,26 @@ func main() {
 	})
 
 	// default middleware: logger, recover
-	router.Use(gin.Logger(), gin.Recovery())
+	//router.Use(gin.Logger())
+	router.Use(func(ctx *gin.Context) {
+		beg := time.Now()
+		path := ctx.Request.URL.Path
+		method := ctx.Request.Method
+
+		ctx.Next() // do actual processing
+
+		end := time.Now()
+		lat := end.Sub(beg)
+
+		log.WithFields(map[string]interface{}{
+			"status":  ctx.Writer.Status(),
+			"client":  ctx.ClientIP(),
+			"request": ctx.Request.URL,
+			"latency": lat,
+			// "errors":  ctx.Errors.JSON(),
+		}).Infof("[%s]: %s %s in %s", "REST", method, path, lat)
+	})
+	router.Use(gin.Recovery())
 
 	// Allow CORS requests for * (all domains)
 	router.Use(cors.Cors("*"))
