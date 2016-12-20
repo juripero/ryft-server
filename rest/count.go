@@ -292,19 +292,27 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 // convert query to JSON value
 func queryToJson(q ryftdec.Query) map[string]interface{} {
 	if q.Simple != nil {
-		return map[string]interface{}{
+		info := map[string]interface{}{
 			"old-expr":   q.Simple.ExprOld,
 			"new-expr":   q.Simple.ExprNew,
 			"structured": q.Simple.Structured,
 			"options":    optionsToJson(q.Simple.Options),
 		}
+
+		if q.Operator != "" {
+			info["operator"] = q.Operator
+		}
+
+		return info
 	} else if len(q.Arguments) > 0 {
 		var op string
 		switch strings.ToUpper(q.Operator) {
-		case "P":
+		case "P", "()":
 			op = "()"
-		case "B":
+		case "B", "{}":
 			op = "{}"
+		case "S", "[]":
+			op = "[]"
 		default: // case "AND", "OR", "XOR":
 			op = strings.ToLower(q.Operator)
 		}

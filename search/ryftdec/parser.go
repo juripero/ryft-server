@@ -216,6 +216,16 @@ func (p *Parser) parseQuery3() Query {
 		res.Arguments = append(res.Arguments, arg)
 		return res
 
+	case LBRACK: // [...]
+		arg := p.parseQuery0()
+		if end := p.scanIgnoreSpace(); end.token != RBRACK {
+			panic(fmt.Errorf("%q found instead of ]", end))
+		}
+
+		res := Query{Operator: "S"}
+		res.Arguments = append(res.Arguments, arg)
+		return res
+
 	default:
 		p.unscan(lex)
 		q := p.parseSimpleQuery()
