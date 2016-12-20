@@ -9,6 +9,7 @@ import (
 // test options equal
 func TestOptionsEqual(t *testing.T) {
 	assert.True(t, Options{}.EqualsTo(Options{}))
+	assert.False(t, Options{}.EqualsTo(Options{FileFilter: ".*"}))
 	assert.False(t, Options{}.EqualsTo(Options{DecimalPoint: "."}))
 	assert.False(t, Options{}.EqualsTo(Options{DigitSeparator: ","}))
 	assert.False(t, Options{}.EqualsTo(Options{CurrencySymbol: "$"}))
@@ -21,8 +22,9 @@ func TestOptionsEqual(t *testing.T) {
 	assert.False(t, Options{}.EqualsTo(Options{Mode: "es"}))
 
 	assert.Equal(t, "", Options{Case: true}.String())
-	assert.Equal(t, `[fake,d=1,w=1,!cs,reduce,octal,sym="$",sep=",",dot="."]`,
+	assert.Equal(t, `[fake,d=1,w=1,!cs,reduce,octal,sym="$",sep=",",dot=".",filter=".*"]`,
 		Options{
+			FileFilter:     ".*",
 			DecimalPoint:   ".",
 			DigitSeparator: ",",
 			CurrencySymbol: "$",
@@ -223,6 +225,14 @@ func TestOptionsSetOpt(t *testing.T) {
 	bad(`DEC=,`, "found instead of string value")
 	bad(`!DEC`, "is not supported for string option")
 	bad(`DEC no`, "found instead of =")
+
+	// FILE_FILTER
+	check(` FILE_FILTER = ".*" `, `[test,filter=".*"]`)
+	check(` FILTER = qwerty `, `[test,filter="qwerty"]`)
+	check(` FF = 1.23 `, `[test,filter="1.23"]`)
+	bad(`FF=,`, "found instead of string value")
+	bad(`!FF`, "is not supported for string option")
+	bad(`FF no`, "found instead of =")
 
 	bad(`BAD no`, "unknown option")
 }

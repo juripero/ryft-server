@@ -379,5 +379,10 @@ func optionsToJson(opts ryftdec.Options) map[string]interface{} {
 		info["decimal"] = opts.DecimalPoint
 	}
 
+	// file filter
+	if len(opts.FileFilter) != 0 {
+		info["filter"] = opts.FileFilter
+	}
+
 	return info
 }

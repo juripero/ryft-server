@@ -218,6 +218,9 @@ func (o *Optimizer) combine(q Query) Query {
 				opts = DefaultOptions() // reset to default
 			}
 
+			// use the latest file filter
+			opts.FileFilter = a.Simple.Options.FileFilter
+
 			structured = structured && a.Simple.Structured
 		}
 

@@ -48,6 +48,8 @@ type Options struct {
 	CurrencySymbol string // Monetary currency symbol, for example "$" (CURRENCY)
 	DigitSeparator string // Digits separator, for example "," (CURRENCY, NUMBER)
 	DecimalPoint   string // Decimal point marker, for example "." (CURRENCY, NUMBER)
+
+	FileFilter string // File filter, regular expression (is used for query combination)
 }
 
 // DefaultOptions creates default options
@@ -103,6 +105,11 @@ func (o Options) EqualsTo(p Options) bool {
 
 	// decimal point
 	if o.DecimalPoint != p.DecimalPoint {
+		return false
+	}
+
+	// file filter
+	if o.FileFilter != p.FileFilter {
 		return false
 	}
 
@@ -163,6 +170,11 @@ func (o Options) String() string {
 		args = append(args, fmt.Sprintf("dot=%q", o.DecimalPoint))
 	}
 
+	// file filter
+	if len(o.FileFilter) != 0 {
+		args = append(args, fmt.Sprintf("filter=%q", o.FileFilter))
+	}
+
 	if len(args) != 0 {
 		return fmt.Sprintf("[%s]", strings.Join(args, ","))
 	}
@@ -188,6 +200,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	// HAMMING
 	case "fhs":
@@ -202,6 +215,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	// EDIT DISTANCE
 	case "feds":
@@ -217,6 +231,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	// DATE
 	case "ds":
@@ -229,6 +244,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	// TIME
 	case "ts":
@@ -241,6 +257,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	// NUMBER
 	case "ns":
@@ -253,6 +270,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.CurrencySymbol = ""
 		//o.DigitSeparator = ""
 		//o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	// CURRENCY
 	case "cs":
@@ -265,6 +283,7 @@ func (o *Options) SetMode(mode string) *Options {
 		//o.CurrencySymbol = ""
 		//o.DigitSeparator = ""
 		//o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	// IPv4
 	case "ipv4":
@@ -277,6 +296,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	// IPv6
 	case "ipv6":
@@ -289,6 +309,7 @@ func (o *Options) SetMode(mode string) *Options {
 		o.CurrencySymbol = ""
 		o.DigitSeparator = ""
 		o.DecimalPoint = ""
+		//o.FileFilter = ""
 
 	default:
 		panic(fmt.Errorf("%q is unknown search mode", mode))
@@ -483,6 +504,22 @@ func (o *Options) Set(option string, positonalName string) (bool, error) {
 			} else {
 				o.DecimalPoint = v
 				// TODO: limit the length to 1?
+			}
+		} else {
+			return named, fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// file filter
+	case strings.EqualFold(opt, "FILE_FILTER"),
+		strings.EqualFold(opt, "FILTER"),
+		strings.EqualFold(opt, "FF"):
+		if not {
+			return named, fmt.Errorf("! is not supported for string option")
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			if v, err := p.parseStringVal(); err != nil {
+				return named, err
+			} else {
+				o.FileFilter = v
 			}
 		} else {
 			return named, fmt.Errorf("%q found instead of =", eq)
