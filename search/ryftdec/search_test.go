@@ -34,7 +34,7 @@ func TestEngineSearchBypass(t *testing.T) {
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (usual case)
-	engine, err := NewEngine(f1, -1, false, false)
+	engine, err := NewEngine(f1, nil)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		cfg := search.NewConfig("hello", "*.txt")
 		cfg.Width = 3
@@ -87,7 +87,7 @@ func TestEngineSearchAnd3(t *testing.T) {
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (usual case)
-	engine, err := NewEngine(f1, -1, false, false)
+	engine, err := NewEngine(f1, nil)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		cfg := search.NewConfig("hello AND hell AND he", "1.txt")
 		cfg.Width = 3
@@ -142,9 +142,9 @@ func TestEngineSearchOr3(t *testing.T) {
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (usual case)
-	engine, err := NewEngine(f1, -1, false, false)
+	engine, err := NewEngine(f1, nil)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
-		cfg := search.NewConfig("hello OR hell OR he", "1.txt")
+		cfg := search.NewConfig("{hello} OR {hell} OR {he}", "1.txt")
 		cfg.Width = 3
 		cfg.ReportIndex = true
 		cfg.ReportData = true
@@ -219,4 +219,10 @@ func TestDetectExtension(t *testing.T) {
 	check([]string{"foo/*.txt", "my.test/*"}, "data.txt", ".txt")
 	check([]string{"my.test/*"}, "data.txt", ".txt")
 	check([]string{"nyctaxi/xml/2015/yellow/*"}, "ryftnyctest.nxml", ".nxml")
+}
+
+// test
+func TestSearchMisc(t *testing.T) {
+	assert.EqualValues(t, "dir", relativeToHome("/ryftone", "/ryftone/dir"))
+	assert.EqualValues(t, "dir", relativeToHome("/ryftone", "dir")) // fallback
 }

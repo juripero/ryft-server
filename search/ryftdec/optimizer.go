@@ -32,21 +32,31 @@ package ryftdec
 
 import (
 	"bytes"
+	"strings"
 	//"fmt"
+)
+
+const (
+	NoLimit = -1
 )
 
 // Optimizer contains some optimizer options.
 type Optimizer struct {
-	// number of boolean operators per search type
-	//OperatorLimits map[string]int // `json:"limits,omitempty" yaml:"limits,omitempty"`
-
+	// optional limit to combine
+	// -1 means "no limit"
 	CombineLimit int // `json:"limit" yaml:"limit,omitempty"`
+
+	// search modes NOT to combine
+	ExceptModes []string // `json:"except" yaml:"except,omitempty"`
 }
 
 // Optimize input query.
 // -1 for no limit.
-func Optimize(q Query, limit int) Query {
-	o := &Optimizer{CombineLimit: limit}
+func Optimize(q Query, limit int, except []string) Query {
+	o := &Optimizer{
+		CombineLimit: limit,
+		ExceptModes:  except,
+	}
 	return o.Process(q)
 }
 
@@ -59,14 +69,13 @@ func (o *Optimizer) Process(q Query) Query {
 func (o *Optimizer) process(q Query) Query {
 	if q.Operator == "B" { // special case for {...}
 		q = o.combine(q)
-		q.boolOps = 2000000000 // prevent further combination!
+		q.boolOps = NoLimit // prevent further combination!
 		q.Operator = "{}"
 	} else if q.Operator == "S" { // special case for [...]
 		q = o.combine(q)
-		q.boolOps = 2000000001 // prevent further combination!
+		q.boolOps = NoLimit // prevent further combination!
 		q.Operator = "[]"
 	} else if q.Operator != "" && len(q.Arguments) > 0 {
-		// oldBoolOps := q.Arguments[0].boolOps
 		a := o.process(q.Arguments[0])
 		first := true
 
@@ -75,7 +84,7 @@ func (o *Optimizer) process(q Query) Query {
 		for i := 1; i < len(q.Arguments); i++ {
 			b := o.Process(q.Arguments[i])
 
-			if o.canCombine(a, b) {
+			if o.canCombine(a, b, q.Operator) {
 				// combine two arguments into one
 				// both a & b should have simple queries!
 				tmp := Query{boolOps: a.boolOps + b.boolOps + 1}
@@ -87,11 +96,14 @@ func (o *Optimizer) process(q Query) Query {
 					tmp.Simple.Options = DefaultOptions() // reset to default
 				}
 
+				// use the latest file filter
+				tmp.Simple.Options.FileFilter = b.Simple.Options.FileFilter
+
 				var exprOld bytes.Buffer
 				var exprNew bytes.Buffer
 
 				// print first argument
-				if a.boolOps > 0 && first {
+				if a.boolOps != 0 && first {
 					exprOld.WriteRune('(')
 					exprOld.WriteString(a.Simple.ExprOld)
 					exprOld.WriteRune(')')
@@ -121,7 +133,7 @@ func (o *Optimizer) process(q Query) Query {
 				}
 
 				// print second argument
-				if b.boolOps > 0 {
+				if b.boolOps != 0 {
 					exprOld.WriteRune('(')
 					exprOld.WriteString(b.Simple.ExprOld)
 					exprOld.WriteRune(')')
@@ -193,7 +205,7 @@ func (o *Optimizer) combine(q Query) Query {
 			// combine argument
 			a := o.combine(q.Arguments[i])
 			res.boolOps += a.boolOps
-			if a.boolOps > 0 {
+			if a.boolOps != 0 {
 				exprOld.WriteRune('(')
 				exprOld.WriteString(a.Simple.ExprOld)
 				exprOld.WriteRune(')')
@@ -238,18 +250,38 @@ func (o *Optimizer) combine(q Query) Query {
 }
 
 // checks if we can combine two queries
-func (o *Optimizer) canCombine(a Query, b Query) bool {
-	// we cannot combine non-structured (RAW_TEXT) queries
-	if !a.IsStructured() || !b.IsStructured() {
+func (o *Optimizer) canCombine(a Query, b Query, op string) bool {
+	// any of {...} or [...] cannot be combined
+	if a.boolOps < 0 || b.boolOps < 0 {
+		return false
+	}
+
+	if !a.IsStructured() && !b.IsStructured() {
+		// we can combine two RAW_TEXT queries only in case of "OR" operator
+		if !NewLexemeStr(IDENT, op).IsOr() {
+			return false
+		}
+	} else if !a.IsStructured() || !b.IsStructured() {
+		// we cannot combine RECORD and RAW_TEXT queries
 		return false
 	}
 
 	// getLimit also checks both queries has the "simple" form
-	if lim := o.getLimit(a, b); lim < 0 || (a.boolOps+b.boolOps) < lim {
-		return true
+	if lim := o.getLimit(a, b); lim >= 0 && (a.boolOps+b.boolOps) >= lim {
+		return false
 	}
 
-	return false
+	// check except modes
+	for _, mode := range o.ExceptModes {
+		if a.Simple != nil && strings.EqualFold(a.Simple.Options.Mode, mode) {
+			return false
+		}
+		if b.Simple != nil && strings.EqualFold(b.Simple.Options.Mode, mode) {
+			return false
+		}
+	}
+
+	return true // finally
 }
 
 // get the bool operations limit

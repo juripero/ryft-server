@@ -158,94 +158,104 @@ func TestOptimizerCombine(t *testing.T) {
 // test for optimization limits
 func TestOptimizerLimits(t *testing.T) {
 	// check
-	check := func(limit int, structured bool, data string, expected string) {
+	check := func(limit int, except []string, structured bool, data string, expected string) {
 		q, err := ParseQuery(data)
 		if assert.NoError(t, err) {
-			res := Optimize(q, limit)
+			res := Optimize(q, limit, except)
 			assert.Equal(t, expected, res.String())
 			assert.Equal(t, structured, res.IsStructured())
 		}
 	}
 
-	check(0, true, // (A) (B) (C) (D) (E) (F) no queries should be combined
+	check(0, nil, true, // (A) (B) (C) (D) (E) (F) no queries should be combined
 		`(RECORD CONTAINS "A") AND (RECORD CONTAINS "B") AND (RECORD CONTAINS "C") AND (RECORD CONTAINS "D") AND (RECORD CONTAINS "E") AND (RECORD CONTAINS "F")`,
 		`AND{(RECORD CONTAINS EXACT("A"))[es], (RECORD CONTAINS EXACT("B"))[es], (RECORD CONTAINS EXACT("C"))[es], (RECORD CONTAINS EXACT("D"))[es], (RECORD CONTAINS EXACT("E"))[es], (RECORD CONTAINS EXACT("F"))[es]}`)
 
-	check(1, true, // (AB) (CD) (EF)
+	check(1, nil, true, // (AB) (CD) (EF)
 		`(RECORD CONTAINS "A") AND (RECORD CONTAINS "B") AND (RECORD CONTAINS "C") AND (RECORD CONTAINS "D") AND (RECORD CONTAINS "E") AND (RECORD CONTAINS "F")`,
 		`AND{(RECORD CONTAINS EXACT("A")) AND (RECORD CONTAINS EXACT("B"))[es]x1, (RECORD CONTAINS EXACT("C")) AND (RECORD CONTAINS EXACT("D"))[es]x1, (RECORD CONTAINS EXACT("E")) AND (RECORD CONTAINS EXACT("F"))[es]x1}`)
 
-	check(2, true, // (ABC) (DEF)
+	check(2, nil, true, // (ABC) (DEF)
 		`(RECORD CONTAINS "A") AND (RECORD CONTAINS "B") AND (RECORD CONTAINS "C") AND (RECORD CONTAINS "D") AND (RECORD CONTAINS "E") AND (RECORD CONTAINS "F")`,
 		`AND{(RECORD CONTAINS EXACT("A")) AND (RECORD CONTAINS EXACT("B")) AND (RECORD CONTAINS EXACT("C"))[es]x2, (RECORD CONTAINS EXACT("D")) AND (RECORD CONTAINS EXACT("E")) AND (RECORD CONTAINS EXACT("F"))[es]x2}`)
 
-	check(3, true, // (ABCD) (EF)
+	check(3, nil, true, // (ABCD) (EF)
 		`(RECORD CONTAINS "A") AND (RECORD CONTAINS "B") AND (RECORD CONTAINS "C") AND (RECORD CONTAINS "D") AND (RECORD CONTAINS "E") AND (RECORD CONTAINS "F")`,
 		`AND{(RECORD CONTAINS EXACT("A")) AND (RECORD CONTAINS EXACT("B")) AND (RECORD CONTAINS EXACT("C")) AND (RECORD CONTAINS EXACT("D"))[es]x3, (RECORD CONTAINS EXACT("E")) AND (RECORD CONTAINS EXACT("F"))[es]x1}`)
 
-	check(0, true, // (A) ((B) (C)) ((D) (E)) (F) - additional parenthesis
+	check(0, nil, true, // (A) ((B) (C)) ((D) (E)) (F) - additional parenthesis
 		`(RECORD CONTAINS "A") AND ((RECORD CONTAINS "B") AND (RECORD CONTAINS "C")) AND ((RECORD CONTAINS "D") AND (RECORD CONTAINS "E")) AND (RECORD CONTAINS "F")`,
 		`AND{(RECORD CONTAINS EXACT("A"))[es], AND{(RECORD CONTAINS EXACT("B"))[es], (RECORD CONTAINS EXACT("C"))[es]}, AND{(RECORD CONTAINS EXACT("D"))[es], (RECORD CONTAINS EXACT("E"))[es]}, (RECORD CONTAINS EXACT("F"))[es]}`)
 
-	check(1, true, // (A) (BC) (DE) (F)
+	check(1, nil, true, // (A) (BC) (DE) (F)
 		`(RECORD CONTAINS "A") AND ((RECORD CONTAINS "B") AND (RECORD CONTAINS "C")) AND ((RECORD CONTAINS "D") AND (RECORD CONTAINS "E")) AND (RECORD CONTAINS "F")`,
 		`AND{(RECORD CONTAINS EXACT("A"))[es], (RECORD CONTAINS EXACT("B")) AND (RECORD CONTAINS EXACT("C"))[es]x1, (RECORD CONTAINS EXACT("D")) AND (RECORD CONTAINS EXACT("E"))[es]x1, (RECORD CONTAINS EXACT("F"))[es]}`)
 
-	check(2, true, // (A(BC)) ((DE)F)
+	check(2, nil, true, // (A(BC)) ((DE)F)
 		`(RECORD CONTAINS "A") AND ((RECORD CONTAINS "B") XOR (RECORD CONTAINS "C")) AND ((RECORD CONTAINS "D") OR (RECORD CONTAINS "E")) AND (RECORD CONTAINS "F")`,
 		`AND{(RECORD CONTAINS EXACT("A")) AND ((RECORD CONTAINS EXACT("B")) XOR (RECORD CONTAINS EXACT("C")))[es]x2, ((RECORD CONTAINS EXACT("D")) OR (RECORD CONTAINS EXACT("E"))) AND (RECORD CONTAINS EXACT("F"))[es]x2}`)
 
-	check(10, false, // (A) (B) no queries should be combined
+	check(10, nil, false, // (A) (B) no queries should be combined
 		`(RECORD CONTAINS "A") AND (RAW_TEXT CONTAINS "B")`,
 		`AND{(RECORD CONTAINS EXACT("A"))[es], (RAW_TEXT CONTAINS EXACT("B"))[es]}`)
 
-	check(10, false, // (A) (B) no queries should be combined
+	check(10, nil, false, // (A) (B) no queries should be combined
 		`(RAW_TEXT CONTAINS "A") AND (RECORD CONTAINS "B")`,
 		`AND{(RAW_TEXT CONTAINS EXACT("A"))[es], (RECORD CONTAINS EXACT("B"))[es]}`)
 
-	check(10, false, // (A) (B) no queries should be combined
+	check(10, nil, false, // (A) (B) no queries should be combined
 		`(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B")`,
 		`AND{(RAW_TEXT CONTAINS EXACT("A"))[es], (RAW_TEXT CONTAINS EXACT("B"))[es]}`)
 
-	check(0, false, // (A) (B) force queries to be combined
+	check(0, nil, false, // (A) (B) force queries to be combined
 		`{(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B")}`,
-		`{}(RAW_TEXT CONTAINS EXACT("A")) AND (RAW_TEXT CONTAINS EXACT("B"))[es]x2000000000`)
-	check(0, false, // (A) (B) force queries to be combined
+		`{}(RAW_TEXT CONTAINS EXACT("A")) AND (RAW_TEXT CONTAINS EXACT("B"))[es]x+`)
+	check(0, nil, false, // (A) (B) force queries to be combined
 		`{(RAW_TEXT CONTAINS FHS("A",d=1)) AND (RAW_TEXT CONTAINS "B")}`,
-		`{}(RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1")) AND (RAW_TEXT CONTAINS EXACT("B"))x2000000000`)
-	check(10, true, // (A) (B) force queries to be NOT combined
+		`{}(RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1")) AND (RAW_TEXT CONTAINS EXACT("B"))x+`)
+	check(10, nil, true, // (A) (B) force queries to be NOT combined
 		`{(RECORD CONTAINS FHS("A",d=1))} AND {(RECORD CONTAINS "B")}`,
-		`AND{{}(RECORD CONTAINS HAMMING("A", DISTANCE="1"))[fhs,d=1]x2000000000, {}(RECORD CONTAINS EXACT("B"))[es]x2000000000}`)
+		`AND{{}(RECORD CONTAINS HAMMING("A", DISTANCE="1"))[fhs,d=1]x+, {}(RECORD CONTAINS EXACT("B"))[es]x+}`)
 
-	check(0, false, // (A) (B) force queries to be combined
+	check(0, nil, false, // (A) (B) force queries to be combined
 		`[(RAW_TEXT CONTAINS "A") AND (RAW_TEXT CONTAINS "B")]`,
-		`[](RAW_TEXT CONTAINS EXACT("A")) AND (RAW_TEXT CONTAINS EXACT("B"))[es]x2000000001`)
-	check(0, false, // (A) (B) force queries to be combined
+		`[](RAW_TEXT CONTAINS EXACT("A")) AND (RAW_TEXT CONTAINS EXACT("B"))[es]x+`)
+	check(0, nil, false, // (A) (B) force queries to be combined
 		`[(RAW_TEXT CONTAINS FHS("A",d=1)) AND (RAW_TEXT CONTAINS "B")]`,
-		`[](RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1")) AND (RAW_TEXT CONTAINS EXACT("B"))x2000000001`)
-	check(10, false, // (A) (B) force queries to be NOT combined
+		`[](RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1")) AND (RAW_TEXT CONTAINS EXACT("B"))x+`)
+	check(10, nil, false, // (A) (B) force queries to be NOT combined
 		`[(RAW_TEXT CONTAINS FHS("A",d=1))] AND (RECORD CONTAINS "B")`,
-		`AND{[](RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1"))[fhs,d=1]x2000000001, (RECORD CONTAINS EXACT("B"))[es]}`)
+		`AND{[](RAW_TEXT CONTAINS HAMMING("A", DISTANCE="1"))[fhs,d=1]x+, (RECORD CONTAINS EXACT("B"))[es]}`)
 
-	check(-1, true, // (A) (B) different options
+	check(NoLimit, nil, true, // (A) (B) different options
+		`((RECORD CONTAINS FHS("A",d=1)) AND (RECORD CONTAINS FEDS("B",d=2)))`,
+		`(RECORD CONTAINS HAMMING("A", DISTANCE="1")) AND (RECORD CONTAINS EDIT_DISTANCE("B", DISTANCE="2"))x1`)
+
+	check(NoLimit, []string{"fhs"}, true, // (A) (B) except mode
 		`((RECORD CONTAINS FHS("A",d=1)) AND (RECORD CONTAINS FEDS("B",d=1)))`,
-		`(RECORD CONTAINS HAMMING("A", DISTANCE="1")) AND (RECORD CONTAINS EDIT_DISTANCE("B", DISTANCE="1"))x1`)
+		`AND{(RECORD CONTAINS HAMMING("A", DISTANCE="1"))[fhs,d=1], (RECORD CONTAINS EDIT_DISTANCE("B", DISTANCE="1"))[feds,d=1]}`)
+	check(NoLimit, []string{"feds"}, true, // (A) (B) except mode
+		`((RECORD CONTAINS FHS("A",d=1)) AND (RECORD CONTAINS FEDS("B",d=1)))`,
+		`AND{(RECORD CONTAINS HAMMING("A", DISTANCE="1"))[fhs,d=1], (RECORD CONTAINS EDIT_DISTANCE("B", DISTANCE="1"))[feds,d=1]}`)
+	check(NoLimit, []string{"fhs", "feds"}, true, // (A) (B) except mode
+		`((RECORD CONTAINS FHS("A",d=1)) AND (RECORD CONTAINS FEDS("B",d=1)))`,
+		`AND{(RECORD CONTAINS HAMMING("A", DISTANCE="1"))[fhs,d=1], (RECORD CONTAINS EDIT_DISTANCE("B", DISTANCE="1"))[feds,d=1]}`)
 
 	// real-life examples
 
-	check(-1, true,
+	check(NoLimit, nil, true,
 		`((RECORD.doc.text_entry CONTAINS FEDS("To", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("be", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("or", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("not", DIST=1)) AND(RECORD.doc.text_entry CONTAINS FEDS("to", DIST=0)) AND(RECORD.doc.text_entry CONTAINS FEDS("tht",DIST=1)))`,
 		`(RECORD.doc.text_entry CONTAINS EXACT("To")) AND (RECORD.doc.text_entry CONTAINS EXACT("be")) AND (RECORD.doc.text_entry CONTAINS EXACT("or")) AND (RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("not", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS EXACT("to")) AND (RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("tht", DISTANCE="1"))x5`)
 
-	check(-1, true,
+	check(NoLimit, nil, true,
 		`((RECORD.doc.text_entry CONTAINS FHS("To", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("be", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("or", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("not", DIST=1)) AND (RECORD.doc.text_entry CONTAINS FHS("to", DIST=1)))`,
 		`(RECORD.doc.text_entry CONTAINS HAMMING("To", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS HAMMING("be", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS HAMMING("or", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS HAMMING("not", DISTANCE="1")) AND (RECORD.doc.text_entry CONTAINS HAMMING("to", DISTANCE="1"))[fhs,d=1]x4`)
 
-	check(-1, true,
+	check(NoLimit, nil, true,
 		`((RECORD.doc.doc.text_entry CONTAINS FEDS("To", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("be", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("or", DIST=0)) AND (RECORD.doc.doc.text_entry CONTAINS FEDS("not", DIST=1)))`,
 		`(RECORD.doc.doc.text_entry CONTAINS EXACT("To")) AND (RECORD.doc.doc.text_entry CONTAINS EXACT("be")) AND (RECORD.doc.doc.text_entry CONTAINS EXACT("or")) AND (RECORD.doc.doc.text_entry CONTAINS EDIT_DISTANCE("not", DISTANCE="1"))x3`)
 
-	check(-1, true,
+	check(NoLimit, nil, true,
 		`
 (
 	(
@@ -276,7 +286,7 @@ func TestOptimizerLimits(t *testing.T) {
 )`,
 		`(((RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("Lrd", DISTANCE="2")) AND (RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("Halet", DISTANCE="2"))) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("PONIUS", DISTANCE="2"))) OR (((RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("Lrd", DISTANCE="2")) AND (RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("Halet", DISTANCE="2"))) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("Hlet", DISTANCE="2"))) OR ((RECORD.doc.speaker CONTAINS EDIT_DISTANCE("PONIUS", DISTANCE="2")) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("Hlet", DISTANCE="2")))[feds,d=2]x7`)
 
-	check(-1, true,
+	check(NoLimit, nil, true,
 		`((RECORD.doc.play_name NOT_CONTAINS "King Lear") AND
 (((RECORD.doc.text_entry CONTAINS FEDS("my lrd", DIST=2)) AND
 (RECORD.doc.speaker CONTAINS FEDS("PONIUS", DIST=2)))
@@ -287,7 +297,7 @@ OR
 (RECORD.doc.speaker CONTAINS FEDS("Mesenger", DIST=2)))))`,
 		`(RECORD.doc.play_name NOT_CONTAINS EXACT("King Lear")) AND (((RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("my lrd", DISTANCE="2")) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("PONIUS", DISTANCE="2"))) OR ((RECORD.doc.text_entry CONTAINS EDIT_DISTANCE("my lrd", DISTANCE="2")) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("Mesenger", DISTANCE="2"))) OR ((RECORD.doc.speaker CONTAINS EDIT_DISTANCE("PONIUS", DISTANCE="2")) AND (RECORD.doc.speaker CONTAINS EDIT_DISTANCE("Mesenger", DISTANCE="2"))))x6`)
 
-	check(-1, true,
+	check(NoLimit, nil, true,
 		`( RECORD.block CONTAINS FHS(""?"INDIANA"?"",CS=true,DIST=0,WIDTH=0) )`,
 		`(RECORD.block CONTAINS EXACT(""?"INDIANA"?""))[es]`)
 }

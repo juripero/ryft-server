@@ -182,7 +182,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
+	task.log().WithField("query", task.rootQuery).Debugf("[%s]: parsed query", TAG)
 	task.rootQuery = engine.optimizer.Process(task.rootQuery)
+	task.log().WithField("query", task.rootQuery).Debugf("[%s]: optimized query", TAG)
 
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))

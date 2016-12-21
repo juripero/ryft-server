@@ -32,10 +32,12 @@ package ryftdec
 
 import (
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/Sirupsen/logrus"
-
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 var (
@@ -55,12 +57,13 @@ type Engine struct {
 }
 
 // NewEngine creates new RyftDEC search engine.
-func NewEngine(backend search.Engine, genericLimit int, keepResults bool, compatMode bool) (*Engine, error) {
+func NewEngine(backend search.Engine, opts map[string]interface{}) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backend = backend
-	engine.optimizer = &Optimizer{CombineLimit: genericLimit}
-	engine.KeepResultFiles = keepResults
-	engine.CompatMode = compatMode
+	engine.optimizer = &Optimizer{CombineLimit: NoLimit}
+	if err := engine.update(opts); err != nil {
+		return nil, err
+	}
 	return engine, nil
 }
 
@@ -72,7 +75,64 @@ func (engine *Engine) String() string {
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return engine.Backend.Options()
+	opts := engine.Backend.Options()
+	opts["compat-mode"] = engine.CompatMode
+	//opts["keep-files"] = engine.KeepResultFiles
+	opts["optimizer-limit"] = engine.optimizer.CombineLimit
+	opts["optimizer-do-not-combine"] = strings.Join(engine.optimizer.ExceptModes, ":")
+	return opts
+}
+
+// parse engine options
+func (engine *Engine) update(opts map[string]interface{}) (err error) {
+	// compatibility mode
+	if v, ok := opts["compat-mode"]; ok {
+		engine.CompatMode, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "compat-mode" option: %s`, err)
+		}
+	}
+
+	// keep result files
+	if v, ok := opts["keep-files"]; ok {
+		engine.KeepResultFiles, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "keep-files" option: %s`, err)
+		}
+	}
+
+	// optimizer limit
+	if v, ok := opts["optimizer-limit"]; ok {
+		vv, err := utils.AsInt64(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "optimizer-limit" option: %s`, err)
+		}
+		engine.optimizer.CombineLimit = int(vv)
+	}
+
+	// optimizer except modes
+	if v, ok := opts["optimizer-do-not-combine"]; ok {
+		vv, err := utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "optimizer-do-not-combine" option: %s`, err)
+		}
+
+		// separator: space or any of ",;:"
+		sep := func(r rune) bool {
+			return unicode.IsSpace(r) ||
+				strings.ContainsRune(",;:", r)
+		}
+
+		modes := []string{}
+		for _, s := range strings.FieldsFunc(vv, sep) {
+			if mode := strings.TrimSpace(s); len(mode) != 0 {
+				modes = append(modes, mode)
+			}
+		}
+		engine.optimizer.ExceptModes = modes
+	}
+
+	return nil
 }
 
 // Files starts synchronous "/files" operation.

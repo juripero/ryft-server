@@ -158,7 +158,7 @@ func TestParserParseSimpleQuery(t *testing.T) {
 	bad(` RAW_TEXT CONTAINS 123 `, "is unexpected expression")
 }
 
-// String gets query as a string (generic format).
+// String gets query as a string (compatibility format).
 func oldString(q Query) string {
 	var buf bytes.Buffer
 	if len(q.Operator) != 0 {
@@ -181,7 +181,11 @@ func oldString(q Query) string {
 	}
 
 	if q.boolOps != 0 {
-		buf.WriteString(fmt.Sprintf("x%d", q.boolOps))
+		if q.boolOps < 0 {
+			buf.WriteString(fmt.Sprintf("x+"))
+		} else {
+			buf.WriteString(fmt.Sprintf("x%d", q.boolOps))
+		}
 	}
 
 	return buf.String()
@@ -247,6 +251,7 @@ func TestParserBad(t *testing.T) {
 	testParserBad(t, `() AND OR" "() MOR ()`, "expected RAW_TEXT or RECORD")
 	testParserBad(t, `(RAW_TEXT CONTAINS "?"`, "found instead of )")
 	testParserBad(t, `{RAW_TEXT CONTAINS "?"`, "found instead of }")
+	testParserBad(t, `[RAW_TEXT CONTAINS "?"`, "found instead of ]")
 
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS)`, "found instead of (")
 	testParserBad(t, `(RAW_TEXT NOT_CONTAINS FHS(123))`, "no string expression found")
@@ -263,6 +268,10 @@ func TestParserBad(t *testing.T) {
 
 // test for valid queries
 func TestParserParse(t *testing.T) {
+	// minor cases: leave it "as is"
+	assert.EqualValues(t, "aaa", getExprOld("aaa", DefaultOptions()))
+	assert.EqualValues(t, "aaa", getExprNew("aaa", DefaultOptions()))
+
 	testParserParse(t, false,
 		`                   "?"  `,
 		`(RAW_TEXT CONTAINS "?")[es]`)

@@ -54,7 +54,7 @@ type Query struct {
 	Simple    *SimpleQuery
 	Arguments []Query
 
-	boolOps int // number of boolean operations inside (optimizer)
+	boolOps int // number of boolean operations inside (optimizer). -1 is shouldn't combined
 }
 
 // String gets query as a string (generic format).
@@ -79,7 +79,11 @@ func (q Query) String() string {
 	}
 
 	if q.boolOps != 0 {
-		buf.WriteString(fmt.Sprintf("x%d", q.boolOps))
+		if q.boolOps < 0 {
+			buf.WriteString(fmt.Sprintf("x+"))
+		} else {
+			buf.WriteString(fmt.Sprintf("x%d", q.boolOps))
+		}
 	}
 
 	return buf.String()
