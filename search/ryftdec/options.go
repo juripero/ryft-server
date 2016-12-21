@@ -384,10 +384,27 @@ func (o *Options) Set(option string, positonalName string) (bool, error) {
 		if not {
 			o.Width = 0
 		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
-			if v, err := p.parseIntVal(0, 64*1024-1); err != nil {
-				return named, err
+			isLine := false // special case for W=LINE
+			switch val := p.scanIgnoreSpace(); val.token {
+			case STRING, IDENT:
+				if strings.EqualFold(val.Unquoted(), "LINE") {
+					isLine = true
+				} else {
+					p.unscan(val)
+				}
+
+			default:
+				p.unscan(val)
+			}
+
+			if isLine {
+				o.Width = -1 // LINE="true"
 			} else {
-				o.Width = int(v)
+				if v, err := p.parseIntVal(0, 64*1024-1); err != nil {
+					return named, err
+				} else {
+					o.Width = int(v)
+				}
 			}
 		} else {
 			return named, fmt.Errorf("%q found instead of =", eq)

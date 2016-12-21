@@ -135,8 +135,11 @@ func TestOptionsSetOpt(t *testing.T) {
 	check(`L = " 1 "`, `[test,line]`)
 	check(`L = TRUE`, `[test,line]`)
 	check(`L = True`, `[test,line]`)
+	check(`L = False`, `[test]`)
 	check(`L`, `[test,line]`) // shortcut
 	check(`!L`, `[test]`)     // not
+	check(`W=LiNe`, `[test,line]`)
+	check(`W="LINE"`, `[test,line]`)
 	bad(`L=tru`, "failed to parse boolean")
 	bad(`L=1.23`, "found instead of boolean value")
 	bad(`L=,`, "found instead of boolean value")
