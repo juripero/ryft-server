@@ -44,13 +44,13 @@ type IndexFile struct {
 	Opt   uint32 // custom option
 
 	delim  string // data delimiter
-	width  uint   // surrounding width
+	width  int    // surrounding width
 	offset uint64
 }
 
 // NewIndexFile creates new empty index file
 // data delimiter is used to adjust data offsets
-func NewIndexFile(delimiter string, width uint) *IndexFile {
+func NewIndexFile(delimiter string, width int) *IndexFile {
 	f := new(IndexFile)
 	f.Items = make([]*search.Index, 0, 1024) // TODO: initial capacity
 	f.delim = delimiter
@@ -108,7 +108,13 @@ func (f *IndexFile) Unwind(index *search.Index) (*search.Index, int) {
 	// in common case data are surrounded: [w]data[w]
 	// but at begin or end of file no surrounding
 	// or just a part of surrounding may be presented
-	if index.Offset == 0 {
+	// in case of --line option the width is negative
+	// and we should take middle of the data as a reference
+	if f.width < 0 {
+		// middle: [...]data[...]
+		dataMid := index.Offset + index.Length/2
+		n = f.Find(dataMid)
+	} else if index.Offset == 0 {
 		// begin: [0..w]data[w]
 		dataEnd := index.Length - uint64(f.width+1)
 		n = f.Find(dataEnd)

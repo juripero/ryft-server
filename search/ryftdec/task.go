@@ -119,7 +119,7 @@ type PostProcessing interface {
 	Drop(keep bool)  // finish work
 
 	AddRyftResults(dataPath, indexPath string,
-		delimiter string, width uint, opt uint32) error
+		delimiter string, width int, opt uint32) error
 	AddCatalog(base *catalog.Catalog) error
 
 	DrainFinalResults(task *Task, mux *search.Result,
@@ -289,7 +289,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 					"new":  rpos,
 				}).Debugf("[%s]: reset buffered file read", TAG)
 
-				_, err = cf.f.Seek(rpos, 0 /*os.SeekBegin*/ /*)
+				_, err = cf.f.Seek(rpos, os.SEEK_SET /*io.SeekStart*/ /*)
 				if err != nil {
 					mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
 					continue
@@ -402,7 +402,7 @@ func (mpp *InMemoryPostProcessing) Drop(keep bool) {
 }
 
 // add Ryft results
-func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width uint, opt uint32) error {
+func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width int, opt uint32) error {
 	start := time.Now()
 	defer func() {
 		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-result duration", TAG)
@@ -628,7 +628,7 @@ BuildItems:
 					"new":  rpos,
 				}).Debugf("[%s]: reset buffered file read", TAG)
 
-				_, err := cf.f.Seek(rpos, 0 /*os.SeekBegin*/)
+				_, err := cf.f.Seek(rpos, os.SEEK_SET /*io.SeekStart*/)
 				if err != nil {
 					mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
 					continue

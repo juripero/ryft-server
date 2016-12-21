@@ -86,7 +86,7 @@ ORDER BY p.d_pos`)
 		var file, data string
 		var offset, length, data_pos uint64
 		var delim sql.NullString
-		var width uint
+		var width int
 		if err := rows.Scan(&file, &offset, &length, &data_pos, &data, &width, &delim); err != nil {
 			return nil, fmt.Errorf("failed to scan parts: %s", err)
 		}

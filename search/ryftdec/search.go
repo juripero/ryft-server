@@ -293,7 +293,7 @@ type RyftCall struct {
 	DataFile  string
 	IndexFile string
 	Delimiter string
-	Width     uint
+	Width     int
 }
 
 // get string
@@ -386,7 +386,7 @@ func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux 
 		DataFile:  cfg.KeepDataAs,
 		IndexFile: cfg.KeepIndexAs,
 		Delimiter: cfg.Delimiter,
-		Width:     uint(cfg.Width),
+		Width:     cfg.Width,
 		// TODO: line options?
 	})
 

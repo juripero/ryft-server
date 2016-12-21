@@ -245,7 +245,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			if err != nil {
 				panic(fmt.Errorf("failed to copy content to temp file: %s", err))
 			}
-			tmp.Seek(0, 0 /*io.SeekStart*/) // go to begin
+			tmp.Seek(0, os.SEEK_SET /*TODO: io.SeekStart*/)
 
 			// update node parameters
 			for _, node := range nodes {
@@ -609,7 +609,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 
 	defer out.Close()
 	if 0 <= params.Offset {
-		_, err = out.Seek(params.Offset, 0 /*io.SeekStart*/)
+		_, err = out.Seek(params.Offset, os.SEEK_SET /*TODO: io.SeekStart*/)
 		if err != nil {
 			return rpath, 0, err
 		}
@@ -658,7 +658,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 		if err != nil {
 			return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
 		}
-		tmp.Seek(0, 0 /*io.SeekStart*/) // go to begin
+		tmp.Seek(0, os.SEEK_SET /*TODO: io.SeekStart*/)
 		content = tmp
 	}
 
@@ -698,7 +698,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	}
 	defer data.Close()
 
-	_, err = data.Seek(int64(data_pos), 0 /*io.SeekStart*/)
+	_, err = data.Seek(int64(data_pos), os.SEEK_SET /*TODO: io.SeekStart*/)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to seek data file: %s", err)
 	}
