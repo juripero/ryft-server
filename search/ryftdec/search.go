@@ -46,7 +46,7 @@ func relativeToHome(home, path string) string {
 	if rel, err := filepath.Rel(home, path); err == nil {
 		return rel
 	} else {
-		log.WithError(err).Warnf("[%s]: failed to get relative path, fallback to absolute")
+		log.WithError(err).Warnf("[%s]: failed to get relative path, fallback to absolute", TAG)
 		return path // fallback
 	}
 }
@@ -182,9 +182,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
-	task.log().WithField("query", task.rootQuery).Debugf("[%s]: parsed query", TAG)
+	//task.log().WithField("query", task.rootQuery).Debugf("[%s]: parsed query", TAG)
 	task.rootQuery = engine.optimizer.Process(task.rootQuery)
-	task.log().WithField("query", task.rootQuery).Debugf("[%s]: optimized query", TAG)
+	//task.log().WithField("query", task.rootQuery).Debugf("[%s]: optimized query", TAG)
 
 	res1 := filepath.Join(instanceName, fmt.Sprintf(".temp-res-%s-%d%s",
 		task.Identifier, task.subtaskId, task.extension))
@@ -192,11 +192,6 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to create res catalog", TAG)
 		return nil, fmt.Errorf("failed to create res catalog: %s", err)
-	}
-	err = task.result.ClearAll()
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to clear res catalog", TAG)
-		return nil, fmt.Errorf("failed to clear res catalog: %s", err)
 	}
 
 	// check input data-set for catalogs

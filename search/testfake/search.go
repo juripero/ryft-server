@@ -193,8 +193,31 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 					start += n + 1 // find next
 					res.Stat.Matches++
 
-					d_beg := start - 1 - int(cfg.Width)
-					d_len := len(text) + 2*int(cfg.Width)
+					d_beg := start - 1
+					d_len := len(text)
+
+					if cfg.Width > 0 {
+						d_beg -= int(cfg.Width)
+						d_len += 2 * int(cfg.Width)
+					} else if cfg.Width < 0 { // line=true
+						// go left
+						for d_beg > 0 {
+							r := rune(data[d_beg-1])
+							if r == '\n' || r == '\r' || r == '\f' {
+								break
+							}
+							d_beg--
+							d_len++
+						}
+						// go right
+						for d_beg+d_len+1 < len(data) {
+							r := rune(data[d_beg+d_len])
+							if r == '\n' || r == '\r' || r == '\f' {
+								break
+							}
+							d_len++
+						}
+					}
 					if d_beg < 0 {
 						d_len += d_beg
 						d_beg = 0

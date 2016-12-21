@@ -698,7 +698,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	}
 	defer data.Close()
 
-	_, err = data.Seek(int64(data_pos), os.SEEK_SET /*TODO: io.SeekStart*/)
+	_, err = data.Seek(data_pos, os.SEEK_SET /*TODO: io.SeekStart*/)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to seek data file: %s", err)
 	}

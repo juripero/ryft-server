@@ -115,8 +115,7 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 
 // PostProcessing general post-processing interface
 type PostProcessing interface {
-	ClearAll() error // prepare work - clear all data
-	Drop(keep bool)  // finish work
+	Drop(keep bool) // finish work
 
 	AddRyftResults(dataPath, indexPath string,
 		delimiter string, width int, opt uint32) error
@@ -142,12 +141,12 @@ func NewCatalogPostProcessing(path string) (PostProcessing, error) {
 		return nil, err
 	}
 
-	return &CatalogPostProcessing{cat: cat}, nil // OK
-}
+	err = cpp.cat.ClearAll()
+	if err != nil {
+		return nil, err
+	}
 
-// clear all results
-func (cpp *CatalogPostProcessing) ClearAll() error {
-	return cpp.cat.ClearAll()
+	return &CatalogPostProcessing{cat: cat}, nil // OK
 }
 
 // Drop
@@ -389,11 +388,6 @@ func NewInMemoryPostProcessing(path string) (PostProcessing, error) {
 	mpp := new(InMemoryPostProcessing)
 	mpp.indexes = make(map[string]*index.IndexFile)
 	return mpp, nil
-}
-
-// clear all results
-func (mpp *InMemoryPostProcessing) ClearAll() error {
-	return nil // do nothing here
 }
 
 // Drop
