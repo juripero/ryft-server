@@ -34,6 +34,7 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -52,9 +53,9 @@ func (cat *Catalog) GetDataDir() string {
 }
 
 // GetDataFiles gets the list of data files (absolute path)
-func (cat *Catalog) GetDataFiles() ([]string, error) {
+func (cat *Catalog) GetDataFiles(checkDelimHasNewLine bool) ([]string, error) {
 	// TODO: several attempts if DB is locked
-	files, err := cat.getDataFilesSync()
+	files, err := cat.getDataFilesSync(checkDelimHasNewLine)
 	if err != nil {
 		return nil, err
 	}
@@ -69,16 +70,16 @@ func (cat *Catalog) GetDataFiles() ([]string, error) {
 }
 
 // get list of data files (synchronized)
-func (cat *Catalog) getDataFilesSync() ([]string, error) {
+func (cat *Catalog) getDataFilesSync(checkDelimHasNewLine bool) ([]string, error) {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()
 
-	return cat.getDataFiles()
+	return cat.getDataFiles(checkDelimHasNewLine)
 }
 
 // get list of data files (unsynchronized)
-func (cat *Catalog) getDataFiles() ([]string, error) {
-	rows, err := cat.db.Query(`SELECT d.file FROM data AS d;`)
+func (cat *Catalog) getDataFiles(checkDelimHasNewLine bool) ([]string, error) {
+	rows, err := cat.db.Query(`SELECT d.file,d.delim FROM data AS d;`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data files: %s", err)
 	}
@@ -87,10 +88,19 @@ func (cat *Catalog) getDataFiles() ([]string, error) {
 	files := []string{}
 	for rows.Next() {
 		var file string
-		if err := rows.Scan(&file); err != nil {
+		var delim sql.NullString
+		if err := rows.Scan(&file, &delim); err != nil {
 			return nil, fmt.Errorf("failed to scan data file: %s", err)
 		}
 		files = append(files, file)
+
+		// for width=line option we have to ensure the data delimiter
+		// contains a new-line character: \n or \r
+		if checkDelimHasNewLine {
+			if !strings.ContainsAny(delim.String, "\r\n") {
+				return nil, fmt.Errorf("data delimiter doesn't contain new line")
+			}
+		}
 	}
 
 	return files, nil // OK

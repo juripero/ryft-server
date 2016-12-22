@@ -53,7 +53,7 @@ func relativeToHome(home, path string) string {
 
 // check if input fileset contains any catalog
 // also populate the Post-Processing engine
-func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []string, error) {
+func checksForCatalog(wcat PostProcessing, files []string, home string, width int) (int, []string, error) {
 	newFiles := make([]string, 0, len(files))
 	NoCatalogs := 0
 
@@ -99,7 +99,7 @@ func checksForCatalog(wcat PostProcessing, files []string, home string) (int, []
 			NoCatalogs++
 
 			// data files (absolute path)
-			if dataFiles, err := cat.GetDataFiles(); err != nil {
+			if dataFiles, err := cat.GetDataFiles(width < 0); err != nil {
 				return 0, nil, fmt.Errorf("failed to get catalog files: %s", err)
 			} else {
 				// relative to home
@@ -196,7 +196,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// check input data-set for catalogs
 	var hasCatalogs int
-	hasCatalogs, cfg.Files, err = checksForCatalog(task.result, cfg.Files, filepath.Join(mountPoint, homeDir))
+	hasCatalogs, cfg.Files, err = checksForCatalog(task.result,
+		cfg.Files, filepath.Join(mountPoint, homeDir), cfg.Width)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to check catalogs", TAG)
 		return nil, fmt.Errorf("failed to check catalogs: %s", err)
