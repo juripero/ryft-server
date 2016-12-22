@@ -116,6 +116,40 @@ For example:
  AND (RECORD.state EQUALS EXACT("MD"))
 ```
 
+There also a few more types of brackets can be used:
+- [curly braces](#curly-braces)
+- [square braces](#square-brackets)
+
+
+## Curly braces
+
+The curly braces can be used to prevent query combination. All queries in the
+curly braces are combined to exactly one Ryft call. For example the following
+query `{Hello} OR {Apple AND Orange}` will be split into two Ryft calls:
+- `(RAW_TEXT CONTAINS "Hello")`
+- `(RAW_TEXT CONTAINS "Apple") AND (RAW_TEXT CONTAINS "Orange")`
+
+The curly braces makes two exceptions here: "Apple" and "Orange" subqueries
+are combined into one Ryft call even `RAW_TEXT/AND` should not be combined,
+"Hello" is not combined even `RAW_TEXT/OR` should be combined.
+
+
+## Square brackets
+
+Usually the `(Hello) AND (Apple)` query does two Ryft calls. The first call is
+looking for "Hello" and saves the results to temporary file. The second call
+is looking for "Apple" in that temporary file.
+
+Square brackets `[Hello] AND (Apple)` work almost in the same way with one exception.
+Once first "Hello" is executed the list of files (from INDEX) is used as
+input data set to do subsequent search with "Apple".
+The key difference: input data set for the second call is not the DATA from the
+first call, but the unique file list extracted from the INDEX file of the first call.
+
+This feature is used to do subsequent search on catalogs. In conjunction with
+the [FILTER](./README.md#filter-option) option it is used for GoogleEarth demo.
+
+
 # Option types
 
 Each search options is of specific type:
