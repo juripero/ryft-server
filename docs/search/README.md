@@ -151,3 +151,40 @@ optional negation: `L, !CS` means `L=true, CS=false`.
 Values should be quoted.
 
 Examples, `SYMBOL="$"`
+
+
+# Generic options
+
+Some options are supported by each search type. For example `WIDTH` or `LINE`.
+Some options are used by ryft REST server internally such as `FILTER` in case
+of search in catalogs.
+
+
+## `FILTER` option
+
+`FILTER` specifies a regular expression as a [string value](./README.md#strings).
+This option is used with catalog's only. It filters resulting catalog file parts
+by name.
+
+For example if catalog contains many `*.txt` text and `*.bin` binary file parts
+then the results can be narrowed down by corresponding regular expression:
+- `FILTER=".*\.txt"` for the text files
+- `FILTER=".*\.bin"` for the binary files
+
+Any regular expression can be used to specify complex filename filtering rules
+like date ranging etc.
+
+`FILTER=""` is used by default. Empty filter means **all** file parts.
+
+The following aliases can be used to specify `FILTER` as well:
+- `FILE_FILTER`
+- `FILTER`
+- `FF`
+
+so the following queries are the same:
+
+```
+(RECORD CONTAINS EXACT("orange", FILE_FILTER=".*txt"))
+(RECORD CONTAINS EXACT("orange", FILTER=".*txt"))
+(RECORD CONTAINS EXACT("orange", FF=".*txt"))
+```

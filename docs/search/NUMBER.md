@@ -103,6 +103,8 @@ The available comma-separated options for the `NUMBER` primitive are:
 - [DECIMAL](#decimal-option)
 - [WIDTH](#width-option)
 - [LINE](#line-option)
+- [FILTER](./README.md#filter-option)
+
 
 ## `SEPARATOR` option
 

@@ -65,6 +65,7 @@ The available comma-separated options for the `TIME` primitive are:
 
 - [WIDTH](#width-option)
 - [LINE](#line-option)
+- [FILTER](./README.md#filter-option)
 
 
 ## `WIDTH` option

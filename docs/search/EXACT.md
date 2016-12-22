@@ -47,6 +47,7 @@ The available comma-separated options for the `EXACT` primitive are:
 - [WIDTH](#width-option)
 - [LINE](#line-option)
 - [CASE](#case-option)
+- [FILTER](./README.md#filter-option)
 
 
 ## `WIDTH` option

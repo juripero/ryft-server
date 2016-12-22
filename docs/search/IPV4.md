@@ -59,6 +59,7 @@ The available comma-separated options for the `IPV4` primitive are:
 - [OCTAL](#octal-option)
 - [WIDTH](#width-option)
 - [LINE](#line-option)
+- [FILTER](./README.md#filter-option)
 
 
 ## `OCTAL` option

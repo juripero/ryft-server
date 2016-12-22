@@ -70,6 +70,7 @@ The available comma-separated options for the `DATE` primitive are:
 
 - [WIDTH](#width-option)
 - [LINE](#line-option)
+- [FILTER](./README.md#filter-option)
 
 
 ## `WIDTH` option

@@ -79,6 +79,7 @@ The available comma-separated options for the `CURRENCY` primitive are:
 - [DECIMAL](#decimal-option)
 - [WIDTH](#width-option)
 - [LINE](#line-option)
+- [FILTER](./README.md#filter-option)
 
 
 ## `SYMBOL` option

@@ -49,6 +49,7 @@ The available comma-separated options for the `HAMMING` primitive are:
 - [WIDTH](#width-option)
 - [LINE](#line-option)
 - [CASE](#case-option)
+- [FILTER](./README.md#filter-option)
 
 Note that the `DISTANCE` option is required, as it sets the Hamming distance
 that will be used. If `DISTANCE` is specified as zero the search mode
