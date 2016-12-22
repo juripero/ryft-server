@@ -21,6 +21,12 @@ var (
 	testFakePort = ":12345"
 )
 
+// set test log level
+func testSetLogLevel() {
+	// SetLogLevelString(testLogLevel)
+	testfake.SetLogLevelString(testLogLevel)
+}
+
 // fake server to generate random data
 type fakeServer struct {
 	server *Server

@@ -18,9 +18,15 @@ func newFake(records, errors int) *testfake.Engine {
 	return engine
 }
 
+// set test log level
+func testSetLogLevel() {
+	SetLogLevelString(testLogLevel)
+	testfake.SetLogLevelString(testLogLevel)
+}
+
 // Check multiplexing of files and directories
 func TestEngineFiles(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	f1 := newFake(0, 0)
 	f1.FilesReportFiles = []string{"1.txt", "2.txt"}
@@ -44,7 +50,7 @@ func TestEngineFiles(t *testing.T) {
 
 // test engine options
 func TestEngineOptions(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	assert.EqualValues(t, testLogLevel, GetLogLevel().String())
 	if err := SetLogLevelString("BAD"); assert.Error(t, err) {

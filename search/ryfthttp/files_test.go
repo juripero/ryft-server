@@ -34,7 +34,7 @@ func (fs *fakeServer) doFiles(w http.ResponseWriter, req *http.Request) {
 
 // test default options
 func TestFilesValid(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	fs := newFake(0, 0)
 	fs.FilesToReport = []string{"1.txt", "2.txt"}

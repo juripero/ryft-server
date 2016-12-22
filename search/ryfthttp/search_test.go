@@ -15,6 +15,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// set test log level
+func testSetLogLevel() {
+	SetLogLevelString(testLogLevel)
+	testfake.SetLogLevelString(testLogLevel)
+}
+
 // do fake GET /search
 func (fs *fakeServer) doSearch(w http.ResponseWriter, req *http.Request) {
 	// report fake data
@@ -106,7 +112,7 @@ func (fs *fakeServer) doCount(w http.ResponseWriter, req *http.Request) {
 
 // Check valid search results
 func TestEngineSearchUsual(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	fs := newFake(1000, 100)
 	fs.Host = "host-1"
@@ -189,7 +195,7 @@ func TestEngineSearchUsual(t *testing.T) {
 
 // Check bad search results
 func TestEngineSearchFailedToDecode(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	fs := newFake(1000, 100)
 	fs.Host = "host-1"
@@ -327,7 +333,7 @@ func TestEngineSearchFailedToDecode(t *testing.T) {
 
 // Check valid search results with cancel
 func TestEngineSearchCancel(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	fs := newFake(100000, 100)
 	fs.ReportLatency = 100 * time.Millisecond

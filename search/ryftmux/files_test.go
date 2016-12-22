@@ -10,7 +10,7 @@ import (
 
 // Check multiplexing of files and directories
 func TestEngineFiles(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	f1 := newFake(0, 0)
 	f1.FilesReportFiles = []string{"1.txt", "2.txt"}

@@ -16,7 +16,7 @@ import (
 
 // Check simple search results.
 func TestEngineSearchBypass(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 	taskId = 0 // reset to check intermediate file names
 
 	f1 := newFake(1000, 10)
@@ -64,7 +64,8 @@ func TestEngineSearchBypass(t *testing.T) {
 			}, strRecords)
 
 			if assert.EqualValues(t, 1, len(f1.SearchCfgLogTrace)) {
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:"", keep-index:"", delim:"", index:true, data:true}`, f1.SearchCfgLogTrace[0].String())
+				// NOTE, files:["1.txt"] - since it is expanded!
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:"", keep-index:"", delim:"", index:true, data:true}`, f1.SearchCfgLogTrace[0].String())
 			}
 		}
 	}
@@ -72,7 +73,7 @@ func TestEngineSearchBypass(t *testing.T) {
 
 // check for simple AND
 func TestEngineSearchAnd3(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 	taskId = 0 // reset to check intermediate file names
 
 	f1 := newFake(1000, 10)
@@ -127,7 +128,7 @@ func TestEngineSearchAnd3(t *testing.T) {
 
 // check for simple OR
 func TestEngineSearchOr3(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 	taskId = 0 // reset to check intermediate file names
 
 	f1 := newFake(1000, 10)
@@ -238,7 +239,7 @@ func testAddToCatalog(cat *catalog.Catalog, filename string, offset int64, data 
 
 // Check catalog search results.
 func TestEngineSearchCatalog(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	f1 := newFake(1000, 0)
 	f1.HomeDir = "/ryft-test"
@@ -397,7 +398,7 @@ func TestEngineSearchCatalog(t *testing.T) {
 
 // check bad cases
 func TestEngineSearchBad(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	f1 := newFake(1000, 0)
 	f1.HomeDir = "/ryft-test"

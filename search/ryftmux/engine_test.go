@@ -11,6 +11,12 @@ var (
 	testLogLevel = "error"
 )
 
+// set test log level
+func testSetLogLevel() {
+	SetLogLevelString(testLogLevel)
+	testfake.SetLogLevelString(testLogLevel)
+}
+
 // create new fake engine
 func newFake(records, errors int) *testfake.Engine {
 	engine, _ := testfake.NewEngine("/tmp", "ryft-mux")
@@ -21,7 +27,7 @@ func newFake(records, errors int) *testfake.Engine {
 
 // test engine options
 func TestEngineOptions(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	assert.EqualValues(t, testLogLevel, GetLogLevel().String())
 

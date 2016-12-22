@@ -12,7 +12,7 @@ import (
 
 // Check multiplexing of search results
 func TestEngineSearchUsual(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	f1 := newFake(100000, 100)
 	f1.HostName = "host-1"
@@ -44,7 +44,7 @@ func TestEngineSearchUsual(t *testing.T) {
 
 // Check multiplexing of search results with limit.
 func TestEngineSearchLimit(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	f1 := newFake(100000, 100)
 	f1.HostName = "host-1"
@@ -78,7 +78,7 @@ func TestEngineSearchLimit(t *testing.T) {
 // Check multiplexing of search results
 // failed to do search on a backend
 func TestEngineSearchFailed1(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	f1 := newFake(100000, 100)
 	f1.HostName = "host-1"
@@ -110,7 +110,7 @@ func TestEngineSearchFailed1(t *testing.T) {
 
 // Check multiplexing of search results with cancel.
 func TestEngineSearchCancel(t *testing.T) {
-	SetLogLevelString(testLogLevel)
+	testSetLogLevel()
 
 	f1 := newFake(100000, 100)
 	f1.SearchReportLatency = time.Millisecond

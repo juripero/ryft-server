@@ -50,7 +50,7 @@ func TestCatalogCommon(t *testing.T) {
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		assert.True(t, cat.CheckScheme())
 		assert.EqualValues(t, "/tmp/ryft/.foo.txt.catalog", cat.GetDataDir())
-		if files, err := cat.GetDataFiles(); assert.NoError(t, err) {
+		if files, err := cat.GetDataFiles(false); assert.NoError(t, err) {
 			assert.Empty(t, files)
 		}
 		assert.True(t, cat.DropFromCache())
@@ -190,7 +190,7 @@ func TestCatalogAddFilePart(t *testing.T) {
 	assert.EqualValues(t, expectedLen, actualLen, "invalid total data length")
 	cat, err := OpenCatalog(catalog)
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
-		files, err := cat.GetDataFiles()
+		files, err := cat.GetDataFiles(false)
 		if assert.NoError(t, err) {
 			sort.Strings(files)
 			sort.Strings(dataFileList)
