@@ -27,10 +27,9 @@ package: control
 	echo "/etc/ryft-users.yaml" >> "${DESTDIR}/DEBIAN/conffiles"
 	rm "${DESTDIR}/var/log/ryft/.keep"
 	rm "${DESTDIR}/var/ryft/.keep"
-	echo "Installed-Size: $$(du -b -s ${DESTDIR} | awk '{print $$1}')" >> "${CONTROLFILE}"
+	echo "Installed-Size: $$(du -k -s ${DESTDIR} | awk '{print 1024*$$1}')" >> "${CONTROLFILE}"
 # chown -R ryftuser.ryftuser "${DESTDIR}"
-	dpkg --build "${DESTDIR}"
-	mv -f "${DESTDIR}.deb" "${DEBNAME}"
+	dpkg-deb --build "${DESTDIR}" "${DEBNAME}"
 	rm -rf "${DESTDIR}"
 
 # initialize template

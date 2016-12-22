@@ -39,6 +39,10 @@ install: $(ASSETS)
 debian: install
 	make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
 
+.PHONY: docker-build docker_build
+docker_build: docker-build
+docker-build:
+	docker build -t ryft.build -f docker/Dockerfile.build .
 
 .PHONY: test_cover test-cover test
 test_cover: test-cover

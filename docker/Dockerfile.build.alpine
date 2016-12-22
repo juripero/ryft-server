@@ -1,12 +1,7 @@
 # Docker file to test ryft-server building.
 # Get's sources from current directory (actually ..)
-FROM ubuntu:16.10
-RUN apt-get update && apt-get install -y git golang gcc make
-
-# install Go
-# ADD https://storage.googleapis.com/golang/go1.7.1.linux-amd64.tar.gz /tmp/
-# RUN tar -C /usr/local -xzf /tmp/go1.7.1.linux-amd64.tar.gz
-# ENV PATH=$PATH:/usr/local/go/bin
+FROM alpine:3.4
+RUN apk add --update go git build-base dpkg tar xz
 
 # copy sources
 ENV GOPATH=/go
@@ -17,4 +12,4 @@ WORKDIR /go/src/github.com/getryft/ryft-server/
 RUN go get -d -v -t
 RUN make debian
 
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["/bin/sh"]
