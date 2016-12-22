@@ -110,10 +110,11 @@ func checksForCatalog(wcat PostProcessing, files []string, home string, width in
 		}
 	}
 
-	if NoCatalogs == 0 {
+	/* try to use already expanded list of files!
+	if N_catalogs == 0 {
 		// use source files "as is"
-		newFiles = files
-	}
+		new_files = files
+	}*/
 
 	return NoCatalogs, newFiles, nil // OK
 }
