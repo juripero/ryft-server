@@ -78,6 +78,15 @@ func newFake() *fakeServer {
 	// DEBUG mode
 	mux.GET("/logging/level", fs.server.DoLoggingLevel)
 
+	os.MkdirAll("/tmp/ryft", 0755) // see BackendOptions above!
+	ioutil.WriteFile("/tmp/ryft/1.txt", []byte(`
+11111-hello-11111
+22222-hello-22222
+33333-hello-33333
+44444-hello-44444
+55555-hello-55555
+`), 0644)
+
 	return fs
 }
 

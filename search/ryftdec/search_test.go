@@ -404,6 +404,16 @@ func TestEngineSearchBad(t *testing.T) {
 	f1.HomeDir = "/ryft-test"
 	f1.HostName = "host"
 
+	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
+	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
+11111-hello-11111
+22222-hello-22222
+33333-hello-33333
+44444-hello-44444
+55555-hello-55555
+`), 0644)
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
+
 	engine, err := NewEngine(f1, nil)
 	if !assert.NoError(t, err) {
 		return

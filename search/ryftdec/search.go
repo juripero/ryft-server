@@ -241,7 +241,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		res, err := engine.doSearch(task, task.rootQuery, cfg, mux)
 		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to do search", TAG)
+			task.log().WithError(err).Warnf("[%s]: failed to do search", TAG)
 			mux.ReportError(err)
 			return
 		}
