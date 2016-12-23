@@ -203,6 +203,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to check catalogs", TAG)
 		return nil, fmt.Errorf("failed to check catalogs: %s", err)
 	}
+	if len(cfg.Files) == 0 {
+		return nil, fmt.Errorf("no any valid file or catalog found")
+	}
 
 	// in simple cases when there is only one subquery
 	// we can pass this query directly to the backend
