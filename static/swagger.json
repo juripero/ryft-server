@@ -427,6 +427,13 @@
             "collectionFormat": "multi",
             "description": "The catalog path to delete. Wildcards are supported.",
             "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "x-go-name": "Local",
+            "description": "Perform action only on this cluster member. Default 'false'."
           }
         ],
         "responses": {
