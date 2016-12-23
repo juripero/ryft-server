@@ -1,6 +1,6 @@
 The `IPv6` Search operation can be used to search for exact IPv6 addresses or
 IPv6 addresses in a particular range in both structured and unstructured text
-using the standard “a:b:c:d:e:f:g:h” format for IPv6 addresses.
+using the standard `"a:b:c:d:e:f:g:h"` format for IPv6 addresses.
 The double colon (::) is also supported, per RFC guidelines.
 
 IPv6 searches extend the general relational expression defined
@@ -124,3 +124,15 @@ so the following queries are the same:
 
 Please see [boolean type](./README.md#booleans) to get the ways
 the `LINE` option can be set.
+
+
+# See Also
+
+- [Exact search](./EXACT.md)
+- [Fuzzy Hamming search](./HAMMING.md)
+- [Fuzzy Edit Distance search](./EDIT_DIST.md)
+- [Date search](./DATE.md)
+- [Time search](./TIME.md)
+- [Number search](./NUMBER.md)
+- [Currency search](./CURRENCY.md)
+- [IPv4 search](./IPV4.md)

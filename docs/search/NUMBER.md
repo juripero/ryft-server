@@ -237,3 +237,15 @@ following queries:
 ```
 
 For all cases the `SEPARATOR=","` and `DECIMAL="."`.
+
+
+# See Also
+
+- [Exact search](./EXACT.md)
+- [Fuzzy Hamming search](./HAMMING.md)
+- [Fuzzy Edit Distance search](./EDIT_DIST.md)
+- [Date search](./DATE.md)
+- [Time search](./TIME.md)
+- [Currency search](./CURRENCY.md)
+- [IPv4 search](./IPV4.md)
+- [IPv6 search](./IPV6.md)

@@ -37,7 +37,14 @@ Note, there is no way to specify additional options in this syntax!
 The global options will be used.
 
 Actually the syntax can be even simplier: standalone `expression` is
-converted to `(RAW_TEXT CONTAINS expression)`.
+converted to `(RAW_TEXT CONTAINS expression)`. For example the
+`"Apple" OR "Orange"` will be converted to
+
+```
+(RAW_TEXT CONTAINS EXACT("Apple"))
+OR
+(RAW_TEXT CONTAINS EXACT("Orange"))
+```
 
 
 # Options
@@ -134,3 +141,15 @@ so the following queries are the same:
 
 Please see [boolean type](./README.md#booleans) to get the ways
 the `CASE` option can be set.
+
+
+# See Also
+
+- [Fuzzy Hamming search](./HAMMING.md)
+- [Fuzzy Edit Distance search](./EDIT_DIST.md)
+- [Date search](./DATE.md)
+- [Time search](./TIME.md)
+- [Number search](./NUMBER.md)
+- [Currency search](./CURRENCY.md)
+- [IPv4 search](./IPV4.md)
+- [IPv6 search](./IPV6.md)

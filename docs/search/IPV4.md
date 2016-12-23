@@ -154,3 +154,15 @@ so the following queries are the same:
 
 Please see [boolean type](./README.md#booleans) to get the ways
 the `LINE` option can be set.
+
+
+# See Also
+
+- [Exact search](./EXACT.md)
+- [Fuzzy Hamming search](./HAMMING.md)
+- [Fuzzy Edit Distance search](./EDIT_DIST.md)
+- [Date search](./DATE.md)
+- [Time search](./TIME.md)
+- [Number search](./NUMBER.md)
+- [Currency search](./CURRENCY.md)
+- [IPv6 search](./IPV6.md)
