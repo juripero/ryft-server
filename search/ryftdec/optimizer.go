@@ -93,11 +93,10 @@ func (o *Optimizer) process(q Query) Query {
 				if a.Simple.Options.EqualsTo(b.Simple.Options) {
 					tmp.Simple.Options = a.Simple.Options
 				} else {
+					ff := selectFileFilter(tmp.Simple.Options, a.Simple.Options)
 					tmp.Simple.Options = DefaultOptions() // reset to default
+					tmp.Simple.Options.FileFilter = ff
 				}
-
-				// use the latest file filter
-				tmp.Simple.Options.FileFilter = b.Simple.Options.FileFilter
 
 				var exprOld bytes.Buffer
 				var exprNew bytes.Buffer
@@ -227,11 +226,10 @@ func (o *Optimizer) combine(q Query) Query {
 			if i == 0 {
 				opts = a.Simple.Options
 			} else if !opts.EqualsTo(a.Simple.Options) {
+				ff := selectFileFilter(opts, a.Simple.Options)
 				opts = DefaultOptions() // reset to default
+				opts.FileFilter = ff
 			}
-
-			// use the latest file filter
-			opts.FileFilter = a.Simple.Options.FileFilter
 
 			structured = structured && a.Simple.Structured
 		}

@@ -552,3 +552,19 @@ func (o *Options) Set(option string, positonalName string) (bool, error) {
 
 	return named, nil // OK
 }
+
+// select single file filter option
+// return the last non-empty option
+func selectFileFilter(a Options, b Options) string {
+	aff := a.FileFilter
+	bff := b.FileFilter
+
+	if /*len(aff) != 0 &&*/ len(bff) != 0 {
+		return bff // both or 'b' are provided, use the last one
+	}
+	if len(aff) != 0 {
+		return aff
+	}
+
+	return "" // nothing provided
+}
