@@ -14,8 +14,55 @@ import (
 )
 
 var (
-	testLogLevel = "debug"
+	testLogLevel = "error"
 )
+
+// test catalog's REGEXP
+func TestCatalogRegexp(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+
+	os.MkdirAll("/tmp/ryft/", 0755)
+	defer os.RemoveAll("/tmp/ryft/")
+
+	cat, err := OpenCatalogNoCache("/tmp/ryft/foo.txt")
+	if assert.NoError(t, err) && assert.NotNil(t, cat) {
+		cat.DataSizeLimit = 50
+		defer cat.Close()
+
+		// put 3 file parts to separate data files
+		_, _, _, err = cat.AddFilePart("1.txt", -1, 10, nil)
+		assert.NoError(t, err)
+		_, _, _, err = cat.AddFilePart("2.txt", -1, 10, nil)
+		assert.NoError(t, err)
+		_, _, _, err = cat.AddFilePart("3.txt", -1, 100, nil)
+		assert.NoError(t, err)
+		_, _, _, err = cat.AddFilePart("1.dat", -1, 100, nil)
+		assert.NoError(t, err)
+		_, _, _, err = cat.AddFilePart("1.bin", -1, 100, nil)
+		assert.NoError(t, err)
+
+		dataFiles, err := cat.GetDataFiles("", false)
+		if assert.NoError(t, err) && assert.EqualValues(t, 4, len(dataFiles)) {
+			// TODO: ask with regular expression
+			log.Infof("data files: %s", dataFiles)
+
+			txtFiles, err := cat.GetDataFiles("^.*txt$", false)
+			if assert.NoError(t, err) && assert.EqualValues(t, 2, len(txtFiles)) {
+				assert.EqualValues(t, dataFiles[0:2], txtFiles)
+			}
+
+			datFiles, err := cat.GetDataFiles("^.*dat$", false)
+			if assert.NoError(t, err) && assert.EqualValues(t, 1, len(datFiles)) {
+				assert.EqualValues(t, dataFiles[2:3], datFiles)
+			}
+
+			binFiles, err := cat.GetDataFiles("^.*bin$", false)
+			if assert.NoError(t, err) && assert.EqualValues(t, 1, len(binFiles)) {
+				assert.EqualValues(t, dataFiles[3:4], binFiles)
+			}
+		}
+	}
+}
 
 // check common catalog tasks
 func TestCatalogCommon(t *testing.T) {
@@ -50,7 +97,7 @@ func TestCatalogCommon(t *testing.T) {
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		assert.True(t, cat.CheckScheme())
 		assert.EqualValues(t, "/tmp/ryft/.foo.txt.catalog", cat.GetDataDir())
-		if files, err := cat.GetDataFiles(false); assert.NoError(t, err) {
+		if files, err := cat.GetDataFiles("", false); assert.NoError(t, err) {
 			assert.Empty(t, files)
 		}
 		assert.True(t, cat.DropFromCache())
@@ -190,7 +237,7 @@ func TestCatalogAddFilePart(t *testing.T) {
 	assert.EqualValues(t, expectedLen, actualLen, "invalid total data length")
 	cat, err := OpenCatalog(catalog)
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
-		files, err := cat.GetDataFiles(false)
+		files, err := cat.GetDataFiles("", false)
 		if assert.NoError(t, err) {
 			sort.Strings(files)
 			sort.Strings(dataFileList)

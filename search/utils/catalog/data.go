@@ -34,9 +34,99 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
+
+var (
+	// global pattern cache (compiled regexp)
+	globalPatternCache patternCache
+)
+
+// pattern cache
+type patternCache struct {
+	cache     map[string]*patternMatch
+	cacheSync sync.Mutex
+}
+
+// register pattern (synchronous)
+func (pc *patternCache) register(pattern string) error {
+	pc.cacheSync.Lock()
+	defer pc.cacheSync.Unlock()
+
+	var pm *patternMatch
+	if pm = pc.cache[pattern]; pm == nil {
+		// create new pattern
+		var err error
+		pm, err = newPatternMatch(pattern)
+		if err != nil {
+			return err
+		}
+
+		// put it to cache
+		if pc.cache == nil {
+			pc.cache = make(map[string]*patternMatch)
+		}
+		pc.cache[pattern] = pm
+	}
+
+	atomic.AddInt32(&pm.refs, +1)
+	return nil // OK
+}
+
+// unregister pattern (synchronous)
+func (pc *patternCache) unregister(pattern string) {
+	pc.cacheSync.Lock()
+	defer pc.cacheSync.Unlock()
+
+	if pm := pc.cache[pattern]; pm != nil {
+		if atomic.AddInt32(&pm.refs, -1) == 0 {
+			// for the last reference remove it
+			delete(pc.cache, pattern)
+		}
+	}
+}
+
+// get the existing pattern match
+func (pc *patternCache) get(pattern string) *patternMatch {
+	// read-only map can be accesses without sync
+	return pc.cache[pattern]
+}
+
+// file filter
+type patternMatch struct {
+	re   *regexp.Regexp // regexp to match
+	refs int32          // number of references
+}
+
+// create new file filter
+func newPatternMatch(pattern string) (*patternMatch, error) {
+	m, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+
+	return &patternMatch{re: m}, nil // OK
+}
+
+// do the match
+func (pm *patternMatch) match(s string) bool {
+	return pm.re.MatchString(s)
+}
+
+// do the REGEXP match
+func regexpMatch(pattern, str string) (bool, error) {
+	// try to use cached pattern
+	if m := globalPatternCache.get(pattern); m != nil {
+		return m.match(str), nil
+	}
+
+	// compile and do it anyway
+	return regexp.MatchString(pattern, str)
+}
 
 // get data directory
 // return absollute path!
@@ -53,9 +143,9 @@ func (cat *Catalog) GetDataDir() string {
 }
 
 // GetDataFiles gets the list of data files (absolute path)
-func (cat *Catalog) GetDataFiles(checkDelimHasNewLine bool) ([]string, error) {
+func (cat *Catalog) GetDataFiles(partFilter string, checkDelimHasNewLine bool) ([]string, error) {
 	// TODO: several attempts if DB is locked
-	files, err := cat.getDataFilesSync(checkDelimHasNewLine)
+	files, err := cat.getDataFilesSync(partFilter, checkDelimHasNewLine)
 	if err != nil {
 		return nil, err
 	}
@@ -70,16 +160,32 @@ func (cat *Catalog) GetDataFiles(checkDelimHasNewLine bool) ([]string, error) {
 }
 
 // get list of data files (synchronized)
-func (cat *Catalog) getDataFilesSync(checkDelimHasNewLine bool) ([]string, error) {
+func (cat *Catalog) getDataFilesSync(partFilter string, checkDelimHasNewLine bool) ([]string, error) {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()
 
-	return cat.getDataFiles(checkDelimHasNewLine)
+	return cat.getDataFiles(partFilter, checkDelimHasNewLine)
 }
 
 // get list of data files (unsynchronized)
-func (cat *Catalog) getDataFiles(checkDelimHasNewLine bool) ([]string, error) {
-	rows, err := cat.db.Query(`SELECT d.file,d.delim FROM data AS d;`)
+func (cat *Catalog) getDataFiles(partFilter string, checkDelimHasNewLine bool) ([]string, error) {
+	var rows *sql.Rows
+	var err error
+	if len(partFilter) != 0 {
+		// register/unregister corresponding pattern match
+		err = globalPatternCache.register(partFilter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create file filter match: %s", err)
+		}
+		defer globalPatternCache.unregister(partFilter)
+
+		rows, err = cat.db.Query(`SELECT DISTINCT d.file,d.delim
+FROM parts AS p
+JOIN data AS d ON p.d_id = d.id
+WHERE p.name REGEXP ?;`, partFilter)
+	} else {
+		rows, err = cat.db.Query(`SELECT d.file,d.delim FROM data AS d;`)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data files: %s", err)
 	}

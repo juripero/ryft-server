@@ -40,7 +40,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	_ "github.com/mattn/go-sqlite3"
+	sqlite "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -64,6 +64,17 @@ var DefaultTempDirectory string = "/tmp/"
 
 // ErrNotACatalog is used to indicate the file is not a catalog meta-data file.
 var ErrNotACatalog = errors.New("not a catalog")
+
+func init() {
+	sql.Register("ryft_sqlite3", &sqlite.SQLiteDriver{
+		ConnectHook: func(conn *sqlite.SQLiteConn) error {
+			if err := conn.RegisterFunc("regexp", regexpMatch, true); err != nil {
+				return err
+			}
+			return nil // OK
+		},
+	})
+}
 
 // SetLogLevelString changes global module log level.
 func SetLogLevelString(level string) error {
@@ -190,8 +201,16 @@ func (cat *Catalog) log() *logrus.Entry {
 }
 
 // openCatalog opens catalog file.
+// if path is empty - memory DB will be used
 func openCatalog(path string) (*Catalog, error) {
-	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_txlock=exclusive", path))
+	var fileName string
+	if len(path) != 0 {
+		fileName = fmt.Sprintf("file:%s?_txlock=exclusive", path)
+	} else {
+		fileName = ":memory:"
+	}
+
+	db, err := sql.Open("ryft_sqlite3", fileName)
 	if err != nil {
 		return nil, err
 	}
