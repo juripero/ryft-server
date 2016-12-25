@@ -1,4 +1,4 @@
-package ryftdec
+package query
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 // test options equal
 func TestOptionsEqual(t *testing.T) {
 	assert.True(t, Options{}.EqualsTo(Options{}))
-	assert.False(t, Options{}.EqualsTo(Options{FileFilter: ".*"}))
+	// assert.False(t, Options{}.EqualsTo(Options{FileFilter: ".*"})) // FileFilter is ignored
 	assert.False(t, Options{}.EqualsTo(Options{DecimalPoint: "."}))
 	assert.False(t, Options{}.EqualsTo(Options{DigitSeparator: ","}))
 	assert.False(t, Options{}.EqualsTo(Options{CurrencySymbol: "$"}))

@@ -28,7 +28,7 @@
  * ============
  */
 
-package ryftdec
+package query
 
 import (
 	"fmt"
@@ -61,7 +61,7 @@ func DefaultOptions() Options {
 	}
 }
 
-// IsTheSame checks the options are the same.
+// EqualsTo checks the options are the same.
 func (o Options) EqualsTo(p Options) bool {
 	// search mode
 	if o.Mode != p.Mode {
@@ -109,9 +109,9 @@ func (o Options) EqualsTo(p Options) bool {
 	}
 
 	// file filter
-	if o.FileFilter != p.FileFilter {
+	/*if o.FileFilter != p.FileFilter {
 		return false
-	}
+	}*/
 
 	return true // equal
 }

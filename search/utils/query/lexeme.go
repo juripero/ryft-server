@@ -28,7 +28,7 @@
  * ============
  */
 
-package ryftdec
+package query
 
 import (
 	"strings"

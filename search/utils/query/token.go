@@ -28,7 +28,7 @@
  * ============
  */
 
-package ryftdec
+package query
 
 // Token type.
 type Token int

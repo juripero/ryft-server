@@ -39,6 +39,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
+	"github.com/getryft/ryft-server/search/utils/query"
 )
 
 // get path relative to home directory
@@ -120,8 +121,8 @@ func checksForCatalog(wcat PostProcessing, files []string, home string, width in
 }
 
 // ConfigToOptions converts search configuration to base Options.
-func ConfigToOptions(cfg *search.Config) Options {
-	opts := DefaultOptions()
+func ConfigToOptions(cfg *search.Config) query.Options {
+	opts := query.DefaultOptions()
 
 	opts.Mode = cfg.Mode
 	opts.Dist = cfg.Dist
@@ -138,7 +139,7 @@ func ConfigToOptions(cfg *search.Config) Options {
 }
 
 // update search configuration with Options
-func updateConfig(cfg *search.Config, opts Options) {
+func updateConfig(cfg *search.Config, opts query.Options) {
 	cfg.Mode = opts.Mode
 	cfg.Dist = opts.Dist
 	cfg.Width = opts.Width
@@ -178,7 +179,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	// split cfg.Query into several expressions
-	task.rootQuery, err = ParseQueryOpt(cfg.Query, ConfigToOptions(cfg))
+	task.rootQuery, err = query.ParseQueryOpt(cfg.Query, ConfigToOptions(cfg))
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
@@ -336,7 +337,7 @@ func (res SearchResult) removeAll(mountPoint, homeDir string) {
 
 // process and wait all /search subtasks
 // returns number of matches and corresponding statistics
-func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
+func (engine *Engine) doSearch(task *Task, query query.Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.subtaskId++ // next subtask
 
 	if query.Simple != nil {
@@ -397,7 +398,7 @@ func (engine *Engine) doSearch(task *Task, query Query, cfg *search.Config, mux 
 }
 
 // process and wait all AND subtasks
-func (engine *Engine) doAnd(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
+func (engine *Engine) doAnd(task *Task, query query.Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.log().Infof("[%s/%d]: running AND", TAG, task.subtaskId)
 	_, homeDir, mountPoint := engine.getBackendOptions()
 
@@ -464,7 +465,7 @@ func (engine *Engine) doAnd(task *Task, query Query, cfg *search.Config, mux *se
 }
 
 // process and wait all OR subtasks
-func (engine *Engine) doOr(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
+func (engine *Engine) doOr(task *Task, query query.Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.log().Infof("[%s/%d]: running OR", TAG, task.subtaskId)
 
 	tempCfg := *cfg
@@ -493,7 +494,7 @@ func (engine *Engine) doOr(task *Task, query Query, cfg *search.Config, mux *sea
 }
 
 // process and wait all XOR subtasks
-func (engine *Engine) doXor(task *Task, query Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
+func (engine *Engine) doXor(task *Task, query query.Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	return nil, fmt.Errorf("XOR is not implemented yet")
 }
 

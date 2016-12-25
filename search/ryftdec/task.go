@@ -42,6 +42,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/getryft/ryft-server/search/utils/index"
+	"github.com/getryft/ryft-server/search/utils/query"
 )
 
 var (
@@ -54,7 +55,7 @@ type Task struct {
 	Identifier string // unique
 	subtaskId  int
 
-	rootQuery Query
+	rootQuery query.Query
 	extension string // used for intermediate results, may be empty
 
 	config *search.Config

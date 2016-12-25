@@ -38,6 +38,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/query"
 )
 
 var (
@@ -50,7 +51,7 @@ var (
 // Engine is decomposition engine that uses an abstract engine as backend.
 type Engine struct {
 	Backend   search.Engine
-	optimizer *Optimizer
+	optimizer *query.Optimizer
 
 	KeepResultFiles bool // false by default
 	CompatMode      bool // false by default
@@ -60,7 +61,7 @@ type Engine struct {
 func NewEngine(backend search.Engine, opts map[string]interface{}) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backend = backend
-	engine.optimizer = &Optimizer{CombineLimit: NoLimit}
+	engine.optimizer = &query.Optimizer{CombineLimit: query.NoLimit}
 	if err := engine.update(opts); err != nil {
 		return nil, err
 	}
@@ -71,6 +72,11 @@ func NewEngine(backend search.Engine, opts map[string]interface{}) (*Engine, err
 func (engine *Engine) String() string {
 	return fmt.Sprintf("ryftdec{backend:%s}", engine.Backend)
 	// TODO: other parameters?
+}
+
+// Optimize does query optimization.
+func (engine *Engine) Optimize(q query.Query) query.Query {
+	return engine.optimizer.Process(q)
 }
 
 // Options gets all engine options.

@@ -1,4 +1,4 @@
-package ryftdec
+package query
 
 import (
 	"testing"
@@ -153,6 +153,32 @@ func TestOptimizerCombine(t *testing.T) {
 	check(false,
 		`(RECORD EQUALS       "100")  AND (RAW_TEXT EQUALS     FHS("200",D=1))           AND (RECORD EQUALS       "300")`,
 		`(RECORD EQUALS EXACT("100")) AND (RAW_TEXT EQUALS HAMMING("200", DISTANCE="1")) AND (RECORD EQUALS EXACT("300"))x2`)
+
+	// check file filter combination (the last non-empty is used)
+	check(false,
+		`(RAW_TEXT CONTAINS ES("100", FF="100.txt")) OR (RAW_TEXT CONTAINS ES("200", FF="200.txt"))`,
+		`(RAW_TEXT CONTAINS EXACT("100")) OR (RAW_TEXT CONTAINS EXACT("200"))[es,filter="200.txt"]x1`)
+	check(false,
+		`(RAW_TEXT CONTAINS ES("100", FF="")) OR (RAW_TEXT CONTAINS ES("200", FF="200.txt"))`,
+		`(RAW_TEXT CONTAINS EXACT("100")) OR (RAW_TEXT CONTAINS EXACT("200"))[es,filter="200.txt"]x1`)
+	check(false,
+		`(RAW_TEXT CONTAINS ES("100", FF="100.txt")) OR (RAW_TEXT CONTAINS ES("200", FF=""))`,
+		`(RAW_TEXT CONTAINS EXACT("100")) OR (RAW_TEXT CONTAINS EXACT("200"))[es,filter="100.txt"]x1`)
+	check(false,
+		`(RAW_TEXT CONTAINS ES("100", FF="")) OR (RAW_TEXT CONTAINS ES("200", FF=""))`,
+		`(RAW_TEXT CONTAINS EXACT("100")) OR (RAW_TEXT CONTAINS EXACT("200"))[es]x1`)
+	check(false,
+		`{(RAW_TEXT CONTAINS ES("100", FF="100.txt")) OR (RAW_TEXT CONTAINS ES("200", FF="200.txt"))}`,
+		`(RAW_TEXT CONTAINS EXACT("100")) OR (RAW_TEXT CONTAINS EXACT("200"))[es,filter="200.txt"]x1`)
+	check(false,
+		`{(RAW_TEXT CONTAINS ES("100", FF="")) OR (RAW_TEXT CONTAINS ES("200", FF="200.txt"))}`,
+		`(RAW_TEXT CONTAINS EXACT("100")) OR (RAW_TEXT CONTAINS EXACT("200"))[es,filter="200.txt"]x1`)
+	check(false,
+		`{(RAW_TEXT CONTAINS ES("100", FF="100.txt")) OR (RAW_TEXT CONTAINS ES("200", FF=""))}`,
+		`(RAW_TEXT CONTAINS EXACT("100")) OR (RAW_TEXT CONTAINS EXACT("200"))[es,filter="100.txt"]x1`)
+	check(false,
+		`{(RAW_TEXT CONTAINS ES("100", FF="")) OR (RAW_TEXT CONTAINS ES("200", FF=""))}`,
+		`(RAW_TEXT CONTAINS EXACT("100")) OR (RAW_TEXT CONTAINS EXACT("200"))[es]x1`)
 }
 
 // test for optimization limits

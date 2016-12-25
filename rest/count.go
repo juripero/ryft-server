@@ -38,6 +38,7 @@ import (
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
+	"github.com/getryft/ryft-server/search/utils/query"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -200,7 +201,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	}
 }
 
-// Handle /count/dry-run endpoint.
+// Handle /count/dry-run and /search/dry-run endpoints.
 func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
@@ -269,28 +270,35 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	}).Infof("[%s]: GET /count/dry-run", CORE)
 
 	// decompose query
-	q, err := ryftdec.ParseQueryOpt(cfg.Query, ryftdec.ConfigToOptions(cfg))
+	q, err := query.ParseQueryOpt(cfg.Query, ryftdec.ConfigToOptions(cfg))
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse query"))
 	}
 
-	optimizer := &ryftdec.Optimizer{}
-	query := optimizer.Process(q)
+	// optimize query
+	var qq query.Query
+	if rd, ok := engine.(*ryftdec.Engine); ok {
+		qq = rd.Optimize(q)
+	} else {
+		// use default optimizer as a fallback
+		optimizer := &query.Optimizer{CombineLimit: query.NoLimit}
+		qq = optimizer.Process(q)
+	}
 
 	// prepare result output
 	info := map[string]interface{}{
 		"request": &params,
 		"engine":  engine,
 		"parsed":  queryToJson(q),
-		"final":   queryToJson(query),
+		"final":   queryToJson(qq),
 	}
 
 	ctx.IndentedJSON(http.StatusOK, info)
 }
 
 // convert query to JSON value
-func queryToJson(q ryftdec.Query) map[string]interface{} {
+func queryToJson(q query.Query) map[string]interface{} {
 	if q.Simple != nil {
 		info := map[string]interface{}{
 			"old-expr":   q.Simple.ExprOld,
@@ -329,7 +337,7 @@ func queryToJson(q ryftdec.Query) map[string]interface{} {
 }
 
 // convert query options to JSON value
-func optionsToJson(opts ryftdec.Options) map[string]interface{} {
+func optionsToJson(opts query.Options) map[string]interface{} {
 	info := make(map[string]interface{})
 
 	// search mode

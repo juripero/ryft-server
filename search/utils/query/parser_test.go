@@ -1,4 +1,4 @@
-package ryftdec
+package query
 
 import (
 	"bytes"

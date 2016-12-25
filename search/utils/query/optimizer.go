@@ -28,7 +28,7 @@
  * ============
  */
 
-package ryftdec
+package query
 
 import (
 	"bytes"
@@ -90,13 +90,13 @@ func (o *Optimizer) process(q Query) Query {
 				tmp := Query{boolOps: a.boolOps + b.boolOps + 1}
 				tmp.Simple = &SimpleQuery{}
 				tmp.Simple.Structured = a.Simple.Structured && b.Simple.Structured
+				ff := selectFileFilter(a.Simple.Options, b.Simple.Options)
 				if a.Simple.Options.EqualsTo(b.Simple.Options) {
 					tmp.Simple.Options = a.Simple.Options
 				} else {
-					ff := selectFileFilter(tmp.Simple.Options, a.Simple.Options)
 					tmp.Simple.Options = DefaultOptions() // reset to default
-					tmp.Simple.Options.FileFilter = ff
 				}
+				tmp.Simple.Options.FileFilter = ff
 
 				var exprOld bytes.Buffer
 				var exprNew bytes.Buffer
@@ -225,9 +225,11 @@ func (o *Optimizer) combine(q Query) Query {
 			// keep options if they are equal
 			if i == 0 {
 				opts = a.Simple.Options
-			} else if !opts.EqualsTo(a.Simple.Options) {
+			} else {
 				ff := selectFileFilter(opts, a.Simple.Options)
-				opts = DefaultOptions() // reset to default
+				if !opts.EqualsTo(a.Simple.Options) {
+					opts = DefaultOptions() // reset to default
+				}
 				opts.FileFilter = ff
 			}
 
