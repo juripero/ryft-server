@@ -40,21 +40,19 @@ func TestCatalogGetIndex(t *testing.T) {
 		if assert.NoError(t, err) {
 			// since limit is 100 bytes we should have 2 data files
 
-			assert.EqualValues(t, `delim:"\n\f\n", offset:0
+			assert.EqualValues(t, `delim:#0a0c0a, width:0, opt:0
 {1.txt#0 [0..17)}
 {2.txt#0 [20..37)}
 {3.txt#0 [40..57)}
 {4.txt#0 [60..77)}
 {5.txt#0 [80..97)}
-{1.txt#17 [100..117)}
-`, files[d1].String())
+{1.txt#17 [100..117)}`, files[d1].String())
 
-			assert.EqualValues(t, `delim:"\n\f\n", offset:0
+			assert.EqualValues(t, `delim:#0a0c0a, width:0, opt:0
 {2.txt#17 [0..17)}
 {3.txt#17 [20..37)}
 {4.txt#17 [40..57)}
-{5.txt#17 [60..77)}
-`, files[d2].String())
+{5.txt#17 [60..77)}`, files[d2].String())
 		}
 
 		// clear all indexes

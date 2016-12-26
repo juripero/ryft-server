@@ -41,7 +41,6 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
-	"github.com/getryft/ryft-server/search/utils/index"
 	"github.com/getryft/ryft-server/search/utils/query"
 )
 
@@ -381,13 +380,13 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 
 // InMemoryPostProcessing in-memory based post-processing
 type InMemoryPostProcessing struct {
-	indexes map[string]*index.IndexFile // [datafile] -> indexes
+	indexes map[string]*search.IndexFile // [datafile] -> indexes
 }
 
 // create in-memory-based post-processing tool
 func NewInMemoryPostProcessing(path string) (PostProcessing, error) {
 	mpp := new(InMemoryPostProcessing)
-	mpp.indexes = make(map[string]*index.IndexFile)
+	mpp.indexes = make(map[string]*search.IndexFile)
 	return mpp, nil
 }
 
@@ -397,14 +396,14 @@ func (mpp *InMemoryPostProcessing) Drop(keep bool) {
 }
 
 // add Ryft results
-func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width int, opt uint32) error {
+func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delim string, width int, opt uint32) error {
 	start := time.Now()
 	defer func() {
 		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-result duration", TAG)
 	}()
 
-	saveTo := index.NewIndexFile(delimiter, width)
-	saveTo.Opt = opt
+	saveTo := search.NewIndexFile(delim, width)
+	saveTo.Option = opt
 	if _, ok := mpp.indexes[dataPath]; ok {
 		return fmt.Errorf("the index file %s already exists in the map", dataPath)
 	}
@@ -418,6 +417,7 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 
 	// try to read all index records
 	r := bufio.NewReader(file)
+	dataPos := uint64(0)
 
 	for {
 		// read line by line
@@ -428,7 +428,8 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 				return fmt.Errorf("failed to parse index: %s", err)
 			}
 
-			saveTo.AddIndex(index)
+			saveTo.Add(index.SetDataPos(dataPos))
+			dataPos += index.Length + uint64(len(delim))
 		}
 
 		if err != nil {
@@ -488,7 +489,7 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 	simple := true
 	capacity := 0
 	for _, f := range mpp.indexes {
-		if (f.Opt & 0x01) != 0x01 {
+		if (f.Option & 0x01) != 0x01 {
 			continue // ignore temporary results
 		}
 
@@ -504,7 +505,7 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 	items := make([]MemItem, 0, capacity)
 BuildItems:
 	for itemDataFile, f := range mpp.indexes {
-		if (f.Opt & 0x01) != 0x01 {
+		if (f.Option & 0x01) != 0x01 {
 			continue // ignore temporary results
 		}
 
