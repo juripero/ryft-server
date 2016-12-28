@@ -193,3 +193,41 @@ func updateConfig(cfg *search.Config, opts query.Options) {
 	cfg.Reduce = opts.Reduce
 	cfg.Case = opts.Case
 }
+
+// find the first file filter
+func findFirstFilter(q query.Query) string {
+	// check simple query first
+	if sq := q.Simple; sq != nil {
+		if f := sq.Options.FileFilter; len(f) != 0 {
+			return f
+		}
+	}
+
+	// check all arguments
+	for i := 0; i < len(q.Arguments); i++ {
+		if f := findFirstFilter(q.Arguments[i]); len(f) != 0 {
+			return f
+		}
+	}
+
+	return "" // not found
+}
+
+// find the last file filter
+func findLastFilter(q query.Query) string {
+	// check all arguments
+	for i := len(q.Arguments) - 1; i >= 0; i-- {
+		if f := findFirstFilter(q.Arguments[i]); len(f) != 0 {
+			return f
+		}
+	}
+
+	// check simple query first
+	if sq := q.Simple; sq != nil {
+		if f := sq.Options.FileFilter; len(f) != 0 {
+			return f
+		}
+	}
+
+	return "" // not found
+}

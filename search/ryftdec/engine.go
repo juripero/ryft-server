@@ -70,7 +70,8 @@ func NewEngine(backend search.Engine, opts map[string]interface{}) (*Engine, err
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("ryftdec{backend:%s}", engine.Backend)
+	return fmt.Sprintf("ryftdec{backend:%s, compat:%t}",
+		engine.Backend, engine.CompatMode)
 	// TODO: other parameters?
 }
 

@@ -102,7 +102,7 @@ func TestEngineOptions(t *testing.T) {
 	engine, err := NewEngine(testNewFake(), nil)
 	assert.NoError(t, err)
 	if assert.NotNil(t, engine) {
-		assert.EqualValues(t, "ryftdec{backend:fake{home:/tmp/ryft}}", engine.String())
+		assert.EqualValues(t, "ryftdec{backend:fake{home:/tmp/ryft}, compat:false}", engine.String())
 		assert.EqualValues(t, map[string]interface{}{
 			"instance-name":            ".work",
 			"ryftone-mount":            "/tmp",

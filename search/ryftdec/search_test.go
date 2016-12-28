@@ -394,6 +394,45 @@ func TestEngineSearchCatalog(t *testing.T) {
 			}
 		}
 	}
+
+	// filter (width=3)
+	if assert.NotNil(t, engine) {
+		cfg := search.NewConfig(`RAW_TEXT CONTAINS EXACT("hello", FILTER="[1|3]\.txt")`, "*.txt")
+		cfg.Width = 3
+		cfg.ReportIndex = true
+		cfg.ReportData = true
+
+		taskId = 0 // reset to check intermediate file names
+		f1.SearchCfgLogTrace = nil
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			records, errors := testfake.Drain(res)
+
+			// convert records to strings and sort
+			strRecords := make([]string, 0, len(records))
+			for _, rec := range records {
+				strRecords = append(strRecords, rec.String())
+			}
+			sort.Strings(strRecords)
+
+			assert.Empty(t, errors)
+			assert.EqualValues(t, []string{
+				`Record{{1.txt#0, len:8, d:0}, data:"hello-00"}`,
+				//`Record{{2.txt#21, len:11, d:0}, data:"22-hello-22"}`,
+				//`Record{{2.txt#3, len:11, d:0}, data:"11-hello-11"}`,
+				//`Record{{2.txt#39, len:11, d:0}, data:"33-hello-33"}`,
+				//`Record{{2.txt#57, len:11, d:0}, data:"44-hello-44"}`,
+				//`Record{{2.txt#75, len:11, d:0}, data:"55-hello-55"}`,
+				`Record{{3.txt#3, len:8, d:0}, data:"99-hello"}`,
+			}, strRecords)
+
+			if assert.EqualValues(t, 1, len(f1.SearchCfgLogTrace)) {
+				f1.SearchCfgLogTrace[0].Files = []string{"*.txt"} // skip catalog's data files
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-1.txt", keep-index:".work/.temp-idx-dec-00000001-1.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+			}
+		}
+	}
 }
 
 // check bad cases

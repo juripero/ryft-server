@@ -36,6 +36,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync/atomic"
 	"time"
 
@@ -135,7 +136,7 @@ type PostProcessing interface {
 		keepDataAs, keepIndexAs, delimiter string,
 		mountPointAndHomeDir string,
 		ryftCalls []RyftCall,
-		reportRecords bool) error
+		filter string) error
 }
 
 /*
@@ -189,7 +190,9 @@ func (cpp *CatalogPostProcessing) AddCatalog(base *catalog.Catalog) error {
 }
 
 // drain final results
-func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall, reportRecords bool) error {
+func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result,
+	keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string,
+	ryftCalls []RyftCall, filter string) error {
 	start := time.Now()
 	defer func() {
 		log.WithField("t", time.Since(start)).Debugf("[%s]: drain-final-results duration", TAG)
@@ -491,14 +494,16 @@ func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, i
 }
 
 // DrainFinalResults drain final results
-func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, home string, ryftCalls []RyftCall, reportRecords bool) error {
+func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result,
+	keepDataAs, keepIndexAs, delimiter string, home string,
+	ryftCalls []RyftCall, filter string) error {
+
 	start := time.Now()
 	defer func() {
 		log.WithField("t", time.Since(start)).Debugf("[%s]: drain-final-results duration", TAG)
 	}()
 
 	// unwind all indexes first and check if it's simple case
-	simple := true
 	capacity := 0
 	for _, f := range mpp.indexes {
 		if (f.Option & 0x01) != 0x01 {
@@ -514,6 +519,16 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 		Index    *search.Index
 	}
 
+	var ff *regexp.Regexp
+	if len(filter) != 0 {
+		var err error
+		ff, err = regexp.Compile(filter)
+		if err != nil {
+			return fmt.Errorf("failed to compile filter's regexp: %s", err)
+		}
+	}
+
+	simple := true
 	items := make([]MemItem, 0, capacity)
 BuildItems:
 	for dataFile, f := range mpp.indexes {
@@ -530,7 +545,11 @@ BuildItems:
 				simple = false
 			}
 
-			// TODO: check the file filter here!
+			// trim mount point from file name! TODO: special option for this?
+			idx.File = relativeToHome(home, idx.File)
+			if ff != nil && !ff.MatchString(idx.File) {
+				continue
+			}
 
 			// put item to further processing
 			items = append(items, MemItem{
@@ -603,11 +622,8 @@ BuildItems:
 	files := make(map[string]*CachedFile)
 
 	// handle all index items
+	const reportRecords = true
 	for _, item := range items {
-		// trim mount point from file name! TODO: special option for this?
-		itemFile := relativeToHome(home, item.Index.File)
-		// TODO: check the file filter here!
-
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
 			f, err := os.Open(item.dataFile)
@@ -723,8 +739,6 @@ BuildItems:
 
 		if reportRecords {
 			idx := search.NewIndexCopy(item.Index)
-			idx.File = itemFile
-
 			rec := search.NewRecord(idx, recRawData)
 			mux.ReportRecord(rec)
 		}

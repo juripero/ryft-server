@@ -156,7 +156,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// check input data-set for catalogs
 	var hasCatalogs int
-	hasCatalogs, cfg.Files, err = checksForCatalog(task.result, cfg.Files, home, cfg.Width, "") // TODO: pass file filter!
+	hasCatalogs, cfg.Files, err = checksForCatalog(task.result, cfg.Files,
+		home, cfg.Width, findFirstFilter(task.rootQuery))
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
 		return nil, fmt.Errorf("failed to check for catalogs: %s", err)
@@ -215,7 +216,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		err = task.result.DrainFinalResults(task, mux,
 			keepDataAs, keepIndexAs, delimiter,
 			filepath.Join(opts.MountPoint, opts.HomeDir),
-			res.Output, true /*report records*/)
+			res.Output, findLastFilter(task.rootQuery))
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
 			mux.ReportError(err)
