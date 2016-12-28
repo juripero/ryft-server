@@ -68,6 +68,9 @@ func TestCatalogRegexp(t *testing.T) {
 func TestCatalogCommon(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 	assert.EqualValues(t, testLogLevel, GetLogLevel().String())
+	if err := SetLogLevelString("BAD"); assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "not a valid logrus Level")
+	}
 	SetDefaultCacheDropTimeout(100 * time.Millisecond)
 
 	os.MkdirAll("/tmp/ryft/", 0755)

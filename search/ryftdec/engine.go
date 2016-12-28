@@ -89,6 +89,32 @@ func (engine *Engine) Options() map[string]interface{} {
 	return opts
 }
 
+// get backend options
+func (engine *Engine) getBackendOptions() backendOptions {
+	opts := engine.Backend.Options()
+
+	instanceName, _ := utils.AsString(opts["instance-name"])
+	mountPoint, _ := utils.AsString(opts["ryftone-mount"])
+	homeDir, _ := utils.AsString(opts["home-dir"])
+
+	return backendOptions{
+		InstanceName: instanceName,
+		MountPoint:   mountPoint,
+		HomeDir:      homeDir,
+	}
+}
+
+// updates the seach configuration
+func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery) {
+	updateConfig(cfg, q.Options)
+	if engine.CompatMode {
+		cfg.Query = q.ExprOld
+	} else {
+		cfg.Query = q.ExprNew
+		cfg.Mode = "g" // generic!
+	}
+}
+
 // parse engine options
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	// compatibility mode
@@ -172,25 +198,21 @@ func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
 }
 
-/*
 // factory creates RyftDEC engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
+/*func factory(opts map[string]interface{}) (search.Engine, error) {
 	backend := parseOptions(opts)
 	engine, err := NewEngine(backend)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create RyftDEC engine: %s", err)
 	}
 	return engine, nil
-}
-*/
+}*/
 
 // package initialization
-/*
-func init() {
+/*func init() {
 	// should be created manually!
 	// search.RegisterEngine(TAG, factory)
 
 	// be silent by default
 	// log.Level = logrus.WarnLevel
-}
-*/
+}*/

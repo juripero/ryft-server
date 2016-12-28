@@ -70,6 +70,23 @@ func NewIndex(file string, offset, length uint64) *Index {
 	idx.Length = length
 	idx.Fuzziness = 0
 	idx.Host = ""
+	idx.DataPos = 0
+
+	return idx
+}
+
+// NewIndexCopy creates a full copy of Index object.
+func NewIndexCopy(idx *Index) *Index {
+	// get object from pool
+	res := idxPool.Get().(*Index)
+
+	// initialize
+	res.File = idx.File
+	res.Offset = idx.Offset
+	res.Length = idx.Length
+	res.Fuzziness = idx.Fuzziness
+	res.Host = idx.Host
+	res.DataPos = idx.DataPos
 
 	return idx
 }

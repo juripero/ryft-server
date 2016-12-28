@@ -52,13 +52,13 @@ var (
 // Task - task related data.
 type Task struct {
 	Identifier string // unique
-	subtaskId  int
+	subtaskId  int    // for each Ryft call
 
-	rootQuery query.Query
-	extension string // used for intermediate results, may be empty
+	rootQuery query.Query // root of decomposed query
+	extension string      // used for intermediate results, may be empty
 
-	config *search.Config
-	result PostProcessing
+	config *search.Config // input configuration
+	result PostProcessing // post processing engine
 }
 
 // NewTask creates new task.
@@ -73,39 +73,49 @@ func NewTask(config *search.Config) *Task {
 }
 
 // Drain all records/errors from 'res' to 'mux'
-func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecords bool) {
-	defer task.log().WithField("result", mux).Debugf("[%s]: got combined result", TAG)
+// Also handle task cancellation.
+func (task *Task) drainResults(mux *search.Result, res *search.Result) {
+	defer task.log().WithField("result", mux).Debugf("[%s/%d]: got combined result", TAG, task.subtaskId)
 
 	for {
 		select {
+		case <-mux.CancelChan:
+			// processing is cancelled
+			errors, records := res.Cancel()
+			if errors > 0 || records > 0 {
+				task.log().WithFields(map[string]interface{}{
+					"errors":  errors,
+					"records": records,
+				}).Debugf("[%s/%d]: some errors/records are ignored", TAG, task.subtaskId)
+			}
+
+			// wait 'res' is actually done!
+
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
+				// task.log().WithError(err).Debugf("[%s/%d]: new error received", TAG, task.subtaskId) // DEBUG
 				// TODO: mark error with subtask's tag?
-				// task.log().WithError(err).Debugf("[%s]/%d: new error received", TAG, task.subtaskId) // DEBUG
 				mux.ReportError(err)
 			}
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				// task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId) // DEBUG
-				if saveRecords {
-					mux.ReportRecord(rec)
-				}
+				// task.log().WithField("rec", rec).Debugf("[%s/%d]: new record received", TAG, task.subtaskId) // DEBUG
+				// we do not expect any RECORDs here, this is actually IMPOSSIBLE, since we use /count
 			}
 
 		case <-res.DoneChan:
 			// drain the error channel
 			for err := range res.ErrorChan {
-				// task.log().WithError(err).Debugf("[%s]/%d: *** new error received", TAG, task.subtaskId) // DEBUG
+				// task.log().WithError(err).Debugf("[%s/%d]: *** new error received", TAG, task.subtaskId) // DEBUG
+				// TODO: mark error with subtask's tag?
 				mux.ReportError(err)
 			}
 
 			// drain the record channel
-			for rec := range res.RecordChan {
-				// task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId) // DEBUG
-				if saveRecords {
-					mux.ReportRecord(rec)
-				}
+			for _ = range res.RecordChan {
+				// task.log().WithField("rec", rec).Debugf("[%s/%d]: *** new record received", TAG, task.subtaskId) // DEBUG
+				// we do not expect any RECORDs here, this is actually IMPOSSIBLE, since we use /count
 			}
 
 			return // done!
@@ -384,7 +394,7 @@ type InMemoryPostProcessing struct {
 }
 
 // create in-memory-based post-processing tool
-func NewInMemoryPostProcessing(path string) (PostProcessing, error) {
+func NewInMemoryPostProcessing() (PostProcessing, error) {
 	mpp := new(InMemoryPostProcessing)
 	mpp.indexes = make(map[string]*search.IndexFile)
 	return mpp, nil
@@ -402,34 +412,36 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-result duration", TAG)
 	}()
 
-	saveTo := search.NewIndexFile(delim, width)
-	saveTo.Option = opt
+	// create new IndexFile
+	indexFile := search.NewIndexFile(delim, width)
+	indexFile.Option = opt
 	if _, ok := mpp.indexes[dataPath]; ok {
 		return fmt.Errorf("the index file %s already exists in the map", dataPath)
 	}
-	mpp.indexes[dataPath] = saveTo
+	mpp.indexes[dataPath] = indexFile
 
+	// open INDEX file
 	file, err := os.Open(indexPath)
 	if err != nil {
 		return fmt.Errorf("failed to open: %s", err)
 	}
 	defer file.Close() // close at the end
 
-	// try to read all index records
-	r := bufio.NewReader(file)
+	// read all index records
+	rd := bufio.NewReader(file)
+	delimLen := uint64(len(delim))
 	dataPos := uint64(0)
-
 	for {
 		// read line by line
-		line, err := r.ReadBytes('\n')
+		line, err := rd.ReadBytes('\n')
 		if len(line) > 0 {
 			index, err := search.ParseIndex(line)
 			if err != nil {
 				return fmt.Errorf("failed to parse index: %s", err)
 			}
 
-			saveTo.Add(index.SetDataPos(dataPos))
-			dataPos += index.Length + uint64(len(delim))
+			indexFile.Add(index.SetDataPos(dataPos))
+			dataPos += (index.Length + delimLen)
 		}
 
 		if err != nil {
@@ -456,30 +468,30 @@ func (mpp *InMemoryPostProcessing) AddCatalog(base *catalog.Catalog) error {
 		return fmt.Errorf("failed to get base catalog indexes: %s", err)
 	}
 
-	for file, idx := range indexes {
+	for file, indexFile := range indexes {
 		if _, ok := mpp.indexes[file]; ok {
 			return fmt.Errorf("the index file %s already exists in the map", file)
 		}
-		mpp.indexes[file] = idx
+		mpp.indexes[file] = indexFile
 	}
 
 	return nil // OK
 }
 
-// unwind index
+// unwind index recursively
 func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, int) {
 	if f, ok := mpp.indexes[index.File]; ok && f != nil {
 		tmp, shift := f.Unwind(index)
 		// task.log().Debugf("unwind %s => %s", index, tmp)
-		idx, n := mpp.unwind(tmp)
-		return idx, n + shift
+		res, n := mpp.unwind(tmp)
+		return res, n + shift
 	}
 
 	return index, 0 // done
 }
 
-// drain final results
-func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall, reportRecords bool) error {
+// DrainFinalResults drain final results
+func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, home string, ryftCalls []RyftCall, reportRecords bool) error {
 	start := time.Now()
 	defer func() {
 		log.WithField("t", time.Since(start)).Debugf("[%s]: drain-final-results duration", TAG)
@@ -498,29 +510,33 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 
 	type MemItem struct {
 		dataFile string
+		dataPos  uint64
 		Index    *search.Index
-		shift    int
 	}
 
 	items := make([]MemItem, 0, capacity)
 BuildItems:
-	for itemDataFile, f := range mpp.indexes {
+	for dataFile, f := range mpp.indexes {
 		if (f.Option & 0x01) != 0x01 {
 			continue // ignore temporary results
 		}
 
 		for _, item := range f.Items {
+			dataPos := item.DataPos
+
 			// do recursive unwinding!
 			idx, shift := mpp.unwind(item)
 			if shift != 0 || idx.Length != item.Length {
 				simple = false
 			}
 
+			// TODO: check the file filter here!
+
 			// put item to further processing
 			items = append(items, MemItem{
-				dataFile: itemDataFile,
+				dataFile: dataFile,
+				dataPos:  dataPos + uint64(shift),
 				Index:    idx,
-				shift:    shift,
 			})
 
 			// apply limit options here
@@ -535,10 +551,11 @@ BuildItems:
 	// optimization: if possible just use the DATA file from RyftCall
 	if len(keepDataAs) > 0 && simple && len(ryftCalls) == 1 {
 		defer func(dataPath string) {
-			oldPath := filepath.Join(mountPointAndHomeDir, ryftCalls[0].DataFile)
-			newPath := filepath.Join(mountPointAndHomeDir, dataPath)
+			oldPath := filepath.Join(home, ryftCalls[0].DataFile)
+			newPath := filepath.Join(home, dataPath)
 			if err := os.Rename(oldPath, newPath); err != nil {
 				log.WithError(err).Warnf("[%s]: failed to move DATA file", TAG)
+				mux.ReportError(fmt.Errorf("failed to move DATA file: %s", err))
 			} else {
 				log.WithFields(map[string]interface{}{
 					"old": oldPath,
@@ -552,7 +569,7 @@ BuildItems:
 	// output DATA file
 	var datFile *bufio.Writer
 	if len(keepDataAs) > 0 {
-		f, err := os.Create(filepath.Join(mountPointAndHomeDir, keepDataAs))
+		f, err := os.Create(filepath.Join(home, keepDataAs))
 		if err != nil {
 			return fmt.Errorf("failed to create DATA file: %s", err)
 		}
@@ -566,7 +583,7 @@ BuildItems:
 	// output INDEX file
 	var idxFile *bufio.Writer
 	if len(keepIndexAs) > 0 {
-		f, err := os.Create(filepath.Join(mountPointAndHomeDir, keepIndexAs))
+		f, err := os.Create(filepath.Join(home, keepIndexAs))
 		if err != nil {
 			return fmt.Errorf("failed to create INDEX file: %s", err)
 		}
@@ -587,6 +604,10 @@ BuildItems:
 
 	// handle all index items
 	for _, item := range items {
+		// trim mount point from file name! TODO: special option for this?
+		itemFile := relativeToHome(home, item.Index.File)
+		// TODO: check the file filter here!
+
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
 			f, err := os.Open(item.dataFile)
@@ -607,7 +628,7 @@ BuildItems:
 		var data, recRawData []byte
 		if cf != nil && (reportRecords || datFile != nil) {
 			// record's data read position in the file
-			rpos := int64(item.Index.DataPos + uint64(item.shift))
+			rpos := int64(item.dataPos)
 
 			//task.log().WithFields(map[string]interface{}{
 			//	"cache-pos": cf.pos,
@@ -701,11 +722,8 @@ BuildItems:
 		}
 
 		if reportRecords {
-			// trim mount point from file name! TODO: special option for this?
-			item.Index.File = relativeToHome(mountPointAndHomeDir, item.Index.File)
-
-			idx := search.NewIndex(item.Index.File, item.Index.Offset, item.Index.Length)
-			idx.Fuzziness = item.Index.Fuzziness
+			idx := search.NewIndexCopy(item.Index)
+			idx.File = itemFile
 
 			rec := search.NewRecord(idx, recRawData)
 			mux.ReportRecord(rec)

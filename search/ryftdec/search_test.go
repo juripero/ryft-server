@@ -19,7 +19,7 @@ func TestEngineSearchBypass(t *testing.T) {
 	testSetLogLevel()
 	taskId = 0 // reset to check intermediate file names
 
-	f1 := newFake(1000, 10)
+	f1 := testNewFake()
 	f1.HomeDir = "/ryft-test"
 	f1.HostName = "host"
 
@@ -76,7 +76,7 @@ func TestEngineSearchAnd3(t *testing.T) {
 	testSetLogLevel()
 	taskId = 0 // reset to check intermediate file names
 
-	f1 := newFake(1000, 10)
+	f1 := testNewFake()
 	f1.HostName = "host-1"
 
 	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
@@ -131,7 +131,7 @@ func TestEngineSearchOr3(t *testing.T) {
 	testSetLogLevel()
 	taskId = 0 // reset to check intermediate file names
 
-	f1 := newFake(1000, 10)
+	f1 := testNewFake()
 	f1.HostName = "host-1"
 
 	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
@@ -241,7 +241,7 @@ func testAddToCatalog(cat *catalog.Catalog, filename string, offset int64, data 
 func TestEngineSearchCatalog(t *testing.T) {
 	testSetLogLevel()
 
-	f1 := newFake(1000, 0)
+	f1 := testNewFake()
 	f1.HomeDir = "/ryft-test"
 	f1.HostName = "host"
 
@@ -400,7 +400,7 @@ func TestEngineSearchCatalog(t *testing.T) {
 func TestEngineSearchBad(t *testing.T) {
 	testSetLogLevel()
 
-	f1 := newFake(1000, 0)
+	f1 := testNewFake()
 	f1.HomeDir = "/ryft-test"
 	f1.HostName = "host"
 
@@ -507,43 +507,4 @@ func TestEngineSearchBad(t *testing.T) {
 			assert.Contains(t, err.Error(), "XOR is not implemented yet")
 		}
 	}
-}
-
-// test extension detection
-func TestDetectExtension(t *testing.T) {
-	// good case
-	check := func(fileNames []string, dataOut string, expected string) {
-		ext, err := detectExtension(fileNames, dataOut)
-		if assert.NoError(t, err) {
-			assert.Equal(t, expected, ext)
-		}
-	}
-
-	// bad case
-	bad := func(fileNames []string, dataOut string, expectedError string) {
-		_, err := detectExtension(fileNames, dataOut)
-		if assert.Error(t, err) {
-			assert.Contains(t, err.Error(), expectedError)
-		}
-	}
-
-	check([]string{}, "out.txt", ".txt")
-	check([]string{"a.txt"}, "", ".txt")
-	check([]string{"a.txt", "b.txt"}, "", ".txt")
-	check([]string{"a.dat", "b.dat"}, "", ".dat")
-	bad([]string{"a.txt", "b.dat"}, "", "unable to detect extension")
-	bad([]string{"a.txt", "b.dat"}, "c.jpeg", "unable to detect extension")
-	check([]string{}, "", "")
-	check([]string{"foo/a.txt", "my.test/b.txt"}, "", ".txt")
-	check([]string{"foo/a.txt", "my.test/b.txt"}, "data.txt", ".txt")
-	check([]string{"foo/*.txt", "my.test/*txt"}, "", ".txt")
-	check([]string{"foo/*.txt", "my.test/*"}, "data.txt", ".txt")
-	check([]string{"my.test/*"}, "data.txt", ".txt")
-	check([]string{"nyctaxi/xml/2015/yellow/*"}, "ryftnyctest.nxml", ".nxml")
-}
-
-// test
-func TestSearchMisc(t *testing.T) {
-	assert.EqualValues(t, "dir", relativeToHome("/ryftone", "/ryftone/dir"))
-	assert.EqualValues(t, "dir", relativeToHome("/ryftone", "dir")) // fallback
 }
