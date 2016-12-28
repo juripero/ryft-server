@@ -127,6 +127,7 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result) {
 // PostProcessing general post-processing interface
 type PostProcessing interface {
 	Drop(keep bool) // finish work
+	ClearAll()      // clear all data
 
 	AddRyftResults(dataPath, indexPath string,
 		delimiter string, width int, opt uint32) error
@@ -137,6 +138,9 @@ type PostProcessing interface {
 		mountPointAndHomeDir string,
 		ryftCalls []RyftCall,
 		filter string) error
+	GetUniqueFiles(task *Task, mux *search.Result,
+		mountPointAndHomeDir string,
+		filter string) ([]string, error)
 }
 
 /*
@@ -406,6 +410,17 @@ func NewInMemoryPostProcessing() (PostProcessing, error) {
 // Drop
 func (mpp *InMemoryPostProcessing) Drop(keep bool) {
 	// do nothing here
+}
+
+// ClearAll clears all data.
+func (mpp *InMemoryPostProcessing) ClearAll() {
+	// release all indexes
+	for _, indexFile := range mpp.indexes {
+		indexFile.Clear()
+	}
+
+	// clear map
+	mpp.indexes = make(map[string]*search.IndexFile)
 }
 
 // add Ryft results
@@ -745,4 +760,51 @@ BuildItems:
 	}
 
 	return nil // OK
+}
+
+// GetUniqueFiles gets the unique list of files from unwinded indexes
+func (mpp *InMemoryPostProcessing) GetUniqueFiles(task *Task, mux *search.Result, home string, filter string) ([]string, error) {
+
+	start := time.Now()
+	defer func() {
+		log.WithField("t", time.Since(start)).Debugf("[%s]: get-unique-files duration", TAG)
+	}()
+
+	// file filter
+	var ff *regexp.Regexp
+	if len(filter) != 0 {
+		var err error
+		ff, err = regexp.Compile(filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile filter's regexp: %s", err)
+		}
+	}
+
+	// unwind all indexes first and build map of files from INDEX
+	res := make(map[string]int)
+	for _, f := range mpp.indexes {
+		if (f.Option & 0x01) != 0x01 {
+			continue // ignore temporary results
+		}
+
+		for _, item := range f.Items {
+			// do recursive unwinding!
+			idx, _ := mpp.unwind(item)
+
+			// trim mount point from file name! TODO: special option for this?
+			idx.File = relativeToHome(home, idx.File)
+			if ff != nil && !ff.MatchString(idx.File) {
+				continue
+			}
+
+			res[idx.File]++ // put item for further processing
+		}
+	}
+
+	// get keys
+	files := make([]string, 0, len(res))
+	for f := range res {
+		files = append(files, f)
+	}
+	return files, nil // OK
 }

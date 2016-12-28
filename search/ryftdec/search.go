@@ -314,9 +314,45 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			break // stop
 		}
 
-		defer res1.removeAll(opts.MountPoint, opts.HomeDir)
-		// part of post-processing procedure:
-		if task.result != nil { // might be nil for /count operation
+		if !engine.KeepResultFiles {
+			defer res1.removeAll(opts.MountPoint, opts.HomeDir)
+		}
+
+		q1 := query.Arguments[i-1]
+		q2 := query.Arguments[i]
+
+		// dataset for the next Ryft call
+		if q1.Operator == "[]" {
+			// post-processing of intermediate results
+			for _, out := range res1.Output {
+				if err := task.result.AddRyftResults(
+					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
+					out.Delimiter, out.Width, 1 /*final*/); err != nil {
+					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
+				}
+			}
+
+			// get unique list of index files...
+			files, err := task.result.GetUniqueFiles(task, mux,
+				filepath.Join(opts.MountPoint, opts.HomeDir),
+				findLastFilter(task.rootQuery))
+			if err != nil {
+				return nil, err
+			}
+
+			// clear all current data (no sense to keep these indexes)
+			task.result.ClearAll()
+
+			// check for catalogs recusively
+			task.log().WithField("files", files).Debugf("[%s/%d]: new input file list", TAG, task.subtaskId)
+			_, tempCfg.Files, err = checksForCatalog(task.result, files,
+				opts.atHome(""), tempCfg.Width, findFirstFilter(q2)) // TODO: check width and filter
+			if err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
+				return nil, fmt.Errorf("failed to check for catalogs: %s", err)
+			}
+		} else {
+			// part of post-processing procedure:
 			for _, out := range res1.Output {
 				if err := task.result.AddRyftResults(
 					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
@@ -324,16 +360,17 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
 				}
 			}
+
+			// read input from temporary file
+			tempCfg.Files = res1.GetDataFiles()
 		}
 
-		// read input from temporary file
-		tempCfg.Files = res1.GetDataFiles()
 		if i+1 == len(query.Arguments) {
 			// for the last iteration use requested delimiter
 			tempCfg.Delimiter = cfg.Delimiter
 		}
 
-		res2, err2 := engine.doSearch(task, opts, query.Arguments[i], &tempCfg, mux)
+		res2, err2 := engine.doSearch(task, opts, q2, &tempCfg, mux)
 		if err2 != nil {
 			return nil, err2
 		}

@@ -247,7 +247,7 @@ func TestEngineSearchCatalog(t *testing.T) {
 
 	catalog.DefaultDataDelimiter = "\n"
 	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
-	cat, err := catalog.OpenCatalog(filepath.Join(f1.MountPoint, f1.HomeDir, "cat.txt"))
+	cat, err := catalog.OpenCatalogNoCache(filepath.Join(f1.MountPoint, f1.HomeDir, "cat.txt"))
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -544,6 +544,94 @@ func TestEngineSearchBad(t *testing.T) {
 		}
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "XOR is not implemented yet")
+		}
+	}
+}
+
+// check for [] AND ()
+func TestEngineSearchIndexAnd(t *testing.T) {
+	testSetLogLevel()
+
+	f1 := testNewFake()
+	f1.HomeDir = "/ryft-test"
+	f1.HostName = "host"
+
+	catalog.DefaultDataDelimiter = "\n"
+	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
+	cat, err := catalog.OpenCatalogNoCache(filepath.Join(f1.MountPoint, f1.HomeDir, "cat.txt"))
+	if !assert.NoError(t, err) {
+		return
+	}
+	defer cat.Close()
+
+	// part-1
+	err = testAddToCatalog(cat, "1.txt", -1, `hello-00000`)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// part-2
+	err = testAddToCatalog(cat, "X.dat", -1, `11111-hello-11111
+22222-hello-22222
+33333-hello-33333
+44444-hello-44444
+55555-hello-55555`)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// part-3
+	err = testAddToCatalog(cat, "3.txt", -1, `99999-hello`)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "X.dat"), []byte(`
+aaaaa-hello-aaaaa
+bbbbb-hello-bbbbb
+ccccc-hello-ccccc
+ddddd-hello-ddddd
+eeeee-hello-eeeee
+`), 0644)
+
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
+
+	// valid (width=0)
+	engine, err := NewEngine(f1, nil)
+	if assert.NoError(t, err) && assert.NotNil(t, engine) {
+		cfg := search.NewConfig("[hello] AND (hello)", "*.txt")
+		cfg.Width = 3
+		cfg.ReportIndex = true
+		cfg.ReportData = true
+
+		taskId = 0 // reset to check intermediate file names
+		f1.SearchCfgLogTrace = nil
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			records, errors := testfake.Drain(res)
+
+			// convert records to strings and sort
+			strRecords := make([]string, 0, len(records))
+			for _, rec := range records {
+				strRecords = append(strRecords, rec.String())
+			}
+			sort.Strings(strRecords)
+
+			assert.Empty(t, errors)
+			assert.EqualValues(t, []string{
+				`Record{{X.dat#22, len:11, d:0}, data:"bb-hello-bb"}`,
+				`Record{{X.dat#4, len:11, d:0}, data:"aa-hello-aa"}`,
+				`Record{{X.dat#40, len:11, d:0}, data:"cc-hello-cc"}`,
+				`Record{{X.dat#58, len:11, d:0}, data:"dd-hello-dd"}`,
+				`Record{{X.dat#76, len:11, d:0}, data:"ee-hello-ee"}`,
+			}, strRecords)
+
+			if assert.EqualValues(t, 2, len(f1.SearchCfgLogTrace)) {
+				f1.SearchCfgLogTrace[0].Files = []string{"*.txt"} // skip catalog's data files
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"\n", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["X.dat"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
+			}
 		}
 	}
 }
