@@ -485,6 +485,18 @@ func TestEngineSearchBad(t *testing.T) {
 		}
 	}
 
+	// no file found
+	if assert.NotNil(t, engine) {
+		cfg := search.NewConfig("hello", "*.missing")
+		cfg.ReportIndex = false
+		cfg.ReportData = false
+
+		_, err := engine.Search(cfg)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "no any valid file or catalog found")
+		}
+	}
+
 	// bad extension
 	if assert.NotNil(t, engine) {
 		cfg := search.NewConfig("hello", "*.txt", "*.dat")

@@ -208,6 +208,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			if err := task.result.AddRyftResults(
 				opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
 				out.Delimiter, out.Width, 1 /*final*/); err != nil {
+				task.log().WithError(err).Errorf("[%s]: failed to add final Ryft results", TAG)
 				mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
 				return
 			}
@@ -219,11 +220,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			res.Output, findLastFilter(task.rootQuery))
 		if err != nil {
 			task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
-			mux.ReportError(err)
+			mux.ReportError(fmt.Errorf("failed to drain search results: %s", err))
 			return
 		}
-
-		// TODO: handle task cancellation!!!
 	}()
 
 	return mux, nil // OK for now
@@ -289,8 +288,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 
 	tempCfg := *cfg
 	tempCfg.Delimiter = catalog.DefaultDataDelimiter
-	tempCfg.ReportIndex = false // /count
-	tempCfg.ReportData = false
+	tempCfg.ReportData, tempCfg.ReportIndex = false, false // /count
 	res1, err1 := engine.doSearch(task, opts, query.Arguments[0], &tempCfg, mux)
 	if err1 != nil {
 		return nil, err1
@@ -337,7 +335,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 				filepath.Join(opts.MountPoint, opts.HomeDir),
 				findLastFilter(task.rootQuery))
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get unique file from INDEX: %s", err)
 			}
 
 			// clear all current data (no sense to keep these indexes)
@@ -357,6 +355,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 				if err := task.result.AddRyftResults(
 					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
 					out.Delimiter, out.Width, 0 /*intermediate*/); err != nil {
+					task.log().WithError(err).Warnf("[%s]: failed to add Ryft intermediate results", TAG)
 					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
 				}
 			}
