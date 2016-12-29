@@ -105,7 +105,7 @@ func relativeToHome(home, path string) string {
 	if rel, err := filepath.Rel(home, path); err == nil {
 		return rel
 	} else {
-		log.WithError(err).Warnf("[%s]: failed to get relative path, fallback to absolute", TAG)
+		// log.WithError(err).Warnf("[%s]: failed to get relative path, fallback to absolute", TAG)
 		return path // fallback
 	}
 }

@@ -23,6 +23,8 @@ func TestEngineSearchBypass(t *testing.T) {
 	f1.HomeDir = "/ryft-test"
 	f1.HostName = "host"
 
+	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
 	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
 11111-hello-11111
@@ -33,7 +35,6 @@ func TestEngineSearchBypass(t *testing.T) {
 `), 0644)
 	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "2.txt"), []byte{}, 0644)
 	os.Mkdir(filepath.Join(f1.MountPoint, f1.HomeDir, "3.txt"), 0755)
-	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (usual case)
 	engine, err := NewEngine(f1, nil)
@@ -79,6 +80,8 @@ func TestEngineSearchAnd3(t *testing.T) {
 	f1 := testNewFake()
 	f1.HostName = "host-1"
 
+	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
 	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
 11111-hello-11111
@@ -87,7 +90,6 @@ func TestEngineSearchAnd3(t *testing.T) {
 44444-hello-44444
 55555-hello-55555
 `), 0644)
-	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (usual case)
 	engine, err := NewEngine(f1, nil)
@@ -134,6 +136,8 @@ func TestEngineSearchOr3(t *testing.T) {
 	f1 := testNewFake()
 	f1.HostName = "host-1"
 
+	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
 	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
 11111-hello-11111
@@ -142,7 +146,6 @@ func TestEngineSearchOr3(t *testing.T) {
 44444-hello-44444
 55555-hello-55555
 `), 0644)
-	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (usual case)
 	engine, err := NewEngine(f1, nil)
@@ -242,10 +245,12 @@ func TestEngineSearchCatalog(t *testing.T) {
 	testSetLogLevel()
 
 	f1 := testNewFake()
-	f1.HomeDir = "/ryft-test"
+	f1.HomeDir = "/ryft-test1"
 	f1.HostName = "host"
 
 	catalog.DefaultDataDelimiter = "\n"
+	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
 	cat, err := catalog.OpenCatalogNoCache(filepath.Join(f1.MountPoint, f1.HomeDir, "cat.txt"))
 	if !assert.NoError(t, err) {
@@ -274,8 +279,6 @@ func TestEngineSearchCatalog(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-
-	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (width=0)
 	engine, err := NewEngine(f1, nil)
@@ -553,10 +556,12 @@ func TestEngineSearchIndexAnd(t *testing.T) {
 	testSetLogLevel()
 
 	f1 := testNewFake()
-	f1.HomeDir = "/ryft-test"
+	f1.HomeDir = "/ryft-test2"
 	f1.HostName = "host"
 
 	catalog.DefaultDataDelimiter = "\n"
+	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
 	cat, err := catalog.OpenCatalogNoCache(filepath.Join(f1.MountPoint, f1.HomeDir, "cat.txt"))
 	if !assert.NoError(t, err) {
@@ -593,8 +598,6 @@ ccccc-hello-ccccc
 ddddd-hello-ddddd
 eeeee-hello-eeeee
 `), 0644)
-
-	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
 
 	// valid (width=0)
 	engine, err := NewEngine(f1, nil)
