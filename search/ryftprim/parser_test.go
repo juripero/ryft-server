@@ -15,7 +15,7 @@ func TestParseStat(t *testing.T) {
 			assert.EqualValues(t, duration, s.Duration)
 			assert.EqualValues(t, totalBytes, s.TotalBytes)
 			assert.EqualValues(t, matches, s.Matches)
-			// assert.InEpsilon(t, fabricDataRate, s.FabricDataRate)
+			// assert.InDelta(t, fabricDataRate, s.FabricDataRate)
 		}
 	}
 

@@ -13,10 +13,10 @@ func testStatEqual(t *testing.T, stat1, stat2 *Stat) {
 	assert.EqualValues(t, stat1.TotalBytes, stat2.TotalBytes)
 
 	assert.EqualValues(t, stat1.Duration, stat2.Duration)
-	assert.InEpsilon(t, stat1.DataRate, stat2.DataRate, 1.0e-3)
+	assert.InDelta(t, stat1.DataRate, stat2.DataRate, 1.0e-3)
 
 	assert.EqualValues(t, stat1.FabricDuration, stat2.FabricDuration)
-	assert.InEpsilon(t, stat1.FabricDataRate, stat2.FabricDataRate, 1.0e-3)
+	assert.InDelta(t, stat1.FabricDataRate, stat2.FabricDataRate, 1.0e-3)
 
 	assert.EqualValues(t, stat1.Host, stat2.Host)
 	if assert.EqualValues(t, len(stat1.Details), len(stat2.Details)) {
