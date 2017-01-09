@@ -375,8 +375,8 @@ IFS=':' read -r -a catalogs <<< "$CATALOGS"
 for catalog in "${catalogs[@]}"; do
 	[[ ! -z $catalog ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "catalog=$catalog")
 done
-[[ -z "$CASE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=$CASE")
-[[ -z "$REDUCE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "reduce=$REDUCE")
+[[ ! -z "$CASE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=$CASE")
+[[ ! -z "$REDUCE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "reduce=$REDUCE")
 [[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")
 [[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
