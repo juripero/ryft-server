@@ -650,3 +650,71 @@ eeeee-hello-eeeee
 		}
 	}
 }
+
+// check for parse final results
+func TestRyftResults(t *testing.T) {
+	testSetLogLevel()
+
+	home := "/tmp/ryft-test3"
+
+	check := func(dataPath, indexPath string, expectedData, expectedIndex string) {
+		task := NewTask(search.NewEmptyConfig())
+		mpp, _ := NewInMemoryPostProcessing()
+		err := mpp.AddRyftResults(filepath.Join(home, dataPath),
+			filepath.Join(home, indexPath), "\n", 0, 1)
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		task.log().Errorf("indexes: %v", mpp.indexes)
+
+		mux := search.NewResult()
+		err = mpp.DrainFinalResults(task, mux,
+			"data.out", "index.out", "\n",
+			home, []RyftCall{}, "")
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		if data, err := ioutil.ReadFile(filepath.Join(home, "data.out")); assert.NoError(t, err) {
+			assert.EqualValues(t, expectedData, string(data))
+		}
+		if data, err := ioutil.ReadFile(filepath.Join(home, "index.out")); assert.NoError(t, err) {
+			assert.EqualValues(t, expectedIndex, string(data))
+		}
+	}
+
+	catalog.DefaultDataDelimiter = "\n"
+	assert.NoError(t, os.RemoveAll(home))
+	defer os.RemoveAll(home)
+	os.MkdirAll(home, 0755)
+
+	ioutil.WriteFile(filepath.Join(home, "X.dat"),
+		[]byte(`aa-hello-aa
+bb-hello-bb
+cc-hello-cc
+dd-hello-dd
+ee-hello-ee
+`), 0644)
+
+	ioutil.WriteFile(filepath.Join(home, "X.txt"),
+		[]byte(`X.dat,21,11,0
+X.dat,3,11,0
+X.dat,57,11,0
+X.dat,39,11,0
+X.dat,75,11,0`), 0644)
+
+	check("X.dat", "X.txt",
+		`aa-hello-aa
+bb-hello-bb
+cc-hello-cc
+dd-hello-dd
+ee-hello-ee
+`,
+		`X.dat,21,11,0
+X.dat,3,11,0
+X.dat,57,11,0
+X.dat,39,11,0
+X.dat,75,11,0
+`)
+}

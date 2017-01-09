@@ -401,7 +401,7 @@ type InMemoryPostProcessing struct {
 }
 
 // create in-memory-based post-processing tool
-func NewInMemoryPostProcessing() (PostProcessing, error) {
+func NewInMemoryPostProcessing() (*InMemoryPostProcessing, error) {
 	mpp := new(InMemoryPostProcessing)
 	mpp.indexes = make(map[string]*search.IndexFile)
 	return mpp, nil
