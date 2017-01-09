@@ -106,7 +106,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 		"files": params.Files,
 		"user":  userName,
 		"home":  homeDir,
-	}).Info("[%s]: deleting...", CORE)
+	}).Infof("[%s]: deleting...", CORE)
 
 	// for each requested file|dir|catalog get list of tags from consul KV/partition.
 	// based of these tags determine the list of nodes having such file|dir|catalog.
