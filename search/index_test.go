@@ -22,6 +22,10 @@ func TestIndexSimple(t *testing.T) {
 	idx.UpdateHost("ryft.com") // shouldn't be changed
 	assert.Equal(t, "localhost", idx.Host)
 
+	idx2 := NewIndexCopy(idx)
+	//assert.False(t, idx == idx2)
+	assert.EqualValues(t, idx.String(), idx2.String())
+
 	idx.Release()
 	assert.Empty(t, idx.File)
 	assert.Empty(t, idx.Host)
