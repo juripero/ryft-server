@@ -755,6 +755,7 @@ BuildItems:
 		if reportRecords {
 			idx := search.NewIndexCopy(item.Index)
 			rec := search.NewRecord(idx, recRawData)
+			idx.DataPos = 0 // hide data position
 			mux.ReportRecord(rec)
 		}
 	}
