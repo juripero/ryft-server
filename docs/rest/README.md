@@ -34,3 +34,16 @@ The GET `/logging/level` endpoint is used to get current logging levels.
 Using the POST `/logging/level` endpoint it is possible to change any
 logging level on the running server.
 
+These endpoints are available only in `debug` mode.
+
+For example, to print current logging levels use:
+
+```{.sh}
+curl -s "http://localhost:8765/logging/level" | jq .
+```
+
+To change `core` and `search/ryftprim` logging levels:
+
+```{.sh}
+curl -X POST -s "http://localhost:8765/logging/level?core=info&search/ryftprim=error" | jq .
+```
