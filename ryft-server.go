@@ -207,7 +207,7 @@ func main() {
 			"request": ctx.Request.URL,
 			"latency": lat,
 			// "errors":  ctx.Errors.JSON(),
-		}).Infof("[%s]: %s %s in %s", "REST", method, path, lat)
+		}).Infof("[%s]: %s %s", "REST", method, path)
 	})
 	router.Use(gin.Recovery())
 
