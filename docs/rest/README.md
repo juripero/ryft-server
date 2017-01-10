@@ -11,7 +11,16 @@ and [/count](./search.md#count).
 If authentication is enabled, there are also a few endpoints related to
 [JWT](./auth.md).
 
-Some endpoints are enabled in debug mode.
+Some endpoints are enabled in `debug` mode only,
+like [/logging/level](#logging-level)
+or [/search/dry-run](./search.md#search).
+
+
+# Compatibility
+
+Since `0.10.0` version the [/search](./search.md#search) endpoint uses
+`cs=true` by default. That means if no `cs` query parameter is provided
+the case sensitive search will be used by default.
 
 
 # Version
