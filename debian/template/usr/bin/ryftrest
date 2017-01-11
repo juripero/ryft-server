@@ -86,7 +86,7 @@ fail() {
 MODE=
 FILES=
 CATALOGS=
-CASE=
+CASE="true"
 REDUCE=
 NODES=
 FUZZINESS=
