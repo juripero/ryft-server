@@ -143,6 +143,30 @@ backend-options:
 
 More information about search engines can be found [here](./search/engine.md)
 
+A few options are used by query parser:
+
+```{.yaml}
+backend-options:
+  ...
+### query decomposition:
+  compat-mode: false       # true - compatibility mode, false - generic
+  optimizer-limit: 1000
+  optimizer-do-not-combine: feds
+```
+
+`compat-mode` flag is used to switch REST server into "compatibility" mode.
+Old search query syntax is used in this mode instead of "generic" syntax.
+This mode is used to run REST server on old firmware without "generic" syntax.
+
+`optimizer-limit` is the maximum number of sub-queries that can be combined.
+By defeault there is no such limit, i.e. `optimizer-limit=-1` means "combine all".
+Zero value `optimizer-limit=0` means "do not combine at all".
+
+`optimizer-do-not-combine` is coma-separated list of search modes that
+should not be combined. Usually `FEDS` cannot be combined. Multiple
+modes can be specified: `optimizer-do-not-combine=feds,fhs`.
+
+
 ### Server configuration
 
 This configuration file also contains most of the command line options
