@@ -287,16 +287,16 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		input = buf.String()
 
 	case lex.token == STRING:
-		input = "RAW_TEXT"
-		operator = "CONTAINS"
+		input = IN_RAW_TEXT
+		operator = OP_CONTAINS
 		expression = p.parseStringExpr(lex) // plain simple query
 		res.Options.SetMode(plainMode)
 
 	case lex.token == IDENT,
 		lex.token == INT,
 		lex.token == FLOAT:
-		input = "RAW_TEXT"
-		operator = "CONTAINS"
+		input = IN_RAW_TEXT
+		operator = OP_CONTAINS
 		expression = fmt.Sprintf(`"%s"`, lex) // plain simple query
 		res.Options.SetMode(plainMode)
 

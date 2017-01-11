@@ -34,6 +34,16 @@ import (
 	"strings"
 )
 
+const (
+	IN_RAW_TEXT = "RAW_TEXT"
+	IN_RECORD   = "RECORD"
+
+	OP_CONTAINS     = "CONTAINS"
+	OP_NOT_CONTAINS = "NOT_CONTAINS"
+	OP_EQUALS       = "EQUALS"
+	OP_NOT_EQUALS   = "NOT_EQUALS"
+)
+
 // Lexeme is token type and corresponding literal pair.
 type Lexeme struct {
 	token   Token
@@ -111,7 +121,7 @@ func (lex Lexeme) IsRawText() bool {
 		return false
 	}
 
-	return strings.EqualFold(lex.literal, "RAW_TEXT")
+	return strings.EqualFold(lex.literal, IN_RAW_TEXT)
 }
 
 // IsRecord checks "RECORD" input.
@@ -120,7 +130,7 @@ func (lex Lexeme) IsRecord() bool {
 		return false
 	}
 
-	return strings.EqualFold(lex.literal, "RECORD")
+	return strings.EqualFold(lex.literal, IN_RECORD)
 }
 
 // IsContains checks "CONTAINS" operator.
@@ -129,7 +139,7 @@ func (lex Lexeme) IsContains() bool {
 		return false
 	}
 
-	return strings.EqualFold(lex.literal, "CONTAINS")
+	return strings.EqualFold(lex.literal, OP_CONTAINS)
 }
 
 // IsNotContains checks "NOT_CONTAINS" operator.
@@ -138,7 +148,7 @@ func (lex Lexeme) IsNotContains() bool {
 		return false
 	}
 
-	return strings.EqualFold(lex.literal, "NOT_CONTAINS")
+	return strings.EqualFold(lex.literal, OP_NOT_CONTAINS)
 }
 
 // IsEquals checks "EQUALS" operator.
@@ -147,7 +157,7 @@ func (lex Lexeme) IsEquals() bool {
 		return false
 	}
 
-	return strings.EqualFold(lex.literal, "EQUALS")
+	return strings.EqualFold(lex.literal, OP_EQUALS)
 }
 
 // IsNotEquals checks "NOT_EQUALS" operator.
@@ -156,7 +166,7 @@ func (lex Lexeme) IsNotEquals() bool {
 		return false
 	}
 
-	return strings.EqualFold(lex.literal, "NOT_EQUALS")
+	return strings.EqualFold(lex.literal, OP_NOT_EQUALS)
 }
 
 // IsES checks "ES" search type.
