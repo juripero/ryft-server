@@ -4,7 +4,7 @@ The new lexical parser was developed instead of regexp based.
 
 The parser contains the following features:
 - [flexible syntax](#flexible-syntax)
-- new query optimization rules
+- [new query optimization rules](#query-optimization-rules)
 - [new documentation](../search/README.md)
 
 
@@ -119,7 +119,7 @@ will override global `WIDTH` and `CASE`.
 
 Each search type has its own set of supported options.
 
-For `FHS` and `FEDS` search if distance is not provided (or provided zero)
+For `FHS` and `FEDS` search if distance is not provided (or provided as zero)
 the search type will be automatically changed to `EXACT`. The following queries
 are the same:
 - `(RAW_TEXT CONTAINS FHS("hello"))`
@@ -136,7 +136,7 @@ Value can be optionally quoted:
 - `(RAW_TEXT CONTAINS FEDS("hello", D="10"))`
 - `(RAW_TEXT CONTAINS FEDS("hello", D=10))`
 
-Boolean options can be specified as:
+Boolean options can be specified in the following ways:
 - `(RAW_TEXT CONTAINS EXACT("hello", CS="False"))`
 - `(RAW_TEXT CONTAINS EXACT("hello", CS=False))`
 - `(RAW_TEXT CONTAINS EXACT("hello", CS=0))`
@@ -146,7 +146,7 @@ Boolean options can be specified as:
 ### Width and Line
 
 `WIDTH` and `LINE` options can be provided at the same time.
-The last one has an effect.
+The last one has an effect. (ryftprim shows error in that case).
 
 Moreover, for consistency with the REST API it is also possible
 to specify `WIDTH=line` instead of `LINE=true`.
@@ -164,3 +164,32 @@ The DATE, TIME, IPV4 and IPV6 search support additional operators:
 These operators will be automatically converted to Ryft-supported form.
 For example: `RAW_TEXT CONTAINS IPv4("1.1.1.1" >= IP > "8.8.8.8")` will be
 converted to `(RAW_TEXT CONTAINS IPV4("8.8.8.8" < IP <= "1.1.1.1"))`.
+
+
+## Query optimization rules
+
+The optimization rules are the following:
+- combine all RECORD-based sub-queries `(RECORD.text CONTAINS FHS("A",d=1)) AND (RECORD.id CONTAINS NUMBER(NUM > 100))`
+- search type based exception list - can be configured via `optimizer-do-not-combine` option: `(RECORD.text CONTAINS FEDS("A",d=1)) AND (RECORD.id CONTAINS NUMBER(NUM > 100))`
+- combine all RAW_TEXT-based sub-queries containing `OR`: `(RAW_TEXT CONTAINS "Apple") OR (RAW_TEXT CONTAINS "Orange")`
+- do NOT combine RAW_TEXT-based sub-queries containing `AND`: `(RAW_TEXT CONTAINS "Apple") AND (RAW_TEXT CONTAINS "Orange")`
+
+There are also [curly braces](../search/README.md#curly-braces) supported.
+The curly braces break optimization rules.
+It can be used for manual optimization.
+
+
+## Line option
+
+In order to support `LINE` options there are a several changes on each
+product part:
+- `ryftrest` supports `--line` switch, actually means `-w=line`.
+- REST service supports `surrounding=line`, see [corresnponding documentation page](../rest/search.md#search-surrounding-parameter)
+- Swagger interface updated, `surrounding` parameter is of `string` type.
+
+
+Example:
+
+```{.sh}
+ryftrest -f regression/wikipe*bin -q '"babe ruth"' -u admin:admin --search --format=utf8 --line | jq .results
+```
