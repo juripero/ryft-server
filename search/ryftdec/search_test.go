@@ -652,26 +652,48 @@ eeeee-hello-eeeee
 }
 
 // check for parse final results
-func TestRyftResults(t *testing.T) {
+func TestRyftFinalResults(t *testing.T) {
 	testSetLogLevel()
 
 	home := "/tmp/ryft-test3"
 
-	check := func(dataPath, indexPath string, expectedData, expectedIndex string) {
-		task := NewTask(search.NewEmptyConfig())
-		mpp, _ := NewInMemoryPostProcessing()
-		err := mpp.AddRyftResults(filepath.Join(home, dataPath),
-			filepath.Join(home, indexPath), "\n", 0, 1)
-		if !assert.NoError(t, err) {
-			return
+	check := func(dataPath, indexPath []string, width []int, expectedData, expectedIndex string) {
+		n := len(dataPath)
+		if len(indexPath) < n {
+			n = len(indexPath)
+		}
+		if len(width) < n {
+			n = len(width)
 		}
 
-		task.log().Errorf("indexes: %v", mpp.indexes)
+		task := NewTask(search.NewEmptyConfig())
+		mpp, _ := NewInMemoryPostProcessing()
+		ryftCalls := make([]RyftCall, n)
+		for i := 0; i < n; i++ {
+			opt := uint32(0)
+			if i+1 == n {
+				opt = 1 // final
+			}
+			rc := RyftCall{
+				DataFile:  dataPath[i],
+				IndexFile: indexPath[i],
+				Delimiter: "\n",
+				Width:     width[i],
+			}
+			ryftCalls[i] = rc
+
+			err := mpp.AddRyftResults(filepath.Join(home, rc.DataFile),
+				filepath.Join(home, rc.IndexFile),
+				rc.Delimiter, rc.Width, opt)
+			if !assert.NoError(t, err) {
+				return
+			}
+		}
 
 		mux := search.NewResult()
-		err = mpp.DrainFinalResults(task, mux,
+		err := mpp.DrainFinalResults(task, mux,
 			"data.out", "index.out", "\n",
-			home, []RyftCall{}, "")
+			home, ryftCalls, "")
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -690,25 +712,87 @@ func TestRyftResults(t *testing.T) {
 	os.MkdirAll(home, 0755)
 
 	ioutil.WriteFile(filepath.Join(home, "X.dat"),
-		[]byte(`aa-hello-aa
-bb-hello-bb
-cc-hello-cc
-dd-hello-dd
-ee-hello-ee
+		[]byte(`aaaaa-hello-aaaaa
+bbbbb-hello-bbbbb
+ccccc-hello-ccccc
+ddddd-hello-ddddd
+eeeee-hello-eeeee
 `), 0644)
 
-	ioutil.WriteFile(filepath.Join(home, "X.txt"),
-		[]byte(`X.dat,21,11,0
+	// "hello", W=3
+	ioutil.WriteFile(filepath.Join(home, "data-0.dat"),
+		[]byte(`bb-hello-bb
+aa-hello-aa
+dd-hello-dd
+cc-hello-cc
+ee-hello-ee
+`), 0644)
+	ioutil.WriteFile(filepath.Join(home, "index-0.txt"), // shuffle output
+		[]byte(`/tmp/ryft-test3/X.dat,21,11,0
+/tmp/ryft-test3/X.dat,3,11,0
+/tmp/ryft-test3/X.dat,57,11,0
+/tmp/ryft-test3/X.dat,39,11,0
+/tmp/ryft-test3/X.dat,75,11,0`), 0644)
+
+	check([]string{"data-0.dat"},
+		[]string{"index-0.txt"},
+		[]int{3},
+		`bb-hello-bb
+aa-hello-aa
+dd-hello-dd
+cc-hello-cc
+ee-hello-ee
+`,
+		`X.dat,21,11,0
 X.dat,3,11,0
 X.dat,57,11,0
 X.dat,39,11,0
-X.dat,75,11,0`), 0644)
+X.dat,75,11,0
+`)
 
-	check("X.dat", "X.txt",
-		`aa-hello-aa
-bb-hello-bb
-cc-hello-cc
+	// "hello", W=3 AND "hello", W=5
+	ioutil.WriteFile(filepath.Join(home, "data-1a.dat"),
+		[]byte(`bb-hello-bb
+aa-hello-aa
 dd-hello-dd
+cc-hello-cc
+ee-hello-ee
+`), 0644)
+	ioutil.WriteFile(filepath.Join(home, "index-1a.txt"), // shuffle output
+		[]byte(`/tmp/ryft-test3/X.dat,21,11,0
+/tmp/ryft-test3/X.dat,3,11,0
+/tmp/ryft-test3/X.dat,57,11,0
+/tmp/ryft-test3/X.dat,39,11,0
+/tmp/ryft-test3/X.dat,75,11,0`), 0644)
+	ioutil.WriteFile(filepath.Join(home, "data-1b.dat"),
+		[]byte(`bb-hello-bb
+a
+b
+aa-hello-aa
+d
+b
+dd-hello-dd
+c
+d
+cc-hello-cc
+e
+c
+ee-hello-ee
+`), 0644)
+	ioutil.WriteFile(filepath.Join(home, "index-1b.txt"),
+		[]byte(`/tmp/ryft-test3/data-1a.dat,0,13,0
+/tmp/ryft-test3/data-1a.dat,10,15,0
+/tmp/ryft-test3/data-1a.dat,22,15,0
+/tmp/ryft-test3/data-1a.dat,34,15,0
+/tmp/ryft-test3/data-1a.dat,46,13,0`), 0644)
+
+	check([]string{"data-1a.dat", "data-1b.dat"},
+		[]string{"index-1a.txt", "index-1b.txt"},
+		[]int{3, 5},
+		`bb-hello-bb
+aa-hello-aa
+dd-hello-dd
+cc-hello-cc
 ee-hello-ee
 `,
 		`X.dat,21,11,0
