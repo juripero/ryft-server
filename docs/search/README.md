@@ -123,7 +123,7 @@ There also a few more types of brackets can be used:
 
 ## Curly braces
 
-The curly braces can be used to prevent query combination. All queries in the
+The curly braces can be used to break query optimization rules. All queries in the
 curly braces are combined to exactly one Ryft call. For example the following
 query `{Hello} OR {Apple AND Orange}` will be split into two Ryft calls:
 - `(RAW_TEXT CONTAINS "Hello")`
@@ -132,6 +132,8 @@ query `{Hello} OR {Apple AND Orange}` will be split into two Ryft calls:
 The curly braces makes two exceptions here: "Apple" and "Orange" subqueries
 are combined into one Ryft call even `RAW_TEXT/AND` should not be combined,
 "Hello" is not combined even `RAW_TEXT/OR` should be combined.
+
+Curly braces can be used for manual optimization.
 
 
 ## Square brackets
