@@ -654,7 +654,7 @@ eeeee-hello-eeeee
 	// valid (width=0)
 	engine, err := NewEngine(f1, nil)
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
-		cfg := search.NewConfig("[hello] AND (hello)", "*.txt")
+		cfg := search.NewConfig("[hello] AND (hello)", "cat.txt")
 		cfg.Width = 3
 		cfg.ReportIndex = true
 		cfg.ReportData = true
@@ -686,6 +686,51 @@ eeeee-hello-eeeee
 				f1.SearchCfgLogTrace[0].Files = []string{"*.txt"} // skip catalog's data files
 				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"\n", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
 				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["X.dat"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
+			}
+		}
+	}
+
+	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
+xxxxx-hello-xxxxx
+`), 0644)
+
+	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "3.txt"), []byte(`
+yyyyy-hello-yyyyy
+zzzzz-hello-zzzzz
+`), 0644)
+
+	// use file filter
+	if assert.NoError(t, err) && assert.NotNil(t, engine) {
+		cfg := search.NewConfig(`[RAW_TEXT CONTAINS EXACT("hello", FF="[0-9]\.txt")] AND (hello)`, "cat.txt")
+		cfg.Width = 3
+		cfg.ReportIndex = true
+		cfg.ReportData = true
+
+		taskId = 0 // reset to check intermediate file names
+		f1.SearchCfgLogTrace = nil
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			records, errors := testfake.Drain(res)
+
+			// convert records to strings and sort
+			strRecords := make([]string, 0, len(records))
+			for _, rec := range records {
+				strRecords = append(strRecords, rec.String())
+			}
+			sort.Strings(strRecords)
+
+			assert.Empty(t, errors)
+			assert.EqualValues(t, []string{
+				`Record{{1.txt#4, len:11, d:0}, data:"xx-hello-xx"}`,
+				`Record{{3.txt#22, len:11, d:0}, data:"zz-hello-zz"}`,
+				`Record{{3.txt#4, len:11, d:0}, data:"yy-hello-yy"}`,
+			}, strRecords)
+
+			if assert.EqualValues(t, 2, len(f1.SearchCfgLogTrace)) {
+				f1.SearchCfgLogTrace[0].Files = []string{"*.txt"} // skip catalog's data files
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"\n", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt" "3.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
 			}
 		}
 	}
