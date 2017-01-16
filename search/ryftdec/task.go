@@ -37,6 +37,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"sync/atomic"
 	"time"
 
@@ -508,6 +509,48 @@ func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, i
 	return index, 0 // done
 }
 
+// in-memory index reference
+type memItem struct {
+	dataFile string
+	dataPos  uint64
+	Index    *search.Index
+}
+
+// compare two in-memory indexes
+func (i memItem) EqualsTo(o memItem) bool {
+	if i.Index.Offset != o.Index.Offset {
+		return false
+	}
+
+	if i.Index.Length != o.Index.Length {
+		return false
+	}
+
+	return i.Index.File == o.Index.File
+}
+
+// array of in-memory indexes
+type memItems []memItem
+
+func (p memItems) Len() int      { return len(p) }
+func (p memItems) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p memItems) Less(i, j int) bool {
+	a := p[i].Index
+	b := p[j].Index
+
+	// compare by File,Offset,Length
+	if a.File == b.File {
+		if a.Offset == b.Offset {
+			return a.Length < b.Length
+		}
+
+		return a.Offset < b.Offset
+	}
+
+	return a.File < b.File
+	// return p[i] < p[j]
+}
+
 // DrainFinalResults drain final results
 func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result,
 	keepDataAs, keepIndexAs, delimiter string, home string,
@@ -528,12 +571,6 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 		capacity += len(f.Items)
 	}
 
-	type MemItem struct {
-		dataFile string
-		dataPos  uint64
-		Index    *search.Index
-	}
-
 	var ff *regexp.Regexp
 	if len(filter) != 0 {
 		var err error
@@ -544,7 +581,7 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 	}
 
 	simple := true
-	items := make([]MemItem, 0, capacity)
+	items := make(memItems, 0, capacity)
 BuildItems:
 	for dataFile, f := range mpp.indexes {
 		if (f.Option & 0x01) != 0x01 {
@@ -567,7 +604,7 @@ BuildItems:
 			}
 
 			// put item to further processing
-			items = append(items, MemItem{
+			items = append(items, memItem{
 				dataFile: dataFile,
 				dataPos:  dataPos + uint64(shift),
 				Index:    idx,
@@ -580,7 +617,29 @@ BuildItems:
 		}
 	}
 
-	// TODO: remove duplicates
+	// sort and remove duplicates
+	if 0 < len(items) {
+		// we must sort "copy" of indexes
+		sortedItems := make(memItems, len(items))
+		copy(sortedItems, items)
+		sort.Sort(sortedItems)
+
+		k := 0
+		for i := 1; i < len(sortedItems); i++ {
+			if !sortedItems[k].EqualsTo(sortedItems[i]) {
+				k++
+				sortedItems[k] = sortedItems[i]
+			}
+		}
+
+		sortedItems = sortedItems[:k+1]
+
+		if len(sortedItems) != len(items) {
+			// that means: not a "simple" case
+			items = sortedItems
+			simple = false
+		}
+	}
 
 	// optimization: if possible just use the DATA file from RyftCall
 	if len(keepDataAs) > 0 && simple && len(ryftCalls) == 1 {

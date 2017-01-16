@@ -131,7 +131,6 @@ func TestEngineSearchAnd3(t *testing.T) {
 // check for simple OR
 func TestEngineSearchOr3(t *testing.T) {
 	testSetLogLevel()
-	taskId = 0 // reset to check intermediate file names
 
 	f1 := testNewFake()
 	f1.HostName = "host-1"
@@ -154,6 +153,9 @@ func TestEngineSearchOr3(t *testing.T) {
 		cfg.Width = 3
 		cfg.ReportIndex = true
 		cfg.ReportData = true
+
+		taskId = 0 // reset to check intermediate file names
+		f1.SearchCfgLogTrace = nil
 
 		res, err := engine.Search(cfg)
 		if assert.NoError(t, err) && assert.NotNil(t, res) {
@@ -189,6 +191,44 @@ func TestEngineSearchOr3(t *testing.T) {
 				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
 				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hell", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
 				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("he", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-4.txt", keep-index:".work/.temp-idx-dec-00000001-4.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[2].String())
+			}
+		}
+	}
+
+	// remove duplicates (usual case)
+	if assert.NotNil(t, engine) {
+		cfg := search.NewConfig("{hello} OR {hello} OR {hello}", "1.txt")
+		cfg.Width = 3
+		cfg.ReportIndex = true
+		cfg.ReportData = true
+
+		taskId = 0 // reset to check intermediate file names
+		f1.SearchCfgLogTrace = nil
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			records, errors := testfake.Drain(res)
+
+			// convert records to strings and sort
+			strRecords := make([]string, 0, len(records))
+			for _, rec := range records {
+				strRecords = append(strRecords, rec.String())
+			}
+			sort.Strings(strRecords)
+
+			assert.Empty(t, errors)
+			assert.EqualValues(t, []string{
+				`Record{{1.txt#22, len:11, d:0}, data:"22-hello-22"}`,
+				`Record{{1.txt#4, len:11, d:0}, data:"11-hello-11"}`,
+				`Record{{1.txt#40, len:11, d:0}, data:"33-hello-33"}`,
+				`Record{{1.txt#58, len:11, d:0}, data:"44-hello-44"}`,
+				`Record{{1.txt#76, len:11, d:0}, data:"55-hello-55"}`,
+			}, strRecords)
+
+			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-4.txt", keep-index:".work/.temp-idx-dec-00000001-4.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[2].String())
 			}
 		}
 	}
