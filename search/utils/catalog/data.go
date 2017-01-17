@@ -201,9 +201,9 @@ WHERE p.name REGEXP ?;`, partFilter)
 		files = append(files, file)
 
 		// for width=line option we have to ensure the data delimiter
-		// contains a new-line character: \n or \r
+		// contains a new-line character: \n [or \r] [or \f]
 		if checkDelimHasNewLine {
-			if !strings.ContainsAny(delim.String, "\r\n") {
+			if !strings.ContainsAny(delim.String, "\n" /*"\r\f"*/) {
 				return nil, fmt.Errorf("data delimiter doesn't contain new line")
 			}
 		}
