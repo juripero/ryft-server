@@ -79,6 +79,7 @@
             "in": "query",
             "type": "boolean",
             "name": "reduce",
+            "default": true,
             "x-go-name": "Reduce",
             "description": "Reduce flag for fuzzy edit distance search"
           },
@@ -225,6 +226,7 @@
             "in": "query",
             "type": "boolean",
             "name": "reduce",
+            "default": true,
             "x-go-name": "Reduce",
             "description": "Reduce flag for fuzzy edit distance search"
           },
