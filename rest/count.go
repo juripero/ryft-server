@@ -73,7 +73,8 @@ func (server *Server) DoCount(ctx *gin.Context) {
 
 	// parse request parameters
 	params := CountParams{
-		Case: true,
+		Case:   true,
+		Reduce: true,
 	}
 	b := binding.Default(ctx.Request.Method, ctx.ContentType())
 	if err := b.Bind(ctx.Request, &params); err != nil {
