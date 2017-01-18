@@ -107,7 +107,6 @@ $ cat /tmp/run3.txt | jq -c '.results | sort_by(._index.file, ._index.offset) | 
 {"file":"twitter/20170108/1483904702.json","offset":1777970,"length":3187,"fuzziness":-1}
 {"file":"twitter/20170108/1483905601.json","offset":1814713,"length":3187,"fuzziness":-1}
 {"file":"twitter/20170108/1483905601.json","offset":1824536,"length":3188,"fuzziness":-1}
-```
 
 $ cat /tmp/run3.txt | jq '.stats'
 {
