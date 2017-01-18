@@ -22,6 +22,10 @@ Since `0.10.0` version the [/search](./search.md#search) endpoint uses
 `cs=true` by default. That means if no `cs` query parameter is provided
 the case sensitive search will be used by default.
 
+Since `0.10.0` there is no `reduce=true` by default for FEDS search.
+There is special REST API [option](./search.md#search-reduce-parameter) for this.
+And `-r` flag for the `ryftrest`.
+
 
 # Version
 
