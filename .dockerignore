@@ -1,0 +1,4 @@
+# .git
+ryft-server
+bindata.go
+debian/*.deb

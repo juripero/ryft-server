@@ -34,40 +34,21 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// TODO: use type Index search.Index to avoid memory allocations
-
-// INDEX format specific data.
-type Index struct {
-	File      string `json:"file" msgpack:"file"`
-	Offset    uint64 `json:"offset" msgpack:"offset"`
-	Length    uint64 `json:"length" msgpack:"length"`
-	Fuzziness int    `json:"fuzziness" msgpack:"fuzziness"`
-	Host      string `json:"host,omitempty" msgpack:"host,omitempty"`
-}
+// Index is format specific data for INDEX.
+// the same as search.Index
+type Index search.Index
 
 // NewIndex creates new format specific data.
-func NewIndex() interface{} {
-	return Index{}
+func NewIndex() *Index {
+	return FromIndex(search.NewIndex("", 0, 0))
 }
 
 // FromIndex converts INDEX to format specific data.
-func FromIndex(idx search.Index) Index {
-	res := Index{}
-	res.File = idx.File
-	res.Offset = idx.Offset
-	res.Length = idx.Length
-	res.Fuzziness = int(idx.Fuzziness)
-	res.Host = idx.Host
-	return res
+func FromIndex(index *search.Index) *Index {
+	return (*Index)(index)
 }
 
 // ToIndex converts format specific data to INDEX.
-func ToIndex(idx Index) search.Index {
-	res := search.Index{}
-	res.File = idx.File
-	res.Offset = idx.Offset
-	res.Length = idx.Length
-	res.Fuzziness = uint8(idx.Fuzziness)
-	res.Host = idx.Host
-	return res
+func ToIndex(index *Index) *search.Index {
+	return (*search.Index)(index)
 }

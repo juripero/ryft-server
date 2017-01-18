@@ -31,17 +31,78 @@
 package catalog
 
 import (
-	"bufio"
+	//"bufio"
 	"database/sql"
 	"fmt"
-	"io"
-	"os"
+	//"io"
+	//"os"
 	"path/filepath"
-	"time"
+	//"time"
 
 	"github.com/getryft/ryft-server/search"
 )
 
+// get list of parts (synchronized)
+func (cat *Catalog) GetSearchIndexFile() (map[string]*search.IndexFile, error) {
+	files, err := cat.getSearchIndexFileSync()
+	if err != nil {
+		return nil, err
+	}
+
+	// convert to absolute path
+	res := make(map[string]*search.IndexFile)
+	dir, _ := filepath.Split(cat.path)
+	for n, i := range files {
+		full := filepath.Join(dir, n)
+		res[full] = i
+	}
+
+	return res, nil // OK
+}
+
+// get list of parts (synchronized)
+func (cat *Catalog) getSearchIndexFileSync() (map[string]*search.IndexFile, error) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.getSearchIndexFile()
+}
+
+// get list of parts (unsynchronized)
+func (cat *Catalog) getSearchIndexFile() (map[string]*search.IndexFile, error) {
+	rows, err := cat.db.Query(`
+SELECT p.name, p.pos, p.len, p.d_pos, d.file, d.s_w, d.delim
+FROM parts AS p
+JOIN data AS d ON p.d_id = d.id
+ORDER BY p.d_pos`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parts: %s", err)
+	}
+	defer rows.Close()
+
+	res := make(map[string]*search.IndexFile)
+	for rows.Next() {
+		var file, data string
+		var offset, length, dataPos uint64
+		var delim sql.NullString
+		var width int
+		if err := rows.Scan(&file, &offset, &length, &dataPos, &data, &width, &delim); err != nil {
+			return nil, fmt.Errorf("failed to scan parts: %s", err)
+		}
+		f := res[data]
+		if f == nil {
+			f = search.NewIndexFile(delim.String, width)
+			res[data] = f
+		}
+
+		idx := search.NewIndex(file, offset, length)
+		f.Add(idx.SetDataPos(dataPos))
+	}
+
+	return res, nil // OK
+}
+
+/*
 // Copy another catalog
 func (cat *Catalog) CopyFrom(base *Catalog) error {
 	log.WithFields(map[string]interface{}{
@@ -172,41 +233,41 @@ AND ? BETWEEN p.d_pos AND p.d_pos+p.len-1`, index.File, offset) // TODO: ORDER B
 				// no base, use defaults
 				// log.Debugf("[%s]: ... no base found, use defaults", TAG) // DEBUG
 			} else {
-				if !base_uname.Valid /*&& !base_upos.Valid && !base_ulen.Valid*/ {
-					base_uname = base_name
-					base_upos = base_pos
-					base_ulen = base_len
-				}
+				if !base_uname.Valid /*&& !base_upos.Valid && !base_ulen.Valid*/ /* {
+	base_uname = base_name
+	base_upos = base_pos
+	base_ulen = base_len
+}
 
-				// found data [beg..end)
-				beg := int64(index.Offset)
-				end := beg + int64(index.Length)
-				baseBeg := base_dpos.Int64
-				baseEnd := baseBeg + base_len.Int64
-				if baseBeg <= beg {
-					// data offset is within our base
-					// need to adjust just offset
-					base_upos.Int64 += int64(index.Offset) - baseBeg
-					base_ulen.Int64 = int64(index.Length)
-				} else {
-					// data offset before our base
-					// need to truncate "begin" surrounding part
-					base_upos.Int64 += 0
-					base_ulen.Int64 = int64(index.Length) - (baseBeg - beg)
-					shift = int(baseBeg - beg)
-				}
-				if end > baseEnd {
-					// end of data after our base
-					// need to truncate "end" surrounding part
-					base_ulen.Int64 -= (end - baseEnd)
-				}
+// found data [beg..end)
+beg := int64(index.Offset)
+end := beg + int64(index.Length)
+baseBeg := base_dpos.Int64
+baseEnd := baseBeg + base_len.Int64
+if baseBeg <= beg {
+	// data offset is within our base
+	// need to adjust just offset
+	base_upos.Int64 += int64(index.Offset) - baseBeg
+	base_ulen.Int64 = int64(index.Length)
+} else {
+	// data offset before our base
+	// need to truncate "begin" surrounding part
+	base_upos.Int64 += 0
+	base_ulen.Int64 = int64(index.Length) - (baseBeg - beg)
+	shift = int(baseBeg - beg)
+}
+if end > baseEnd {
+	// end of data after our base
+	// need to truncate "end" surrounding part
+	base_ulen.Int64 -= (end - baseEnd)
+}
 
-				/* log.WithFields(map[string]interface{}{
-					"file": base_name.String,
-					"pos":  base_pos.Int64,
-					"len":  base_len.Int64,
-					"at":   base_dpos.Int64,
-				}).Debugf("[%s]: ... base found %s#%d/%d shift:%d", TAG, base_uname.String, base_upos.Int64, base_ulen.Int64, shift) */
+/* log.WithFields(map[string]interface{}{
+	"file": base_name.String,
+	"pos":  base_pos.Int64,
+	"len":  base_len.Int64,
+	"at":   base_dpos.Int64,
+}).Debugf("[%s]: ... base found %s#%d/%d shift:%d", TAG, base_uname.String, base_upos.Int64, base_ulen.Int64, shift) */ /*
 			}
 
 			// insert new file part (data file will be updated by INSERT trigger!)
@@ -257,7 +318,7 @@ type IndexItem struct {
 	Offset    uint64
 	Length    uint64
 	Shift     int
-	Fuzziness uint8
+	Fuzziness int32
 
 	DataFile string
 	DataPos  uint64
@@ -401,3 +462,4 @@ AND (? BETWEEN d_pos AND (d_pos+len-1))`,
 		return index, 0, err
 	}
 }
+*/

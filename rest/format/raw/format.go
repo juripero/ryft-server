@@ -50,14 +50,14 @@ func (*Format) NewIndex() interface{} {
 }
 
 // Convert INDEX to RAW format specific data.
-func (*Format) FromIndex(idx search.Index) interface{} {
-	return FromIndex(idx)
+func (*Format) FromIndex(index *search.Index) interface{} {
+	return FromIndex(index)
 }
 
 // Convert RAW format specific data to INDEX.
 // WARN: will panic if argument is not of raw.Index type!
-func (*Format) ToIndex(idx interface{}) search.Index {
-	return ToIndex(idx.(Index))
+func (*Format) ToIndex(index interface{}) *search.Index {
+	return ToIndex(index.(*Index))
 }
 
 // NewRecord creates new format specific data.
@@ -82,12 +82,12 @@ func (*Format) NewStat() interface{} {
 }
 
 // Convert STATISTICS to RAW format specific data.
-func (f *Format) FromStat(stat *search.Statistics) interface{} {
+func (f *Format) FromStat(stat *search.Stat) interface{} {
 	return FromStat(stat)
 }
 
 // Convert RAW format specific data to STATISTICS.
 // WARN: will panic if argument is not of raw.Statistics type!
-func (f *Format) ToStat(stat interface{}) *search.Statistics {
-	return ToStat(stat.(*Statistics))
+func (f *Format) ToStat(stat interface{}) *search.Stat {
+	return ToStat(stat.(*Stat))
 }

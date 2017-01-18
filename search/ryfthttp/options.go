@@ -54,7 +54,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["server-url"]; ok {
 		engine.ServerURL, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "server-url" option: %s`, err)
+			return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
 		}
 	} else {
 		engine.ServerURL = "http://localhost:8765"
@@ -67,7 +67,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["auth-token"]; ok {
 		engine.AuthToken, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "auth-token" option: %s`, err)
+			return fmt.Errorf(`failed to parse "auth-token" option: %s`, err)
 		}
 	} else {
 		engine.AuthToken = ""
@@ -77,7 +77,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["local-only"]; ok {
 		engine.LocalOnly, err = utils.AsBool(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "local-only" option: %s`, err)
+			return fmt.Errorf(`failed to parse "local-only" option: %s`, err)
 		}
 	}
 
@@ -85,7 +85,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["skip-stat"]; ok {
 		engine.SkipStat, err = utils.AsBool(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "skip-stat" option: %s`, err)
+			return fmt.Errorf(`failed to parse "skip-stat" option: %s`, err)
 		}
 	}
 
@@ -93,7 +93,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["index-host"]; ok {
 		engine.IndexHost, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "index-host" option: %s`, err)
+			return fmt.Errorf(`failed to parse "index-host" option: %s`, err)
 		}
 	}
 

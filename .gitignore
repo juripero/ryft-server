@@ -1,4 +1,5 @@
 /ryft-server
 /bindata.go
+/cover.out
 *.deb
 *.orig

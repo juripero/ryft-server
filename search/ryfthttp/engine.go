@@ -36,7 +36,6 @@ import (
 	"net/url"
 
 	"github.com/Sirupsen/logrus"
-
 	"github.com/getryft/ryft-server/search"
 )
 
@@ -56,7 +55,6 @@ type Engine struct {
 	IndexHost string // optional host in cluster mode
 
 	httpClient *http.Client
-	// TODO: authentication?
 }
 
 // NewEngine creates new RyftHTTP search engine.
@@ -73,33 +71,44 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftHTTP{url:%q, local:%t, stat:%t}",
+	return fmt.Sprintf("ryfthttp{url:%q, local:%t, stat:%t}",
 		engine.ServerURL, engine.LocalOnly, !engine.SkipStat)
 	// TODO: other parameters?
 }
 
-// prepareUrl formats proper URL based on search configuration.
-func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
+// prepareSearchUrl formats proper URL based on search configuration.
+func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	// server URL should be parsed in engine initialization
 	// so we can omit error checking here
 	u, _ := url.Parse(engine.ServerURL)
+	if cfg.ReportIndex {
+		u.Path += "/search"
+	} else {
+		u.Path += "/count"
+	}
 
 	// prepare query
 	q := url.Values{}
-	q.Set("format", format)
+	if cfg.ReportData {
+		q.Set("format", "raw")
+	} else {
+		q.Set("format", "null")
+	}
 	q.Set("query", cfg.Query)
 	for _, file := range cfg.Files {
-		q.Add("files", file) // TODO: replace with "file", "files" will be deprecated
+		q.Add("file", file)
 	}
 	if len(cfg.Mode) != 0 {
 		q.Set("mode", cfg.Mode)
 	}
-	q.Set("cs", fmt.Sprintf("%t", cfg.CaseSensitive))
-	if cfg.Surrounding > 0 {
-		q.Set("surrounding", fmt.Sprintf("%d", cfg.Surrounding))
+	q.Set("cs", fmt.Sprintf("%t", cfg.Case))
+	if cfg.Width < 0 {
+		q.Set("surrounding", "line")
+	} else if cfg.Width > 0 {
+		q.Set("surrounding", fmt.Sprintf("%d", cfg.Width))
 	}
-	if cfg.Fuzziness > 0 {
-		q.Set("fuzziness", fmt.Sprintf("%d", cfg.Fuzziness))
+	if cfg.Dist > 0 {
+		q.Set("fuzziness", fmt.Sprintf("%d", cfg.Dist))
 	}
 	if cfg.Nodes > 0 {
 		q.Set("nodes", fmt.Sprintf("%d", cfg.Nodes))
@@ -123,15 +132,17 @@ func (engine *Engine) prepareUrl(cfg *search.Config, format string) *url.URL {
 	return u
 }
 
-// prepareUrl formats proper /files URL based on directory name provided.
-func (engine *Engine) prepareFilesUrl(path string) *url.URL {
+// prepareFilesUrl formats proper /files URL based on directory name provided.
+func (engine *Engine) prepareFilesUrl(path string, hidden bool) *url.URL {
 	// server URL should be parsed in engine initialization
 	// so we can omit error checking here
 	u, _ := url.Parse(engine.ServerURL)
+	u.Path += "/files"
 
 	// prepare query
 	q := url.Values{}
 	q.Set("dir", path)
+	q.Set("hidden", fmt.Sprintf("%t", hidden))
 	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
 
 	u.RawQuery = q.Encode()
@@ -145,7 +156,7 @@ func SetLogLevelString(level string) error {
 		return err
 	}
 
-	log.Level = ll
+	SetLogLevel(ll)
 	return nil // OK
 }
 
@@ -168,7 +179,7 @@ func (task *Task) log() *logrus.Entry {
 func factory(opts map[string]interface{}) (search.Engine, error) {
 	engine, err := NewEngine(opts)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create %s engine: %s", TAG, err)
+		return nil, fmt.Errorf("failed to create %s engine: %s", TAG, err)
 	}
 	return engine, nil
 }

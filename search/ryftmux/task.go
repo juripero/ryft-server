@@ -32,6 +32,7 @@ package ryftmux
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -44,22 +45,24 @@ var (
 	taskId = uint64(0 * time.Now().UnixNano())
 )
 
-// RyftMUX task related data.
+// Task is mux-task related data.
 type Task struct {
 	Identifier string // unique
-	Limit      uint64 // limit number of records
 
+	// config & results
+	config   *search.Config
 	subtasks sync.WaitGroup
-	results  []*search.Result
+	results  []*search.Result // from each backend
 }
 
 // NewTask creates new task.
-func NewTask() *Task {
+func NewTask(cfg *search.Config) *Task {
 	id := atomic.AddUint64(&taskId, 1)
 
 	task := new(Task)
 	task.Identifier = fmt.Sprintf("mux-%08x", id)
 
+	task.config = cfg
 	return task
 }
 
@@ -75,59 +78,77 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	defer mux.Close()
 	defer mux.ReportDone()
 
-	// communication channel
-	ch := make(chan *search.Result,
+	// communication channel to report completed results
+	resCh := make(chan *search.Result,
 		len(task.results))
 
 	// start multiplexing results and errors
+	task.log().Debugf("[%s]: start subtask processing...", TAG)
+	var recordsReported uint64 // for all subtasks, atomic
+	var recordsLimit uint64
+	if task.config.Limit != 0 {
+		recordsLimit = uint64(task.config.Limit)
+	} else {
+		recordsLimit = math.MaxUint64
+	}
 	for _, res := range task.results {
-		task.log().Debugf("[%s]: subtask in progress", TAG)
 		go func(res *search.Result) {
 			defer func() {
 				task.subtasks.Done()
-				ch <- res
+				resCh <- res
 			}()
 
-			// handle subtask's results and errors
+			// drain subtask's records and errors
 			for {
 				select {
 				case err, ok := <-res.ErrorChan:
 					if ok && err != nil {
 						// TODO: mark error with subtask's tag?
-						task.log().WithError(err).Debugf("[%s]: new error received", TAG)
+						// task.log().WithError(err).Debugf("[%s]: new error received", TAG) // FIXME: DEBUG
 						mux.ReportError(err)
 					}
 
 				case rec, ok := <-res.RecordChan:
 					if ok && rec != nil {
-						task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG)
-						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-
-						mux.ReportRecord(rec)
-
-						// check for records limit!
-						if task.Limit > 0 && mux.RecordsReported() >= task.Limit {
-							task.log().WithField("limit", task.Limit).Infof("[%s]: stopped by limit", TAG)
+						if atomic.AddUint64(&recordsReported, 1) <= recordsLimit {
+							// task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG) // FIXME: DEBUG
+							rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+							mux.ReportRecord(rec)
+						} else {
+							task.log().WithField("limit", recordsLimit).Infof("[%s]: stopped by limit", TAG)
+							errors, records := res.Cancel()
+							if errors > 0 || records > 0 {
+								task.log().WithFields(map[string]interface{}{
+									"errors":  errors,
+									"records": records,
+								}).Debugf("[%s]: some errors/records are ignored", TAG)
+							}
 							return // done!
 						}
 					}
 
 				case <-res.DoneChan:
-					// drain the error channel
+					// drain the whole errors channel
 					for err := range res.ErrorChan {
-						task.log().WithError(err).Debugf("[%s]: *** new error received", TAG)
+						// task.log().WithError(err).Debugf("[%s]: *** new error received", TAG) // FIXME: DEBUG
 						mux.ReportError(err)
 					}
 
-					// drain the record channel
+					// drain the whole records channel
 					for rec := range res.RecordChan {
-						task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG)
-						rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
-						mux.ReportRecord(rec)
-
-						// check for records limit!
-						if task.Limit > 0 && mux.RecordsReported() >= task.Limit {
-							task.log().WithField("limit", task.Limit).Infof("[%s]: *** stopped by limit", TAG)
+						if atomic.AddUint64(&recordsReported, 1) <= recordsLimit {
+							// task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG) // FIXME: DEBUG
+							rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+							mux.ReportRecord(rec)
+						} else {
+							task.log().WithField("limit", recordsLimit).Infof("[%s]: *** stopped by limit", TAG)
+							errors, records := res.Cancel()
+							if errors > 0 || records > 0 {
+								task.log().WithFields(map[string]interface{}{
+									"errors":  errors,
+									"records": records,
+								}).Debugf("[%s]: *** some errors/records are ignored", TAG)
+							}
 							return // done!
 						}
 					}
@@ -140,40 +161,46 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	}
 
 	// wait for statistics and process cancellation
-	finished := map[*search.Result]bool{}
+	finished := make(map[*search.Result]bool)
+WaitLoop:
 	for _ = range task.results {
 		select {
-		case res, ok := <-ch:
+		case res, ok := <-resCh:
 			if ok && res != nil {
 				// once subtask is finished combine statistics
-				task.log().WithField("stat", res.Stat).
+				task.log().WithField("result", res).
 					Infof("[%s]: subtask is finished", TAG)
 				if res.Stat != nil {
 					if mux.Stat == nil {
+						// create multiplexed statistics
 						mux.Stat = search.NewStat(engine.IndexHost)
 					}
 					mux.Stat.Merge(res.Stat)
 				}
 				finished[res] = true
 			}
-			continue
+			continue WaitLoop
 
 		case <-mux.CancelChan:
 			// cancel all unfinished tasks
-			task.log().Infof("[%s]: cancel all unfinished subtasks", TAG)
+			task.log().Warnf("[%s]: cancelling by client", TAG)
 			for _, r := range task.results {
 				if !finished[r] {
 					errors, records := r.Cancel()
 					if errors > 0 || records > 0 {
-						task.log().WithField("errors", errors).WithField("records", records).
-							Debugf("[%s]: some errors/records are ignored", TAG)
+						task.log().WithFields(map[string]interface{}{
+							"errors":  errors,
+							"records": records,
+						}).Debugf("[%s]: subtask is cancelled, some errors/records are ignored", TAG)
 					}
 				}
 			}
-
+			break WaitLoop
 		}
 	}
 
 	// wait all goroutines
+	task.log().Debugf("[%s]: waiting all subtasks...", TAG)
 	task.subtasks.Wait()
+	task.log().Debugf("[%s]: done", TAG)
 }

@@ -45,6 +45,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/tylerb/graceful.v1"
 )
 
 var (
@@ -149,13 +150,6 @@ func main() {
 		log.WithError(err).Fatal("failed to prepare server configuration")
 	}
 
-	// be quiet and efficient in production
-	if !server.Config.DebugMode {
-		gin.SetMode(gin.ReleaseMode)
-	} else {
-		log.Level = logrus.DebugLevel
-	}
-
 	log.WithFields(map[string]interface{}{
 		"version":  Version,
 		"git-hash": GitHash,
@@ -167,15 +161,21 @@ func main() {
 		"settings-path": server.Config.SettingsPath,
 	}).Info("main configuration")
 	log.WithFields(map[string]interface{}{
-		"search-backend":          server.Config.SearchBackend,
-		"backend-options":         server.Config.BackendOptions,
-		"http-timeout":            server.Config.HttpTimeout,
-		"tls-enabled":             server.Config.TLS.Enabled,
-		"tls-address":             server.Config.TLS.ListenAddress,
-		"auth-type":               server.Config.AuthType,
-		"busyness-tolerance":      server.Config.Busyness.Tolerance,
-		"booleans-per-expression": server.Config.BooleansPerExpression,
+		"search-backend":     server.Config.SearchBackend,
+		"backend-options":    server.Config.BackendOptions,
+		"http-timeout":       server.Config.HttpTimeout,
+		"tls-enabled":        server.Config.TLS.Enabled,
+		"tls-address":        server.Config.TLS.ListenAddress,
+		"auth-type":          server.Config.AuthType,
+		"busyness-tolerance": server.Config.Busyness.Tolerance,
 	}).Debug("other configuration")
+
+	// be quiet and efficient in production
+	if !server.Config.DebugMode {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		log.Level = logrus.DebugLevel
+	}
 
 	// Create a router
 	router := gin.New()
@@ -190,7 +190,26 @@ func main() {
 	})
 
 	// default middleware: logger, recover
-	router.Use(gin.Logger(), gin.Recovery())
+	//router.Use(gin.Logger())
+	router.Use(func(ctx *gin.Context) {
+		beg := time.Now()
+		path := ctx.Request.URL.Path
+		method := ctx.Request.Method
+
+		ctx.Next() // do actual processing
+
+		end := time.Now()
+		lat := end.Sub(beg)
+
+		log.WithFields(map[string]interface{}{
+			"status":  ctx.Writer.Status(),
+			"client":  ctx.ClientIP(),
+			"request": ctx.Request.URL,
+			"latency": lat,
+			// "errors":  ctx.Errors.JSON(),
+		}).Infof("[%s]: %s %s", "REST", method, path)
+	})
+	router.Use(gin.Recovery())
 
 	// Allow CORS requests for * (all domains)
 	router.Use(cors.Cors("*"))
@@ -266,6 +285,12 @@ func main() {
 		router.GET("/debug/stack", server.DoDebugStack)
 		router.GET("/logging/level", server.DoLoggingLevel)
 		router.POST("/logging/level", server.DoLoggingLevel)
+
+		// a few aliases for "dry-run"...
+		private.GET("/search/dry-run", server.DoCountDryRun)
+		private.GET("/count/dry-run", server.DoCountDryRun)
+		private.GET("/search/dryrun", server.DoCountDryRun)
+		private.GET("/count/dryrun", server.DoCountDryRun)
 	}
 
 	// static assets
@@ -290,8 +315,13 @@ func main() {
 		ep.WriteTimeout = server.Config.HttpTimeout
 
 		go func() {
-			if err := ep.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
-				log.WithError(err).WithField("addr", tls.ListenAddress).Fatal("failed to listen HTTPS")
+			worker := &graceful.Server{
+				Timeout: server.Config.ShutdownTimeout,
+				Server:  ep,
+			}
+
+			if err := worker.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
+				log.WithError(err).WithField("address", tls.ListenAddress).Fatal("failed to listen HTTPS")
 			}
 		}()
 	}
@@ -301,8 +331,14 @@ func main() {
 		ep := &http.Server{Addr: addr, Handler: router}
 		ep.ReadTimeout = server.Config.HttpTimeout
 		ep.WriteTimeout = server.Config.HttpTimeout
-		if err := ep.ListenAndServe(); err != nil {
-			log.WithError(err).WithField("addr", addr).Fatal("failed to listen HTTP")
+
+		worker := &graceful.Server{
+			Timeout: server.Config.ShutdownTimeout,
+			Server:  ep,
+		}
+
+		if err := worker.ListenAndServe(); err != nil {
+			log.WithError(err).WithField("address", addr).Fatal("failed to listen HTTP")
 		}
 	}
 }

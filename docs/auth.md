@@ -9,9 +9,9 @@ To verify user credentials the LDAP service or simple file may be used.
 
 The following endpoints are protected:
 
-- [/search](./restapi.md#search)
-- [/count](./restapi.md#count)
-- [/files](./restapi.md#files)
+- [/search](./rest/search.md#search)
+- [/count](./rest/search.md#count)
+- [/files](./rest/files.md)
 
 
 # Authentication
@@ -57,7 +57,7 @@ curl -H "Authorization: Bearer $TOKEN" "http://localhost:8765/search?query=Joe&f
 
 ## JWT options
 
-To pass JWT secret to the server the [configuration file](./buildandrun.md#authentication-server-configuration)
+To pass JWT secret to the server the [configuration file](./run.md#authentication-server-configuration)
 or `--jwt-secret` command line option can be used:
 
 ```{.sh}
@@ -75,12 +75,12 @@ Default token lifetime is 1 hour.
 To change it use `--jwt-lifetime` command line option.
 Note, the overall token refresh timeout is set to 10 lifetimes!
 
-See corresponding section in [configuration file](./buildandrun.md#authentication-server-configuration) to check all available options.
+See corresponding section in [configuration file](./run.md#authentication-server-configuration) to check all available options.
 
 
 ## LDAP
 
-Most of LDAP customization can be done via [configuration file](./buildandrun.md#authentication-server-configuration).
+Most of LDAP customization can be done via [configuration file](./run.md#authentication-server-configuration).
 But there is also some command line options are available.
 Check `ryft-server --help` output.
 

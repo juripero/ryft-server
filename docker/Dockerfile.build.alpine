@@ -1,0 +1,15 @@
+# Docker file to test ryft-server building.
+# Get's sources from current directory (actually ..)
+FROM alpine:3.4
+RUN apk add --update go git build-base dpkg tar xz
+
+# copy sources
+ENV GOPATH=/go
+COPY . /go/src/github.com/getryft/ryft-server/
+WORKDIR /go/src/github.com/getryft/ryft-server/
+
+# TODO: need to provide password for private getryft repositories
+RUN go get -d -v -t
+RUN make debian
+
+ENTRYPOINT ["/bin/sh"]

@@ -47,36 +47,36 @@ import (
 
 // Stream JSON encoder.
 type StreamEncoder struct {
-	writer  io.Writer
-	encoder *backend.Encoder
+	e *backend.Encoder // JSON encoder
 }
 
 const (
-	TAG_REC  = `"rec" `
-	TAG_ERR  = `"err" `
-	TAG_STAT = `"stat" `
-	TAG_EOF  = `"end"`
+	TAG_REC  = "rec"
+	TAG_ERR  = "err"
+	TAG_STAT = "stat"
+	TAG_EOF  = "end"
 )
 
 // Create new stream JSON encoder instance.
 func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 	enc := new(StreamEncoder)
-	enc.encoder = backend.NewEncoder(w)
-	enc.writer = w
+	enc.e = backend.NewEncoder(w)
 	return enc, nil
 }
 
 // Write a RECORD
 func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
+	if rec == nil {
+		return nil // nothing to do
+	}
+
 	// write tag
-	_, err := enc.writer.Write([]byte(TAG_REC))
-	if err != nil {
+	if err := enc.e.Encode(TAG_REC); err != nil {
 		return err
 	}
 
 	// encode record
-	err = enc.encoder.Encode(rec)
-	if err != nil {
+	if err := enc.e.Encode(rec); err != nil {
 		return err
 	}
 
@@ -85,15 +85,17 @@ func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
 
 // Write a STATISTICS
 func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
+	if stat == nil {
+		return nil // nothing to do
+	}
+
 	// write tag
-	_, err := enc.writer.Write([]byte(TAG_STAT))
-	if err != nil {
+	if err := enc.e.Encode(TAG_STAT); err != nil {
 		return err
 	}
 
 	// encode statistics
-	err = enc.encoder.Encode(stat)
-	if err != nil {
+	if err := enc.e.Encode(stat); err != nil {
 		return err
 	}
 
@@ -102,15 +104,17 @@ func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
 
 // Write an ERROR
 func (enc *StreamEncoder) EncodeError(err_ error) error {
+	if err_ == nil {
+		return nil // nothing to do
+	}
+
 	// write tag
-	_, err := enc.writer.Write([]byte(TAG_ERR))
-	if err != nil {
+	if err := enc.e.Encode(TAG_ERR); err != nil {
 		return err
 	}
 
 	// encode error as a string
-	err = enc.encoder.Encode(err_.Error())
-	if err != nil {
+	if err := enc.e.Encode(err_.Error()); err != nil {
 		return err
 	}
 
@@ -120,8 +124,7 @@ func (enc *StreamEncoder) EncodeError(err_ error) error {
 // End writing, close stream.
 func (enc *StreamEncoder) Close() error {
 	// write tag
-	_, err := enc.writer.Write([]byte(TAG_EOF))
-	if err != nil {
+	if err := enc.e.Encode(TAG_EOF); err != nil {
 		return err
 	}
 
@@ -130,20 +133,20 @@ func (enc *StreamEncoder) Close() error {
 
 // JSON stream decoder.
 type StreamDecoder struct {
-	decoder *backend.Decoder
+	d *backend.Decoder
 }
 
 // Create new stream JSON decoder instance.
 func NewStreamDecoder(r io.Reader) (*StreamDecoder, error) {
 	dec := new(StreamDecoder)
-	dec.decoder = backend.NewDecoder(r)
+	dec.d = backend.NewDecoder(r)
 	return dec, nil
 }
 
 // NextTag decodes next tag from the stream.
 func (dec *StreamDecoder) NextTag() (string, error) {
 	var tag string
-	err := dec.decoder.Decode(&tag)
+	err := dec.d.Decode(&tag)
 	if err != nil {
 		return "", err
 	}
@@ -152,5 +155,5 @@ func (dec *StreamDecoder) NextTag() (string, error) {
 
 // Next decodes next item from the stream.
 func (dec *StreamDecoder) Next(item interface{}) error {
-	return dec.decoder.Decode(item)
+	return dec.d.Decode(item)
 }

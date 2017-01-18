@@ -37,7 +37,6 @@ import (
 	"github.com/getryft/ryft-server/search/ryftdec"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
-	_ "github.com/getryft/ryft-server/search/ryftone"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -184,7 +183,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 
 		// index-host
 		if _, ok := opts["index-host"]; !ok {
-			opts["index-host"] = getHostName()
+			opts["index-host"] = s.Config.HostName
 		}
 	}
 
@@ -193,7 +192,7 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 		return backend, err
 	}
 
-	return ryftdec.NewEngine(backend, s.Config.BooleansPerExpression, s.Config.KeepResults)
+	return ryftdec.NewEngine(backend, opts)
 }
 
 // deep copy of backend options
@@ -214,4 +213,16 @@ func (s *Server) getMountPoint(homeDir string) (string, error) {
 
 	opts := engine.Options()
 	return utils.AsString(opts["ryftone-mount"])
+}
+
+// cancels results if not done
+func cancelIfNotDone(res *search.Result) {
+	if !res.IsDone() { // cancel processing
+		if errors, records := res.Cancel(); errors > 0 || records > 0 {
+			log.WithFields(map[string]interface{}{
+				"errors":  errors,
+				"records": records,
+			}).Debugf("[%s]: some errors/records are ignored (panic recover)", CORE)
+		}
+	}
 }

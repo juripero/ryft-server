@@ -42,17 +42,18 @@ import (
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
 	return map[string]interface{}{
-		"instance-name":    engine.Instance,
-		"ryftprim-exec":    engine.ExecPath,
-		"ryftprim-legacy":  engine.LegacyMode,
-		"ryftone-mount":    engine.MountPoint,
-		"home-dir":         engine.HomeDir,
-		"open-poll":        engine.OpenFilePollTimeout.String(),
-		"read-poll":        engine.ReadFilePollTimeout.String(),
-		"read-limit":       engine.ReadFilePollLimit,
-		"keep-files":       engine.KeepResultFiles,
-		"minimize-latency": engine.MinimizeLatency,
-		"index-host":       engine.IndexHost,
+		"instance-name":           engine.Instance,
+		"ryftprim-exec":           engine.ExecPath,
+		"ryftprim-legacy":         engine.LegacyMode,
+		"ryftprim-kill-on-cancel": engine.KillToolOnCancel,
+		"ryftone-mount":           engine.MountPoint,
+		"home-dir":                engine.HomeDir,
+		"open-poll":               engine.OpenFilePollTimeout.String(),
+		"read-poll":               engine.ReadFilePollTimeout.String(),
+		"read-limit":              engine.ReadFilePollLimit,
+		"keep-files":              engine.KeepResultFiles,
+		"minimize-latency":        engine.MinimizeLatency,
+		"index-host":              engine.IndexHost,
 	}
 }
 
@@ -62,7 +63,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "instance-name" option: %s`, err)
+			return fmt.Errorf(`failed to parse "instance-name": %s`, err)
 		}
 	}
 
@@ -70,56 +71,66 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["ryftprim-exec"]; ok {
 		engine.ExecPath, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "ryftprim-exec" option: %s`, err)
+			return fmt.Errorf(`failed to parse "ryftprim-exec" option: %s`, err)
 		}
 	} else {
 		engine.ExecPath = "/usr/bin/ryftprim"
 	}
 	// check ExecPath exists
 	if _, err := os.Stat(engine.ExecPath); err != nil {
-		return fmt.Errorf("failed to locate %q ryftprim executable: %s",
-			engine.ExecPath, err)
+		return fmt.Errorf("failed to locate ryftprim executable: %s", err)
 	}
 
 	// `ryftprim` legacy mode
 	if v, ok := opts["ryftprim-legacy"]; ok {
 		engine.LegacyMode, err = utils.AsBool(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "ryftprim-legacy" option: %s`, err)
+			return fmt.Errorf(`failed to parse "ryftprim-legacy" option: %s`, err)
 		}
 	} else {
 		engine.LegacyMode = true // enable by default
+	}
+
+	// `ryftprim` kill on cancel
+	if v, ok := opts["ryftprim-kill-on-cancel"]; ok {
+		engine.KillToolOnCancel, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "ryftprim-kill-on-cancel" option: %s`, err)
+		}
+	} else {
+		engine.KillToolOnCancel = false // disable by default
 	}
 
 	// `ryftone` mount point
 	if v, ok := opts["ryftone-mount"]; ok {
 		engine.MountPoint, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "ryftone-mount" option: %s`, err)
+			return fmt.Errorf(`failed to parse "ryftone-mount" option: %s`, err)
 		}
 	} else {
 		engine.MountPoint = "/ryftone"
 	}
 	// check MountPoint exists
-	if info, err := os.Stat(engine.MountPoint); err != nil || !info.IsDir() {
-		return fmt.Errorf("failed to locate %q mount point: %s",
-			engine.MountPoint, err)
+	if info, err := os.Stat(engine.MountPoint); err != nil {
+		return fmt.Errorf("failed to locate mount point: %s", err)
+	} else if !info.IsDir() {
+		return fmt.Errorf("%q mount point is not a directory", engine.MountPoint)
 	}
 
 	// user's home directory
 	if v, ok := opts["home-dir"]; ok {
 		engine.HomeDir, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "home-dir" option: %s`, err)
+			return fmt.Errorf(`failed to parse "home-dir" option: %s`, err)
 		}
 	} else {
 		engine.HomeDir = "/"
 	}
 
 	// create working directory
-	work_dir := filepath.Join(engine.MountPoint, engine.HomeDir, engine.Instance)
+	workDir := filepath.Join(engine.MountPoint, engine.HomeDir, engine.Instance)
 	// TODO: option to clear working dir before start?
-	err = os.MkdirAll(work_dir, 0755)
+	err = os.MkdirAll(workDir, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create working directory: %s", err)
 	}
@@ -128,7 +139,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["open-poll"]; ok {
 		engine.OpenFilePollTimeout, err = utils.AsDuration(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "open-poll" option: %s`, err)
+			return fmt.Errorf(`failed to parse "open-poll" option: %s`, err)
 		}
 	} else {
 		engine.OpenFilePollTimeout = 50 * time.Millisecond
@@ -138,7 +149,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["read-poll"]; ok {
 		engine.ReadFilePollTimeout, err = utils.AsDuration(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "read-poll" option: %s`, err)
+			return fmt.Errorf(`failed to parse "read-poll" option: %s`, err)
 		}
 	} else {
 		engine.ReadFilePollTimeout = 50 * time.Millisecond
@@ -148,7 +159,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["read-limit"]; ok {
 		vv, err := utils.AsUint64(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "read-limit" option: %s`, err)
+			return fmt.Errorf(`failed to parse "read-limit" option: %s`, err)
 		}
 		engine.ReadFilePollLimit = int(vv)
 	} else {
@@ -162,7 +173,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["keep-files"]; ok {
 		engine.KeepResultFiles, err = utils.AsBool(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "keep-files" option: %s`, err)
+			return fmt.Errorf(`failed to parse "keep-files" option: %s`, err)
 		}
 	}
 
@@ -170,7 +181,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["minimize-latency"]; ok {
 		engine.MinimizeLatency, err = utils.AsBool(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "minimize-latency" option: %s`, err)
+			return fmt.Errorf(`failed to parse "minimize-latency" option: %s`, err)
 		}
 	}
 
@@ -178,7 +189,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if v, ok := opts["index-host"]; ok {
 		engine.IndexHost, err = utils.AsString(v)
 		if err != nil {
-			return fmt.Errorf(`failed to convert "index-host" option: %s`, err)
+			return fmt.Errorf(`failed to parse "index-host" option: %s`, err)
 		}
 	}
 
