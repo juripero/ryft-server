@@ -92,6 +92,7 @@ type backendOptions struct {
 	InstanceName string
 	MountPoint   string
 	HomeDir      string
+	IndexHost    string
 }
 
 // get home-based path

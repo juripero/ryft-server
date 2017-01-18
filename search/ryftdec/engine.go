@@ -97,11 +97,13 @@ func (engine *Engine) getBackendOptions() backendOptions {
 	instanceName, _ := utils.AsString(opts["instance-name"])
 	mountPoint, _ := utils.AsString(opts["ryftone-mount"])
 	homeDir, _ := utils.AsString(opts["home-dir"])
+	indexHost, _ := utils.AsString(opts["index-host"])
 
 	return backendOptions{
 		InstanceName: instanceName,
 		MountPoint:   mountPoint,
 		HomeDir:      homeDir,
+		IndexHost:    indexHost,
 	}
 }
 

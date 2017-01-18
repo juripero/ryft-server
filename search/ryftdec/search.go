@@ -127,6 +127,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// check file names are relative to home (without "..")
 	opts := engine.getBackendOptions()
+	task.UpdateHostTo = opts.IndexHost
 	home := opts.atHome("")
 	if err := cfg.CheckRelativeToHome(home); err != nil {
 		task.log().WithError(err).Warnf("[%s]: bad file names detected", TAG)

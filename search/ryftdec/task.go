@@ -61,6 +61,8 @@ type Task struct {
 
 	config *search.Config // input configuration
 	result PostProcessing // post processing engine
+
+	UpdateHostTo string // for cluster mode
 }
 
 // NewTask creates new task.
@@ -813,6 +815,7 @@ BuildItems:
 
 		if reportRecords {
 			idx := search.NewIndexCopy(item.Index)
+			idx.UpdateHost(task.UpdateHostTo)
 			rec := search.NewRecord(idx, recRawData)
 			idx.DataPos = 0 // hide data position
 			mux.ReportRecord(rec)
