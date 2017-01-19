@@ -51,7 +51,7 @@ a distance of `1` would be:
 
 The following aliases can be used to specify `EDIT_DISTANCE` primitive as well:
 - `EDIT_DISTANCE`
-- `EDIT_DIST`
+- **`EDIT_DIST`**
 - `EDIT`
 - `FEDS`
 
@@ -99,7 +99,7 @@ have more than one internal match, each of which could have a different distance
 `DISTANCE=0` is used by default.
 
 The following aliases can be used to specify `DISTANCE` as well:
-- `DISTANCE`
+- **`DISTANCE`**
 - `FUZZINESS`
 - `DIST`
 - `D`
@@ -138,7 +138,7 @@ Note, although `REDUCE=false` is used by default it is usually overriden
 by global `ryft-server`'s `reduce=true` option!
 
 The following aliases can be used to specify `REDUCE` as well:
-- `REDUCE`
+- **`REDUCE`**
 - `R`
 
 so the following queries are the same:
@@ -169,7 +169,7 @@ if both are specified in the same query.
 
 The following aliases can be used to specify `WIDTH` as well:
 - `SURROUNDING`
-- `WIDTH`
+- **`WIDTH`**
 - `W`
 
 so the following queries are the same:
@@ -203,7 +203,7 @@ if both are specified in the same query.
 `LINE=false` is used by default.
 
 The following aliases can be used to specify `LINE` as well:
-- `LINE`
+- **`LINE`**
 - `L`
 
 so the following queries are the same:
@@ -224,7 +224,7 @@ When `CASE` is `false`, the query will be run caseinsensitive.
 `CASE=true` is used by default, so searches are case sensitive.
 
 The following aliases can be used to specify `LINE` as well:
-- `CASE`
+- **`CASE`**
 - `CS`
 
 so the following queries are the same:

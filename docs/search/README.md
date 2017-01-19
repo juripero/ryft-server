@@ -214,7 +214,7 @@ like date ranging etc.
 
 The following aliases can be used to specify `FILTER` as well:
 - `FILE_FILTER`
-- `FILTER`
+- **`FILTER`**
 - `FF`
 
 so the following queries are the same:

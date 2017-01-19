@@ -78,7 +78,7 @@ if both are specified in the same query.
 
 The following aliases can be used to specify `WIDTH` as well:
 - `SURROUNDING`
-- `WIDTH`
+- **`WIDTH`**
 - `W`
 
 so the following queries are the same:
@@ -112,7 +112,7 @@ if both are specified in the same query.
 `LINE=false` is used by default.
 
 The following aliases can be used to specify `LINE` as well:
-- `LINE`
+- **`LINE`**
 - `L`
 
 so the following queries are the same:

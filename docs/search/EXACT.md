@@ -15,7 +15,7 @@ A fully qualified `EXACT` clause looking for the term `"orange"` would be:
 ```
 
 The following aliases can be used to specify `EXACT` primitive as well:
-- `EXACT`
+- **`EXACT`**
 - `ES`
 
 so the following queries are the same:
@@ -74,7 +74,7 @@ if both are specified in the same query.
 
 The following aliases can be used to specify `WIDTH` as well:
 - `SURROUNDING`
-- `WIDTH`
+- **`WIDTH`**
 - `W`
 
 so the following queries are the same:
@@ -108,7 +108,7 @@ if both are specified in the same query.
 `LINE=false` is used by default.
 
 The following aliases can be used to specify `LINE` as well:
-- `LINE`
+- **`LINE`**
 - `L`
 
 so the following queries are the same:
@@ -129,7 +129,7 @@ When `CASE` is `false`, the query will be run caseinsensitive.
 `CASE=true` is used by default, so searches are case sensitive.
 
 The following aliases can be used to specify `LINE` as well:
-- `CASE`
+- **`CASE`**
 - `CS`
 
 so the following queries are the same:

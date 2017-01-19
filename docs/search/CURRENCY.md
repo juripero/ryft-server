@@ -57,7 +57,7 @@ range. But currency values like `-$123.00`, `$449.99` and `$100,000` would
 not match.
 
 The following aliases can be used to specify `CURRENCY` primitive as well:
-- `CURRENCY`
+- **`CURRENCY`**
 - `MONEY`
 
 so the following queries are the same:
@@ -89,7 +89,7 @@ state machine which starts a currency match state machine. For example,
 for standard US currency, a dollar sign would be specified as `"$"`.
 
 The following aliases can be used to specify `SYMBOL` as well:
-- `SYMBOL`
+- **`SYMBOL`**
 - `SYMB`
 - `SYM`
 
@@ -117,7 +117,7 @@ Note that the `SEPARATOR` and `DECIMAL` must be different. If the same
 character is specified for both, an error message will be generated.
 
 The following aliases can be used to specify `SEPARATOR` as well:
-- `SEPARATOR`
+- **`SEPARATOR`**
 - `SEP`
 
 so the following queries are the same:
@@ -143,7 +143,7 @@ Note that the `DECIMAL` and `SEPARATOR` must be different. If the same
 character is specified for both, an error message will be generated.
 
 The following aliases can be used to specify `DECIMAL` as well:
-- `DECIMAL`
+- **`DECIMAL`**
 - `DEC`
 
 so the following queries are the same:
@@ -171,7 +171,7 @@ if both are specified in the same query.
 
 The following aliases can be used to specify `WIDTH` as well:
 - `SURROUNDING`
-- `WIDTH`
+- **`WIDTH`**
 - `W`
 
 so the following queries are the same:
@@ -205,7 +205,7 @@ if both are specified in the same query.
 `LINE=false` is used by default.
 
 The following aliases can be used to specify `LINE` as well:
-- `LINE`
+- **`LINE`**
 - `L`
 
 so the following queries are the same:

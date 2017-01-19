@@ -84,7 +84,7 @@ would not be a match, as it does not fall within the requested range,
 nor would the number `+1,050.00001`.
 
 The following aliases can be used to specify `NUMBER` primitive as well:
-- `NUMBER`
+- **`NUMBER`**
 - `NUMERIC`
 
 so the following queries are the same:
@@ -120,7 +120,7 @@ Note that the `SEPARATOR` and `DECIMAL` must be different. If the same
 character is specified for both, an error message will be generated.
 
 The following aliases can be used to specify `SEPARATOR` as well:
-- `SEPARATOR`
+- **`SEPARATOR`**
 - `SEP`
 
 so the following queries are the same:
@@ -143,7 +143,7 @@ Note that the `DECIMAL` and `SEPARATOR` must be different. If the same
 character is specified for both, an error message will be generated.
 
 The following aliases can be used to specify `DECIMAL` as well:
-- `DECIMAL`
+- **`DECIMAL`**
 - `DEC`
 
 so the following queries are the same:
@@ -171,7 +171,7 @@ if both are specified in the same query.
 
 The following aliases can be used to specify `WIDTH` as well:
 - `SURROUNDING`
-- `WIDTH`
+- **`WIDTH`**
 - `W`
 
 so the following queries are the same:
@@ -205,7 +205,7 @@ if both are specified in the same query.
 `LINE=false` is used by default.
 
 The following aliases can be used to specify `LINE` as well:
-- `LINE`
+- **`LINE`**
 - `L`
 
 so the following queries are the same:

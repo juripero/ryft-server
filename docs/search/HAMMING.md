@@ -25,7 +25,7 @@ and return matching lines using a distance of `1` would be:
 ```
 
 The following aliases can be used to specify `HAMMING` primitive as well:
-- `HAMMING`
+- **`HAMMING`**
 - `FHS`
 
 so the following queries are the same:
@@ -75,7 +75,7 @@ have more than one internal match, each of which could have a different distance
 `DISTANCE=0` is used by default.
 
 The following aliases can be used to specify `DISTANCE` as well:
-- `DISTANCE`
+- **`DISTANCE`**
 - `FUZZINESS`
 - `DIST`
 - `D`
@@ -107,7 +107,7 @@ if both are specified in the same query.
 
 The following aliases can be used to specify `WIDTH` as well:
 - `SURROUNDING`
-- `WIDTH`
+- **`WIDTH`**
 - `W`
 
 so the following queries are the same:
@@ -141,7 +141,7 @@ if both are specified in the same query.
 `LINE=false` is used by default.
 
 The following aliases can be used to specify `LINE` as well:
-- `LINE`
+- **`LINE`**
 - `L`
 
 so the following queries are the same:
@@ -162,7 +162,7 @@ When `CASE` is `false`, the query will be run caseinsensitive.
 `CASE=true` is used by default, so searches are case sensitive.
 
 The following aliases can be used to specify `LINE` as well:
-- `CASE`
+- **`CASE`**
 - `CS`
 
 so the following queries are the same:
