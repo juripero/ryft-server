@@ -82,6 +82,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	params := SearchParams{
 		Format: format.RAW,
 		Case:   true,
+		Reduce: true,
 	}
 	b := binding.Default(ctx.Request.Method, ctx.ContentType())
 	if err := b.Bind(ctx.Request, &params); err != nil {

@@ -21,7 +21,8 @@ Search specific:
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
--r|--reduce        Reduce the duplicates for FEDS
+-r|--reduce        Reduce the duplicates for FEDS (by default)
+--no-reduce        Do not reduce the duplicates for FEDS
 -n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use (default is 4).
 -d|--fuzziness=<D> Specifies the fuzzy search distance.
 -w|--width=<W>     Specifies the surrounding width.
@@ -87,7 +88,7 @@ MODE=
 FILES=
 CATALOGS=
 CASE="true"
-REDUCE=
+REDUCE=true
 NODES=
 FUZZINESS=
 SURROUNDING=
@@ -197,6 +198,10 @@ while [[ $# > 0 ]]; do
         ;;
     -r|--reduce)
         REDUCE="true"
+        shift
+        ;;
+    --no-reduce)
+        REDUCE="false"
         shift
         ;;
     -n=*|--nodes=*)

@@ -217,7 +217,7 @@ The search `reduce` boolean flag is used for fuzzy edit distance searches only.
 The `reduce=true` tells engine to remove duplicates.
 See [reduce option](../search/EDIT_DIST.md#reduce-option) for more details.
 
-`reduce=false` is used **by default**.
+`reduce=true` is used **by default**.
 
 
 ### Search `fields` parameter

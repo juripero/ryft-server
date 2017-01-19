@@ -134,7 +134,8 @@ The third is missing the leading `'g'`, for a distance of one.
 All three are reported. With this option set to `true`,
 only one match will be reported: `"giraffe"`.
 
-`REDUCE=false` is used by default.
+Note, although `REDUCE=false` is used by default it is usually overriden
+by global `ryft-server`'s `reduce=true` option!
 
 The following aliases can be used to specify `REDUCE` as well:
 - `REDUCE`
