@@ -297,7 +297,8 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		lex.token == FLOAT:
 		input = IN_RAW_TEXT
 		operator = OP_CONTAINS
-		expression = fmt.Sprintf(`"%s"`, lex) // plain simple query
+		// expression = fmt.Sprintf(`"%s"`, lex) // plain simple query
+		expression = p.parseIdentExpr(lex) // plain simple query
 		res.Options.SetMode(plainMode)
 
 	default:
@@ -1379,6 +1380,53 @@ func (p *Parser) parseStringExpr(start Lexeme) string {
 			return buf.String()
 		}
 	}
+}
+
+// parse ident expression (multiple identifiers or spaces)
+// the last space is ignored
+func (p *Parser) parseIdentExpr(start Lexeme) string {
+	// consume all IDENTs and WSs
+	res := []Lexeme{start}
+Loop:
+	for {
+		switch lex := p.scan(); lex.token {
+		case WS, INT, FLOAT:
+			res = append(res, lex)
+
+		case IDENT:
+			// stop on any reserved keywords
+			if lex.IsAnd() || lex.IsOr() || lex.IsXor() ||
+				lex.IsRecord() || lex.IsRawText() {
+				p.unscan(lex)
+				break Loop
+			} else {
+				res = append(res, lex)
+			}
+
+		default:
+			p.unscan(lex)
+			break Loop
+		}
+	}
+
+	// remove the last WS if present
+	for len(res) > 0 {
+		last := len(res) - 1
+		if res[last].token == WS {
+			res = res[0:last]
+		} else {
+			break
+		}
+	}
+
+	// prepare quoted output
+	var buf bytes.Buffer
+	buf.WriteRune('"')
+	for _, lex := range res {
+		buf.WriteString(lex.literal)
+	}
+	buf.WriteRune('"')
+	return buf.String()
 }
 
 // parse string value

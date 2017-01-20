@@ -68,6 +68,20 @@ func TestParserParseSimpleQuery(t *testing.T) {
 		`(RAW_TEXT CONTAINS "123.456")[es]`,
 		`(RAW_TEXT CONTAINS EXACT("123.456"))[es]`)
 
+	// multiple words
+	check(false,
+		`                    hello hello  `,
+		`(RAW_TEXT CONTAINS "hello hello")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello hello"))[es]`)
+	check(false,
+		`                    hello 123  `,
+		`(RAW_TEXT CONTAINS "hello 123")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello 123"))[es]`)
+	check(false,
+		`                    hello  123.456  `,
+		`(RAW_TEXT CONTAINS "hello  123.456")[es]`,
+		`(RAW_TEXT CONTAINS EXACT("hello  123.456"))[es]`)
+
 	// input
 	bad(`,`, "expected RAW_TEXT or RECORD")
 	check(false,
@@ -311,6 +325,18 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t, false,
 		` ( ( RAW_TEXT CONTAINS "hello " ) ) `,
 		`P{P{(RAW_TEXT CONTAINS "hello ")[es]}}`)
+
+	testParserParse(t, false,
+		` hello and hello `,
+		`AND{(RAW_TEXT CONTAINS "hello")[es], (RAW_TEXT CONTAINS "hello")[es]}`)
+
+	testParserParse(t, false,
+		` hello xOr 123 `,
+		`XOR{(RAW_TEXT CONTAINS "hello")[es], (RAW_TEXT CONTAINS "123")[es]}`)
+
+	testParserParse(t, false,
+		` hello or 123.456 `,
+		`OR{(RAW_TEXT CONTAINS "hello")[es], (RAW_TEXT CONTAINS "123.456")[es]}`)
 
 	testParserParse(t, true,
 		` ( RECORD.Name.Actors.[].Name CONTAINS "Christian" ) `,
