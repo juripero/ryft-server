@@ -94,7 +94,7 @@ func (o *Optimizer) process(q Query) Query {
 				if a.Simple.Options.EqualsTo(b.Simple.Options) {
 					tmp.Simple.Options = a.Simple.Options
 				} else {
-					tmp.Simple.Options = DefaultOptions() // reset to default
+					tmp.Simple.Options = EmptyOptions() // reset to default
 				}
 				tmp.Simple.Options.FileFilter = ff
 
@@ -228,7 +228,7 @@ func (o *Optimizer) combine(q Query) Query {
 			} else {
 				ff := selectFileFilter(opts, a.Simple.Options)
 				if !opts.EqualsTo(a.Simple.Options) {
-					opts = DefaultOptions() // reset to default
+					opts = EmptyOptions() // reset to default
 				}
 				opts.FileFilter = ff
 			}

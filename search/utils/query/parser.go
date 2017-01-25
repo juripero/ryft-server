@@ -518,13 +518,9 @@ func getExprNew(expr string, opts Options) string {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
-		if len(opts.DigitSeparator) != 0 {
-			args = append(args, fmt.Sprintf(`SEPARATOR="%s"`, opts.DigitSeparator))
-		}
-
-		if len(opts.DecimalPoint) != 0 {
-			args = append(args, fmt.Sprintf(`DECIMAL="%s"`, opts.DecimalPoint))
-		}
+		// all options are required
+		args = append(args, fmt.Sprintf(`SEPARATOR="%s"`, opts.DigitSeparator))
+		args = append(args, fmt.Sprintf(`DECIMAL="%s"`, opts.DecimalPoint))
 
 		return fmt.Sprintf("NUMBER(%s)", strings.Join(args, ", "))
 
@@ -536,17 +532,10 @@ func getExprNew(expr string, opts Options) string {
 			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
 		}
 
-		if len(opts.CurrencySymbol) != 0 {
-			args = append(args, fmt.Sprintf(`SYMBOL="%s"`, opts.CurrencySymbol))
-		}
-
-		if len(opts.DigitSeparator) != 0 {
-			args = append(args, fmt.Sprintf(`SEPARATOR="%s"`, opts.DigitSeparator))
-		}
-
-		if len(opts.DecimalPoint) != 0 {
-			args = append(args, fmt.Sprintf(`DECIMAL="%s"`, opts.DecimalPoint))
-		}
+		// all options are required
+		args = append(args, fmt.Sprintf(`SYMBOL="%s"`, opts.CurrencySymbol))
+		args = append(args, fmt.Sprintf(`SEPARATOR="%s"`, opts.DigitSeparator))
+		args = append(args, fmt.Sprintf(`DECIMAL="%s"`, opts.DecimalPoint))
 
 		return fmt.Sprintf("CURRENCY(%s)", strings.Join(args, ", "))
 

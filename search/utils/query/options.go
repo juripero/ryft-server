@@ -58,6 +58,19 @@ func DefaultOptions() Options {
 	return Options{
 		// Mode: "es",
 		Case: true,
+
+		CurrencySymbol: "$",
+		DigitSeparator: ",",
+		DecimalPoint:   ".",
+	}
+}
+
+// EmptyOptions creates empty options
+// Case sensitivity is set by default
+func EmptyOptions() Options {
+	return Options{
+		// Mode: "es",
+		Case: true,
 	}
 }
 
