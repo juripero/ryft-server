@@ -26,6 +26,12 @@ Since `0.10.0` the `reduce=true` is used by default (FEDS only) by `ryftrest` an
 There is special REST API [option](./search.md#search-reduce-parameter) for this.
 And `--reduce` and `--no-reduce` flags for the `ryftrest`.
 
+Since `0.10.0` the [NUMBER](../search/NUMBER.md) and [CURRENCY](../search/CURRENCY.md)
+search uses the following options by default:
+- "$" for the `SYMBOL` option
+- "," for the `SEPARATOR` option
+- "." for the `DECIMAL` option
+
 
 # Version
 
