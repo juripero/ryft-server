@@ -130,6 +130,9 @@ so the following queries are the same:
 (RECORD.id CONTAINS NUMBER(1025<NUM<1050, SEP=",", DECIMAL="."))
 ```
 
+The `SEPARATOR=","` is used by default, i.e. if nothing is provided.
+This behaviour differs from `ryftprim`!
+
 
 ## `DECIMAL` option
 
@@ -152,6 +155,9 @@ so the following queries are the same:
 (RECORD.id CONTAINS NUMBER(1025<NUM<1050, SEP=",", DECIMAL="."))
 (RECORD.id CONTAINS NUMBER(1025<NUM<1050, SEP=",", DEC="."))
 ```
+
+The `DECIMAL="."` is used by default, i.e. if nothing is provided.
+This behaviour differs from `ryftprim`!
 
 
 ## `WIDTH` option

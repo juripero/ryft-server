@@ -151,12 +151,12 @@ func TestParserParseSimpleQuery(t *testing.T) {
 		`(RAW_TEXT CONTAINS TIME(HH:MM:SS != 00:11:22))[ts]`)
 	check(false,
 		` RAW_TEXT CONTAINS NUMBER(NUM != 0) `,
-		`(RAW_TEXT CONTAINS NUMBER(NUM != "0", "", ""))[ns]`,
-		`(RAW_TEXT CONTAINS NUMBER(NUM != "0"))[ns]`)
+		`(RAW_TEXT CONTAINS NUMBER(NUM != "0", ",", "."))[ns,sep=",",dot="."]`,
+		`(RAW_TEXT CONTAINS NUMBER(NUM != "0", SEPARATOR=",", DECIMAL="."))[ns,sep=",",dot="."]`)
 	check(false,
 		` RAW_TEXT CONTAINS CURRENCY(CUR != 0) `,
-		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0", "", "", ""))[cs]`,
-		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0"))[cs]`)
+		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0", "$", ",", "."))[cs,sym="$",sep=",",dot="."]`,
+		`(RAW_TEXT CONTAINS CURRENCY(CUR != "0", SYMBOL="$", SEPARATOR=",", DECIMAL="."))[cs,sym="$",sep=",",dot="."]`)
 	check(false,
 		` RAW_TEXT CONTAINS IPv4(IP != "0.0.0.0") `,
 		`(RAW_TEXT CONTAINS IPV4(IP != "0.0.0.0"))[ipv4]`,
@@ -963,24 +963,24 @@ func TestParserParseNUMBER(t *testing.T) {
 	// simple cases
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS NUMBER(NUM > "0", W=1))`,
-		`P{(RAW_TEXT CONTAINS NUMBER(NUM > "0", WIDTH="1"))[ns,w=1]}`)
+		`P{(RAW_TEXT CONTAINS NUMBER(NUM > "0", WIDTH="1", SEPARATOR=",", DECIMAL="."))[ns,w=1,sep=",",dot="."]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS NUMBER(NUM > 0, W=1))`, // quotes should be added
-		`P{(RAW_TEXT CONTAINS NUMBER(NUM > "0", WIDTH="1"))[ns,w=1]}`)
+		`P{(RAW_TEXT CONTAINS NUMBER(NUM > "0", WIDTH="1", SEPARATOR=",", DECIMAL="."))[ns,w=1,sep=",",dot="."]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS NUMERIC(NUM != 0, W=1))`,
-		`P{(RAW_TEXT CONTAINS NUMBER(NUM != "0", WIDTH="1"))[ns,w=1]}`)
+		`P{(RAW_TEXT CONTAINS NUMBER(NUM != "0", WIDTH="1", SEPARATOR=",", DECIMAL="."))[ns,w=1,sep=",",dot="."]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS NUMBER(1  <  NUM  <  2, L=true))`,
-		`P{(RAW_TEXT CONTAINS NUMBER("1" < NUM < "2", LINE="true"))[ns,line]}`)
+		`P{(RAW_TEXT CONTAINS NUMBER("1" < NUM < "2", LINE="true", SEPARATOR=",", DECIMAL="."))[ns,line,sep=",",dot="."]}`)
 
 	// operator replacement
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS NUMBER(NUM  ==  123, W=1))`, // == should be replaced with single =
-		`P{(RAW_TEXT CONTAINS NUMBER(NUM = "123", WIDTH="1"))[ns,w=1]}`)
+		`P{(RAW_TEXT CONTAINS NUMBER(NUM = "123", WIDTH="1", SEPARATOR=",", DECIMAL="."))[ns,w=1,sep=",",dot="."]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS NUMBER(2   >   NUM   >=   1, L=true))`,
-		`P{(RAW_TEXT CONTAINS NUMBER("1" <= NUM < "2", LINE="true"))[ns,line]}`)
+		`P{(RAW_TEXT CONTAINS NUMBER("1" <= NUM < "2", LINE="true", SEPARATOR=",", DECIMAL="."))[ns,line,sep=",",dot="."]}`)
 
 	// TODO: compatibility mode
 
@@ -999,24 +999,24 @@ func TestParserParseCURRENCY(t *testing.T) {
 	// simple cases
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS CURRENCY(CUR > "0", W=1))`,
-		`P{(RAW_TEXT CONTAINS CURRENCY(CUR > "0", WIDTH="1"))[cs,w=1]}`)
+		`P{(RAW_TEXT CONTAINS CURRENCY(CUR > "0", WIDTH="1", SYMBOL="$", SEPARATOR=",", DECIMAL="."))[cs,w=1,sym="$",sep=",",dot="."]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS CURRENCY(CUR > 0, W=1))`, // quotes should be added
-		`P{(RAW_TEXT CONTAINS CURRENCY(CUR > "0", WIDTH="1"))[cs,w=1]}`)
+		`P{(RAW_TEXT CONTAINS CURRENCY(CUR > "0", WIDTH="1", SYMBOL="$", SEPARATOR=",", DECIMAL="."))[cs,w=1,sym="$",sep=",",dot="."]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS CURRENCY(CUR != 0, W=1))`,
-		`P{(RAW_TEXT CONTAINS CURRENCY(CUR != "0", WIDTH="1"))[cs,w=1]}`)
+		`P{(RAW_TEXT CONTAINS CURRENCY(CUR != "0", WIDTH="1", SYMBOL="$", SEPARATOR=",", DECIMAL="."))[cs,w=1,sym="$",sep=",",dot="."]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS CURRENCY(1  <  CUR  <  2, L=true))`,
-		`P{(RAW_TEXT CONTAINS CURRENCY("1" < CUR < "2", LINE="true"))[cs,line]}`)
+		`P{(RAW_TEXT CONTAINS CURRENCY("1" < CUR < "2", LINE="true", SYMBOL="$", SEPARATOR=",", DECIMAL="."))[cs,line,sym="$",sep=",",dot="."]}`)
 
 	// operator replacement
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS CURRENCY(CUR  ==  123, W=1))`, // == should be replaced with single =
-		`P{(RAW_TEXT CONTAINS CURRENCY(CUR = "123", WIDTH="1"))[cs,w=1]}`)
+		`P{(RAW_TEXT CONTAINS CURRENCY(CUR = "123", WIDTH="1", SYMBOL="$", SEPARATOR=",", DECIMAL="."))[cs,w=1,sym="$",sep=",",dot="."]}`)
 	testParserParseG(t, false,
 		`(RAW_TEXT CONTAINS CURRENCY(2   >   CUR   >=   1, L=true))`,
-		`P{(RAW_TEXT CONTAINS CURRENCY("1" <= CUR < "2", LINE="true"))[cs,line]}`)
+		`P{(RAW_TEXT CONTAINS CURRENCY("1" <= CUR < "2", LINE="true", SYMBOL="$", SEPARATOR=",", DECIMAL="."))[cs,line,sym="$",sep=",",dot="."]}`)
 
 	// TODO: compatibility mode
 

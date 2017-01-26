@@ -101,6 +101,9 @@ so the following queries are the same:
 (RECORD.price CONTAINS CURRENCY(450<CUR, SYM="$", SEPARATOR=",", DECIMAL="."))
 ```
 
+The `SYMBOL="$"` is used by default, i.e. if nothing is provided.
+This behaviour differs from `ryftprim`!
+
 
 ## `SEPARATOR` option
 
@@ -127,6 +130,9 @@ so the following queries are the same:
 (RECORD.id CONTAINS CURRENCY(450<CUR, SYM="$", SEP=",", DECIMAL="."))
 ```
 
+The `SEPARATOR=","` is used by default, i.e. if nothing is provided.
+This behaviour differs from `ryftprim`!
+
 
 ## `DECIMAL` option
 
@@ -152,6 +158,9 @@ so the following queries are the same:
 (RECORD.id CONTAINS CURRENCY(450<CUR, SYM="$", SEP=",", DECIMAL="."))
 (RECORD.id CONTAINS CURRENCY(450<CUR, SYM="$", SEP=",", DEC="."))
 ```
+
+The `DECIMAL="."` is used by default, i.e. if nothing is provided.
+This behaviour differs from `ryftprim`!
 
 
 ## `WIDTH` option
