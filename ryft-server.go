@@ -341,4 +341,6 @@ func main() {
 			log.WithError(err).WithField("address", addr).Fatal("failed to listen HTTP")
 		}
 	}
+
+	log.Info("server stopped")
 }
