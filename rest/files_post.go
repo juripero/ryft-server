@@ -1,3 +1,33 @@
+/*
+ * ============= Ryft-Customized BSD License ============
+ * Copyright (c) 2015, Ryft Systems, Inc.
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *   this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation and/or
+ *   other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
+ *   This product includes software developed by Ryft Systems, Inc.
+ * 4. Neither the name of Ryft Systems, Inc. nor the names of its contributors may be used
+ *   to endorse or promote products derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY RYFT SYSTEMS, INC. ''AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL RYFT SYSTEMS, INC. BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * ============
+ */
+
 package rest
 
 import (
@@ -15,9 +45,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // PostFilesParams query parameters for POST /files
@@ -49,35 +81,52 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 	// parse request parameters
 	noDelim := fmt.Sprintf("no-binding-%x", time.Now().UnixNano()) // use random marker!
-	params := PostFilesParams{}
-	params.Delimiter = noDelim
-	params.Offset = -1 // mark as "unspecified"
-	params.Length = -1
-	if err := ctx.Bind(&params); err != nil {
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			err.Error(), "failed to parse request parameters"))
+	params := PostFilesParams{
+		Delimiter: noDelim,
+		Offset:    -1, // mark as "unspecified"
+		Length:    -1,
+	}
+	b := binding.Default(ctx.Request.Method, ctx.ContentType())
+	if err := b.Bind(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest,
+			err.Error()).WithDetails("failed to parse request parameters"))
 	}
 
 	// if delimiter is provided this value will be NOT NIL
 	var delim *string
 	if params.Delimiter != noDelim {
-		delim = &params.Delimiter
+		tmp := mustParseDelim(params.Delimiter)
+		delim = &tmp
 	} else {
 		params.Delimiter = ""
+		// delim is nil
 	}
 
 	if len(params.File) == 0 {
-		panic(NewServerError(http.StatusBadRequest,
+		panic(NewError(http.StatusBadRequest,
 			"no valid filename provided"))
 	}
 
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
-		panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-			err.Error(), "failed to get mount point"))
+		panic(NewError(http.StatusInternalServerError,
+			err.Error()).WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
+
+	// checks all the input filenames are relative to home
+	if len(params.Catalog) != 0 {
+		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Catalog)) {
+			panic(NewError(http.StatusBadRequest,
+				fmt.Sprintf("catalog path %q is not relative to home", params.Catalog)))
+		}
+	} else {
+		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.File)) {
+			panic(NewError(http.StatusBadRequest,
+				fmt.Sprintf("path %q is not relative to home", params.File)))
+		}
+	}
 
 	var file io.Reader
 
@@ -86,8 +135,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	case "multipart/form-data":
 		f, _, err := ctx.Request.FormFile("file")
 		if err != nil {
-			panic(NewServerErrorWithDetails(http.StatusBadRequest,
-				err.Error(), `no "file" form data provided`))
+			panic(NewError(http.StatusBadRequest,
+				err.Error()).WithDetails(`no "file" form data provided`))
 		}
 		defer f.Close()
 		file = f
@@ -101,14 +150,14 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		log.Debugf("saving octet-stream...")
 
 	default:
-		panic(NewServerErrorWithDetails(http.StatusBadRequest,
-			contentType, "unexpected content type"))
+		panic(NewError(http.StatusBadRequest,
+			contentType).WithDetails("unexpected content type"))
 	}
 
 	if len(params.Lifetime) > 0 {
 		if params.lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
-			panic(NewServerErrorWithDetails(http.StatusBadRequest,
-				err.Error(), "failed to parse lifetime"))
+			panic(NewError(http.StatusBadRequest,
+				err.Error()).WithDetails("failed to parse lifetime"))
 		}
 	}
 
@@ -127,8 +176,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 		services, tags, err := s.getConsulInfoForFiles(userTag, files)
 		if err != nil || len(tags) != len(files) {
-			panic(NewServerErrorWithDetails(http.StatusInternalServerError,
-				err.Error(), "failed to map files to tags"))
+			panic(NewError(http.StatusInternalServerError,
+				err.Error()).WithDetails("failed to map files to tags"))
 		}
 		log.WithField("tags", tags[0]).Debugf("related tags")
 
@@ -196,7 +245,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			if err != nil {
 				panic(fmt.Errorf("failed to copy content to temp file: %s", err))
 			}
-			tmp.Seek(0, 0 /*io.SeekStart*/) // go to begin
+			tmp.Seek(0, os.SEEK_SET /*TODO: io.SeekStart*/)
 
 			// update node parameters
 			for _, node := range nodes {
@@ -560,7 +609,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 
 	defer out.Close()
 	if 0 <= params.Offset {
-		_, err = out.Seek(params.Offset, 0 /*io.SeekStart*/)
+		_, err = out.Seek(params.Offset, os.SEEK_SET /*TODO: io.SeekStart*/)
 		if err != nil {
 			return rpath, 0, err
 		}
@@ -609,7 +658,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 		if err != nil {
 			return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
 		}
-		tmp.Seek(0, 0 /*io.SeekStart*/) // go to begin
+		tmp.Seek(0, os.SEEK_SET /*TODO: io.SeekStart*/)
 		content = tmp
 	}
 
@@ -627,7 +676,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	defer cat.Close()
 
 	// update catalog atomically
-	data_path, data_pos, data_delim, err := cat.AddFile(filePath, params.Offset, params.Length, delim)
+	data_path, data_pos, data_delim, err := cat.AddFilePart(filePath, params.Offset, params.Length, delim)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
 	}
@@ -649,7 +698,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	}
 	defer data.Close()
 
-	_, err = data.Seek(int64(data_pos), 0 /*io.SeekStart*/)
+	_, err = data.Seek(data_pos, os.SEEK_SET /*TODO: io.SeekStart*/)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to seek data file: %s", err)
 	}

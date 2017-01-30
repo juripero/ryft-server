@@ -32,41 +32,58 @@ package search
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
 
+// thread-safe pool of Record objects
+var recPool = &sync.Pool{
+	New: func() interface{} {
+		return new(Record)
+	},
+}
+
 // Record is INDEX and DATA combined.
 type Record struct {
-	Index Index
-	Data  []byte
+	Index   *Index      `json:"_index,omitempty" msgpack:"_index,omitempty"` // relatedmeta-data
+	RawData []byte      `json:"raw,omitempty" msgpack:"raw,omitempty"`       // base-64 encoded in general case
+	Data    interface{} `json:"data,omitempty" msgpack:"data,omitempty"`     // format specific data
 }
 
-// String gets the string representation of record.
-func (r Record) String() string {
-	return fmt.Sprintf("Record{%s, data:%q}",
-		r.Index, utils.DumpAsString(r.Data))
+// NewRecord creates a new Record object.
+// This object can be utilized by Release method.
+func NewRecord(index *Index, data []byte) *Record {
+	// get object from pool
+	rec := recPool.Get().(*Record)
+
+	// initialize
+	rec.Index = index
+	rec.RawData = data
+	rec.Data = data
+
+	return rec
 }
 
-// Index is INDEX meta-data.
-type Index struct {
-	File      string
-	Offset    uint64
-	Length    uint64
-	Fuzziness uint8
-	Host      string // optional host address (used in cluster mode)
-}
-
-// UpdateHost updates the index's host.
-// Host is updates only once, if it was set before.
-func (i *Index) UpdateHost(host string) {
-	if len(i.Host) == 0 && len(host) != 0 {
-		i.Host = host
+// Release releases the record.
+// Please call this method once record is used.
+func (rec *Record) Release() {
+	// release index
+	if idx := rec.Index; idx != nil {
+		rec.Index = nil
+		idx.Release()
 	}
+
+	// release data (for GC)
+	rec.RawData = nil
+	rec.Data = nil
+
+	// put back to pool
+	recPool.Put(rec)
 }
 
-// String gets the string representation of Index.
-func (i Index) String() string {
-	return fmt.Sprintf("{%s#%d, len:%d, d:%d}",
-		i.File, i.Offset, i.Length, i.Fuzziness)
+// String gets the string representation of Record.
+func (rec Record) String() string {
+	return fmt.Sprintf("Record{%s, data:%q}",
+		rec.Index, utils.DumpAsString(rec.RawData))
 }

@@ -38,7 +38,6 @@ import (
 	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
-	"github.com/getryft/ryft-server/search/ryftone"
 	"github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 
@@ -57,18 +56,19 @@ var (
 const (
 	CORE = "core"
 	JOBS = "jobs"
-	BUSY = "busyness"
+	BUSY = "busy"
 )
 
 // handle /logging/level endpoint: change logger's level
 func (server *Server) DoLoggingLevel(ctx *gin.Context) {
+	defer RecoverFromPanic(ctx)
+
 	// try to set levels from query
 	for key, vals := range ctx.Request.URL.Query() {
 		for _, level := range vals { // usually one item
 			if err := setLoggingLevel(key, level); err != nil {
-				ctx.IndentedJSON(http.StatusBadRequest,
-					map[string]interface{}{"error": err.Error()})
-				return
+				panic(NewError(http.StatusBadRequest, err.Error()).
+					WithDetails("failed to change logging level"))
 			}
 		}
 	}
@@ -80,12 +80,11 @@ func (server *Server) DoLoggingLevel(ctx *gin.Context) {
 		"core/pending-jobs": jobsLog.Level.String(),
 		"core/busyness":     busyLog.Level.String(),
 		"search/ryftprim":   ryftprim.GetLogLevel().String(),
-		"search/ryftone":    ryftone.GetLogLevel().String(),
 		"search/ryfthttp":   ryfthttp.GetLogLevel().String(),
 		"search/ryftmux":    ryftmux.GetLogLevel().String(),
 		"search/ryftdec":    ryftdec.GetLogLevel().String(),
 
-		// TODO: more core loggers, see setLoggingLevel() function
+		// TODO: more loggers, see setLoggingLevel() function
 	}
 
 	ctx.IndentedJSON(http.StatusOK, info)
@@ -110,8 +109,6 @@ func setLoggingLevel(logger string, level string) error {
 		// TODO: more core loggers
 	case "search/ryftprim":
 		ryftprim.SetLogLevel(ll)
-	case "search/ryftone":
-		ryftone.SetLogLevel(ll)
 	case "search/ryfthttp":
 		ryfthttp.SetLogLevel(ll)
 	case "search/ryftmux":
@@ -125,6 +122,7 @@ func setLoggingLevel(logger string, level string) error {
 	return nil // OK
 }
 
+// make logging options with the same level
 func makeDefaultLoggingOptions(level string) map[string]string {
 	return map[string]string{
 		"core":              level,
@@ -132,7 +130,6 @@ func makeDefaultLoggingOptions(level string) map[string]string {
 		"core/pending-jobs": level,
 		"core/busyness":     level,
 		"search/ryftprim":   level,
-		"search/ryftone":    level,
 		"search/ryfthttp":   level,
 		"search/ryftmux":    level,
 		"search/ryftdec":    level,

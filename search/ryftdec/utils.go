@@ -32,70 +32,203 @@ package ryftdec
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
+
+	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/query"
 )
 
-func containsString(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
+// RyftCall - one Ryft call result
+type RyftCall struct {
+	DataFile  string // output DATA file
+	IndexFile string // output INDEX file
+	Delimiter string // delimiter string
+	Width     int    // surrounding width, -1 for LINE=true
 }
 
-func containsAnySubString(s string, subs []string) string {
-	for _, v := range subs {
-		if strings.Contains(s, v) {
-			return v
-		}
+// get string
+func (rc RyftCall) String() string {
+	return fmt.Sprintf("RyftCall{data:%s, index:%s, delim:#%x, width:%d}",
+		rc.DataFile, rc.IndexFile, rc.Delimiter, rc.Width)
+}
+
+// SearchResult - intermediate search results
+type SearchResult struct {
+	Stat   *search.Stat
+	Output []RyftCall // list of data/index files
+}
+
+// Matches gets the number of matches
+func (res SearchResult) Matches() uint64 {
+	if res.Stat != nil {
+		return res.Stat.Matches
 	}
-	return ""
+
+	return 0 // no stat yet
+}
+
+// GetDataFiles gets the list of data files
+func (res SearchResult) GetDataFiles() []string {
+	files := make([]string, 0, len(res.Output))
+	for _, out := range res.Output {
+		files = append(files, out.DataFile)
+	}
+
+	return files
+}
+
+// remove all data and index files
+// (all errors are ignored)
+func (res SearchResult) removeAll(mountPoint, homeDir string) {
+	for _, out := range res.Output {
+		os.RemoveAll(filepath.Join(mountPoint, homeDir, out.DataFile))
+		os.RemoveAll(filepath.Join(mountPoint, homeDir, out.IndexFile))
+	}
+}
+
+// main backend options
+type backendOptions struct {
+	InstanceName string
+	MountPoint   string
+	HomeDir      string
+	IndexHost    string
+}
+
+// get home-based path
+func (opts backendOptions) atHome(path string) string {
+	return filepath.Join(opts.MountPoint, opts.HomeDir, path)
+}
+
+// get path relative to home directory
+// fallback to absolute in case of error
+func relativeToHome(home, path string) string {
+	if rel, err := filepath.Rel(home, path); err == nil {
+		return rel
+	} else {
+		// log.WithError(err).Warnf("[%s]: failed to get relative path, fallback to absolute", TAG)
+		return path // fallback
+	}
 }
 
 // Detect extension using input file set and optional data file.
-func detectExtension(fileNames []string, dataOut string) (string, error) {
-	extensions := map[string]int{}
+func detectExtension(files []string, data string) (string, error) {
+	extensions := make(map[string]int)
 
 	// output data file
-	if ext := filepath.Ext(dataOut); len(ext) != 0 {
-		extensions[ext] += 1
+	if ext := filepath.Ext(data); len(ext) != 0 {
+		extensions[ext]++
 	}
 
 	// collect unique file extensions
-	for _, file := range fileNames {
-		ext := filepath.Ext(file)
-		if len(ext) != 0 {
-			extensions[ext] += 1
+	for _, file := range files {
+		if ext := filepath.Ext(file); len(ext) != 0 {
+			extensions[ext]++
 		}
 	}
 
 	if len(extensions) <= 1 {
 		// return the first extension
-		for k, _ := range extensions {
+		for k := range extensions {
 			return k, nil // OK
 		}
 
 		return "", nil // OK, no extension
 	}
 
-	return "", fmt.Errorf("unable to detect extension from %v", extensions)
+	return "", fmt.Errorf("ambiguous extension: %v", extensions)
 }
 
-func indexOfToken(tokens []string, token string) int {
-	for index, value := range tokens {
-		if value == token {
-			return index
+// combine statistics
+func combineStat(mux *search.Stat, stat *search.Stat) {
+	mux.Matches += stat.Matches
+	mux.TotalBytes += stat.TotalBytes
+
+	mux.Duration += stat.Duration
+	mux.FabricDuration += stat.FabricDuration
+
+	// update data rates (including TotalBytes/0=+Inf protection)
+	if mux.FabricDuration > 0 {
+		mb := float64(mux.TotalBytes) / 1024 / 1024
+		sec := float64(mux.FabricDuration) / 1000
+		mux.FabricDataRate = mb / sec
+	} else {
+		mux.FabricDataRate = 0.0
+	}
+	if mux.Duration > 0 {
+		mb := float64(mux.TotalBytes) / 1024 / 1024
+		sec := float64(mux.Duration) / 1000
+		mux.DataRate = mb / sec
+	} else {
+		mux.DataRate = 0.0
+	}
+
+	// save details
+	mux.Details = append(mux.Details, stat)
+}
+
+// ConfigToOptions converts search configuration to Options.
+func ConfigToOptions(cfg *search.Config) query.Options {
+	opts := query.DefaultOptions()
+
+	opts.Mode = cfg.Mode
+	opts.Dist = cfg.Dist
+	opts.Width = cfg.Width
+	opts.Reduce = cfg.Reduce
+	opts.Case = cfg.Case
+
+	// opts.Octal =
+	// opts.CurrencySymbol =
+	// opts.DigitSeparator =
+	// opts.DecimalPoint =
+	// opts.FileFilter =
+
+	return opts
+}
+
+// update search configuration with Options.
+func updateConfig(cfg *search.Config, opts query.Options) {
+	cfg.Mode = opts.Mode
+	cfg.Dist = opts.Dist
+	cfg.Width = opts.Width
+	cfg.Reduce = opts.Reduce
+	cfg.Case = opts.Case
+}
+
+// find the first file filter
+func findFirstFilter(q query.Query) string {
+	// check simple query first
+	if sq := q.Simple; sq != nil {
+		if f := sq.Options.FileFilter; len(f) != 0 {
+			return f
 		}
 	}
-	return -1
+
+	// check all arguments
+	for i := 0; i < len(q.Arguments); i++ {
+		if f := findFirstFilter(q.Arguments[i]); len(f) != 0 {
+			return f
+		}
+	}
+
+	return "" // not found
 }
 
-func removeQuotedText(expr string) string {
-	s := []byte(expr)
-	repl := []byte("")
-	reg := regexp.MustCompile(`\"(.*?)\"`)
-	return string(reg.ReplaceAll(s, repl))
+// find the last file filter
+func findLastFilter(q query.Query) string {
+	// check all arguments
+	for i := len(q.Arguments) - 1; i >= 0; i-- {
+		if f := findFirstFilter(q.Arguments[i]); len(f) != 0 {
+			return f
+		}
+	}
+
+	// check simple query first
+	if sq := q.Simple; sq != nil {
+		if f := sq.Options.FileFilter; len(f) != 0 {
+			return f
+		}
+	}
+
+	return "" // not found
 }

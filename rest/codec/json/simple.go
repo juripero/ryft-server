@@ -42,6 +42,8 @@ import (
 , errors: [ <errors ]
 , stats: <statistics>
 }
+
+Not thread-safe!
 */
 
 // Simple JSON encoder.
@@ -50,8 +52,8 @@ type SimpleEncoder struct {
 	encoder *backend.Encoder
 
 	records int         // number of records written
-	stat    interface{} // cached statistics
 	errors  []string    // cached error messages
+	stat    interface{} // cached statistics
 }
 
 // Create new simple JSON encoder instance.
@@ -64,6 +66,10 @@ func NewSimpleEncoder(w io.Writer) (*SimpleEncoder, error) {
 
 // Write a RECORD
 func (enc *SimpleEncoder) EncodeRecord(rec interface{}) error {
+	if rec == nil {
+		return nil // nothing to do
+	}
+
 	// write header for the first record
 	if enc.records == 0 {
 		err := enc.writeHeader()
@@ -98,10 +104,10 @@ func (enc *SimpleEncoder) EncodeStat(stat interface{}) error {
 }
 
 // Write an ERROR
-func (enc *SimpleEncoder) EncodeError(err error) error {
-	if err != nil {
+func (enc *SimpleEncoder) EncodeError(err_ error) error {
+	if err_ != nil {
 		// just save, will be written later
-		enc.errors = append(enc.errors, err.Error())
+		enc.errors = append(enc.errors, err_.Error())
 	}
 
 	return nil // OK
@@ -118,7 +124,7 @@ func (enc *SimpleEncoder) Close() error {
 	}
 
 	// end of records
-	_, err := enc.writer.Write([]byte("]"))
+	_, err := enc.writer.Write([]byte{']'})
 	if err != nil {
 		return err
 	}
@@ -154,7 +160,7 @@ func (enc *SimpleEncoder) Close() error {
 	}
 
 	// write footer
-	_, err = enc.writer.Write([]byte("}"))
+	_, err = enc.writer.Write([]byte{'}'})
 	return err
 }
 

@@ -35,30 +35,24 @@ import (
 )
 
 // RECORD format specific data.
-type Record map[string]interface{}
-
-const (
-	recFieldIndex = "_index"
-	recFieldError = "_error"
-	recFieldData  = "data"
-)
+// Optimization: the rec.Data is just assigned to nil!
+type Record search.Record
 
 // NewRecord creates new format specific data.
-func NewRecord() interface{} {
-	return new(Record)
+func NewRecord() *Record {
+	return (*Record)(search.NewRecord(nil, nil))
 }
 
 // FromRecord converts RECORD to format specific data.
+// WARNING: the data of 'rec' will be lost!
 func FromRecord(rec *search.Record) *Record {
 	if rec == nil {
 		return nil
 	}
 
-	res := Record{
-		recFieldIndex: FromIndex(rec.Index),
-	}
-
-	return &res
+	rec.Data = nil // no data
+	rec.RawData = nil
+	return (*Record)(rec)
 }
 
 // ToRecord converts format specific data to RECORD.
@@ -67,8 +61,5 @@ func ToRecord(rec *Record) *search.Record {
 		return nil
 	}
 
-	panic("NULL ToRecord is not implemented!")
-	//res := new(search.Record)
-	//res.Index = ToIndex(rec.Index)
-	//return res
+	return (*search.Record)(rec)
 }

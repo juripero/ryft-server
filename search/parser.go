@@ -37,49 +37,46 @@ import (
 	"strings"
 )
 
-// ParseIndex parses Index record from custom line.
-func ParseIndex(buf []byte) (index Index, err error) {
-	sep := []byte(",")
-	fields := bytes.Split(bytes.TrimSpace(buf), sep)
+// ParseIndex parses index from Ryft index file line.
+func ParseIndex(buf []byte) (*Index, error) {
+	coma := []byte{','}
+	fields := bytes.Split(buf, coma)
 	n := len(fields)
 	if n < 4 {
-		return index, fmt.Errorf("invalid number of fields in '%s'", string(buf))
+		return nil, fmt.Errorf("invalid number of fields in '%s'", string(buf))
 	}
 
 	// NOTE: filename (first field) may contains ','
 	// so we have to combine some first fields
-	file := bytes.Join(fields[0:n-3], sep)
+	file := bytes.Join(fields[0:n-3], coma)
 
 	// Offset
-	var offset uint64
-	offset, err = strconv.ParseUint(string(fields[n-3]), 10, 64)
+	offset, err := strconv.ParseUint(string(bytes.TrimSpace(fields[n-3])), 10, 64)
 	if err != nil {
-		return index, fmt.Errorf("failed to parse offset: %s", err)
+		return nil, fmt.Errorf("failed to parse offset: %s", err)
 	}
 
 	// Length
-	var length uint64
-	length, err = strconv.ParseUint(string(fields[n-2]), 10, 64)
+	length, err := strconv.ParseUint(string(bytes.TrimSpace(fields[n-2])), 10, 64)
 	if err != nil {
-		return index, fmt.Errorf("failed to parse length: %s", err)
+		return nil, fmt.Errorf("failed to parse length: %s", err)
 	}
 
-	// Fuzziness
-	var fuzz uint64
-	if strings.EqualFold(string(fields[n-1]), "n/a") {
-		fuzz = 0 // TODO: check special value for N/A
+	// Fuzziness distance
+	var dist int64
+	if str := string(bytes.TrimSpace(fields[n-1])); strings.EqualFold(str, "n/a") {
+		dist = -1 // TODO: check special value for N/A
 	} else {
-		fuzz, err = strconv.ParseUint(string(fields[n-1]), 10, 8)
+		dist, err = strconv.ParseInt(str, 10, 31)
 		if err != nil {
-			return index, fmt.Errorf("failed to parse fuzziness: %s", err)
+			return nil, fmt.Errorf("failed to parse fuzziness distance: %s", err)
 		}
 	}
 
-	// update index
-	index.File = string(file)
-	index.Offset = offset
-	index.Length = length
-	index.Fuzziness = uint8(fuzz)
+	// create index
+	path := string(bytes.TrimSpace(file))
+	index := NewIndex(path, offset, length)
+	index.Fuzziness = int32(dist)
 
-	return // OK
+	return index, nil // OK
 }

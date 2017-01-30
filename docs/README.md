@@ -1,13 +1,13 @@
 This directory contains documentation related to ryft server.
 
-[Build and Run](./buildandrun.md) document contains detailed instructions
-how to build ryft server and run it with various parameters.
+[Build](./build.md) document contains detailed instructions
+how to build ryft server and [Run](./run.md) it with various parameters.
 
-[REST API](./restapi.md) document contains detailed description of exported
-REST API endpoints such as [/search](./restapi.md#search)
-and [/version](./restapi.md#version)
+[REST API](./rest/README.md) document contains detailed description of exported
+REST API endpoints such as [/search](./rest/search.md#search)
+and [/version](./rest/README.md#version)
 
-[Search syntax](./searchsyntax.md) document contains description and
+[Search syntax](./search/README.md) document contains description and
 examples  of various search types supported.
 
 [Authentication](./auth.md) document contains information
@@ -16,5 +16,5 @@ related to authentication schemes supported by ryft server.
 [Cluster](./cluster.md) document contains some information
 related to cluster mode.
 
-[Search engines](./search.md) document contains detailed description
+[Search engines](./search/engine.md) document contains detailed description
 of some ryft-server internals.

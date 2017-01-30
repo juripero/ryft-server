@@ -33,9 +33,9 @@ make debian
 ```
 
 Most of the options can be customized via configuration file.
-See [build and run](./docs/buildandrun.md) document for more details.
+See [build](./docs/build.md) document for more details.
 
-There is also some information about [search engine](./docs/search.md)
+There is also some information about [search engine](./docs/search/engine.md)
 implementation and [authnetication](./docs/auth.md).
 
 
@@ -43,10 +43,10 @@ implementation and [authnetication](./docs/auth.md).
 
 `ryft-server` supports a few REST endpoints:
 
-  - [/version](./docs/restapi.md#version)
-  - [/search](./docs/restapi.md#search)
-  - [/count](./docs/restapi.md#count)
-  - [/files](./docs/restapi.md#files)
+  - [/version](./docs/rest/README.md#version)
+  - [/search](./docs/rest/search.md#search)
+  - [/count](./docs/rest/search.md#count)
+  - [/files](./docs/rest/files.md)
 
 All examples assume the `ryft-server` host name is `ryftone-777`.
 
@@ -92,10 +92,10 @@ This request prints current server version and corresponding git hash number.
 This information is extremelly useful for bug reporting.
 
 
-See [REST API](./docs/restapi.md) document for more details.
+See [REST API](./docs/rest/README.md) document for more details.
 
 Some endpoints are protected. See [authentication](./docs/auth.md) document
-and [corresponding demo](./docs/demo-2016-07-21.md).
+and [corresponding demo](./docs/demo/2016-07-21-authentication.md).
 
 
 # Command line tools
@@ -129,4 +129,4 @@ ryftrest -q '((RECORD.Date CONTAINS TIME(11:50:00 < HH:MM:SS <= 11:55:00)) \
 ```
 
 For more detailed examples see:
-[ryftrest sample 1](./docs/demo-2016-04-28.md) and [ryftrest sample 2](./docs/demo-2016-05-12.md)
+[ryftrest sample 1](./docs/demo/2016-04-28-ryftrest.md) and [ryftrest sample 2](./docs/demo/2016-05-12-ryftrest.md)

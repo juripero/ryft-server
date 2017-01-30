@@ -31,23 +31,22 @@
 package ryftmux
 
 import (
-	// "fmt"
+	"fmt"
 
 	"github.com/getryft/ryft-server/search"
 )
 
-// Search starts asynchronous "/search" with RyftMUX engine.
+// Search starts asynchronous "/search" or "/count" operation.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
-	task := NewTask()
+	task := NewTask(cfg)
 	mux := search.NewResult()
-	engine.prepare(task, cfg)
 
 	// prepare requests
 	for _, backend := range engine.Backends {
 		res, err := backend.Search(cfg)
 		if err != nil {
-			task.log().WithError(err).Errorf("[%s]: failed to start /search subtask", TAG)
-			mux.ReportError(err)
+			task.log().WithError(err).Warnf("[%s]: failed to start /search backend", TAG)
+			mux.ReportError(fmt.Errorf("failed to start /search backend: %s", err))
 			continue
 		}
 

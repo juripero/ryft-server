@@ -33,9 +33,10 @@ package codec
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/getryft/ryft-server/rest/codec/json"
-	"github.com/getryft/ryft-server/rest/codec/msgpack.v2"
+	"github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 )
 
 const (
@@ -60,37 +61,30 @@ type Decoder interface {
 
 // Get list of supported MIME types.
 func GetSupportedMimeTypes() []string {
-	types := []string{}
-	types = append(types, MIME_JSON)
-	types = append(types, MIME_MSGPACK)
-	types = append(types, MIME_XMSGPACK)
-	return types
+	return []string{
+		MIME_JSON,
+		MIME_MSGPACK,
+		MIME_XMSGPACK,
+	}
 }
 
 // Create new encoder instance by MIME type.
-func NewEncoder(w io.Writer, mime string, stream bool, spark bool) (Encoder, error) {
-	switch mime {
+func NewEncoder(w io.Writer, mime string, stream bool) (Encoder, error) {
+	switch strings.ToLower(mime) {
 	case MIME_JSON:
-		if spark {
-			return json.NewSparkEncoder(w)
-		} else if stream {
+		if stream {
 			return json.NewStreamEncoder(w)
 		} else {
 			return json.NewSimpleEncoder(w)
 		}
+
 	case MIME_XMSGPACK, MIME_MSGPACK:
-		if spark {
-			enc, err := msgpack.NewSimpleEncoder(w)
-			if err != nil {
-				return nil, err
-			}
-			enc.RecordsOnly = true // Spark format
-			return enc, err
-		} else if stream {
+		if stream {
 			return msgpack.NewStreamEncoder(w)
 		} else {
 			return msgpack.NewSimpleEncoder(w)
 		}
+
 	default:
 		return nil, fmt.Errorf("%q is unsupported MIME type", mime)
 	}

@@ -3,7 +3,7 @@
   "info": {
     "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "RyftOne REST API",
-    "version": "0.8.0"
+    "version": "0.10.0"
   },
   "paths": {
     "/search": {
@@ -45,13 +45,10 @@
           },
           {
             "in": "query",
-            "type": "integer",
-            "format": "uint32",
-            "maximum": 262144,
-            "minimum": 0,
+            "type": "string",
             "name": "surrounding",
             "x-go-name": "Surrounding",
-            "description": "Number of characters before the match and after the match that will be returned. This parameter is used with RAW text search"
+            "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
           },
           {
             "in": "query",
@@ -77,6 +74,14 @@
             "name": "cs",
             "x-go-name": "CaseSensitive",
             "description": "Case sensitive flag"
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "reduce",
+            "default": true,
+            "x-go-name": "Reduce",
+            "description": "Reduce flag for fuzzy edit distance search"
           },
           {
             "in": "query",
@@ -195,13 +200,10 @@
           },
           {
             "in": "query",
-            "type": "integer",
-            "format": "uint32",
-            "maximum": 262144,
-            "minimum": 0,
+            "type": "string",
             "name": "surrounding",
             "x-go-name": "Surrounding",
-            "description": "Number of characters before the match and after the match that will be returned. This parameter is used with RAW text search"
+            "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
           },
           {
             "in": "query",
@@ -219,6 +221,14 @@
             "name": "cs",
             "x-go-name": "CaseSensitive",
             "description": "Case sensitive flag"
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "reduce",
+            "default": true,
+            "x-go-name": "Reduce",
+            "description": "Reduce flag for fuzzy edit distance search"
           },
           {
             "in": "query",
@@ -283,7 +293,7 @@
         ],
         "summary": "List a directory content",
         "description": "Endpoint to query node/cluster file system structure",
-        "operationId": "files",
+        "operationId": "getFiles",
         "parameters": [
           {
             "name": "dir",
@@ -319,7 +329,7 @@
         ],
         "summary": "Upload files",
         "description": "Endpoint to upload files",
-        "operationId": "files",
+        "operationId": "postFiles",
         "parameters": [
           {
             "name": "file",
@@ -388,7 +398,7 @@
         ],
         "summary": "Delete directories and files",
         "description": "Endpoint to delete node's directories and files",
-        "operationId": "files",
+        "operationId": "deleteFiles",
         "parameters": [
           {
             "name": "dir",
@@ -419,6 +429,13 @@
             "collectionFormat": "multi",
             "description": "The catalog path to delete. Wildcards are supported.",
             "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "x-go-name": "Local",
+            "description": "Perform action only on this cluster member. Default 'false'."
           }
         ],
         "responses": {

@@ -59,28 +59,24 @@ func NewSimpleEncoder(w io.Writer) (*SimpleEncoder, error) {
 
 // Write a RECORD
 func (enc *SimpleEncoder) EncodeRecord(rec interface{}) error {
-	err := enc.encoder.Encode(rec)
-	if err != nil {
-		return err
+	if rec == nil {
+		return nil // nothing to do
 	}
 
-	return nil // OK
+	return enc.encoder.Encode(rec)
 }
 
 // Write a STATISTICS
 func (enc *SimpleEncoder) EncodeStat(stat interface{}) error {
-	if !enc.RecordsOnly {
-		enc.stat = stat // will be written later
-	}
-
-	return nil // OK
+	enc.stat = stat // will be written later
+	return nil      // OK
 }
 
 // Write an ERROR
-func (enc *SimpleEncoder) EncodeError(err error) error {
-	if err != nil && !enc.RecordsOnly {
+func (enc *SimpleEncoder) EncodeError(err_ error) error {
+	if err_ != nil {
 		// just save, will be written later
-		enc.errors = append(enc.errors, err.Error())
+		enc.errors = append(enc.errors, err_.Error())
 	}
 
 	return nil // OK

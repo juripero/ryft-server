@@ -36,12 +36,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
+	"sort"
 	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
+	"github.com/getryft/ryft-server/search/utils/query"
 )
 
 var (
@@ -49,16 +51,18 @@ var (
 	taskId = uint64(0 * time.Now().UnixNano())
 )
 
-// RyftDEC task related data.
+// Task - task related data.
 type Task struct {
 	Identifier string // unique
-	subtaskId  int
+	subtaskId  int    // for each Ryft call
 
-	config    *search.Config
-	queries   *Node // root query
-	extension string
+	rootQuery query.Query // root of decomposed query
+	extension string      // used for intermediate results, may be empty
 
-	result PostProcessing
+	config *search.Config // input configuration
+	result PostProcessing // post processing engine
+
+	UpdateHostTo string // for cluster mode
 }
 
 // NewTask creates new task.
@@ -67,70 +71,55 @@ func NewTask(config *search.Config) *Task {
 
 	task := new(Task)
 	task.Identifier = fmt.Sprintf("dec-%08x", id)
-	task.config = config
 
+	task.config = config
 	return task
 }
 
-// get search mode based on query type
-func getSearchMode(query QueryType, opts Options) string {
-	switch query {
-	case QTYPE_SEARCH:
-		if opts.Dist == 0 {
-			return "es" // exact_search if fuzziness is zero
-		}
-		return opts.Mode
-	case QTYPE_DATE:
-		return "ds" // date_search
-	case QTYPE_TIME:
-		return "ts" // time_search
-	case QTYPE_NUMERIC, QTYPE_CURRENCY:
-		return "ns" // numeric_search
-	case QTYPE_REGEX:
-		return "rs" // regex_search
-	case QTYPE_IPV4:
-		return "ipv4" // IPv4 search
-	case QTYPE_IPV6:
-		return "ipv6" // IPv6 search
-	}
-
-	return opts.Mode
-}
-
 // Drain all records/errors from 'res' to 'mux'
-func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecords bool) {
-	defer task.log().WithField("result", mux).Debugf("[%s]: got combined result", TAG)
+// Also handle task cancellation.
+func (task *Task) drainResults(mux *search.Result, res *search.Result) {
+	defer task.log().WithField("result", mux).Debugf("[%s/%d]: got combined result", TAG, task.subtaskId)
 
 	for {
 		select {
+		case <-mux.CancelChan:
+			// processing is cancelled
+			errors, records := res.Cancel()
+			if errors > 0 || records > 0 {
+				task.log().WithFields(map[string]interface{}{
+					"errors":  errors,
+					"records": records,
+				}).Debugf("[%s/%d]: some errors/records are ignored", TAG, task.subtaskId)
+			}
+
+			// wait 'res' is actually done!
+
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
+				// task.log().WithError(err).Debugf("[%s/%d]: new error received", TAG, task.subtaskId) // DEBUG
 				// TODO: mark error with subtask's tag?
-				// task.log().WithError(err).Debugf("[%s]/%d: new error received", TAG, task.subtaskId) // DEBUG
 				mux.ReportError(err)
 			}
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
-				// task.log().WithField("rec", rec).Debugf("[%s]/%d: new record received", TAG, task.subtaskId) // DEBUG
-				if saveRecords {
-					mux.ReportRecord(rec)
-				}
+				// task.log().WithField("rec", rec).Debugf("[%s/%d]: new record received", TAG, task.subtaskId) // DEBUG
+				// we do not expect any RECORDs here, this is actually IMPOSSIBLE, since we use /count
 			}
 
 		case <-res.DoneChan:
 			// drain the error channel
 			for err := range res.ErrorChan {
-				// task.log().WithError(err).Debugf("[%s]/%d: *** new error received", TAG, task.subtaskId) // DEBUG
+				// task.log().WithError(err).Debugf("[%s/%d]: *** new error received", TAG, task.subtaskId) // DEBUG
+				// TODO: mark error with subtask's tag?
 				mux.ReportError(err)
 			}
 
 			// drain the record channel
-			for rec := range res.RecordChan {
-				// task.log().WithField("rec", rec).Debugf("[%s]/%d: *** new record received", TAG, task.subtaskId) // DEBUG
-				if saveRecords {
-					mux.ReportRecord(rec)
-				}
+			for _ = range res.RecordChan {
+				// task.log().WithField("rec", rec).Debugf("[%s/%d]: *** new record received", TAG, task.subtaskId) // DEBUG
+				// we do not expect any RECORDs here, this is actually IMPOSSIBLE, since we use /count
 			}
 
 			return // done!
@@ -138,22 +127,26 @@ func (task *Task) drainResults(mux *search.Result, res *search.Result, saveRecor
 	}
 }
 
-// general post-processing interface
+// PostProcessing general post-processing interface
 type PostProcessing interface {
-	ClearAll() error // prepare work - clear all data
-	Drop(keep bool)  // finish work
+	Drop(keep bool) // finish work
+	ClearAll()      // clear all data
 
 	AddRyftResults(dataPath, indexPath string,
-		delimiter string, width uint, opt uint32) error
+		delimiter string, width int, opt uint32) error
 	AddCatalog(base *catalog.Catalog) error
 
 	DrainFinalResults(task *Task, mux *search.Result,
 		keepDataAs, keepIndexAs, delimiter string,
 		mountPointAndHomeDir string,
 		ryftCalls []RyftCall,
-		reportRecords bool) error
+		filter string) error
+	GetUniqueFiles(task *Task, mux *search.Result,
+		mountPointAndHomeDir string,
+		filter string) ([]string, error)
 }
 
+/*
 // post-processing SQLite-based
 type CatalogPostProcessing struct {
 	cat *catalog.Catalog
@@ -166,12 +159,12 @@ func NewCatalogPostProcessing(path string) (PostProcessing, error) {
 		return nil, err
 	}
 
-	return &CatalogPostProcessing{cat: cat}, nil // OK
-}
+	err = cpp.cat.ClearAll()
+	if err != nil {
+		return nil, err
+	}
 
-// clear all results
-func (cpp *CatalogPostProcessing) ClearAll() error {
-	return cpp.cat.ClearAll()
+	return &CatalogPostProcessing{cat: cat}, nil // OK
 }
 
 // Drop
@@ -187,8 +180,7 @@ func (cpp *CatalogPostProcessing) Drop(keep bool) {
 func (cpp *CatalogPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width uint, opt uint32) error {
 	start := time.Now()
 	defer func() {
-		stop := time.Now()
-		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-result duration", TAG)
+		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-result duration", TAG)
 	}()
 
 	return cpp.cat.AddRyftResults(dataPath, indexPath, delimiter, width, opt)
@@ -198,19 +190,19 @@ func (cpp *CatalogPostProcessing) AddRyftResults(dataPath, indexPath string, del
 func (cpp *CatalogPostProcessing) AddCatalog(base *catalog.Catalog) error {
 	start := time.Now()
 	defer func() {
-		stop := time.Now()
-		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-catalog duration", TAG)
+		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-catalog duration", TAG)
 	}()
 
 	return cpp.cat.CopyFrom(base)
 }
 
 // drain final results
-func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall, reportRecords bool) error {
+func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Result,
+	keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string,
+	ryftCalls []RyftCall, filter string) error {
 	start := time.Now()
 	defer func() {
-		stop := time.Now()
-		log.WithField("t", stop.Sub(start)).Debugf("[%s]: drain-final-results duration", TAG)
+		log.WithField("t", time.Since(start)).Debugf("[%s]: drain-final-results duration", TAG)
 	}()
 
 	wcat := cpp.cat
@@ -234,7 +226,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 				}).Infof("[%s]: use DATA file from last Ryft call", TAG)
 			}
 		}(keepDataAs)
-		keepDataAs = "" // prevent futher processing
+		keepDataAs = "" // prevent further processing
 	}
 
 	// output DATA file
@@ -277,7 +269,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 	for item := range items {
 		var rec search.Record
 		// trim mount point from file name! TODO: special option for this?
-		item.File = strings.TrimPrefix(item.File, mountPointAndHomeDir)
+		item.File = relativeToHome(mountPointAndHomeDir, item.File)
 
 		cf := files[item.DataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
@@ -316,7 +308,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 					"new":  rpos,
 				}).Debugf("[%s]: reset buffered file read", TAG)
 
-				_, err = cf.f.Seek(rpos, 0 /*os.SeekBegin*/)
+				_, err = cf.f.Seek(rpos, os.SEEK_SET /*io.SeekStart*/ /*)
 				if err != nil {
 					mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
 					continue
@@ -339,8 +331,8 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 				}
 			}
 
-			rec.Data = make([]byte, item.Length)
-			n, err := io.ReadFull(cf.rd, rec.Data)
+			rec.RawData = make([]byte, item.Length)
+			n, err := io.ReadFull(cf.rd, rec.RawData)
 			//task.log().WithFields(map[string]interface{}{
 			//	"read":      n,
 			//	"requested": item.Length,
@@ -351,7 +343,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			} else if uint64(n) != item.Length {
 				mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Length))
 			} else {
-				data = rec.Data
+				data = rec.RawData
 			}
 		}
 
@@ -404,22 +396,18 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 
 	return nil // OK
 }
+*/
 
-// in-memory based post-processing
+// InMemoryPostProcessing in-memory based post-processing
 type InMemoryPostProcessing struct {
 	indexes map[string]*search.IndexFile // [datafile] -> indexes
 }
 
 // create in-memory-based post-processing tool
-func NewInMemoryPostProcessing(path string) (PostProcessing, error) {
+func NewInMemoryPostProcessing() (*InMemoryPostProcessing, error) {
 	mpp := new(InMemoryPostProcessing)
 	mpp.indexes = make(map[string]*search.IndexFile)
 	return mpp, nil
-}
-
-// clear all results
-func (mpp *InMemoryPostProcessing) ClearAll() error {
-	return nil // do nothing here
 }
 
 // Drop
@@ -427,40 +415,54 @@ func (mpp *InMemoryPostProcessing) Drop(keep bool) {
 	// do nothing here
 }
 
+// ClearAll clears all data.
+func (mpp *InMemoryPostProcessing) ClearAll() {
+	// release all indexes
+	for _, indexFile := range mpp.indexes {
+		indexFile.Clear()
+	}
+
+	// clear map
+	mpp.indexes = make(map[string]*search.IndexFile)
+}
+
 // add Ryft results
-func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delimiter string, width uint, opt uint32) error {
+func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delim string, width int, opt uint32) error {
 	start := time.Now()
 	defer func() {
-		stop := time.Now()
-		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-result duration", TAG)
+		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-result duration", TAG)
 	}()
 
-	saveTo := search.NewIndexFile(delimiter, width)
-	saveTo.Opt = opt
+	// create new IndexFile
+	indexFile := search.NewIndexFile(delim, width)
+	indexFile.Option = opt
 	if _, ok := mpp.indexes[dataPath]; ok {
 		return fmt.Errorf("the index file %s already exists in the map", dataPath)
 	}
-	mpp.indexes[dataPath] = saveTo
+	mpp.indexes[dataPath] = indexFile
 
+	// open INDEX file
 	file, err := os.Open(indexPath)
 	if err != nil {
 		return fmt.Errorf("failed to open: %s", err)
 	}
 	defer file.Close() // close at the end
 
-	// try to read all index records
-	r := bufio.NewReader(file)
-
+	// read all index records
+	rd := bufio.NewReader(file)
+	delimLen := uint64(len(delim))
+	dataPos := uint64(0)
 	for {
 		// read line by line
-		line, err := r.ReadBytes('\n')
+		line, err := rd.ReadBytes('\n')
 		if len(line) > 0 {
 			index, err := search.ParseIndex(line)
 			if err != nil {
 				return fmt.Errorf("failed to parse index: %s", err)
 			}
 
-			saveTo.AddIndex(index)
+			indexFile.Add(index.SetDataPos(dataPos))
+			dataPos += (index.Length + delimLen)
 		}
 
 		if err != nil {
@@ -479,8 +481,7 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 func (mpp *InMemoryPostProcessing) AddCatalog(base *catalog.Catalog) error {
 	start := time.Now()
 	defer func() {
-		stop := time.Now()
-		log.WithField("t", stop.Sub(start)).Debugf("[%s]: add-ryft-catalog duration", TAG)
+		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-catalog duration", TAG)
 	}()
 
 	indexes, err := base.GetSearchIndexFile()
@@ -488,74 +489,127 @@ func (mpp *InMemoryPostProcessing) AddCatalog(base *catalog.Catalog) error {
 		return fmt.Errorf("failed to get base catalog indexes: %s", err)
 	}
 
-	for file, idx := range indexes {
+	for file, indexFile := range indexes {
 		if _, ok := mpp.indexes[file]; ok {
 			return fmt.Errorf("the index file %s already exists in the map", file)
 		}
-		mpp.indexes[file] = idx
+		mpp.indexes[file] = indexFile
 	}
 
 	return nil // OK
 }
 
-// unwind index
-func (mpp *InMemoryPostProcessing) unwind(index search.Index) (search.Index, int) {
+// unwind index recursively
+func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, int) {
 	if f, ok := mpp.indexes[index.File]; ok && f != nil {
 		tmp, shift := f.Unwind(index)
 		// task.log().Debugf("unwind %s => %s", index, tmp)
-		idx, n := mpp.unwind(tmp)
-		return idx, n + shift
+		res, n := mpp.unwind(tmp)
+		return res, n + shift
 	}
 
 	return index, 0 // done
 }
 
-// drain final results
-func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result, keepDataAs, keepIndexAs, delimiter string, mountPointAndHomeDir string, ryftCalls []RyftCall, reportRecords bool) error {
+// in-memory index reference
+type memItem struct {
+	dataFile string
+	dataPos  uint64
+	Index    *search.Index
+}
+
+// compare two in-memory indexes
+func (i memItem) EqualsTo(o memItem) bool {
+	if i.Index.Offset != o.Index.Offset {
+		return false
+	}
+
+	if i.Index.Length != o.Index.Length {
+		return false
+	}
+
+	return i.Index.File == o.Index.File
+}
+
+// array of in-memory indexes
+type memItems []memItem
+
+func (p memItems) Len() int      { return len(p) }
+func (p memItems) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p memItems) Less(i, j int) bool {
+	a := p[i].Index
+	b := p[j].Index
+
+	// compare by File,Offset,Length
+	if a.File == b.File {
+		if a.Offset == b.Offset {
+			return a.Length < b.Length
+		}
+
+		return a.Offset < b.Offset
+	}
+
+	return a.File < b.File
+	// return p[i] < p[j]
+}
+
+// DrainFinalResults drain final results
+func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result,
+	keepDataAs, keepIndexAs, delimiter string, home string,
+	ryftCalls []RyftCall, filter string) error {
+
 	start := time.Now()
 	defer func() {
-		stop := time.Now()
-		log.WithField("t", stop.Sub(start)).Debugf("[%s]: drain-final-results duration", TAG)
+		log.WithField("t", time.Since(start)).Debugf("[%s]: drain-final-results duration", TAG)
 	}()
 
 	// unwind all indexes first and check if it's simple case
-	simple := true
 	capacity := 0
 	for _, f := range mpp.indexes {
-		if (f.Opt & 0x01) != 0x01 {
+		if (f.Option & 0x01) != 0x01 {
 			continue // ignore temporary results
 		}
 
 		capacity += len(f.Items)
 	}
 
-	type MemItem struct {
-		dataFile string
-		Index    search.Index
-		dataPos  uint64
-		shift    int
+	var ff *regexp.Regexp
+	if len(filter) != 0 {
+		var err error
+		ff, err = regexp.Compile(filter)
+		if err != nil {
+			return fmt.Errorf("failed to compile filter's regexp: %s", err)
+		}
 	}
 
-	items := make([]MemItem, 0, capacity)
+	simple := true
+	items := make(memItems, 0, capacity)
 BuildItems:
-	for itemDataFile, f := range mpp.indexes {
-		if (f.Opt & 0x01) != 0x01 {
+	for dataFile, f := range mpp.indexes {
+		if (f.Option & 0x01) != 0x01 {
 			continue // ignore temporary results
 		}
 
 		for _, item := range f.Items {
+			dataPos := item.DataPos
+
 			// do recursive unwinding!
-			idx, shift := mpp.unwind(item.Index)
-			if shift != 0 || idx.Length != item.Index.Length {
+			idx, shift := mpp.unwind(item)
+			if shift != 0 || idx.Length != item.Length {
 				simple = false
 			}
 
-			// put item to futher processing
-			items = append(items, MemItem{
-				dataFile: itemDataFile,
+			// trim mount point from file name! TODO: special option for this?
+			idx.File = relativeToHome(home, idx.File)
+			if ff != nil && !ff.MatchString(idx.File) {
+				continue
+			}
+
+			// put item to further processing
+			items = append(items, memItem{
+				dataFile: dataFile,
+				dataPos:  dataPos + uint64(shift),
 				Index:    idx,
-				dataPos:  item.DataBeg,
-				shift:    shift,
 			})
 
 			// apply limit options here
@@ -565,15 +619,38 @@ BuildItems:
 		}
 	}
 
-	// TODO: remove duplicates
+	// sort and remove duplicates
+	if 0 < len(items) {
+		// we must sort "copy" of indexes
+		sortedItems := make(memItems, len(items))
+		copy(sortedItems, items)
+		sort.Sort(sortedItems)
+
+		k := 0
+		for i := 1; i < len(sortedItems); i++ {
+			if !sortedItems[k].EqualsTo(sortedItems[i]) {
+				k++
+				sortedItems[k] = sortedItems[i]
+			}
+		}
+
+		sortedItems = sortedItems[:k+1]
+
+		if len(sortedItems) != len(items) {
+			// that means: not a "simple" case
+			items = sortedItems
+			simple = false
+		}
+	}
 
 	// optimization: if possible just use the DATA file from RyftCall
 	if len(keepDataAs) > 0 && simple && len(ryftCalls) == 1 {
 		defer func(dataPath string) {
-			oldPath := filepath.Join(mountPointAndHomeDir, ryftCalls[0].DataFile)
-			newPath := filepath.Join(mountPointAndHomeDir, dataPath)
+			oldPath := filepath.Join(home, ryftCalls[0].DataFile)
+			newPath := filepath.Join(home, dataPath)
 			if err := os.Rename(oldPath, newPath); err != nil {
 				log.WithError(err).Warnf("[%s]: failed to move DATA file", TAG)
+				mux.ReportError(fmt.Errorf("failed to move DATA file: %s", err))
 			} else {
 				log.WithFields(map[string]interface{}{
 					"old": oldPath,
@@ -581,13 +658,13 @@ BuildItems:
 				}).Infof("[%s]: use DATA file from last Ryft call", TAG)
 			}
 		}(keepDataAs)
-		keepDataAs = "" // prevent futher processing
+		keepDataAs = "" // prevent further processing
 	}
 
 	// output DATA file
 	var datFile *bufio.Writer
 	if len(keepDataAs) > 0 {
-		f, err := os.Create(filepath.Join(mountPointAndHomeDir, keepDataAs))
+		f, err := os.Create(filepath.Join(home, keepDataAs))
 		if err != nil {
 			return fmt.Errorf("failed to create DATA file: %s", err)
 		}
@@ -601,7 +678,7 @@ BuildItems:
 	// output INDEX file
 	var idxFile *bufio.Writer
 	if len(keepIndexAs) > 0 {
-		f, err := os.Create(filepath.Join(mountPointAndHomeDir, keepIndexAs))
+		f, err := os.Create(filepath.Join(home, keepIndexAs))
 		if err != nil {
 			return fmt.Errorf("failed to create INDEX file: %s", err)
 		}
@@ -621,11 +698,8 @@ BuildItems:
 	files := make(map[string]*CachedFile)
 
 	// handle all index items
+	const reportRecords = true
 	for _, item := range items {
-		var rec search.Record
-		// trim mount point from file name! TODO: special option for this?
-		item.Index.File = strings.TrimPrefix(item.Index.File, mountPointAndHomeDir)
-
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
 			f, err := os.Open(item.dataFile)
@@ -643,10 +717,10 @@ BuildItems:
 			}
 		}
 
-		var data []byte
+		var data, recRawData []byte
 		if cf != nil && (reportRecords || datFile != nil) {
 			// record's data read position in the file
-			rpos := int64(item.dataPos + uint64(item.shift))
+			rpos := int64(item.dataPos)
 
 			//task.log().WithFields(map[string]interface{}{
 			//	"cache-pos": cf.pos,
@@ -663,7 +737,7 @@ BuildItems:
 					"new":  rpos,
 				}).Debugf("[%s]: reset buffered file read", TAG)
 
-				_, err := cf.f.Seek(rpos, 0 /*os.SeekBegin*/)
+				_, err := cf.f.Seek(rpos, os.SEEK_SET /*io.SeekStart*/)
 				if err != nil {
 					mux.ReportError(fmt.Errorf("failed to seek data: %s", err))
 					continue
@@ -686,8 +760,8 @@ BuildItems:
 				}
 			}
 
-			rec.Data = make([]byte, item.Index.Length)
-			n, err := io.ReadFull(cf.rd, rec.Data)
+			recRawData = make([]byte, item.Index.Length)
+			n, err := io.ReadFull(cf.rd, recRawData)
 			//task.log().WithFields(map[string]interface{}{
 			//	"read":      n,
 			//	"requested": item.Length,
@@ -698,7 +772,7 @@ BuildItems:
 			} else if uint64(n) != item.Index.Length {
 				mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Index.Length))
 			} else {
-				data = rec.Data
+				data = recRawData
 			}
 		}
 
@@ -740,14 +814,60 @@ BuildItems:
 		}
 
 		if reportRecords {
-			rec.Index.File = item.Index.File
-			rec.Index.Offset = item.Index.Offset
-			rec.Index.Length = item.Index.Length
-			rec.Index.Fuzziness = item.Index.Fuzziness
-
-			mux.ReportRecord(&rec)
+			idx := search.NewIndexCopy(item.Index)
+			idx.UpdateHost(task.UpdateHostTo)
+			rec := search.NewRecord(idx, recRawData)
+			idx.DataPos = 0 // hide data position
+			mux.ReportRecord(rec)
 		}
 	}
 
 	return nil // OK
+}
+
+// GetUniqueFiles gets the unique list of files from unwinded indexes
+func (mpp *InMemoryPostProcessing) GetUniqueFiles(task *Task, mux *search.Result, home string, filter string) ([]string, error) {
+
+	start := time.Now()
+	defer func() {
+		log.WithField("t", time.Since(start)).Debugf("[%s]: get-unique-files duration", TAG)
+	}()
+
+	// file filter
+	var ff *regexp.Regexp
+	if len(filter) != 0 {
+		var err error
+		ff, err = regexp.Compile(filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile filter's regexp: %s", err)
+		}
+	}
+
+	// unwind all indexes first and build map of files from INDEX
+	res := make(map[string]int)
+	for _, f := range mpp.indexes {
+		if (f.Option & 0x01) != 0x01 {
+			continue // ignore temporary results
+		}
+
+		for _, item := range f.Items {
+			// do recursive unwinding!
+			idx, _ := mpp.unwind(item)
+
+			// trim mount point from file name! TODO: special option for this?
+			idx.File = relativeToHome(home, idx.File)
+			if ff != nil && !ff.MatchString(idx.File) {
+				continue
+			}
+
+			res[idx.File]++ // put item for further processing
+		}
+	}
+
+	// get keys
+	files := make([]string, 0, len(res))
+	for f := range res {
+		files = append(files, f)
+	}
+	return files, nil // OK
 }

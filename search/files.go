@@ -32,15 +32,52 @@ package search
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 )
 
 // TODO: replace with NodeInfo struct to support trees
+// TODO: report file sizes
+// TODO: report catalogs
 
 // DirInfo is directory's content.
 type DirInfo struct {
-	Path  string   // directory path (relative to mount point)
-	Files []string // files
-	Dirs  []string // subdirectories
+	Path  string   `json:"dir"`               // directory path (relative to mount point)
+	Files []string `json:"files,omitempty"`   // list of files
+	Dirs  []string `json:"folders,omitempty"` // subdirectories
+}
+
+// ReadDir gets directory content from filesystem.
+// if hidden is `true` then all hidden files are also reported.
+func ReadDir(mountPoint, dirPath string, hidden bool) (*DirInfo, error) {
+	// read directory content
+	items, err := ioutil.ReadDir(filepath.Join(mountPoint, dirPath))
+	if err != nil {
+		return nil, err
+	}
+
+	// process directory content
+	res := NewDirInfo(dirPath)
+	for _, item := range items {
+		name := item.Name()
+
+		if hidden {
+			/*if name == "." || name == ".." {
+				continue // skip "." and ".."
+			}*/
+		} else if strings.HasPrefix(name, ".") {
+			continue // skip all hidden files
+		}
+
+		if item.IsDir() {
+			res.AddDir(name)
+		} else {
+			res.AddFile(name)
+		}
+	}
+
+	return res, nil // OK
 }
 
 // NewDirInfo creates empty directory content.
@@ -50,7 +87,7 @@ func NewDirInfo(path string) *DirInfo {
 	// path cannot be empty
 	// so replace "" with "/"
 	if len(path) != 0 {
-		res.Path = path
+		res.Path = filepath.Clean(path)
 	} else {
 		res.Path = "/"
 	}
@@ -66,4 +103,27 @@ func NewDirInfo(path string) *DirInfo {
 func (dir *DirInfo) String() string {
 	return fmt.Sprintf("Dir{path:%q, files:%q, dirs:%q}",
 		dir.Path, dir.Files, dir.Dirs)
+}
+
+// AddFile adds a new file.
+func (dir *DirInfo) AddFile(file ...string) {
+	dir.Files = append(dir.Files, file...)
+}
+
+// AddDir adds a new subdirectory.
+func (dir *DirInfo) AddDir(subdir ...string) {
+	dir.Dirs = append(dir.Dirs, subdir...)
+}
+
+// check if path is relative to home
+func IsRelativeToHome(home string, path string) bool {
+	// home = filepath.Clean(home)
+	// path = filepath.Clean(path)
+	if relPath, err := filepath.Rel(home, path); err != nil {
+		return false
+	} else if strings.Contains(relPath, "..") {
+		return false
+	}
+
+	return true // OK
 }

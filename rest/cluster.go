@@ -53,7 +53,7 @@ func (server *Server) DoClusterMembers(ctx *gin.Context) {
 
 	services, _, err := server.getConsulInfo("", nil) // no user tag, no files
 	if err != nil {
-		panic(NewServerError(http.StatusInternalServerError, err.Error()))
+		panic(NewError(http.StatusInternalServerError, err.Error()))
 	}
 
 	// convert services (only subset of fields)

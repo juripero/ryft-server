@@ -2,7 +2,7 @@
 
 # print usage info
 usage() {
-	cat <<EOF
+    cat <<EOF
 ryftrest is a ryftprim equivalent, it uses ryft-server as a backend.
 
 Usage: $0 [options]
@@ -10,21 +10,23 @@ Usage: $0 [options]
 Search specific:
 -h|--help          Prints this short help message.
 -p|--mode=<mode>   Specifies the search mode to run, which can be one of:
-                     - exact_search (or es)
-                     - fuzzy_hamming_search (or fhs) (used by default)
+                     - exact_search (or es) (used by default)
+                     - fuzzy_hamming_search (or fhs)
                      - fuzzy_edit_distance_search (or feds)
                      - date_search (or ds)
                      - time_search (or ts)
                      - numeric_search (or ns) also used for currency
-                     - regex_search (or rs)
                      - ipv4_search (or ipv4)
                      - ipv6_search (or ipv6)
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
+-r|--reduce        Reduce the duplicates for FEDS (by default)
+--no-reduce        Do not reduce the duplicates for FEDS
 -n|--nodes=<N>     Specifies 1-4 RCAB processing nodes to use (default is 4).
 -d|--fuzziness=<D> Specifies the fuzzy search distance.
 -w|--width=<W>     Specifies the surrounding width.
+--line             Specifies the surrounding whole line (the same as -w=line).
 -e|--delimiter=<E> Specifies the delimiter used between found records.
                    For example pass Windows new line as -e $'\r\n'.
 -s|-q=<query>      Specifies the search/query expression to use.
@@ -37,7 +39,7 @@ REST specific:
                       "http://localhost:8765" by default.
 -u|--user=<cred> Use user credentials, "username:password".
   |--auth
---search         Use /search endpoint (used by default) to print all found items.
+--search         Use /search endpoint to print all found items.
 --count          Use /count endpoint instead of /search to print just statistics (default).
 --limit=N        Specifies the limit on total number of records printed (used with /search).
 --local          Specifies the local search. Opposite to --cluster. (default)
@@ -64,7 +66,7 @@ REST specific:
 
 Examples:
 
-$0 -q 'Joe' -f '*.txt' -vv
+$0 -q 'Joe' -f '*.txt' -vv --search
   will search and print all 'Joe' occurences in text files.
 
 $0 -q 'Joe' -f '*.txt' -vv --count
@@ -77,15 +79,16 @@ EOF
 
 # print error message $1 and exit
 fail() {
-	echo "ERROR: $1"
-	exit 1
+    echo "ERROR: $1"
+    exit 1
 }
 
 # default values
 MODE=
 FILES=
 CATALOGS=
-CASE_INSENS=
+CASE="true"
+REDUCE=true
 NODES=
 FUZZINESS=
 SURROUNDING=
@@ -113,39 +116,39 @@ ADD_DRATE=
 ADD_DETAILS=
 HIDE_HOSTNAME=true
 #
-# individual pieces jq formatting to add units of measurment for demo displays 
+# individual pieces jq formatting to add units of measurment for demo displays
 #
 UNITS1=' if .duration >= 1000 then
-                {"Duration(sec)         ": ((.duration / 1000)|.*10+0.5|floor|./10)}
+             {"Duration(sec)         ": ((.duration / 1000)|.*10+0.5|floor|./10)}
         else {"Duration(msec)        ": .duration}
         end
         + if .totalBytes >= 1099511627776 then
-                {"Total Bytes(TB)       ": ((.totalBytes / 1024 / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
+             {"Total Bytes(TB)       ": ((.totalBytes / 1024 / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
         elif .totalBytes >= 1073741824 then
-                {"Total Bytes(GB)       ": ((.totalBytes / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
+             {"Total Bytes(GB)       ": ((.totalBytes / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
         elif .totalBytes >= 1048576 then
-                {"Total Bytes(MB)       ": ((.totalBytes / 1024 / 1024)|.*100+0.005|floor|./100)}
+             {"Total Bytes(MB)       ": ((.totalBytes / 1024 / 1024)|.*100+0.005|floor|./100)}
         elif .totalBytes >= 1024 then
-                {"Total Bytes(KB)       ": ((.totalBytes / 1024)|.*100+0.005|floor|./100)}
+             {"Total Bytes(KB)       ": ((.totalBytes / 1024)|.*100+0.005|floor|./100)}
         else {"Total Bytes           ": .totalBytes}
         end'
 
 UNITS_DR=' + if .dataRate >= 1024 then
-                {"Data Rate(GB/s)       ": ((.dataRate / 1024)|.*100+0.005|floor|./100)}
+             {"Data Rate(GB/s)       ": ((.dataRate / 1024)|.*100+0.005|floor|./100)}
         elif .dataRate < 0.001 then
-                {"Data Rate(KB/s)       ": ((.dataRate * 1024)|.*100+0.005|floor|./100)}
+             {"Data Rate(KB/s)       ": ((.dataRate * 1024)|.*100+0.005|floor|./100)}
         else {"Data Rate(MB/s)       ": (.dataRate |.*100+0.005|floor|./100)}
         end'
 
 UNITS2=' + {"Matches               ": .matches}
         + if .fabricDataRate >= 1024 then
-                {"Fabric Data Rate(GB/s)": ((.fabricDataRate / 1024)|.*100+0.005|floor|./100)}
+             {"Fabric Data Rate(GB/s)": ((.fabricDataRate / 1024)|.*100+0.005|floor|./100)}
         elif .fabricDataRate < 0.001 then
-                {"Fabric Data Rate(KB/s)": ((.fabricDataRate * 1024)|.*100+0.005|floor|./100)}
+             {"Fabric Data Rate(KB/s)": ((.fabricDataRate * 1024)|.*100+0.005|floor|./100)}
         else {"Fabric Data Rate(MB/s)": .fabricDataRate}
         end
         + if .fabricDuration >= 1000 then
-                {"Fabric Duration(sec)  ": ((.fabricDuration / 1000)|.*100+0.005|floor|./100)}
+             {"Fabric Duration(sec)  ": ((.fabricDuration / 1000)|.*100+0.005|floor|./100)}
         else {"Fabric Duration(msec) ": .fabricDuration}
         end'
 
@@ -154,200 +157,212 @@ UNITS_H=' + {"Host                  ": .host}'
 UNITS_H_DET=' + {"Host             ": .details.host}'
 
 UNITS_1_DET=' + {"Duration         ": .details.duration}
-                + {"Total Bytes      ": .details.totalBytes}'
+              + {"Total Bytes      ": .details.totalBytes}'
 
 UNITS_DR_DET=' + {"Data Rate        ": .details.dataRate}'
 
-UNITS_2_DET='	+ {"Matches          ": .details.matches}
-		+ {"Fabric Data Rate ": .details.fabricDataRate}
-		+ {"Fabric Duration  ": .details.fabricDuration}'
+UNITS_2_DET=' + {"Matches          ": .details.matches}
+              + {"Fabric Data Rate ": .details.fabricDataRate}
+              + {"Fabric Duration  ": .details.fabricDuration}'
 
 # parse options
 while [[ $# > 0 ]]; do
-	case "$1" in
-	-p=*|--mode=*)
-		MODE="${1#*=}"
-		shift
-		;;
-	-p|--mode)
-		MODE="$2"
-		shift 2
-		;;
-	-f=*|--file=*)
-		FILES="$FILES:${1#*=}"
-		shift
-		;;
-	-f|--file)
-		FILES="$FILES:$2"
-		shift 2
-		;;
-	-c=*|--catalog=*)
-		CATALOGS="$CATALOGS:${1#*=}"
-		shift
-		;;
-	-c|--catalog)
-		CATALOGS="$CATALOGS:$2"
-		shift 2
-		;;
-	-i)
-		CASE_INSENS="true"
-		shift
-		;;
-	-n=*|--nodes=*)
-		NODES="${1#*=}"
-		shift
-		;;
-	-n|--nodes)
-		NODES="$2"
-		shift 2
-		;;
-	-d=*|--fuzziness=*)
-		FUZZINESS="${1#*=}"
-		shift
-		;;
-	-d|--fuzziness)
-		FUZZINESS="$2"
-		shift 2
-		;;
-	-w=*|--width=*)
-		SURROUNDING="${1#*=}"
-		shift
-		;;
-	-w|--width)
-		SURROUNDING="$2"
-		shift 2
-		;;
-	-e=*|--delimiter=*)
-		DELIMITER="${1#*=}"
-		shift
-		;;
-	-e|--delimiter)
-		DELIMITER="$2"
-		shift 2
-		;;
-	-s=*|-q=*|--query=*)
-		QUERY="${1#*=}"
-		shift
-		;;
-	-s|-q|--query)
-		QUERY="$2"
-		shift 2
-		;;
-	-od=*|--data=*)
-		DATA="${1#*=}"
-		shift
-		;;
-	-od|--data)
-		DATA="$2"
-		shift 2
-		;;
-	-oi=*|--index=*)
-		INDEX="${1#*=}"
-		shift
-		;;
-	-oi|--index)
-		INDEX="$2"
-		shift 2
-		;;
-	-a=*|--address=*)
-		ADDRESS="${1#*=}"
-		shift
-		;;
-	-a|--address)
-		ADDRESS="$2"
-		shift 2
-		;;
-	-u=*|--user=*|--auth=*)
-		AUTH_USER="${1#*=}"
-		shift
-		;;
-	-u|--user|--auth)
-		AUTH_USER="$2"
-		shift 2
-		;;
-	--search)
-		ENDPOINT="/search"
-		shift
-		;;
-	--count)
-		ENDPOINT="/count"
-		shift
-		;;
-	--limit=*)
-		LIMIT="${1#*=}"
-		shift
-		;;
-	--limit)
-		LIMIT="$2"
-		shift 2
-		;;
-	--local)
-		LOCAL="true"
-		shift
-		;;
-	--cluster)
-		LOCAL="false"
-		HIDE_HOSTNAME=
-		shift
-		;;
-	--format=*)
-		FORMAT="${1#*=}"
-		shift
-		;;
-	--format)
-		FORMAT="$2"
-		shift 2
-		;;
-	--fields=*)
-		FIELDS="${1#*=}"
-		shift
-		;;
-	--fields)
-		FIELDS="$2"
-		shift 2
-		;;
-	--no-stats)
-		STATS="false"
-		shift
-		;;
-	--stream)
-		STREAM="true"
-		shift
-		;;
-	--spark)
-		SPARK="true"
-		shift
-		;;
-	-vv|--pretty)
-		VERBOSE="-s" # tell curl to be silent
-		PRETTY=true
-		shift
-		;;
-	-v|--verbose)
-		VERBOSE="-v"
-		PRETTY=""
-		shift
-		;;
-	--drate)
-		VERBOSE="-s"
-		PRETTY=true
-		ADD_DRATE=true
-		shift
-		;;
-	--details)
-		VERBOSE="-s" # tell curl to be silent
-		PRETTY=true
-		ADD_DETAILS=true
-		shift
-		;;
-	-h|--help)
-		usage
-		exit 0
-		;;
-	*) # unknown option
-		fail "'$1' is unknown option, run '$0 --help' for help"
-		;;
-	esac
+    case "$1" in
+    -p=*|--mode=*)
+        MODE="${1#*=}"
+        shift
+        ;;
+    -p|--mode)
+        MODE="$2"
+        shift 2
+        ;;
+    -f=*|--file=*)
+        FILES="$FILES:${1#*=}"
+        shift
+        ;;
+    -f|--file)
+        FILES="$FILES:$2"
+        shift 2
+        ;;
+    -c=*|--catalog=*)
+        CATALOGS="$CATALOGS:${1#*=}"
+        shift
+        ;;
+    -c|--catalog)
+        CATALOGS="$CATALOGS:$2"
+        shift 2
+        ;;
+    -i)
+        CASE="false"
+        shift
+        ;;
+    -r|--reduce)
+        REDUCE="true"
+        shift
+        ;;
+    --no-reduce)
+        REDUCE="false"
+        shift
+        ;;
+    -n=*|--nodes=*)
+        NODES="${1#*=}"
+        shift
+        ;;
+    -n|--nodes)
+        NODES="$2"
+        shift 2
+        ;;
+    -d=*|--fuzziness=*)
+        FUZZINESS="${1#*=}"
+        shift
+        ;;
+    -d|--fuzziness)
+        FUZZINESS="$2"
+        shift 2
+        ;;
+    -w=*|--width=*)
+        SURROUNDING="${1#*=}"
+        shift
+        ;;
+    -w|--width)
+        SURROUNDING="$2"
+        shift 2
+        ;;
+    --line)
+        SURROUNDING="line"
+        shift
+        ;;
+    -e=*|--delimiter=*)
+        DELIMITER="${1#*=}"
+        shift
+        ;;
+    -e|--delimiter)
+        DELIMITER="$2"
+        shift 2
+        ;;
+    -s=*|-q=*|--query=*)
+        QUERY="${1#*=}"
+        shift
+        ;;
+    -s|-q|--query)
+        QUERY="$2"
+        shift 2
+        ;;
+    -od=*|--data=*)
+        DATA="${1#*=}"
+        shift
+        ;;
+    -od|--data)
+        DATA="$2"
+        shift 2
+        ;;
+    -oi=*|--index=*)
+        INDEX="${1#*=}"
+        shift
+        ;;
+    -oi|--index)
+        INDEX="$2"
+        shift 2
+        ;;
+    -a=*|--address=*)
+        ADDRESS="${1#*=}"
+        shift
+        ;;
+    -a|--address)
+        ADDRESS="$2"
+        shift 2
+        ;;
+    -u=*|--user=*|--auth=*)
+        AUTH_USER="${1#*=}"
+        shift
+        ;;
+    -u|--user|--auth)
+        AUTH_USER="$2"
+        shift 2
+        ;;
+    --search)
+        ENDPOINT="/search"
+        shift
+        ;;
+    --count)
+        ENDPOINT="/count"
+        shift
+        ;;
+    --limit=*)
+        LIMIT="${1#*=}"
+        shift
+        ;;
+    --limit)
+        LIMIT="$2"
+        shift 2
+        ;;
+    --local)
+        LOCAL="true"
+        shift
+        ;;
+    --cluster)
+        LOCAL="false"
+        HIDE_HOSTNAME=
+        shift
+        ;;
+    --format=*)
+        FORMAT="${1#*=}"
+        shift
+        ;;
+    --format)
+        FORMAT="$2"
+        shift 2
+        ;;
+    --fields=*)
+        FIELDS="${1#*=}"
+        shift
+        ;;
+    --fields)
+        FIELDS="$2"
+        shift 2
+        ;;
+    --no-stats)
+        STATS="false"
+        shift
+        ;;
+    --stream)
+        STREAM="true"
+        shift
+        ;;
+    --spark)
+        SPARK="true"
+        shift
+        ;;
+    -vv|--pretty)
+        VERBOSE="-s" # tell curl to be silent
+        PRETTY=true
+        shift
+        ;;
+    -v|--verbose)
+        VERBOSE="-v"
+        PRETTY=""
+        shift
+        ;;
+    --drate)
+        VERBOSE="-s"
+        PRETTY=true
+        ADD_DRATE=true
+        shift
+        ;;
+    --details)
+        VERBOSE="-s" # tell curl to be silent
+        PRETTY=true
+        ADD_DETAILS=true
+        shift
+        ;;
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    *) # unknown option
+        fail "'$1' is unknown option, run '$0 --help' for help"
+        ;;
+    esac
 done
 
 [[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
@@ -359,13 +374,14 @@ URL_DATA=(--data-urlencode "local=$LOCAL")
 [[ ! -z "$QUERY" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "query=$QUERY")
 IFS=':' read -r -a files <<< "$FILES"
 for file in "${files[@]}"; do
-	[[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "files=$file")
+    [[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "files=$file")
 done
 IFS=':' read -r -a catalogs <<< "$CATALOGS"
 for catalog in "${catalogs[@]}"; do
-	[[ ! -z $catalog ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "catalog=$catalog")
+    [[ ! -z $catalog ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "catalog=$catalog")
 done
-[[ -z "$CASE_INSENS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=true") # inverted!
+[[ ! -z "$CASE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=$CASE")
+[[ ! -z "$REDUCE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "reduce=$REDUCE")
 [[ ! -z "$NODES" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "nodes=$NODES")
 [[ ! -z "$FUZZINESS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fuzziness=$FUZZINESS")
 [[ ! -z "$SURROUNDING" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "surrounding=$SURROUNDING")
@@ -381,46 +397,47 @@ done
 [[ ! -z "$SPARK" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "spark=$SPARK")
 
 # check dependencies
-[[ -z `which curl`  ]] && fail "no curl found, run 'apt-get install curl' to install it"
-[[ ! -z "$PRETTY" ]] && [[ -z `which jq`  ]] && fail "no jq found, run 'apt-get install jq' to install it"
+[[ -z `which curl` ]] && fail "no curl found, run 'apt-get install curl' to install it"
+[[ ! -z "$PRETTY" ]] && [[ -z `which jq` ]] && fail "no jq found, run 'apt-get install jq' to install it"
 
 if [[ ! -z "$PRETTY" ]]; then
 # setup jq filter based on user inputs
 # check for query error; if local, remove hosts; if not dataRate, remove data rate; and normalize measurements
 # Build up the filtering string
-	if [[ -z "$ADD_DETAILS" ]]; then
-                DETAILS="."
+    if [[ -z "$ADD_DETAILS" ]]; then
+        DETAILS="."
+    else
+        DETAILS=". +{details}"
+    fi
+    if [[ ! -z "$HIDE_HOSTNAME" ]]; then
+        if [[ ! -z "$ADD_DRATE" ]]; then
+            # Delete hostname, leave dataRate
+            JQ_STR="${DETAILS} | .message // ( . | del(.host) | ${UNITS1} ${UNITS_DR} ${UNITS2}"
+#            UNITS_DETAILS="${UNITS_1_DET} ${UNITS_DR_DET} ${UNITS_2_DET}"
         else
-                DETAILS=". +{details}"
-	fi
-	if [[ ! -z "$HIDE_HOSTNAME" ]]; then
-                if [[ ! -z "$ADD_DRATE" ]]; then
-			# Delete hostname, leave dataRate
-                        JQ_STR="${DETAILS} | .message // ( . | del(.host) | ${UNITS1} ${UNITS_DR} ${UNITS2}"
-#			UNITS_DETAILS="${UNITS_1_DET} ${UNITS_DR_DET} ${UNITS_2_DET}"
-                else
-			# Delete hostname and dataRate
-                        JQ_STR="${DETAILS} | .message // ( . | del(.dataRate,.host) | ${UNITS1} ${UNITS2}"
-#			UNITS_DETAILS="${UNITS_1_DET} ${UNITS_2_DET}"
-                fi
-	elif [[ -z "$ADD_DRATE" ]]; then
-                JQ_STR="${DETAILS} | .message // ( . | del(.dataRate) | ${UNITS1} ${UNITS2} ${UNITS_H}"
-#		UNITS_DETAILS="${UNITS_H_DET} ${UNITS_1_DET} ${UNITS_2_DET}"
-        else
-                JQ_STR="${DETAILS} | .message // ( . | ${UNITS1} ${UNITS_DR} ${UNITS2} ${UNITS_H}"
-#		UNITS_DETAILS="${UNITS_H_DET} ${UNITS_1_DET} ${UNITS_DR_DET} ${UNITS_2_DET}"
-	fi
-	if [[ ! -z "$ADD_DETAILS" ]]; then
-		JQ_STR="$JQ_STR | . +{details})"
-	else
-		JQ_STR="${JQ_STR})"
-	fi
+            # Delete hostname and dataRate
+            JQ_STR="${DETAILS} | .message // ( . | del(.dataRate,.host) | ${UNITS1} ${UNITS2}"
+#            UNITS_DETAILS="${UNITS_1_DET} ${UNITS_2_DET}"
+        fi
+    elif [[ -z "$ADD_DRATE" ]]; then
+        JQ_STR="${DETAILS} | .message // ( . | del(.dataRate) | ${UNITS1} ${UNITS2} ${UNITS_H}"
+#        UNITS_DETAILS="${UNITS_H_DET} ${UNITS_1_DET} ${UNITS_2_DET}"
+    else
+        JQ_STR="${DETAILS} | .message // ( . | ${UNITS1} ${UNITS_DR} ${UNITS2} ${UNITS_H}"
+#        UNITS_DETAILS="${UNITS_H_DET} ${UNITS_1_DET} ${UNITS_DR_DET} ${UNITS_2_DET}"
+    fi
+    if [[ ! -z "$ADD_DETAILS" ]]; then
+        JQ_STR="$JQ_STR | . +{details})"
+    else
+        JQ_STR="${JQ_STR})"
+    fi
 fi
+
 # do the search and print error/results
 if [[ -z "$PRETTY" ]]; then
-        # Flat output for feeding into other processes
-	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
+    # Flat output for feeding into other processes
+    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
 else
-        # Prettified output without data rate or details
-	curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | jq "$JQ_STR"
+    # Prettified output without data rate or details
+    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | jq "$JQ_STR"
 fi

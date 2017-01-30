@@ -34,132 +34,223 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"sync"
 )
 
-// base index item
-type baseIndex struct {
-	Index   Index
-	DataBeg uint64 // begin of data
-	DataEnd uint64 // end of data (without delimiter)
+// thread-safe pool of Index objects
+var idxPool = &sync.Pool{
+	New: func() interface{} {
+		return new(Index)
+	},
 }
 
-func (i baseIndex) String() string {
-	return fmt.Sprintf("{%s#%d [%d..%d)}", i.Index.File, i.Index.Offset, i.DataBeg, i.DataEnd)
+// Index is INDEX meta-data.
+type Index struct {
+	File      string `json:"file" msgpack:"file"`           // filename
+	Offset    uint64 `json:"offset" msgpack:"offset"`       // data offset in 'File'
+	Length    uint64 `json:"length" msgpack:"length"`       // length of data
+	Fuzziness int32  `json:"fuzziness" msgpack:"fuzziness"` // fuzziness distance
+
+	// optional host address (used in cluster mode)
+	Host string `json:"host,omitempty" msgpack:"host,omitempty"`
+
+	// position in Ryft data file
+	DataPos uint64 `json:"datapos,omitempty" msgpack:"datapos,omitempty"`
+}
+
+// NewIndex creates a new Index object.
+// This object can be utilized by Release method.
+func NewIndex(file string, offset, length uint64) *Index {
+	// get object from pool
+	idx := idxPool.Get().(*Index)
+
+	// initialize
+	idx.File = file
+	idx.Offset = offset
+	idx.Length = length
+	idx.Fuzziness = 0
+	idx.Host = ""
+	idx.DataPos = 0
+
+	return idx
+}
+
+// NewIndexCopy creates a full copy of Index object.
+func NewIndexCopy(idx *Index) *Index {
+	// get object from pool
+	res := idxPool.Get().(*Index)
+
+	// initialize
+	res.File = idx.File
+	res.Offset = idx.Offset
+	res.Length = idx.Length
+	res.Fuzziness = idx.Fuzziness
+	res.Host = idx.Host
+	res.DataPos = idx.DataPos
+
+	return idx
+}
+
+// Release releases the Index object.
+// Please call this method once record is used.
+func (idx *Index) Release() {
+	// release data (for GC)
+	idx.File = ""
+	idx.Host = ""
+
+	// put back to pool
+	idxPool.Put(idx)
+}
+
+// UpdateHost updates the index's host.
+// Host is updated only once, if it wasn't set before.
+// returns the `self` pointer.
+func (idx *Index) UpdateHost(host string) *Index {
+	if len(idx.Host) == 0 && len(host) != 0 {
+		idx.Host = host
+	}
+	return idx
+}
+
+// SetDataPos sets position in DATA file.
+// returns the `self` pointer.
+func (idx *Index) SetDataPos(pos uint64) *Index {
+	idx.DataPos = pos
+	return idx
+}
+
+// SetFuzziness sets fuzziness distance.
+// returns the `self` pointer.
+func (idx *Index) SetFuzziness(d int32) *Index {
+	idx.Fuzziness = d
+	return idx
+}
+
+// String gets the string representation of Index.
+func (idx Index) String() string {
+	return fmt.Sprintf("{%s#%d, len:%d, d:%d}",
+		idx.File, idx.Offset, idx.Length, idx.Fuzziness)
 }
 
 // IndexFile contains base indexes
 type IndexFile struct {
-	Items []baseIndex
-	Opt   uint32 // custom option
+	Items  []*Index
+	Option uint32 // custom option
 
-	delim  string // data delimiter
-	width  uint   // surrounding width
-	offset uint64
+	Delim string // data delimiter
+	Width int    // surrounding width, -1 means LINE=true
 }
 
 // NewIndexFile creates new empty index file
 // data delimiter is used to adjust data offsets
-func NewIndexFile(delimiter string, width uint) *IndexFile {
+func NewIndexFile(delim string, width int) *IndexFile {
 	f := new(IndexFile)
-	f.Items = make([]baseIndex, 0, 1024) // TODO: initial capacity
-	f.delim = delimiter
-	f.width = width
-	f.offset = 0
+	f.Items = make([]*Index, 0, 32*1024) // TODO: initial capacity?
+	f.Delim = delim
+	f.Width = width
 	return f
 }
 
+// String gets index file as string.
 func (f *IndexFile) String() string {
 	buf := bytes.Buffer{}
 
-	buf.WriteString(fmt.Sprintf("delim:%q, offset:%d\n", f.delim, f.offset))
+	buf.WriteString(fmt.Sprintf("delim:#%x, width:%d, opt:%d",
+		f.Delim, f.Width, f.Option))
 	for _, i := range f.Items {
-		buf.WriteString(i.String())
-		buf.WriteRune('\n')
+		buf.WriteString(fmt.Sprintf("\n{%s#%d [%d..%d)}", i.File,
+			i.Offset, i.DataPos, i.DataPos+i.Length))
 	}
 
 	return buf.String()
 }
 
-// AddIndex adds base index to the list
-func (f *IndexFile) Add(file string, offset, length, data_pos uint64) {
-	f.Items = append(f.Items, baseIndex{
-		DataBeg: data_pos,
-		DataEnd: data_pos + length,
-		Index: Index{
-			File:   file,
-			Offset: offset,
-			Length: length,
-		},
-	})
+// Clear releases all indexes.
+func (f *IndexFile) Clear() {
+	for _, idx := range f.Items {
+		idx.Release()
+	}
+	f.Items = f.Items[0:0] // keep the array
 }
 
-// AddIndex adds base index to the list
-func (f *IndexFile) AddIndex(index Index) {
-	f.Items = append(f.Items, baseIndex{
-		//order:  i,
-		DataBeg: f.offset,
-		DataEnd: f.offset + index.Length,
-		Index:   index,
-	})
-
-	f.offset += index.Length + uint64(len(f.delim))
+// Add adds index to the list.
+func (f *IndexFile) Add(idx *Index) {
+	f.Items = append(f.Items, idx)
 }
 
-// get the length
+// Len gets the number of indexes.
 func (f *IndexFile) Len() int {
 	return len(f.Items)
 }
 
-// Find base item index for specific offset
+// Find base item index for specific DATA position.
 func (f *IndexFile) Find(offset uint64) int {
 	return sort.Search(len(f.Items), func(i int) bool {
-		return offset < f.Items[i].DataEnd
+		idx := f.Items[i]
+		end := idx.DataPos + idx.Length
+		return offset < end
 	})
 }
 
 // Unwind unwinds the index
-func (f *IndexFile) Unwind(index Index) (Index, int) {
-	var n, shift int // item index, data shift
-
+func (f *IndexFile) Unwind(index *Index) (*Index, int) {
 	// we should take into account surrounding width.
 	// in common case data are surrounded: [w]data[w]
 	// but at begin or end of file no surrounding
 	// or just a part of surrounding may be presented
-	if index.Offset == 0 {
+	// in case of --line option the width is negative
+	// and we should take middle of the data as a reference
+	var n int // base item index
+	if f.Width < 0 {
+		// middle: [...]data[...]
+		dataMid := index.Offset + index.Length/2
+		n = f.Find(dataMid)
+	} else if index.Offset == 0 {
 		// begin: [0..w]data[w]
-		dataEnd := index.Length - uint64(f.width+1)
+		dataEnd := index.Length - uint64(f.Width+1)
 		n = f.Find(dataEnd)
 	} else {
 		// middle: [w]data[w]
 		// or end: [w]data[0..w]
-		dataBeg := index.Offset + uint64(f.width)
+		dataBeg := index.Offset + uint64(f.Width)
 		n = f.Find(dataBeg)
 	}
 
 	if n < len(f.Items) {
 		base := f.Items[n]
-		index.File = base.Index.File
 
 		// found data [beg..end)
+		baseBeg := base.DataPos
+		baseEnd := base.DataPos + base.Length
 		beg := index.Offset
 		end := index.Offset + index.Length
-		if base.DataBeg <= beg {
+		Len := index.Length
+
+		var shift uint64
+		if baseBeg <= beg {
 			// data offset is within our base
 			// need to adjust just offset
-			index.Offset = base.Index.Offset + (beg - base.DataBeg)
+			beg += base.Offset - baseBeg
 		} else {
 			// data offset before our base
 			// need to truncate "begin" surrounding part
-			index.Offset = base.Index.Offset
-			index.Length -= (base.DataBeg - beg)
-			shift = int(base.DataBeg - beg)
+			shift = baseBeg - beg
+			beg = base.Offset
+			Len -= shift
 		}
-		if end > base.DataEnd {
+		if end > baseEnd {
 			// end of data after our base
 			// need to truncate "end" surrounding part
-			index.Length -= (end - base.DataEnd)
+			Len -= (end - baseEnd)
 		}
+
+		// create new resulting index
+		res := NewIndex(base.File, beg, Len)
+		res.Fuzziness = index.Fuzziness
+		res.DataPos = index.DataPos
+		res.Host = index.Host
+		return res, int(shift)
 	}
 
-	return index, shift
+	return index, 0 // "as is" fallback
 }

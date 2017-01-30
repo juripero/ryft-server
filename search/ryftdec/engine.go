@@ -32,10 +32,13 @@ package ryftdec
 
 import (
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/Sirupsen/logrus"
-
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/query"
 )
 
 var (
@@ -45,31 +48,131 @@ var (
 	TAG = "ryftdec"
 )
 
-// RyftDEC engine uses abstract engine as backend.
+// Engine is decomposition engine that uses an abstract engine as backend.
 type Engine struct {
-	Backend               search.Engine
-	BooleansPerExpression map[string]int
-	KeepResultFiles       bool // false by default
+	Backend   search.Engine
+	optimizer *query.Optimizer
+
+	KeepResultFiles bool // false by default
+	CompatMode      bool // false by default
 }
 
 // NewEngine creates new RyftDEC search engine.
-func NewEngine(backend search.Engine, booleansLimit map[string]int, keepResults bool) (*Engine, error) {
+func NewEngine(backend search.Engine, opts map[string]interface{}) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backend = backend
-	engine.BooleansPerExpression = booleansLimit
-	engine.KeepResultFiles = keepResults
+	engine.optimizer = &query.Optimizer{CombineLimit: query.NoLimit}
+	if err := engine.update(opts); err != nil {
+		return nil, err
+	}
 	return engine, nil
 }
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("RyftDEC{backend:%s}", engine.Backend)
+	return fmt.Sprintf("ryftdec{backend:%s, compat:%t}",
+		engine.Backend, engine.CompatMode)
 	// TODO: other parameters?
+}
+
+// Optimize does query optimization.
+func (engine *Engine) Optimize(q query.Query) query.Query {
+	return engine.optimizer.Process(q)
 }
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return engine.Backend.Options()
+	opts := engine.Backend.Options()
+	opts["compat-mode"] = engine.CompatMode
+	//opts["keep-files"] = engine.KeepResultFiles
+	opts["optimizer-limit"] = engine.optimizer.CombineLimit
+	opts["optimizer-do-not-combine"] = strings.Join(engine.optimizer.ExceptModes, ":")
+	return opts
+}
+
+// get backend options
+func (engine *Engine) getBackendOptions() backendOptions {
+	opts := engine.Backend.Options()
+
+	instanceName, _ := utils.AsString(opts["instance-name"])
+	mountPoint, _ := utils.AsString(opts["ryftone-mount"])
+	homeDir, _ := utils.AsString(opts["home-dir"])
+	indexHost, _ := utils.AsString(opts["index-host"])
+
+	return backendOptions{
+		InstanceName: instanceName,
+		MountPoint:   mountPoint,
+		HomeDir:      homeDir,
+		IndexHost:    indexHost,
+	}
+}
+
+// updates the seach configuration
+func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery) {
+	updateConfig(cfg, q.Options)
+	if engine.CompatMode {
+		cfg.Query = q.ExprOld
+	} else {
+		cfg.Query = q.ExprNew
+		cfg.Mode = "g" // generic!
+	}
+}
+
+// parse engine options
+func (engine *Engine) update(opts map[string]interface{}) (err error) {
+	// compatibility mode
+	if v, ok := opts["compat-mode"]; ok {
+		engine.CompatMode, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "compat-mode" option: %s`, err)
+		}
+	}
+
+	// keep result files
+	if v, ok := opts["keep-files"]; ok {
+		engine.KeepResultFiles, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "keep-files" option: %s`, err)
+		}
+	}
+
+	// optimizer limit
+	if v, ok := opts["optimizer-limit"]; ok {
+		vv, err := utils.AsInt64(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "optimizer-limit" option: %s`, err)
+		}
+		engine.optimizer.CombineLimit = int(vv)
+	}
+
+	// optimizer except modes
+	if v, ok := opts["optimizer-do-not-combine"]; ok {
+		vv, err := utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "optimizer-do-not-combine" option: %s`, err)
+		}
+
+		// separator: space or any of ",;:"
+		sep := func(r rune) bool {
+			return unicode.IsSpace(r) ||
+				strings.ContainsRune(",;:", r)
+		}
+
+		modes := []string{}
+		for _, s := range strings.FieldsFunc(vv, sep) {
+			if mode := strings.TrimSpace(s); len(mode) != 0 {
+				modes = append(modes, mode)
+			}
+		}
+		engine.optimizer.ExceptModes = modes
+	}
+
+	return nil
+}
+
+// Files starts synchronous "/files" operation.
+func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
+	return engine.Backend.Files(path, hidden)
 }
 
 // SetLogLevelString changes global module log level.
@@ -79,7 +182,7 @@ func SetLogLevelString(level string) error {
 		return err
 	}
 
-	log.Level = ll
+	SetLogLevel(ll)
 	return nil // OK
 }
 
@@ -98,23 +201,21 @@ func (task *Task) log() *logrus.Entry {
 	return log.WithField("task", task.Identifier)
 }
 
-/*
 // factory creates RyftDEC engine.
-func factory(opts map[string]interface{}) (search.Engine, error) {
+/*func factory(opts map[string]interface{}) (search.Engine, error) {
 	backend := parseOptions(opts)
 	engine, err := NewEngine(backend)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create RyftDEC engine: %s", err)
 	}
 	return engine, nil
-}
-*/
+}*/
 
 // package initialization
-func init() {
+/*func init() {
 	// should be created manually!
 	// search.RegisterEngine(TAG, factory)
 
 	// be silent by default
 	// log.Level = logrus.WarnLevel
-}
+}*/

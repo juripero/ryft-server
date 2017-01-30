@@ -40,16 +40,17 @@ import (
 )
 
 // ParseStat parses statistics from ryftprim output.
-func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
+func ParseStat(buf []byte, host string) (*search.Stat, error) {
+	var err error
+
 	// parse as YAML map first
 	v := map[string]interface{}{}
-	err = yaml.Unmarshal(buf, &v)
-	if err != nil {
-		return stat, fmt.Errorf("failed to parse ryftprim output: %s", err)
+	if err = yaml.Unmarshal(buf, &v); err != nil {
+		return nil, fmt.Errorf("failed to parse ryftprim output: %s", err)
 	}
 
-	log.WithField("stat", v).Debugf("[%s]: output as YAML", TAG)
-	stat = search.NewStat(host)
+	log.WithField("stat", v).Debugf("[%s]: output as YAML parsed", TAG)
+	stat := search.NewStat(host)
 
 	// Duration
 	if x, ok := v["Duration"]; ok {
@@ -117,7 +118,6 @@ func ParseStat(buf []byte, host string) (stat *search.Statistics, err error) {
 		// new version of ryftprim doesn't print "Data Rate"
 		// but we can easily calculate it as (total bytes [MB]) / (duration [sec])
 		if stat.Duration > 0 {
-			// TODO: ryftone.BpmsToMbps(stat.TotalBytes, stat.Duration)
 			mb := float64(stat.TotalBytes) / (1024 * 1024) // bytes -> MB
 			sec := float64(stat.Duration) / 1000           // msec -> sec
 			stat.DataRate = mb / sec

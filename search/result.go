@@ -39,37 +39,36 @@ import (
 // It's possible to cancel result (and stop futher processing).
 // All communication is done via channels (error, records, etc).
 // Need to read from Error and Record channels to prevent blocking!
-// Once processing is done `nil` is sent to Done channel
-// and all channels are closed. Note, after Done is sent
-// client still need to drain Error and Record channels!
+// Once processing is done all channels are closed.
+// Note, after Done is sent client still need to drain Error and Record channels!
 type Result struct {
-	// Channel of processing errors (Engine -> client)
+	// Channel of processing errors (Engine -> Client)
 	ErrorChan      chan error
-	errorsReported uint64 // statistics
+	errorsReported uint64 // number of errors reported
 
-	// Channel of processed records (Engine -> client)
+	// Channel of processed records (Engine -> Client)
 	RecordChan      chan *Record
-	recordsReported uint64 // statistics
+	recordsReported uint64 // number of records reported
 
-	// Cancel channel is used to notify search engine
-	// to stop processing immideatelly (client -> Engine)
-	CancelChan  chan struct{}
-	isCancelled int32 // atomic access
-
-	// Done channel is used to notify client search is done (Engine -> client)
+	// Done channel is used to notify client search is done (Engine -> Client)
 	DoneChan chan struct{}
 	isDone   int32 // atomic access
 
+	// Cancel channel is used to notify search engine
+	// to stop processing immideatelly (Client -> Engine)
+	CancelChan  chan struct{}
+	isCancelled int32 // atomic access
+
 	// Search processing statistics (optional)
-	Stat *Statistics
+	Stat *Stat
 }
 
 // NewResult creates new empty search results.
 func NewResult() *Result {
 	res := new(Result)
 
-	res.ErrorChan = make(chan error, 256)    // TODO: capacity constant?
-	res.RecordChan = make(chan *Record, 256) // TODO: capacity constant?
+	res.ErrorChan = make(chan error, 256)     // TODO: capacity constant?
+	res.RecordChan = make(chan *Record, 4096) // TODO: capacity constant?
 	res.CancelChan = make(chan struct{})
 	res.DoneChan = make(chan struct{})
 
@@ -110,14 +109,13 @@ func (res *Result) RecordsReported() uint64 {
 	return atomic.LoadUint64(&res.recordsReported)
 }
 
-// Cancel stops the search processing.
+// Cancel stops the search processing and ignores all records and errors.
 //  return number of ignored errors and records
 func (res *Result) Cancel() (errors uint64, records uint64) {
-	if atomic.CompareAndSwapInt32(&res.isCancelled, 0, 1) {
-		close(res.CancelChan)
-	}
+	res.JustCancel()
 
-	for !res.IsDone() {
+	// drain channels
+	for {
 		select {
 		case <-res.DoneChan:
 			// drain the error channel
@@ -126,9 +124,12 @@ func (res *Result) Cancel() (errors uint64, records uint64) {
 			}
 
 			// drain the record channel
-			for _ = range res.RecordChan {
+			for rec := range res.RecordChan {
+				rec.Release()
 				records++
 			}
+
+			return // done
 
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
@@ -137,12 +138,19 @@ func (res *Result) Cancel() (errors uint64, records uint64) {
 
 		case rec, ok := <-res.RecordChan:
 			if ok && rec != nil {
+				rec.Release()
 				records++
 			}
 		}
 	}
+}
 
-	return // done!
+// JustCancel just stops the search processing.
+// Still need to read all records and errors.
+func (res *Result) JustCancel() {
+	if atomic.CompareAndSwapInt32(&res.isCancelled, 0, 1) {
+		close(res.CancelChan)
+	}
 }
 
 // IsCancelled checks is the result cancelled?
@@ -164,6 +172,7 @@ func (res *Result) IsDone() bool {
 
 // Close closes all channels.
 // Is called by search Engine.
+// Do not call it twice!
 func (res *Result) Close() {
 	close(res.RecordChan)
 	close(res.ErrorChan)

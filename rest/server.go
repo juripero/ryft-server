@@ -87,6 +87,7 @@ type ServerConfig struct {
 	LocalOnly      bool                   `yaml:"local-only,omitempty"`
 	DebugMode      bool                   `yaml:"debug-mode,omitempty"`
 	KeepResults    bool                   `yaml:"keep-results,omitempty"`
+	ExtraRequest   bool                   `yaml:"extra-request,omitempty"`
 
 	Logging        string                       `yaml:"logging,omitempty"`
 	LoggingOptions map[string]map[string]string `yaml:"logging-options,omitempty"`
@@ -95,6 +96,9 @@ type ServerConfig struct {
 
 	HttpTimeout_ TimeDuration  `yaml:"http-timeout,omitempty"`
 	HttpTimeout  time.Duration `yaml:"-"`
+
+	ShutdownTimeout_ TimeDuration  `yaml:"shutdown-timeout,omitempty"`
+	ShutdownTimeout  time.Duration `yaml:"-"`
 
 	TLS struct {
 		Enabled       bool   `yaml:"enabled,omitempty"`
@@ -123,8 +127,6 @@ type ServerConfig struct {
 		UpdateLatency  time.Duration `yaml:"-"`
 	} `yaml:"busyness,omitempty"`
 
-	BooleansPerExpression map[string]int `yaml:"booleans-per-expression"`
-
 	// catalogs related options
 	Catalogs struct {
 		MaxDataFileSize   string        `yaml:"max-data-file-size"`
@@ -135,6 +137,7 @@ type ServerConfig struct {
 	} `yaml:"catalogs,omitempty"`
 
 	SettingsPath string `yaml:"settings-path,omitempty"`
+	HostName     string `yaml:"hostname,omitempty"`
 }
 
 // Server instance
@@ -162,12 +165,15 @@ func NewServer() *Server {
 	s := new(Server)
 
 	// default configuration
+	// s.Config.ExtraRequest = true
 	s.Config.SearchBackend = "ryftprim"
 	s.Config.BackendOptions = map[string]interface{}{}
 	s.Config.Busyness.UpdateLatency = 1 * time.Second
 	s.Config.Busyness.UpdateLatency_ = NewTimeDuration(&s.Config.Busyness.UpdateLatency)
 	s.Config.HttpTimeout = 1 * time.Hour
 	s.Config.HttpTimeout_ = NewTimeDuration(&s.Config.HttpTimeout)
+	s.Config.ShutdownTimeout = 10 * time.Minute
+	s.Config.ShutdownTimeout_ = NewTimeDuration(&s.Config.ShutdownTimeout)
 	s.Config.Catalogs.CacheDropTimeout = 10 * time.Second
 	s.Config.Catalogs.CacheDropTimeout_ = NewTimeDuration(&s.Config.Catalogs.CacheDropTimeout)
 	s.Config.SettingsPath = "/var/ryft/server.settings"
@@ -204,7 +210,7 @@ func (s *Server) ParseConfig(fileName string) error {
 	}
 
 	// assign catalog options
-	catalog.DefaultCacheDropTimeout = s.Config.Catalogs.CacheDropTimeout
+	catalog.SetDefaultCacheDropTimeout(s.Config.Catalogs.CacheDropTimeout)
 	catalog.DefaultDataDelimiter = s.Config.Catalogs.DataDelimiter
 	catalog.DefaultTempDirectory = s.Config.Catalogs.TempDirectory
 
@@ -222,6 +228,15 @@ func (s *Server) Prepare() (err error) {
 	_ = os.MkdirAll(settingsDir, 0755)
 	if s.settings, err = OpenSettings(s.Config.SettingsPath); err != nil {
 		return fmt.Errorf("failed to open settings: %s", err)
+	}
+
+	// hostname
+	if len(s.Config.HostName) == 0 {
+		if h, err := os.Hostname(); err != nil {
+			return fmt.Errorf("failed to get hostname: %s", err)
+		} else {
+			s.Config.HostName = h
+		}
 	}
 
 	// automatic debug mode
@@ -275,10 +290,4 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 	}
 
 	return
-}
-
-// get local host name
-func getHostName() string {
-	hostName, _ := os.Hostname()
-	return hostName
 }
