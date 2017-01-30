@@ -102,6 +102,19 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		// delim is nil
 	}
 
+	// get directory prefix from "path" parameter
+	// so the following URLs are the same:
+	// - POST http://host:port/files/foo/test.txt
+	// - POST http://host:port/files/foo?file=test.txt
+	// - POST http://host:port/files?file=/foo/test.txt
+	if prefix := ctx.Param("path"); len(prefix) != 0 {
+		if len(params.Catalog) != 0 {
+			params.Catalog = filepath.Join(prefix, params.Catalog)
+		} else {
+			params.File = filepath.Join(prefix, params.File)
+		}
+	}
+
 	if len(params.File) == 0 {
 		panic(NewError(http.StatusBadRequest,
 			"no valid filename provided"))

@@ -276,9 +276,9 @@ func main() {
 	private.GET("/search", server.DoSearch)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
-	private.GET("/files", server.DoGetFiles)
-	private.DELETE("/files", server.DoDeleteFiles)
-	private.POST("/files", server.DoPostFiles)
+	private.GET("/files/*path", server.DoGetFiles)
+	private.DELETE("/files/*path", server.DoDeleteFiles)
+	private.POST("/files/*path", server.DoPostFiles)
 
 	// debug API endpoints
 	if server.Config.DebugMode {

@@ -86,6 +86,16 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 	params.Files = append(params.Files, params.Dirs...)
 	params.Dirs = nil // reset
 
+	// get directory prefix from "path" parameter
+	// so the following URLs are the same:
+	// - DELETE http://host:port/files/foo/dir/
+	// - DELETE http://host:port/files?dir=/foo/dir
+	if prefix := ctx.Param("path"); len(prefix) != 0 {
+		for i := 0; i < len(params.Files); i++ {
+			params.Files[i] = filepath.Join(prefix, params.Files[i])
+		}
+	}
+
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
 	mountPoint, err := server.getMountPoint(homeDir)
 	if err != nil {

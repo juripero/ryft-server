@@ -32,6 +32,7 @@ package rest
 
 import (
 	"net/http"
+	"path/filepath"
 	"sort"
 
 	"github.com/getryft/ryft-server/rest/codec"
@@ -56,6 +57,14 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 	if err := b.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
+	}
+
+	// get directory prefix from "path" parameter
+	// so the following URLs are the same:
+	// - GET http://host:port/files/foo/dir/
+	// - GET http://host:port/files?dir=/foo/dir
+	if prefix := ctx.Param("path"); len(prefix) != 0 {
+		params.Dir = filepath.Join(prefix, params.Dir)
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
