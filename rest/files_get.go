@@ -32,19 +32,23 @@ package rest
 
 import (
 	"net/http"
+	"os"
 	"path/filepath"
 	"sort"
 
 	"github.com/getryft/ryft-server/rest/codec"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
 
 // GetFileParams query parameters for GET /files
 type GetFilesParams struct {
-	Dir    string `form:"dir" json:"dir"`       // directory to get content of
-	Hidden bool   `form:"hidden" json:"hidden"` // show hidden files/dirs
-	Local  bool   `form:"local" json:"local"`
+	Dir     string `form:"dir" json:"dir"`         // directory to get content of
+	File    string `form:"file" json:"file"`       // file to get content of
+	Catalog string `form:"catalog" json:"catalog"` // catalog to get content of
+	Hidden  bool   `form:"hidden" json:"hidden"`   // show hidden files/dirs
+	Local   bool   `form:"local" json:"local"`
 }
 
 // GET /files method
@@ -86,28 +90,83 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 			WithDetails("failed to get search engine"))
 	}
 
-	log.WithFields(map[string]interface{}{
-		"dir":     params.Dir,
-		"user":    userName,
-		"home":    homeDir,
-		"cluster": userTag,
-	}).Infof("[%s]: start GET /files", CORE)
-	info, err := engine.Files(params.Dir, params.Hidden)
+	// auto-detect directory/catalog/file
+	if len(params.Catalog) != 0 {
+		panic(NewError(http.StatusNotImplemented, "GET for catalog is not implemented yet"))
+	} else {
+		mountPoint, _ := server.getMountPoint(homeDir)
+		path := filepath.Join(mountPoint, params.Dir, params.File)
+
+		// stat the requested path...
+		if info, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				panic(NewError(http.StatusNotFound, err.Error()))
+			} else if os.IsPermission(err) {
+				panic(NewError(http.StatusForbidden, err.Error()))
+			} else {
+				panic(NewError(http.StatusInternalServerError, err.Error()).
+					WithDetails("failed to stat requested path"))
+			}
+		} else if info.IsDir() { // directory
+			log.WithFields(map[string]interface{}{
+				"dir":     params.Dir,
+				"user":    userName,
+				"home":    homeDir,
+				"cluster": userTag,
+			}).Infof("[%s]: start GET /files", CORE)
+			info, err := engine.Files(params.Dir, params.Hidden)
+			if err != nil {
+				panic(NewError(http.StatusInternalServerError, err.Error()).
+					WithDetails("failed to get files"))
+			}
+
+			// TODO: if params.Sort {
+			// sort names in the ascending order
+			sort.Strings(info.Files)
+			sort.Strings(info.Dirs)
+
+			// TODO: use transcoder/dedicated structure instead of simple map!
+			json := map[string]interface{}{
+				"dir":     info.Path,
+				"files":   info.Files,
+				"folders": info.Dirs,
+			}
+			ctx.JSON(http.StatusOK, json)
+		} else { // catalog or regular file
+			cat, err := catalog.OpenCatalogReadOnly(path)
+			if err != nil {
+				if err != catalog.ErrNotACatalog {
+					panic(NewError(http.StatusInternalServerError, err.Error()).
+						WithDetails("failed to open catalog"))
+				}
+
+				server.doGetRegularFile(ctx, path)
+			} else {
+				defer cat.Close()
+
+				server.doGetCatalog(ctx, cat)
+			}
+		}
+	}
+}
+
+// GET /files method: regular FILE
+func (server *Server) doGetRegularFile(ctx *gin.Context, path string) {
+	f, err := os.Open(path)
 	if err != nil {
-		panic(NewError(http.StatusInternalServerError, err.Error()).
-			WithDetails("failed to get files"))
+		panic(err)
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		panic(err)
 	}
 
-	// TODO: if params.Sort {
-	// sort names in the ascending order
-	sort.Strings(info.Files)
-	sort.Strings(info.Dirs)
+	http.ServeContent(ctx.Writer, ctx.Request, path, info.ModTime(), f)
+}
 
-	// TODO: use transcoder/dedicated structure instead of simple map!
-	json := map[string]interface{}{
-		"dir":     info.Path,
-		"files":   info.Files,
-		"folders": info.Dirs,
-	}
-	ctx.JSON(http.StatusOK, json)
+// GET /files method: CATALOG
+func (server *Server) doGetCatalog(ctx *gin.Context, cat *catalog.Catalog) {
+	panic(NewError(http.StatusNotImplemented, "GET for catalog is not implemented yet"))
 }
