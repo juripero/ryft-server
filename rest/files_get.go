@@ -37,6 +37,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/getryft/ryft-server/search"
@@ -96,67 +97,68 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 	}
 
 	// auto-detect directory/catalog/file
+	mountPoint, _ := server.getMountPoint(homeDir)
+	var path string
 	if len(params.Catalog) != 0 {
-		panic(NewError(http.StatusNotImplemented, "GET for catalog is not implemented yet"))
+		path = filepath.Join(mountPoint, params.Dir, params.Catalog)
 	} else {
-		mountPoint, _ := server.getMountPoint(homeDir)
-		path := filepath.Join(mountPoint, params.Dir, params.File)
+		path = filepath.Join(mountPoint, params.Dir, params.File)
+	}
 
-		// checks the input filename is relative to home
-		if !search.IsRelativeToHome(mountPoint, path) {
-			panic(NewError(http.StatusBadRequest,
-				fmt.Sprintf("path %q is not relative to home", path)))
+	// checks the input filename is relative to home
+	if !search.IsRelativeToHome(mountPoint, path) {
+		panic(NewError(http.StatusBadRequest,
+			fmt.Sprintf("path %q is not relative to home", path)))
+	}
+
+	// stat the requested path...
+	if info, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			panic(NewError(http.StatusNotFound, err.Error()))
+		} else if os.IsPermission(err) {
+			panic(NewError(http.StatusForbidden, err.Error()))
+		} else {
+			panic(NewError(http.StatusInternalServerError, err.Error()).
+				WithDetails("failed to stat requested path"))
+		}
+	} else if info.IsDir() { // directory
+		log.WithFields(map[string]interface{}{
+			"dir":     params.Dir,
+			"user":    userName,
+			"home":    homeDir,
+			"cluster": userTag,
+		}).Infof("[%s]: start GET /files", CORE)
+		info, err := engine.Files(params.Dir, params.Hidden)
+		if err != nil {
+			panic(NewError(http.StatusInternalServerError, err.Error()).
+				WithDetails("failed to get files"))
 		}
 
-		// stat the requested path...
-		if info, err := os.Stat(path); err != nil {
-			if os.IsNotExist(err) {
-				panic(NewError(http.StatusNotFound, err.Error()))
-			} else if os.IsPermission(err) {
-				panic(NewError(http.StatusForbidden, err.Error()))
-			} else {
+		// TODO: if params.Sort {
+		// sort names in the ascending order
+		sort.Strings(info.Files)
+		sort.Strings(info.Dirs)
+
+		// TODO: use transcoder/dedicated structure instead of simple map!
+		json := map[string]interface{}{
+			"dir":     info.Path,
+			"files":   info.Files,
+			"folders": info.Dirs,
+		}
+		ctx.JSON(http.StatusOK, json)
+	} else { // catalog or regular file
+		cat, err := catalog.OpenCatalogReadOnly(path)
+		if err != nil {
+			if err != catalog.ErrNotACatalog {
 				panic(NewError(http.StatusInternalServerError, err.Error()).
-					WithDetails("failed to stat requested path"))
-			}
-		} else if info.IsDir() { // directory
-			log.WithFields(map[string]interface{}{
-				"dir":     params.Dir,
-				"user":    userName,
-				"home":    homeDir,
-				"cluster": userTag,
-			}).Infof("[%s]: start GET /files", CORE)
-			info, err := engine.Files(params.Dir, params.Hidden)
-			if err != nil {
-				panic(NewError(http.StatusInternalServerError, err.Error()).
-					WithDetails("failed to get files"))
+					WithDetails("failed to open catalog"))
 			}
 
-			// TODO: if params.Sort {
-			// sort names in the ascending order
-			sort.Strings(info.Files)
-			sort.Strings(info.Dirs)
+			server.doGetRegularFile(ctx, path)
+		} else {
+			defer cat.Close()
 
-			// TODO: use transcoder/dedicated structure instead of simple map!
-			json := map[string]interface{}{
-				"dir":     info.Path,
-				"files":   info.Files,
-				"folders": info.Dirs,
-			}
-			ctx.JSON(http.StatusOK, json)
-		} else { // catalog or regular file
-			cat, err := catalog.OpenCatalogReadOnly(path)
-			if err != nil {
-				if err != catalog.ErrNotACatalog {
-					panic(NewError(http.StatusInternalServerError, err.Error()).
-						WithDetails("failed to open catalog"))
-				}
-
-				server.doGetRegularFile(ctx, path)
-			} else {
-				defer cat.Close()
-
-				server.doGetCatalog(ctx, cat)
-			}
+			server.doGetCatalog(ctx, params.File, info.ModTime(), cat)
 		}
 	}
 }
@@ -178,6 +180,12 @@ func (server *Server) doGetRegularFile(ctx *gin.Context, path string) {
 }
 
 // GET /files method: CATALOG
-func (server *Server) doGetCatalog(ctx *gin.Context, cat *catalog.Catalog) {
-	panic(NewError(http.StatusNotImplemented, "GET for catalog is not implemented yet"))
+func (server *Server) doGetCatalog(ctx *gin.Context, filename string, mt time.Time, cat *catalog.Catalog) {
+	f, err := cat.GetFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	http.ServeContent(ctx.Writer, ctx.Request, cat.GetPath(), mt, f)
 }
