@@ -109,9 +109,13 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	// - POST http://host:port/files?file=/foo/test.txt
 	if prefix := ctx.Param("path"); len(prefix) != 0 {
 		if len(params.Catalog) != 0 {
-			params.Catalog = filepath.Join(prefix, params.Catalog)
+			params.Catalog = strings.Join([]string{prefix, params.Catalog},
+				string(filepath.Separator))
+			// filepath.Join() cleans the path, we don't need it yet!
 		} else {
-			params.File = filepath.Join(prefix, params.File)
+			params.File = strings.Join([]string{prefix, params.File},
+				string(filepath.Separator))
+			// filepath.Join() cleans the path, we don't need it yet!
 		}
 	}
 

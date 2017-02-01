@@ -31,12 +31,15 @@
 package rest
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/getryft/ryft-server/rest/codec"
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -68,7 +71,9 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 	// - GET http://host:port/files/foo/dir/
 	// - GET http://host:port/files?dir=/foo/dir
 	if prefix := ctx.Param("path"); len(prefix) != 0 {
-		params.Dir = filepath.Join(prefix, params.Dir)
+		params.Dir = strings.Join([]string{prefix, params.Dir},
+			string(filepath.Separator))
+		// filepath.Join() cleans the path, we don't need it yet!
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
@@ -96,6 +101,12 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 	} else {
 		mountPoint, _ := server.getMountPoint(homeDir)
 		path := filepath.Join(mountPoint, params.Dir, params.File)
+
+		// checks the input filename is relative to home
+		if !search.IsRelativeToHome(mountPoint, path) {
+			panic(NewError(http.StatusBadRequest,
+				fmt.Sprintf("path %q is not relative to home", path)))
+		}
 
 		// stat the requested path...
 		if info, err := os.Stat(path); err != nil {
