@@ -188,6 +188,7 @@ p.pos,p.len,p.d_pos,d.file
 FROM parts AS p
 JOIN data AS d ON d.id = p.d_id
 WHERE p.name IS ?;`, filename)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// sql.ErrNoRows means no file part found
@@ -206,6 +207,10 @@ WHERE p.name IS ?;`, filename)
 		} else {
 			parts = append(parts, p)
 		}
+	}
+
+	if len(parts) == 0 {
+		return nil, os.ErrNotExist
 	}
 
 	return &File{parts: parts}, nil // OK
@@ -251,7 +256,9 @@ type filePart struct {
 // find the part's index by offset
 func (f *File) findPart(pos int64) int {
 	return sort.Search(len(f.parts), func(i int) bool {
-		return f.parts[i].offset >= pos
+		p := f.parts[i]
+		end := p.offset + p.length
+		return pos < end
 	})
 }
 
@@ -259,6 +266,18 @@ func (f *File) findPart(pos int64) int {
 func (f *File) Read(buf []byte) (n int, err error) {
 	if i := f.findPart(f.pos); i < len(f.parts) {
 		p := f.parts[i] // found part
+
+		off := f.pos - p.offset
+		if off < 0 {
+			// fill zeros
+			for ; off < 0; n++ {
+				buf[n] = 0
+				off++
+			}
+
+			f.pos += int64(n)
+			return n, nil
+		}
 
 		fd := f.cache[p.dataPath]
 		if fd == nil { // cache miss
@@ -275,7 +294,6 @@ func (f *File) Read(buf []byte) (n int, err error) {
 			f.cache[p.dataPath] = fd
 		}
 
-		off := f.pos - p.offset
 		_, err = fd.Seek(p.dataPos+off, io.SeekStart)
 		if err != nil {
 			return 0, err
