@@ -58,8 +58,8 @@ func newFake() *fakeServer {
 	fs.server.Config.SearchBackend = testfake.TAG
 	fs.server.Config.BackendOptions = map[string]interface{}{
 		"instance-name": ".work",
-		"home-dir":      "/ryft",
-		"ryftone-mount": "/tmp",
+		"home-dir":      "",
+		"ryftone-mount": "/tmp/ryft",
 		"host-name":     "",
 	}
 	fs.server.Config.SettingsPath = "/tmp/ryft/.settings"
@@ -78,7 +78,7 @@ func newFake() *fakeServer {
 	// DEBUG mode
 	mux.GET("/logging/level", fs.server.DoLoggingLevel)
 
-	os.MkdirAll("/tmp/ryft", 0755) // see BackendOptions above!
+	os.MkdirAll("/tmp/ryft/foo", 0755) // see BackendOptions above!
 	ioutil.WriteFile("/tmp/ryft/1.txt", []byte(`
 11111-hello-11111
 22222-hello-22222

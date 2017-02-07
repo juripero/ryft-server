@@ -46,9 +46,6 @@ func TestFilesGetUsual(t *testing.T) {
 
 	if all {
 		check("/files1", "", 0, http.StatusNotFound, "page not found")
-
-		check("/files?dir=foo", "application/msgpack", 0,
-			http.StatusUnsupportedMediaType, "only JSON format is supported for now")
 	}
 
 	if oldSearchBackend := fs.server.Config.SearchBackend; all {
