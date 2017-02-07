@@ -70,4 +70,27 @@ func TestFilesGetUsual(t *testing.T) {
 		delete(fs.server.Config.BackendOptions, "files-report-files")
 		delete(fs.server.Config.BackendOptions, "files-report-dirs")
 	}
+
+	if all {
+		check("/files/foo?dir=../..", "", 0, http.StatusBadRequest, "is not relative to home")
+	}
+
+	if all {
+		check("/files/foo?dir=..&file=missing.txt", "", 0, http.StatusNotFound, "no such file or directory")
+	}
+
+	if all {
+		check("/files/foo?dir=..&file=bad.dat", "", 0, http.StatusInternalServerError, "failed to open file", "permission denied")
+	}
+
+	if all {
+		check("/files/foo?dir=..&file=1.txt", "", 0, http.StatusOK,
+			"11111-hello-11111", "22222-hello-22222", "33333-hello-33333",
+			"44444-hello-44444", "55555-hello-55555")
+	}
+
+	if all {
+		check("/files/foo?dir=..&catalog=catalog.test&file=1.txt", "", 0, http.StatusOK,
+			"11111-hello-11111", "aaaaa-hello-aaaaa")
+	}
 }
