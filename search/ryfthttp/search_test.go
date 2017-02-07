@@ -1,13 +1,14 @@
 package ryfthttp
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"testing"
 	"time"
 
-	//codec "github.com/getryft/ryft-server/rest/codec/json"
+	json_codec "github.com/getryft/ryft-server/rest/codec/json"
 	codec "github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
@@ -94,11 +95,13 @@ func (fs *fakeServer) doSearch(w http.ResponseWriter, req *http.Request) {
 
 // do fake GET /count
 func (fs *fakeServer) doCount(w http.ResponseWriter, req *http.Request) {
-	enc, _ := codec.NewStreamEncoder(w)
-	defer enc.Close()
+	//enc, _ := codec.NewStreamEncoder(w)
+	//defer enc.Close()
 
-	w.Header().Set("Content-Type", codec.MIME)
+	w.Header().Set("Content-Type", json_codec.MIME)
 	w.WriteHeader(http.StatusOK)
+
+	time.Sleep(fs.ReportLatency)
 
 	stat := search.NewStat(fs.Host)
 	stat.Matches = uint64(fs.RecordsToReport)
@@ -107,7 +110,8 @@ func (fs *fakeServer) doCount(w http.ResponseWriter, req *http.Request) {
 	stat.FabricDuration = stat.Duration / 2
 
 	xstat := format.FromStat(stat)
-	enc.EncodeStat(xstat)
+	enc := json.NewEncoder(w)
+	enc.Encode(xstat)
 }
 
 // Check valid search results
@@ -191,6 +195,45 @@ func TestEngineSearchUsual(t *testing.T) {
 		}
 	}
 	engine.ServerURL = oldUrl // restore back
+}
+
+// Check valid count results
+func TestEngineCountUsual(t *testing.T) {
+	testSetLogLevel()
+
+	fs := newFake(0, 0)
+	fs.Host = "host-1"
+
+	go func() {
+		err := fs.server.ListenAndServe()
+		assert.NoError(t, err, "failed to start fake server")
+	}()
+	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	defer func() {
+		fs.server.Stop(0)
+		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+	}()
+
+	// valid (usual case)
+	engine, err := NewEngine(map[string]interface{}{
+		"server-url": fmt.Sprintf("http://localhost%s", testFakePort),
+		"auth-token": "Basic: any-value-ignored",
+		"local-only": true,
+	})
+	if assert.NoError(t, err) && assert.NotNil(t, engine) {
+		cfg := search.NewConfig("hello", "1.txt")
+		cfg.ReportIndex = false
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			records, errors := testfake.Drain(res)
+
+			assert.EqualValues(t, fs.RecordsToReport, res.RecordsReported())
+			assert.EqualValues(t, fs.ErrorsToReport, res.ErrorsReported())
+			assert.EqualValues(t, fs.RecordsToReport, len(records))
+			assert.EqualValues(t, fs.ErrorsToReport, len(errors))
+		}
+	}
 }
 
 // Check bad search results
@@ -358,6 +401,26 @@ func TestEngineSearchCancel(t *testing.T) {
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		cfg := search.NewConfig("hello", "1.txt")
 		cfg.ReportIndex = true
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			go func() {
+				time.Sleep(1 * time.Second)
+				log.Infof("[%s/test]: cancelling request!", TAG)
+				res.Cancel() // cancel in 1 second
+			}()
+			_, _ = testfake.Drain(res)
+
+			assert.True(t, res.IsCancelled())
+			assert.True(t, res.IsDone())
+		}
+	}
+
+	// the same for /count
+	if assert.NotNil(t, engine) {
+		fs.ReportLatency = 2 * time.Second
+		cfg := search.NewConfig("hello", "1.txt")
+		cfg.ReportIndex = false
 
 		res, err := engine.Search(cfg)
 		if assert.NoError(t, err) && assert.NotNil(t, res) {
