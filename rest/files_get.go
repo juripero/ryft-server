@@ -39,7 +39,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
@@ -75,17 +74,6 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 		params.Dir = strings.Join([]string{prefix, params.Dir},
 			string(filepath.Separator))
 		// filepath.Join() cleans the path, we don't need it yet!
-	}
-
-	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
-	// default to JSON
-	if accept == "" {
-		accept = codec.MIME_JSON
-		// log.Debugf("[%s]: Content-Type changed to %s", CORE, accept)
-	}
-	if accept != codec.MIME_JSON { //if accept == encoder.MIME_MSGPACK || accept == encoder.MIME_XMSGPACK {
-		panic(NewError(http.StatusUnsupportedMediaType,
-			"only JSON format is supported for now"))
 	}
 
 	// get search engine
