@@ -8,12 +8,19 @@
 #
 # constants
 #
+ryftsudo=""
+initctl show-config ssh >>/dev/null 2>&1 
+if [ $? -ne 0 ]
+then
+	ryftsudo="sudo"
+fi
 tailLines="-40"
 ryftoneLog=/var/log/ryft/ryftone.log
 ryft_server_dLog=/var/log/ryft/server.log
-ryftwebapidemoLog=/tmp/apidemo.log
+ryftwebapidemoLog=/tmp/ryft-demo.log
 ryftodbcdLog=/usr/local/ryft/bin/x8664/ryftone_server.log
 consulLog=/var/log/consul
+consulAlertsLog=/var/log/consul-alerts
 
 #
 # initial state 
@@ -62,7 +69,7 @@ ryft_app_logs() {
 	
 	# generate a list of log files
 	rm -f $tarList
-	for i in /var/log/ryft/ryftone.log /var/log/ryft/server.log /tmp/apidemo.log /usr/local/ryft/bin/x8664/ryftone_server.log /usr/local/ryft/bin/x8664/ryftone_server*.log /var/log/consul /looney/balooney
+	for i in /var/log/ryft/ryftone.log /var/log/ryft/server.log /var/log/ryft/ryft-demo.log /usr/local/ryft/bin/x8664/ryftone_server.log /usr/local/ryft/bin/x8664/ryftone_server*.log /var/log/consul /looney/balooney
 	do
 		if [ -e $i ] 
 		then
@@ -97,10 +104,10 @@ ryft_boot_enabled() {
 	local returnValue=0
 	local i=$1
 
-	initctl show-config $i >>/dev/null 2>&1 
+	$ryftsudo initctl show-config $i >>/dev/null 2>&1 
 	if [ $? = 0 ]
 	then
-		x=`initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
+		x=`$ryftsudo initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
 		#echo "x=$x"
 		if [ $x = "boot_on" ]
 		then
@@ -114,14 +121,14 @@ function ryft_boot_status() {
 	echo
 	printf "%-15s" "SERVICE" "BOOT_STATUS" "RUNNING_STATUS" 
 	echo
-	for i in ryft-server-d ryftwebapidemo consul ryftodbcd
+	for i in ryft-server-d ryftwebapidemo ryftodbcd consul consul-alerts elasticsearch
 	do
 		printf "%-15s" $i
-		initctl show-config $i >>/dev/null 2>&1 
+		$ryftsudo initctl show-config $i >>/dev/null 2>&1 
 		if [ $? = 0 ]
 		then
 			# running processes must be newer than override file to be visible
-			x=`initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
+			x=`$ryftsudo initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
 			#echo "x=$x"
 			if [ $x = "boot_on" ]
 			then
@@ -133,7 +140,7 @@ function ryft_boot_status() {
 			# sensing file instead
 			#printf "%-15s" `cat /etc/init/$i.*| grep -q "^manual" && echo -n boot_off || echo -n boot_on`
 	
-			x=`service $i status|cut -d' ' -f2-`
+			x=`$ryftsudo service $i status|cut -d' ' -f2-`
 			y=`echo "$x"| grep process`
 			if [ $? = 0 ]
 			then
@@ -312,7 +319,7 @@ function ryft_start
 	# start process if not already running
 	# ryft_showCommand
 	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
-	service $service status|grep process
+	$ryftsudo service $service status|grep process
 	if [ $? != 0 ]
 	then
     	    ryft_showCommand "sudo service $service start"
@@ -332,14 +339,18 @@ function ryft_start_menu
     START_MENU_TEXT[3]="Start ryftwebapidemo"
     START_MENU_TEXT[4]="Start ryftodbcd"
     START_MENU_TEXT[5]="Start consul"
+    START_MENU_TEXT[6]="Start consul-alerts"
+    START_MENU_TEXT[7]="Start elasticsearch"
     
     local -a START_MENU_ACTIONS
     START_MENU_ACTIONS[0]="exit"
-    START_MENU_ACTIONS[1]="ryft_separator; ryft_start \"ryft-server-d ryftwebapidemo ryftodbcd consul\"; ryft_separator"
+    START_MENU_ACTIONS[1]="ryft_separator; ryft_start \"ryft-server-d ryftwebapidemo ryftodbcd consul consul-alerts elasticsearch\"; ryft_separator"
     START_MENU_ACTIONS[2]="ryft_start ryft-server-d"
     START_MENU_ACTIONS[3]="ryft_start ryftwebapidemo"
     START_MENU_ACTIONS[4]="ryft_start ryftodbcd"
     START_MENU_ACTIONS[5]="ryft_start consul"
+    START_MENU_ACTIONS[6]="ryft_start consul-alerts"
+    START_MENU_ACTIONS[7]="ryft_start elasticsearch"
 
     local START_MENU_COMMAND="ryft_boot_status; ryft_status"
 
@@ -357,7 +368,7 @@ function ryft_stop
 	# stop process if running 
 	# ryft_showCommand
 	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
-	service $service status|grep process
+	$ryftsudo service $service status|grep process
 	if [ $? = 0 ]
 	then
     	    ryft_showCommand "sudo service $service stop"
@@ -377,14 +388,18 @@ function ryft_stop_menu
     STOP_MENU_TEXT[3]="Stop ryftwebapidemo"
     STOP_MENU_TEXT[4]="Stop ryftodbcd"
     STOP_MENU_TEXT[5]="Stop consul"
+    STOP_MENU_TEXT[6]="Stop consul-alerts"
+    STOP_MENU_TEXT[7]="Stop elasticsearch"
     
     local -a STOP_MENU_ACTIONS
     STOP_MENU_ACTIONS[0]="exit"
-    STOP_MENU_ACTIONS[1]="ryft_separator; ryft_stop \"ryft-server-d ryftwebapidemo ryftodbcd consul\"; ryft_separator";
+    STOP_MENU_ACTIONS[1]="ryft_separator; ryft_stop \"ryft-server-d ryftwebapidemo ryftodbcd consul consul-alerts elasticsearch\"; ryft_separator";
     STOP_MENU_ACTIONS[2]="ryft_stop ryft-server-d"
     STOP_MENU_ACTIONS[3]="ryft_stop ryftwebapidemo"
     STOP_MENU_ACTIONS[4]="ryft_stop ryftodbcd"
     STOP_MENU_ACTIONS[5]="ryft_stop consul"
+    STOP_MENU_ACTIONS[6]="ryft_stop consul-alerts"
+    STOP_MENU_ACTIONS[7]="ryft_stop elasticsearch"
 
     local STOP_MENU_COMMAND="ryft_boot_status; ryft_status"
 
@@ -413,14 +428,18 @@ function ryft_restart_menu
     RESTART_MENU_TEXT[3]="Restart ryftwebapidemo"
     RESTART_MENU_TEXT[4]="Restart ryftodbcd"
     RESTART_MENU_TEXT[5]="Restart consul"
+    RESTART_MENU_TEXT[6]="Restart consul-alerts"
+    RESTART_MENU_TEXT[7]="Restart elasticsearch"
 
     local -a RESTART_MENU_ACTIONS
     RESTART_MENU_ACTIONS[0]="exit"
-    RESTART_MENU_ACTIONS[1]="ryft_restart \"ryft-server-d ryftwebapidemo ryftodbcd consul\""
+    RESTART_MENU_ACTIONS[1]="ryft_restart \"ryft-server-d ryftwebapidemo ryftodbcd consul consul-alerts elasticsearch\""
     RESTART_MENU_ACTIONS[2]="ryft_restart ryft-server-d"
     RESTART_MENU_ACTIONS[3]="ryft_restart ryftwebapidemo"
     RESTART_MENU_ACTIONS[4]="ryft_restart ryftodbcd"
     RESTART_MENU_ACTIONS[5]="ryft_restart consul"
+    RESTART_MENU_ACTIONS[6]="ryft_restart consul-alerts"
+    RESTART_MENU_ACTIONS[7]="ryft_restart elasticsearch"
 
     local RESTART_MENU_COMMAND="ryft_boot_status; ryft_status"
 
@@ -446,7 +465,7 @@ function ryft_boot_off
 	# restart process if running	
 	# ryft_showCommand
 	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
-	service $service status|grep process
+	$ryftsudo service $service status|grep process
 	if [ $? = 0 ]
 	then
     		ryft_showCommand "sudo service $service restart"
@@ -470,7 +489,7 @@ function ryft_boot_on
 	# restart process if running
 	# ryft_showCommand
 	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
-	service $service status|grep process
+	$ryftsudo service $service status|grep process
 	if [ $? = 0 ]
 	then
     		ryft_showCommand "sudo service $service restart"
@@ -508,14 +527,18 @@ function ryft_boot_toggle_menu
     BOOT_TOGGLE_MENU_TEXT[3]="Boot toggle ryftwebapidemo"
     BOOT_TOGGLE_MENU_TEXT[4]="Boot toggle ryftodbcd"
     BOOT_TOGGLE_MENU_TEXT[5]="Boot toggle consul"
+    BOOT_TOGGLE_MENU_TEXT[6]="Boot toggle consul-alerts"
+    BOOT_TOGGLE_MENU_TEXT[7]="Boot toggle elasticsearch"
     
     local -a BOOT_TOGGLE_MENU_ACTIONS
     BOOT_TOGGLE_MENU_ACTIONS[0]="exit"
-    BOOT_TOGGLE_MENU_ACTIONS[1]="ryft_separator; ryft_boot_toggle \"ryft-server-d ryftwebapidemo ryftodbcd consul\"; ryft_separator;"
+    BOOT_TOGGLE_MENU_ACTIONS[1]="ryft_separator; ryft_boot_toggle \"ryft-server-d ryftwebapidemo ryftodbcd consul consul-alerts elasticsearch\"; ryft_separator;"
     BOOT_TOGGLE_MENU_ACTIONS[2]="ryft_boot_toggle ryft-server-d"
     BOOT_TOGGLE_MENU_ACTIONS[3]="ryft_boot_toggle ryftwebapidemo"
     BOOT_TOGGLE_MENU_ACTIONS[4]="ryft_boot_toggle ryftodbcd"
     BOOT_TOGGLE_MENU_ACTIONS[5]="ryft_boot_toggle consul"
+    BOOT_TOGGLE_MENU_ACTIONS[6]="ryft_boot_toggle consul-alerts"
+    BOOT_TOGGLE_MENU_ACTIONS[7]="ryft_boot_toggle elasticsearch"
 
     local BOOT_TOGGLE_MENU_COMMAND="ryft_boot_status; ryft_status"
 
@@ -533,14 +556,18 @@ function ryft_boot_on_menu
     BOOT_ON_MENU_TEXT[3]="Boot on ryftwebapidemo"
     BOOT_ON_MENU_TEXT[4]="Boot on ryftodbcd"
     BOOT_ON_MENU_TEXT[5]="Boot on consul"
+    BOOT_ON_MENU_TEXT[6]="Boot on consul-alerts"
+    BOOT_ON_MENU_TEXT[7]="Boot on elasticsearch"
     
     local -a BOOT_ON_MENU_ACTIONS
     BOOT_ON_MENU_ACTIONS[0]="exit"
-    BOOT_ON_MENU_ACTIONS[1]="ryft_separator; ryft_boot_on \"ryft-server-d ryftwebapidemo ryftodbcd consul\"; ryft_separator;"
+    BOOT_ON_MENU_ACTIONS[1]="ryft_separator; ryft_boot_on \"ryft-server-d ryftwebapidemo ryftodbcd consul consul-alerts elasticsearch\"; ryft_separator;"
     BOOT_ON_MENU_ACTIONS[2]="ryft_boot_on ryft-server-d"
     BOOT_ON_MENU_ACTIONS[3]="ryft_boot_on ryftwebapidemo"
     BOOT_ON_MENU_ACTIONS[4]="ryft_boot_on ryftodbcd"
     BOOT_ON_MENU_ACTIONS[5]="ryft_boot_on consul"
+    BOOT_ON_MENU_ACTIONS[6]="ryft_boot_on consul-alerts"
+    BOOT_ON_MENU_ACTIONS[7]="ryft_boot_on elasticsearch"
     
     local BOOT_ON_MENU_COMMAND="ryft_boot_status; ryft_status"
 
@@ -558,14 +585,18 @@ function ryft_boot_off_menu
     BOOT_OFF_MENU_TEXT[3]="Boot off ryftwebapidemo"
     BOOT_OFF_MENU_TEXT[4]="Boot off ryftodbcd"
     BOOT_OFF_MENU_TEXT[5]="Boot off consul"
+    BOOT_OFF_MENU_TEXT[6]="Boot off consul-alerts"
+    BOOT_OFF_MENU_TEXT[7]="Boot off elasticsearch"
 
     local -a BOOT_OFF_MENU_ACTIONS
     BOOT_OFF_MENU_ACTIONS[0]="exit"
-    BOOT_OFF_MENU_ACTIONS[1]="ryft_separator; ryft_boot_off \"ryft-server-d ryftwebapidemo ryftodbcd consul\"; ryft_separator"
+    BOOT_OFF_MENU_ACTIONS[1]="ryft_separator; ryft_boot_off \"ryft-server-d ryftwebapidemo ryftodbcd consul consul-alerts elasticsearch\"; ryft_separator"
     BOOT_OFF_MENU_ACTIONS[2]="ryft_boot_off ryft-server-d"
     BOOT_OFF_MENU_ACTIONS[3]="ryft_boot_off ryftwebapidemo"
     BOOT_OFF_MENU_ACTIONS[4]="ryft_boot_off ryftodbcd"
     BOOT_OFF_MENU_ACTIONS[5]="ryft_boot_off consul"
+    BOOT_OFF_MENU_ACTIONS[6]="ryft_boot_off consul-alerts"
+    BOOT_OFF_MENU_ACTIONS[7]="ryft_boot_off elasticsearch"
 
     local BOOT_OFF_MENU_COMMAND="ryft_boot_status; ryft_status"
 
@@ -835,9 +866,10 @@ function ryft_logs_menu
     LOGS_MENU_TEXT[3]="ryftwebapidemo log       (tail ${tailLines} $ryftwebapidemoLog)"
     LOGS_MENU_TEXT[4]="ryftodbcd log            (tail ${tailLines} $ryftodbcdLog)"
     LOGS_MENU_TEXT[5]="consul log               (tail ${tailLines} $consulLog)"
-    LOGS_MENU_TEXT[6]="RyftOne diagnostic dump  (sudo ryft_diagnostics_dump)"
-    LOGS_MENU_TEXT[7]="RyftOne clean log        (from Admin Guide - TroubleShooting Section)"
-    LOGS_MENU_TEXT[8]="RyftOne App Logs dump    (tar all application logs, menu selection #1,2,3,4,5)"
+    LOGS_MENU_TEXT[6]="consul-alerts log        (tail ${tailLines} $consulAlertsLog)"
+    LOGS_MENU_TEXT[7]="RyftOne diagnostic dump  (sudo ryft_diagnostics_dump)"
+    LOGS_MENU_TEXT[8]="RyftOne clean log        (from Admin Guide - TroubleShooting Section)"
+    LOGS_MENU_TEXT[9]="RyftOne App Logs dump    (tar all application logs, menu selection #1,2,3,4,5)"
     
     local -a LOGS_MENU_ACTIONS
     LOGS_MENU_ACTIONS[0]="exit"
@@ -846,9 +878,10 @@ function ryft_logs_menu
     LOGS_MENU_ACTIONS[3]="ryft_separator; tail ${tailLines} $ryftwebapidemoLog; ryft_separator"
     LOGS_MENU_ACTIONS[4]="ryft_separator; tail ${tailLines} $ryftodbcdLog; ryft_separator"
     LOGS_MENU_ACTIONS[5]="ryft_separator; tail ${tailLines} $consulLog; ryft_separator"
-    LOGS_MENU_ACTIONS[6]="ryft_separator; ryft_showCommand \"sudo ryft_diagnostics_dump\" && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
-    LOGS_MENU_ACTIONS[7]="ryft_ays \"Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.\" && ryft_separator && ryftone_clean_logs && ryft_separator"
-    LOGS_MENU_ACTIONS[8]="ryft_separator; ryft_app_logs; ryft_separator; echo -n \" App Logs dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
+    LOGS_MENU_ACTIONS[6]="ryft_separator; tail ${tailLines} $consulAlertsLog; ryft_separator"
+    LOGS_MENU_ACTIONS[7]="ryft_separator; ryft_showCommand \"sudo ryft_diagnostics_dump\" && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
+    LOGS_MENU_ACTIONS[8]="ryft_ays \"Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.\" && ryft_separator && ryftone_clean_logs && ryft_separator"
+    LOGS_MENU_ACTIONS[9]="ryft_separator; ryft_app_logs; ryft_separator; echo -n \" App Logs dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
 
     local LOGS_MENU_COMMAND="ryft_boot_status; ryft_status;"
 
@@ -1058,7 +1091,6 @@ show_filesystem_error () {
 	echo "Follow corrective actions in following order:"
 	echo "1. command: '(cd ~ryftuser/ryft/regression/util;./cpc;./recycle)'"
 	echo "   Repeat command if 'ryft_status' doesn't indicate OKAY"
-        echo "   If ryft_status is not OKAY, issue 'sudo fsck_rhfs -y -Y'"
  	echo "   If ryft_status is not OKAY, advance to step #2."
 	echo "   If OKAY, 'ryft_status -smoke' should show no problems."
 	echo "   if 'ryft_status -smoke' problems persist, advance to next step."
@@ -1113,6 +1145,7 @@ show_ccc_mgr_error () {
 	echo "	'~ryftuser/ryft/regression/util/recycle'"
 }
 
+#
 ryftServer=NotInstalled
 test -e /usr/bin/ryft-server
 if [ $? == 0 ] 
@@ -1148,7 +1181,7 @@ show_ryftServer_error () {
 	echo "	'$ryftServer_startCommand'"
 }
 
-
+#
 ryft1_odbcd=NotInstalled
 test -d /usr/local/ryft/bin
 if [ $? == 0 ] 
@@ -1215,6 +1248,40 @@ show_consul_error () {
 	echo "	'$consul_startCommand'"
 }
 
+#
+consulAlerts=NotInstalled
+test -f /etc/init/consul-alerts.conf
+if [ $? == 0 ] 
+then
+	consulAlerts=Installed
+fi
+if [ $debug != 0 ]
+then
+	echo "consulAlerts=$consulAlerts"
+fi
+consulAlerts_boot=`ryft_boot_enabled consul-alerts`
+consulAlerts_status=0
+consulAlerts_error=0
+consulAlerts_startCommand="sudo service consul-alerts start"
+consulAlerts_start() {
+	echo "--------------------"
+	echo "starting consul-alerts with $consulAlerts_startCommand"
+	${consulAlerts_startCommand}
+}
+consulAlerts_stopCommand="sudo service consul-alerts stop"
+consulAlerts_stop() {
+	echo "--------------------"
+	echo "stopping consul-alerts with $consulAlerts_stopCommand"
+	${consulAlerts_stopCommand}
+}
+show_consulAlerts_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* consul-alerts is not running.${attributesOFF} To start consul-alerts, issue command: "
+	echo "	'$consulAlerts_startCommand'"
+}
+#echo "TBD consulAlerts=$consulAlerts, consulAlerts_boot=$consulAlerts_boot, consulAlerts_status=$consulAlerts_status"
+
+#
 apidemo=NotInstalled
 test -d ~ryftuser/ryft/apidemo || test -d /opt/ryft-demo
 if [ $? == 0 ] 
@@ -1245,6 +1312,39 @@ show_apidemo_error () {
 	echo -e "${redAttributeON}*${problemCounter}* apidemo is not running.${attributesOFF} To start, issue command:"
 	echo "	'$apidemo_startCommand'"
 }
+
+#
+elasticsearch=NotInstalled
+test -e /etc/init/elasticsearch.conf
+if [ $? == 0 ] 
+then
+	elasticsearch=Installed
+fi
+if [ $debug != 0 ]
+then
+	echo "elasticsearch=$elasticsearch"
+fi
+elasticsearch_boot=`ryft_boot_enabled elasticsearch`
+elasticsearch_status=0
+elasticsearch_error=0
+elasticsearch_startCommand="sudo service elasticsearch start"
+elasticsearch_start() {
+	echo "--------------------"
+	echo "starting elasticsearch with $elasticsearch_startCommand"
+	${elasticsearch_startCommand}
+}
+elasticsearch_stopCommand="sudo service elasticsearch stop"
+elasticsearch_stop() {
+	echo "--------------------"
+	echo "stopping elasticsearch with $elasticsearch_stopCommand"
+	${elasticsearch_stopCommand}
+}
+show_elasticsearch_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* elasticsearch is not running.${attributesOFF} To start, issue command:"
+	echo "	'$elasticsearch_startCommand'"
+}
+#echo "TBD elasticsearch=$elasticsearch, elasticsearch_boot=$elasticsearch_boot, elasticsearch_status=$elasticsearch_status"
 
 
 showErrorDisplay() {
@@ -1328,7 +1428,9 @@ then
 	exit 0
 fi
 
-ryft_status() {
+ryft_statusX() {
+	problemCounter=0
+
 	expectedProcessCount=3		# rhfsd, ccc_mgr, tlogd
 
 	#
@@ -1377,11 +1479,27 @@ ryft_status() {
 	then
 		expectedProcessCount=$((expectedProcessCount+1))
 	fi
+	
+	consulAlerts_status=0
+	consulAlerts_error=0
+	consulAlerts_boot=`ryft_boot_enabled consul-alerts`
+	if [ $consulAlerts_boot = 1 ]
+	then
+		expectedProcessCount=$((expectedProcessCount+1))
+	fi
 
 	apidemo_status=0
 	apidemo_error=0
 	apidemo_boot=`ryft_boot_enabled ryftwebapidemo`
 	if [ $apidemo_boot = 1 ]
+	then
+		expectedProcessCount=$((expectedProcessCount+1))
+	fi
+	
+	elasticsearch_status=0
+	elasticsearch_error=0
+	elasticsearch_boot=`ryft_boot_enabled elasticsearch`
+	if [ $elasticsearch_boot = 1 ]
 	then
 		expectedProcessCount=$((expectedProcessCount+1))
 	fi
@@ -1440,10 +1558,14 @@ ryft_status() {
 	#echo "ryftServer_status=$ryftServer_status"
 	ryft1_odbcd_status=`detect_process "ryft1_odbcd"`
 	# echo "ryft1_odbcd_status=$ryft1_odbcd_status"
-	consul_status=`detect_process "/opt/consul/bin/consul"`
+	consul_status=`detect_process "/opt/consul/bin/consul agent"`
 	# echo "consul_status=$consul_status"
+	consulAlerts_status=`detect_process "/opt/consul/bin/consul-alerts start"`
+	# echo "consulAlerts_status=$consulAlerts_status"
 	apidemo_status=`detect_process 'java\s+-cp\s+conf:lib/\*\s+com.metasys.ryft.DemoApp'`
 	#echo "apidemo_status=$apidemo_status"
+	# echo "elasticsearch_status=$elasticsearch_status"
+	elasticsearch_status=`detect_process "/usr/lib/jvm/java-1.8.0.*/opt/elasticsearch"`
 	
 	if [ $tlogd_status = 0 ]
 	then
@@ -1464,31 +1586,45 @@ ryft_status() {
 		status=$((status+1))
 	fi
 
-	#echo "ryftServer=$ryftServer, ryftServer_boot=$ryftServer_boot, ryftServer_status=$ryftServer_status"
+	#echo "TBD ryftServer=$ryftServer, ryftServer_boot=$ryftServer_boot, ryftServer_status=$ryftServer_status"
 	if [ $ryftServer = "Installed"  -a $ryftServer_boot != 0  -a $ryftServer_status = 0 ]
 	then
 		ryftServer_error=1
 		status=$((status+1))
 	fi
 
-	#echo "ryft1_odbcd=$ryft1_odbcd, ryft1_odbcd_boot=$ryft1_odbcd_boot, ryft1_odbcd_status=$ryft1_odbcd_status"
+	#echo "TBD ryft1_odbcd=$ryft1_odbcd, ryft1_odbcd_boot=$ryft1_odbcd_boot, ryft1_odbcd_status=$ryft1_odbcd_status"
 	if [ $ryft1_odbcd = "Installed" -a $ryft1_odbcd_boot != 0 -a $ryft1_odbcd_status = 0 ]
 	then
 		ryft1_odbcd_error=1
 		status=$((status+1))
 	fi
 
-	#echo "consul=$consul, consul_boot=$consul_boot, consul_status=$consul_status"
+	#echo "TBD consul=$consul, consul_boot=$consul_boot, consul_status=$consul_status"
 	if [ $consul = "Installed"      -a $consul_boot != 0      -a $consul_status = 0 ]
 	then
 		consul_error=1
 		status=$((status+1))
 	fi
+	
+	#echo "TBD consulAlerts=$consulAlerts, consulAlerts_boot=$consulAlerts_boot, consulAlerts_status=$consulAlerts_status"
+	if [ $consulAlerts = "Installed" -a $consulAlerts_boot != 0 -a $consulAlerts_status = 0 ]
+	then
+		consulAlerts_error=1
+		status=$((status+1))
+	fi
 
-	#echo "apidemo=$apidemo, apidemo_boot=$apidemo_boot, apidemo_status=$apidemo_status"
+	#echo "TBD apidemo=$apidemo, apidemo_boot=$apidemo_boot, apidemo_status=$apidemo_status"
 	if [ $apidemo = "Installed"      -a $apidemo_boot != 0    -a $apidemo_status = 0 ]
 	then
 		apidemo_error=1
+		status=$((status+1))
+	fi
+	
+	#echo "TBD elasticsearch=$elasticsearch, elasticsearch_boot=$elasticsearch_boot, elasticsearch_status=$elasticsearch_status"
+	if [ $elasticsearch = "Installed"      -a $elasticsearch_boot != 0    -a $elasticsearch_status = 0 ]
+	then
+		elasticsearch_error=1
 		status=$((status+1))
 	fi
 
@@ -1576,12 +1712,20 @@ ryft_status() {
 		then
 			show_consul_error
 		fi
+		if [ $consulAlerts_error != 0 ]
+		then
+			show_consulAlerts_error
+		fi
 		if [ $apidemo_error != 0 ]
 		then
 			show_apidemo_error
 		fi
+		if [ $elasticsearch_error != 0 ]
+		then
+			show_elasticsearch_error
+		fi
 		
-		count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $apidemo_error" | bc` 
+		count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $consulAlerts_error + $apidemo_error + $elasticsearch_error" | bc` 
 		message=""
 		#echo "### count=$count"
 		if [ $count != 0 -a $tlogd_error = 0 -a $filesystem_error = 0 -a $rhfsd_error = 0 -a $ccc_mgr_error = 0 ] 
@@ -1595,7 +1739,7 @@ ryft_status() {
 		echo -e "${redAttributeON}$hostname ryft_status found $status $PROBLEMS${attributesOFF} $message"
 	fi
 }
-ryft_status
+ryft_statusX
 
 
 #
@@ -1606,7 +1750,8 @@ then
 	#
 	# any processes we can stop?
 	#
-	count=`echo "$ryftServer_status + $ryft1_odbcd_status + $consul_status + $apidemo_status" | bc` 
+	#echo "TBD ryftServer_status=$ryftServer_status + ryft1_odbcd_status=$ryft1_odbcd_status + consul_status=$consul_status + consulAlerts_status=$consulAlerts_status + apidemo_status=$apidemo_status + elasticsearch_status=$elasticsearch_status" 
+	count=`echo "$ryftServer_status + $ryft1_odbcd_status + $consul_status + $consulAlerts_status + $apidemo_status + $elasticsearch_status" | bc` 
 	echo "********************"
 	echo -e "${redAttributeON}$hostname Stopping $count services${attributesOFF}"
 	echo "********************"
@@ -1626,16 +1771,24 @@ then
 		then
 			consul_stop
 		fi
+		if [ $consulAlerts = "Installed" -a $consulAlerts_error = 0 -a $stopFlag = 1 ]
+		then
+			consulAlerts_stop
+		fi
 		if [ $apidemo = "Installed" -a $apidemo_error = 0 -a $stopFlag = 1 ]
 		then
 			apidemo_stop
+		fi
+		if [ $elasticsearch = "Installed" -a $elasticsearch_error = 0 -a $stopFlag = 1 ]
+		then
+			elasticsearch_stop
 		fi
 	fi
 	if [ $count != 0 ]
 	then
 		sleep $sleepValue 
 		finalStatus=0
-		ryft_status
+		ryft_statusX
 	fi
 fi
 
@@ -1654,13 +1807,13 @@ then
 		sleep $sleepValue 
 		finalStatus=0
 
-		ryft_status
+		ryft_statusX
 	fi
 
 	#
 	# fix by starting missing processes
 	#
-	count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $apidemo_error" | bc` 
+	count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $consulAlerts_error + $apidemo_error + $elasticsearch_error" | bc` 
 	if [ $count != 0 -a $filesystem_error = 0 -a $rhfsd_error = 0 -a $ccc_mgr_error = 0 ] 
 	then
 		if [ $ryftServer_error != 0 ]
@@ -1675,12 +1828,20 @@ then
 		then
 			consul_start
 		fi
+		if [ $consulAlerts_error != 0 ]
+		then
+			consulAlerts_start
+		fi
 		if [ $apidemo_error != 0 ]
 		then
 			apidemo_start
 		fi
+		if [ $elasticsearch_error != 0 ]
+		then
+			elasticsearch_start
+		fi
 
-		ryft_status
+		ryft_statusX
 	fi
 fi
 
@@ -1694,7 +1855,7 @@ then
 	# requested to start problem processes
 	#
 	okayToStart=0
-	count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $apidemo_error" | bc` 
+	count=`echo "$ryftServer_error + $ryft1_odbcd_error + $consul_error + $consulAlerts_error + $apidemo_error + $elasticsearch_error" | bc` 
 	if [ $filesystem_error = 0 -a $rhfsd_error = 0 -a $ccc_mgr_error = 0 ] 
 	then
 		# should be okay to start since filesystem, rhfsd and ccc_mgr appear okay
@@ -1719,9 +1880,17 @@ then
 		then
 			consul_start
 		fi
+		if [ $consulAlerts_error != 0 -a $startFlag = 1 ]
+		then
+			consulAlerts_start
+		fi
 		if [ $apidemo_error != 0 -a $startFlag = 1 ]
 		then
 			apidemo_start
+		fi
+		if [ $elasticsearch_error != 0 -a $startFlag = 1 ]
+		then
+			elasticsearch_start
 		fi
 	fi
 
@@ -1729,7 +1898,7 @@ then
 	then
 		sleep $sleepValue 
 		finalStatus=0
-		ryft_status
+		ryft_statusX
 	fi
 
 fi

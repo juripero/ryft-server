@@ -1,0 +1,933 @@
+#!/bin/bash
+
+#
+# ryftutil for command line access to ryftapi file list, copy, delete capabilities
+#
+
+scriptStartTime=`date +%s`
+
+Revision="0.0.1"
+
+# Debug level - default to 0 for none.
+debug=0
+
+# 
+# command line variables
+#
+apimode=""
+
+# configuration depends on server
+catalogCloseDelay=10
+ADDR=localhost:8765
+AUTH="-u admin:admin"
+
+# configuration
+LOCAL=true
+LOCALFLAG="--local"
+
+pathList[0]=""
+pathListCount=0
+
+maxdepth="-maxdepth 1"
+appendFile=0
+stripPath=0
+
+# -copy|-cp
+sourcePath=""
+sourcePathList[0]=""
+sourcePathListCount=0
+
+catalogSearch=""
+
+# -c
+ryftCatalog=""
+ryftCatalogList[0]=""
+ryftCatalogListCount=0
+catalogPush=""
+
+# -f
+fileSearch=""
+strategySearch=0	# Used by strategy to indicate file to search (overrides cmd line)
+strategyFileList[0]=""
+strategyFileListCount=0
+ryftFile=""
+ryftFileList[0]=""
+ryftFileListCount=0
+
+stamp=""
+#delimiter="&delimiter=%0A---rAnDoM---sTrInG---%0A"
+delimiter=""
+lifetime=""
+skipUpload=0		# formerly command line settable 
+skipSearch=0		# formerly command line settable 
+quietUpload=1		# Default to quiet mode
+showRyftRest=0		# show ryftRyftRest command
+strategyFile=""
+
+# term colors 
+UNDERLINE='\e[4m'
+NO_UNDERLINE='\e[0m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+COLOR=$CYAN
+NO_COLOR='\033[0m'
+CLEAR_LINE='\033[2K'
+#
+#
+#
+query=""
+program=""
+od=""
+oi=""
+queryWidth=""
+
+#
+#
+#
+searchOutput=/tmp/ryft_util_example.$$.api.json
+csvOutput=/tmp/ryft_util_example.$$.api.json.csv
+apiErrorMessage=/tmp/ryft_util_example.$$.api.error
+
+csvFilterOutput=/tmp/ryft_util_example.$$.program.stdout
+csvFilterError=/tmp/ryft_util_example.$$.program.stderr
+uploadCounterFile=/tmp/ryft_util_example.$$.uploadCounter
+
+FINDSTDOUT=/tmp/ryft_util_example_ls.$$.stdout
+FINDSTDERR=/tmp/ryft_util_example_ls.$$.stderr
+OUT_FILE_RECORD_COUNT=0
+
+if [ "${debug}" -ne 0 ]
+then
+	# keep names constant
+	searchOutput=/tmp/ryft_util_example.api.json
+	csvOutput=/tmp/ryft_util_example.jpi.json.csv
+	apiErrorMessage=/tmp/ryft_util_example.api.error
+	
+	csvFilterOutput=/tmp/ryft_util_example.program.stdout
+	csvFilterError=/tmp/ryft_util_example.program.stderr
+	uploadCounterFile=/tmp/ryft_util_example.uploadCounter
+	
+	FINDSTDOUT=/tmp/ryft_util_example_ls.stdout
+	FINDSTDERR=/tmp/ryft_util_example_ls.stderr
+fi
+
+
+#
+# basic usage 
+#
+usage() {
+	(
+	echo "usage: $0"
+	echo
+	echo "command command line access to RyftAPI file list, copy, delete features" 
+	echo ""
+	echo "Revision: $Revision"
+	echo ""
+        echo "-help                     shows usage"
+        echo "-vers                     shows the version of this script (also shown in help)"
+	echo ""
+	echo "-ls|-dir                  uses the server to list contents of -f directory/ on RyftONE" 
+	echo "-cp|-copy <filename>      Copies the <filename> files or directory tree to the target"
+	echo "                          RyftONE (no wildcards are allowed in the directory path)"
+	echo "    -lifetime <#>h            sets file/catalog lifetime to seconds, minutes or hours (#s|#m|#h)"
+	echo "    -maxdepth <depth>         sets directory traversal depth (default is 1, 0 for full recursion)"
+	echo "    -stripPath|-sp            strips the source directory path from the destination file compressing"
+        echo "                              multi-level directories into a single RyftONE directory"
+	echo "    -append                   append to exsting files when copying"
+	echo "    -replace                  replace existing files when copying (default)"
+	echo "-rm|-del                  Deletes specified files (-f file), directories (-f directory/), or"
+	echo "                          catalogs (-c catalogs) on the target RyftONE"
+	echo ""
+	echo "-f <filename>             sets target RyftONE file <filename>."
+	echo "-c <filename>             sets target RyftONE catalog <filename>"
+	echo "     -cache-drop-timeout <#>   defaults 10 seconds ( from /etc/ryft-server.conf )"
+	echo "     -delimiter <delimiter>    defaults to RyftONE's /etc/ryft-server.conf:default-data-delim,"
+	echo "                               typically \"%0A%0C%0A\""
+        echo "     -stamp                    appends current _YYYYMMDD-HHMMSS to catalog name"
+	echo ""
+	echo ""
+	echo "-a <address>              defaults to localhost:8765"
+        echo "-u user:password          defaults to admin:admin"
+	echo "-local                    operation applies to a single RyftONE (default)"
+	echo "-cluster                  operation applies to a RyftONE Cluster"
+	echo ""
+	echo "                          See CCStrategy.txt for a sample strategy."
+	echo "-verbose                  turn on intermediate status statements"
+	echo "-debug <level>            turn on debugging output where <level> is an integer"
+	echo "-show                     show ryftrest/api commands" 
+
+	echo 
+	echo "Examples:"
+	echo "  # list file on remote host's /ryftone filesystem"
+	echo "	ryftutil -a hostname:8765 -ls -f / "
+	echo 
+	echo "  # list files on remote host's /ryftone/directory"
+	echo "	ryftutil -a hostname:8765 -ls -f /directory"
+	echo
+	echo "  # copy localfile to remote host's /ryftone/remotefile"
+	echo "  ryftutil -a hostname:8765 -cp localfile -f /remotefile"
+	echo
+	echo "  # copy localfile to remote host's catalog"
+	echo "  ryftutil -a hostname:8765 -cp localfile -c /remoteCatalog"
+	echo 
+	echo "  # append file to remote host's catalog"
+	echo "  ryftutil -a hostname:8765 -cp anotherfile -c /remoteCatalog -append"
+	echo
+	echo "  # delete file/directory on remote host"
+        echo "  ryftutil -a hostname:8765 -del -f /remotefile"
+        echo "  ryftutil -a hostname:8765 -del -f /remotedirectory"
+
+	) >&2
+        exit 0
+}
+
+showVersion() {
+	pname=`basename "$0"`
+	(
+	echo "Version: $pname $Revision"
+	echo ""
+	) >&2
+        exit 0
+}
+twoPlaceParamCheck() {
+	pat="^\-"
+        if [[ -z "${2}" || "${2}" =~ $pat ]]
+	then
+       		(
+		echo -e "${RED} ${1} missing parameter ${NO_COLOR}"
+		) >&2
+       		usage
+	fi
+}
+numericParamCheck() {
+	ok=0
+	case ${2} in
+		''|*[!0-9]*) 
+             		(
+			echo -e "${RED} ${1} missing or unrecognized parameter, \"${2}\" ${NO_COLOR}"
+			) >&2
+       			usage
+			;;
+                *) ok=1;;
+	esac
+}
+dotdotParamCheck() {
+	ok=0
+	case ${2} in
+		''|*\.\.*) 
+			(
+			echo -e "${RED} $1 \"${2}\" parameter missing or contains \"..\" ${NO_COLOR}"
+			) >&2
+       			usage
+			;;
+       		*) ok=1;;
+	esac
+}
+lifetimeParamCheck() {
+	ok=0
+	case ${2} in
+		''|*[!0-9]*[h|m|s]) 
+			(
+			echo -e "${RED} ${1} \"${2}\" parameter error. Example: '1h' ${NO_COLOR}"
+			) >&2
+       			usage
+			;;
+       		*) ok=1;;
+	esac
+}
+function urlencode() {
+	local LANG=C
+	for ((i=0;i<${#1};i++)); do
+		if [[ ${1:$i:1} =~ ^[a-zA-Z0-9\.\~\_\-]$ ]]; then
+			printf "${1:$i:1}"
+		else
+			printf '%%%02X' "'${1:$i:1}"
+		fi
+	done
+}
+
+
+aparse() {
+        while [[ $# > 0 ]] ; do
+          case "$1" in
+            -help)
+		usage;
+       		;;
+
+		# major operations
+            -cp|-copy)
+		twoPlaceParamCheck "${1}" "${2}"
+		apimode=${1}
+		sourcePath=${2}
+		sourcePathList[${sourcePathListCount}]=${2}
+       		sourcePathListCount=$(($sourcePathListCount + 1))	  
+		shift
+       		;;  
+            -ls)
+		apimode="-ls"
+		;;
+            -dir)
+		apimode="-dir"
+		;;
+            -rm)
+		apimode="-rm"
+		;;
+	    -del)
+		apimode="-del"
+		;;
+
+            -vers*)
+		showVersion
+		;;
+
+            -maxdepth)
+		numericParamCheck "${1}" "${2}"
+		maxdepth=""
+		if [ "${2}" -ne 0 ]
+		then
+			maxdepth="-maxdepth ${2}"
+		fi
+		shift
+		;;
+	    -append)
+		appendFile=1
+		;;
+	    -replace)
+		appendFile=0
+		;;
+	    -sp|-strip*)
+		stripPath=1
+		;;
+
+		# destination parameters
+            -f)
+		dotdotParamCheck "${1}" "${2}"
+		fileSearch=${2}
+		ryftFile=${2}
+		ryftFileList[${ryftFileListCount}]=${2}
+       		ryftFileListCount=$(($ryftFileListCount + 1))	  
+		shift
+		;;
+            -c)
+		dotdotParamCheck "${1}" "${2}"
+		catalogSearch=${2}
+		ryftCatalog=${2}
+		ryftCatalogList[${ryftCatalogListCount}]=${2}
+       		ryftCatalogListCount=$(($ryftCatalogListCount + 1))	  
+              	shift;  
+		;;  
+            -stamp)
+              stamp=_`date +%Y%m%d-%H%M%S`
+              catalogSearch=${catalogSearch}${stamp}
+              catalogPush="&catalog="`urlencode "${catalogSearch}"`
+              ;;
+            -delimiter)
+		twoPlaceParamCheck "${1}" "${2}"
+       		delimiter="&delimiter="`urlencode "${2}"`
+		shift;
+       		;;
+            -lifetime)
+		lifetimeParamCheck "${1}" "${2}"
+       		lifetime="&lifetime="`urlencode "${2}"`
+		shift;
+       		;;
+            -cache-drop-timeout) 
+		numericParamCheck "${1}" "${2}"
+		catalogCloseDelay=${2}
+		shift;
+		;;
+       
+            -a)
+		twoPlaceParamCheck "${1}" "${2}"
+       		ADDR=${2}
+		shift;
+       		;;
+            -u)
+		twoPlaceParamCheck "${1}" "${2}"
+       		AUTH="-u ${2}"
+		shift;
+       		;;
+	    -local)
+		LOCAL=true
+		LOCALFLAG="--local"
+		;;
+	    -cluster)
+		LOCAL=false
+		LOCALFLAG="--cluster"
+		;;
+
+            -verbose)
+		quietUpload=0
+       		;;
+	    -debug)
+		numericParamCheck "${1}" "${2}"
+		debug="0"
+		if [ "${2}" -ne 0 ]
+		then
+			debug=${2}
+		fi
+		shift
+		;;
+            -show)
+		showRyftRest=1
+       		;;
+            *)
+		(
+		echo -e "${RED} unknown \"${1}\" parameter ${NO_COLOR}"
+		) >&2
+       		usage;
+		;;
+          esac
+          shift
+        done
+
+	if [ "${apimode}" == "-ls" -o "${apimode}" == "-dir" ]; then
+		if [ "${ryftFile}" == "" ]; then
+			(
+			echo -e "${RED}${apimode} specified no -f directory/ to list${NO_COLOR}"
+			) >&2
+			usage
+		fi
+	fi
+	if [ "${apimode}" == "-rm" -o "${apimode}" == "-del" ]; then
+		if [ "${ryftCatalog}" == "" -a "${ryftFile}" == "" ]
+		then
+			(
+			echo -e "${RED}${apimode} specified no -f file, -f directory/, or -c catalog for deletion, skipping delete${NO_COLOR}"
+			) >&2
+			usage
+		fi
+	fi
+}
+
+aparse "$@"
+
+#
+#
+#
+
+#
+#
+#
+
+cleanup() {
+	if [ "${debug}" -eq 0 ]
+	then
+		rm -f ${searchOutput}
+		rm -f ${csvOutput}
+		rm -f ${apiErrorMessage}
+		
+		rm -f ${csvFilterOutput}
+		rm -f ${csvFilterError}
+		rm -f ${uploadCounterFile}
+		
+		rm -f ${FINDSTDOUT}
+		rm -f ${FINDSTDERR}
+	else
+		(
+			echo "temp files not deleted"
+		) >&2
+	fi
+}
+errorExit() {
+	if [ "${debug}" -gt 0 ]
+	then
+		(
+		echo "errorExit exitCode=${1}"
+		) >&2
+	fi
+	cleanup
+	exit ${1} 
+}
+
+checkCurlOutput() {
+	#
+	# check return code
+	#
+	if [ "${curlReturnCode}" -ne 0 ]
+	then
+		(
+		echo -e "${RED}error detected: curl returnCode=${curlReturnCode} ${NO_COLOR}"
+		if [ "${curlReturnCode}" -eq 7 ]
+		then
+			if [ "${ADDR}" == "localhost:8765" ]
+			then
+				echo -e "${RED}try specifying -a <address>, which defaults to localhost:8765${NO_COLOR}"
+			else
+				echo -e "${RED}verify -a <address> parameter is correct${NO_COLOR}"
+			fi
+		fi
+		echo -e "${RED}"; 
+		cat "${searchOutput}"
+		echo -e "${NO_COLOR}"
+		) >&2
+		errorExit ${curlReturnCode}
+	fi
+
+	#
+	# check for zero-length output
+	#
+	if [ ! -s "${searchOutput}" ]
+	then
+		(
+		echo -e "${RED}error detected: ${searchOutput} has no output ${NO_COLOR}"
+		) >&2
+		errorExit 4
+	fi
+
+	#
+	# check errors
+	#
+	cat "${searchOutput}" | jq .error >${apiErrorMessage}
+        if [ -s "${apiErrorMessage}" ]
+	then
+		error=`cat ${apiErrorMessage}|sed 's/\s*//g'`
+		if [ "${error}" != "null" ]
+		then
+			(
+	                echo -e "${RED}error detected: in curl output:${NO_COLOR}"
+			echo -e "${RED}"
+	                cat /tmp/curl.$$.error
+			echo -e "${NO_COLOR}"
+			) >&2
+			errorExit 2
+	        fi
+	fi
+}
+
+checkRyftrestOutput() {
+	#
+	# check return code
+	#
+	if [ "${ryftrestReturnCode}" != 0 ]
+	then
+		(
+		echo -e "${RED}error detected: ryftrest returnCode=${ryftrestReturnCode} ${NO_COLOR}"
+		if [ "${ryftrestReturnCode}" -eq 7 ]
+		then
+			if [ "${ADDR}" == "localhost:8765" ]
+			then
+				echo -e "${RED}try specifying -a <address>, which defaults to localhost:8765${NO_COLOR}"
+			else
+				echo -e "${RED}verify -a <address> parameter is correct${NO_COLOR}"
+			fi
+		fi
+		) >&2
+		errorExit ${ryftrestReturnCode}
+		
+	fi
+
+	errors=`cat ${searchOutput}|jq .errors|sed 's/\r//g'`
+	resultsCount=`cat ${searchOutput}|jq ".results|length"|sed 's/\r//g'`
+	stats=`cat ${searchOutput}|jq .stats|sed 's/\r//g'`
+	matches=`cat ${searchOutput}|jq .stats.matches|sed 's/\r//g'`
+	if [ "${debug}" -ne 0 ]; then
+		(
+		echo "REMOVE_ME resultsCount=${resultsCount}"
+		echo "REMOVE_ME matches=${matches}"
+		) >&2
+	fi
+
+	validResults=0
+
+	pat='^[0-9]+$'
+	if [[ "${resultsCount}" =~ $pat ]]; then
+		validResults=1
+	fi
+
+	#
+	# check api error messages
+	#
+	errors=`cat ${searchOutput}|jq .errors|sed 's/\r//g'`
+	if [ "${errors}" != "null" ]; then
+		(
+			echo -e "${RED}error detected: ryftrest error=$errors ${NO_COLOR}"
+		) >&2
+		if [ "${validResults}" -eq 0 ]; then
+			errorExit 5
+		fi
+	fi
+}
+
+#
+# ryftDELETE()
+#
+ryftDELETE() {
+	#
+	# begin delete
+	#
+	URL_DATA=()
+	URL_DATA=("${URL_DATA[@]}""local="`urlencode "${LOCAL}"`)
+	if [ "$ryftCatalog" != "" ]; then
+		for f in "${ryftCatalogList[@]}"
+		do
+			#
+			# add catalogs
+			#
+			if [ "$quietUpload" -eq 0 ]; then
+				(
+				echo "${f}"
+				) >&2
+			fi
+			URL_DATA=("${URL_DATA[@]}""&catalog="`urlencode "${f}"`)
+		done
+	fi
+	if [ "$ryftFile" != "" ]; then
+		for f in "${ryftFileList[@]}"
+		do
+			#
+			# add files and directories
+			#
+			if [ "$quietUpload" -eq 0 ]; then
+				(
+				echo "${f}"
+				) >&2
+			fi
+			pat='.*/$'
+			if [[ "${f}" =~ ${pat} ]]
+			then
+				URL_DATA=("${URL_DATA[@]}""&dir="`urlencode "${f}"`)
+			else
+				URL_DATA=("${URL_DATA[@]}""&file="`urlencode "${f}"`)
+			fi
+		done
+	fi
+
+	#
+	# destination filename may not contain ".."
+	#					
+	pat='^(/|[/|\?|\*]*)$'
+	if [[ "${f}" =~ ${pat} ]]; then
+		(
+			echo -e "${RED} destination filename, \"${f}\" , may not select entire \"ryftone\" volume using '*' or '?'${NO_COLOR}"
+		) >&2
+		errorExit 8
+	fi
+	
+	if [ "${showRyftRest}" -eq 1 ]
+	then
+		(
+			echo
+			echo "curl -X DELETE ${AUTH} --header \"Accept: application/json\" -s \"http://${ADDR}/files?${URL_DATA[@]}\" "
+			echo
+		) >&2
+	fi
+	rm -f ${searchOutput}
+	curl -X DELETE ${AUTH} --header \"Accept: application/json\" -s "http://${ADDR}/files?${URL_DATA[@]}" >${searchOutput} 
+
+	curlReturnCode=$?
+	(
+		cat "${searchOutput}"|jq .
+	) >&2
+	checkCurlOutput 
+
+}
+
+#
+# ryftLS()
+#
+# Funtion to list the target directory on a remote RyftONE 
+#
+
+ryftLS() {
+	#
+	# begin ls
+	#
+	URL_DATA=()
+	URL_DATA=(--data-urlencode "dir=${ryftFile}")
+	URL_DATA=("${URL_DATA[@]}" --data-urlencode "local=${LOCAL}")
+	if [ "${showRyftRest}" -eq 1 ]
+	then
+		echo " " #blank line for readability
+		echo "curl --get ${AUTH} --header \"Accept: application/json\" -s "${URL_DATA[@]}" \"http://${ADDR}/files\" "
+	fi
+	rm -f "${searchOutput}"
+	curl --get ${AUTH} --header \"Accept: application/json\" -s "${URL_DATA[@]}" "http://${ADDR}/files" >${searchOutput} 
+       	curlReturnCode=$?
+
+	(
+		cat "${searchOutput}"|jq .
+	) >&2
+	checkCurlOutput 
+}
+
+#
+# ryftCOPY()
+#
+
+ryftCOPY() {
+	rm -f "${uploadCounterFile}"
+	if [ "${skipUpload}" -eq 0 ] 
+	then
+		fileCounter=0
+		for sourcePath in "${sourcePathList[@]}"
+		do
+			if [ "${showRyftRest}" -eq 1 ]
+			then
+				(
+				echo 
+				echo -e "${BLUE}copy \"${sourcePath}\"${NO_COLOR}"
+				echo
+				) >&2
+			fi
+			
+			if [ -d "${sourcePath}" ]
+			then
+				sourcePathDirname="${sourcePath}"
+				sourcePathBasename=""
+			else
+				sourcePathDirname=`dirname "${sourcePath}"`
+				sourcePathBasename=`basename "${sourcePath}"`
+			fi
+
+			#
+			# defaults to current directory
+			#
+			if [ "${sourcePathDirname}" == "" ]; then
+				sourcePathDirname="."
+			fi
+
+			#
+			# no wildcards allowed in directory			
+			#
+			pat='\*'
+			if [[ "${sourcePathDirname}" =~ ${pat} ]]
+			then
+				(
+					echo -e "${RED} no wildcards in directory \"${sourcePath}\" ${NO_COLOR}"
+				) >&2
+				errorExit 10
+			fi
+
+			#
+			# defaults to all files in directory
+			#
+			fileParm="*"
+			if [ "${sourcePathBasename}" != "" ]
+			then
+				fileParm="${sourcePathBasename}"
+				#fileParm=""
+			fi
+		
+			#
+			# find files to copy
+			#	
+			find "${sourcePathDirname}" ${maxdepth} -name "${fileParm}" -type f >${FINDSTDOUT} 2>${FINDSTDERR}
+			if [ $? -ne 0 ]
+			then
+				(
+					echo -e "${RED} error locating filename \"${sourcePath}\" ${NO_COLOR}"
+					echo -e "${RED}"
+					cat ${FINDSTDERR}
+					echo -e " ${NO_COLOR}"
+					errorExit 9
+				) >&2
+				errorExit 11
+			fi
+
+			#
+			# copy the files
+			#
+			while IFS='' read -r line || [[ -n "${line}" ]]; do
+				i=${line}
+				#if [ -f "${i}" -a -s "${i}" ]
+				if [ -f "${i}" ]
+				then
+					sf="${i}"
+					df=""
+					catalogPush=""
+
+					#echo "step 1"
+					#echo "sourceFilename=${sf}"
+					#echo "destinationFilename=${df}"
+					#echo "catalog=${ryftCatalog}";
+					#echo "stripPath=${stripPath}"	
+					#echo "sourcePathDirname=${sourcePathDirname}"
+
+					if [ "${ryftCatalog}" != "" ]
+					then
+						catalogPush="&catalog="`urlencode "${ryftCatalog}"`
+
+						# strip sourcePathDirname from destination file
+						df=${sf#${sourcePathDirname}/}
+						if [ "${stripPath}" -eq 1 ]
+						then
+							# strip directory from destination file
+							df=`basename "${sf}"`
+						fi
+					else
+						df=$sf
+						if [ "${ryftFile}" == "" ]; then
+							# no destination filename was specified, use source filename
+						
+							# strip sourcePathDirname from destination file
+							df=${df#${sourcePathDirname}/}
+							if [ "${stripPath}" -eq 1 ]
+							then
+								# strip directory from destination file
+								df=`basename "${df}"`
+							fi
+						else
+							# a destination filename was specified, use it
+
+							df=${ryftFile}
+							pat='.*/$'
+							if [[ "${df}" =~ ${pat} ]]; then
+								# destination filename is a directory
+
+								# strip sourcePathDirname from destination file
+								sf=${sf#${sourcePathDirname}/}
+								if [ "${stripPath}" -eq 1 ]
+								then
+									# strip directory from destination file
+									sf=`basename "${sf}"`
+								fi
+								df=${df}${sf}
+							fi
+						fi
+
+						#
+						# destination filename may not contain ".."
+						#					
+						pat='\.\.'
+						if [[ "${df}" =~ ${pat} ]]; then
+							(
+							echo -e "${RED} destination filename, \"${df}\" , may not contains \"..\" ${NO_COLOR}"
+							) >&2
+				       			errorExit 8
+						fi
+					fi
+
+					if [ "$quietUpload" -eq 0 ] 
+					then
+						(
+						echo -e "${CLEAR_LINE}${i}"
+						) >&2
+					fi
+
+					if [ "${debug}" -gt 1 ]; then
+						(
+						echo "REMOVE_ME step 2"
+						echo "REMOVE_ME sourceFilename=${sf}"
+						echo "REMOVE_ME destinationFilename=${df}"
+						echo "REMOVE_ME stripPath=${stripPath}"	
+						echo "REMOVE_ME appendFile=${appendFile}"
+						echo "REMOVE_ME ryftCatalog=\"${ryftCatalog}\""
+						echo "REMOVE_ME fileCounter=$fileCounter"
+						echo "REMOVE_ME ryftFile=\"$ryftFile\""
+						) >&2
+					fi
+
+					pat='^.*/$'
+					if [[ "${appendFile}" -eq 0 && (("${ryftCatalog}" != "" && "${fileCounter}" -eq 0) || ("${ryftCatalog}" == "" && (("${ryftFile}" =~ $pat) || ("${fileCounter}" -eq 0 ) || ("${ryftFile}" == "")))) ]]
+					then
+						#
+						# delete destination file
+						# when !append and -c <catalog> specified and first file
+						# when !append and -f <dir>/ specified
+						# when !append and -f <fileblob> specified and first file
+						# when !append and no -f specified
+						#
+						URL_DATA=()
+						if [ "${ryftCatalog}" == "" ]
+						then
+							pat='.*/'
+							if [[ "${df}" =~ ${pat} ]]
+							then
+								URL_DATA=("dir="`urlencode "${df}"`)
+							else
+								URL_DATA=("file="`urlencode "${df}"`)
+							fi
+						else
+							URL_DATA=("catalog="`urlencode "${catalogSearch}"`)
+						fi
+						URL_DATA=("${URL_DATA[@]}""&local="`urlencode "${LOCAL}"`)
+			
+						if [ "${showRyftRest}" -eq 1 ]
+						then
+							echo "curl -X DELETE ${AUTH} --header \"Accept: application/json\" -s \"http://${ADDR}/files?${URL_DATA[@]}\" "
+						fi
+						rm -f "${searchOutput}"
+						curl -X DELETE ${AUTH} --header \"Accept: application/json\" -s "http://${ADDR}/files?${URL_DATA[@]}" >${searchOutput} 
+			                       	curlReturnCode=$?
+						if [ "$quietUpload" -eq 0 ]; then
+							(
+							cat "${searchOutput}"|jq .
+							) >&2
+						fi
+						checkCurlOutput 
+					fi
+
+					udf=`urlencode "${df}"`
+					if [ "${showRyftRest}" -eq 1 ]
+					then
+						echo "curl --data-binary @\"${i}\" ${AUTH} -H \"Content-Type: application/octet-stream\" -s \"http://${ADDR}/files?file=${udf}${catalogPush}&local=${LOCAL}${delimiter}${lifetime}\" "
+					fi
+					
+					curl --data-binary @"${i}" ${AUTH} -H "Content-Type: application/octet-stream" -s "http://${ADDR}/files?file=${udf}${catalogPush}&local=${LOCAL}${delimiter}${lifetime}" >${searchOutput} 
+		                       	curlReturnCode=$?
+		
+		  			cat ${searchOutput} >>${uploadCounterFile} 
+					if [ "$quietUpload" -eq 0 ]; then
+						(
+						cat ${searchOutput} | jq . 
+						) >&2
+					fi
+					checkCurlOutput 
+					fileCounter=$((${fileCounter} + 1))
+				fi
+				timeToShow=$((fileCounter%100))
+				if [ "$timeToShow" -eq 0 -a "$quietUpload" -eq 1 ]; then
+					(
+					echo "${fileCounter} files transferred"
+					) >&2
+				fi
+			done < "${FINDSTDOUT}"
+		done
+		
+		if [ "${fileCounter}" -eq 0 ]
+		then
+			(
+			echo 
+			echo -e "${RED}error detected: ${sourcePath} no files found${NO_COLOR}"
+			) >&2
+			errorExit 7
+		fi
+	
+		size=`cat ${uploadCounterFile}|jq  ".length"|jq -s .|jq "add"|sed 's/\r//g'`
+		filecount=`cat ${uploadCounterFile}|jq  ".length"|jq -s .|jq "length"|sed 's/\r//g'`
+		(
+		echo
+		echo -e "${BLUE}Pushed ${filecount} file(s), ${size} bytes.${NO_COLOR}"
+	
+		if [ "${skipSearch}" -eq 0 ]
+		then
+			if [ "${catalogPush}" != "" ]
+			then
+				if [ "${showRyftRest}" -eq 1 ]
+				then
+					# wait catalog closure
+					echo "... wait catalog closure"
+				fi	
+				sleep ${catalogCloseDelay}
+			fi
+		fi
+		) >&2
+	fi
+}
+
+if [ "${apimode}" == "-ls" -o "${apimode}" == "-dir" ]; then
+	ryftLS
+elif [ "${apimode}" == "-cp" -o "${apimode}" == "-copy" ]; then
+	ryftCOPY
+elif [ "${apimode}" == "-rm" -o "${apimode}" == "-del" ]; then
+	ryftDELETE
+else
+	usage
+fi
+cleanup
+scriptEndTime=`date +%s`
+elapsedTime=$(( ${scriptEndTime} - ${scriptStartTime} ))
+echo -e "${GREEN}Elapsed time: ${elapsedTime} secs${NO_COLOR}"

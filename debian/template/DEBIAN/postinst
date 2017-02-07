@@ -22,9 +22,11 @@ fixUIDGID /usr/bin/ryft_rdf
 fixUIDGID /usr/bin/ryft_status
 fixUIDGID /usr/bin/ryft-server
 fixUIDGID /usr/bin/ryftrest
+fixUIDGID /usr/bin/ryftutil
 
 # configurations
 chown "$target_uid:$target_gid" -f /etc/init/ryft-server-d.conf
+chown "$target_uid:$target_gid" -f /etc/init/rhfsdTrigger.conf
 chown "$target_uid:$target_gid" -f /etc/ryft-server.conf
 chown "$target_uid:$target_gid" -f /etc/ryft-users.yaml
 

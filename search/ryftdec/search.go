@@ -110,6 +110,18 @@ func checksForCatalog(wcat PostProcessing, files []string, home string, width in
 	return NoCatalogs, newFiles, nil // OK
 }
 
+// check if task contains complex query and need intermediate results
+func needExtension(q query.Query) bool {
+	if len(q.Arguments) > 0 &&
+		(strings.EqualFold(q.Operator, "AND") ||
+			strings.EqualFold(q.Operator, "OR") ||
+			strings.EqualFold(q.Operator, "XOR")) {
+		return true
+	}
+
+	return false
+}
+
 // Search starts asynchronous "/search" with RyftDEC engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if cfg.ReportData && !cfg.ReportIndex {
@@ -132,13 +144,6 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if err := cfg.CheckRelativeToHome(home); err != nil {
 		task.log().WithError(err).Warnf("[%s]: bad file names detected", TAG)
 		return nil, err
-	}
-
-	// use source list of files to detect extensions
-	task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
-		return nil, fmt.Errorf("failed to detect extension: %s", err)
 	}
 
 	// split cfg.Query into several sub-expressions (use options from config)
@@ -178,6 +183,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.result.Drop(false) // no sense to save empty working catalog
 		engine.updateConfig(cfg, sq)
 		return engine.Backend.Search(cfg)
+	}
+
+	// AND/OR: use source list of files to detect extensions
+	if needExtension(task.rootQuery) {
+		task.extension, err = detectExtension(cfg.Files, cfg.KeepDataAs)
+		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to detect extension", TAG)
+			return nil, fmt.Errorf("failed to detect extension: %s", err)
+		}
 	}
 
 	mux := search.NewResult()

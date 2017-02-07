@@ -31,11 +31,12 @@
 package ryfthttp
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync/atomic"
 
-	//codec "github.com/getryft/ryft-server/rest/codec/json"
+	json_codec "github.com/getryft/ryft-server/rest/codec/json"
 	codec "github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
@@ -54,8 +55,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
-	// we expect MSGPACK format for streaming
-	req.Header.Set("Accept", codec.MIME)
+	if cfg.ReportIndex {
+		// we expect MSGPACK format for streaming
+		req.Header.Set("Accept", codec.MIME)
+	} else {
+		// we expect JSON format, no streaming required
+		req.Header.Set("Accept", json_codec.MIME)
+	}
 
 	// authorization
 	if len(engine.AuthToken) != 0 {
@@ -63,7 +69,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	res := search.NewResult()
-	go engine.doSearch(task, req, res)
+	if cfg.ReportIndex {
+		go engine.doSearch(task, req, res)
+	} else {
+		go engine.doCount(task, req, res)
+	}
 
 	return res, nil // OK for now
 }
@@ -175,4 +185,63 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 			return // failed, no sense to continue processing
 		}
 	}
+}
+
+// do /count processing
+func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result) {
+	// some futher cleanup
+	defer res.Close()
+	defer res.ReportDone()
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+
+	cancelCh := make(chan struct{})
+	req.Cancel = cancelCh
+	var cancelled int32 // atomic
+
+	// do HTTP request
+	resp, err := engine.httpClient.Do(req)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to send request", TAG)
+		res.ReportError(fmt.Errorf("failed to send request: %s", err))
+		return // failed
+	}
+
+	defer resp.Body.Close() // close it later
+
+	if resp.StatusCode != http.StatusOK {
+		task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid response status", TAG)
+		res.ReportError(fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status))
+		return // failed (not 200)
+	}
+
+	// handle task cancellation
+	go func() {
+		select {
+		case <-res.CancelChan:
+			task.log().Warnf("[%s]: cancelling by client", TAG)
+			if atomic.CompareAndSwapInt32(&cancelled, 0, 1) {
+				close(cancelCh) // cancel the request, once
+			}
+
+		case <-doneCh:
+			task.log().Debugf("[%s]: done", TAG)
+			return
+		}
+	}()
+
+	dec := json.NewDecoder(resp.Body)
+
+	var stat format.Stat
+	err = dec.Decode(&stat)
+	if err != nil {
+		task.log().WithError(err).Errorf("[%s]: failed to decode response", TAG)
+		res.ReportError(fmt.Errorf("failed to decode JSON respose: %s", err))
+		return // failed
+	}
+
+	res.Stat = format.ToStat(&stat)
+	task.log().WithField("stat", res.Stat).
+		Infof("[%s]: statistics received", TAG)
 }
