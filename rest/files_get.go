@@ -154,36 +154,33 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 					WithDetails("failed to open catalog"))
 			}
 
-			server.doGetRegularFile(ctx, path)
+			server.doGetRegularFile(ctx, path, info.ModTime())
 		} else {
 			defer cat.Close()
 
-			server.doGetCatalog(ctx, params.File, info.ModTime(), cat)
+			server.doGetCatalog(ctx, cat, params.File, info.ModTime())
 		}
 	}
 }
 
-// GET /files method: regular FILE
-func (server *Server) doGetRegularFile(ctx *gin.Context, path string) {
+// GET /files method: standalone FILE
+func (server *Server) doGetRegularFile(ctx *gin.Context, path string, mt time.Time) {
 	f, err := os.Open(path)
 	if err != nil {
-		panic(err)
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to open file"))
 	}
 	defer f.Close()
 
-	info, err := f.Stat()
-	if err != nil {
-		panic(err)
-	}
-
-	http.ServeContent(ctx.Writer, ctx.Request, path, info.ModTime(), f)
+	http.ServeContent(ctx.Writer, ctx.Request, path, mt, f)
 }
 
 // GET /files method: CATALOG
-func (server *Server) doGetCatalog(ctx *gin.Context, filename string, mt time.Time, cat *catalog.Catalog) {
+func (server *Server) doGetCatalog(ctx *gin.Context, cat *catalog.Catalog, filename string, mt time.Time) {
 	f, err := cat.GetFile(filename)
 	if err != nil {
-		panic(err)
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to open catalog file"))
 	}
 	defer f.Close()
 
