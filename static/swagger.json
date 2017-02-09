@@ -291,8 +291,8 @@
         "tags": [
           "files"
         ],
-        "summary": "List a directory content",
-        "description": "Endpoint to query node/cluster file system structure",
+        "summary": "List a directory content or download a file",
+        "description": "Endpoint to query node/cluster file system structure or download a file",
         "operationId": "getFiles",
         "parameters": [
           {
@@ -302,9 +302,27 @@
             "in": "query"
           },
           {
+            "name": "hidden",
+            "type": "boolean",
+            "description": "Report hidden files",
+            "in": "query"
+          },
+          {
             "name": "local",
             "type": "boolean",
             "description": "Return file structure from local node only or whole cluster",
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The path to catalog to download file of",
+            "in": "query"
+          },
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The filepath to download",
             "in": "query"
           }
         ],

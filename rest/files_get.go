@@ -48,8 +48,8 @@ import (
 // GetFileParams query parameters for GET /files
 type GetFilesParams struct {
 	Dir     string `form:"dir" json:"dir"`         // directory to get content of
-	File    string `form:"file" json:"file"`       // file to get content of
 	Catalog string `form:"catalog" json:"catalog"` // catalog to get content of
+	File    string `form:"file" json:"file"`       // file to get content of
 	Hidden  bool   `form:"hidden" json:"hidden"`   // show hidden files/dirs
 	Local   bool   `form:"local" json:"local"`
 }
