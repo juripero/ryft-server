@@ -31,8 +31,10 @@
 package ryftdec
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
@@ -231,4 +233,24 @@ func findLastFilter(q query.Query) string {
 	}
 
 	return "" // not found
+}
+
+// call a post-processing script
+// if out == nil then skip this record.
+func callScript(path []string, in []byte) ([]byte, error) {
+	if len(path) == 0 {
+		return nil, fmt.Errorf("no script provided")
+	}
+
+	cmd := exec.Command(path[0], path[1:]...)
+	// cmd.Dir = working directory
+	cmd.Stdin = bytes.NewReader(in)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			return nil, err // no output
+		}
+	}
+
+	return out, err
 }
