@@ -137,6 +137,6 @@ func TestCallScript(t *testing.T) {
 
 	check([]string{"/bin/cat"}, "hello", "hello")
 	check([]string{"/bin/grep", "hell"}, "apple\nhello\norange\n", "hello\n")
-	bad([]string{"/bin/false"}, "hello", "exit status 1")
+	bad([]string{"/bin/false"}, "hello", "skipped")
 	bad([]string{}, "hello", "no script provided")
 }
