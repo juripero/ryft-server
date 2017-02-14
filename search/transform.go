@@ -60,7 +60,7 @@ func NewRegexpMatch(expr string) (*regexpMatch, error) {
 }
 
 // do regexp-match transformation
-func (t *regexpMatch) Transform(in []byte) ([]byte, bool, error) {
+func (t *regexpMatch) Process(in []byte) ([]byte, bool, error) {
 	return in, !t.re.Match(in), nil
 }
 
@@ -82,7 +82,7 @@ func NewRegexpReplace(expr string, template string) (*regexpReplace, error) {
 }
 
 // do regexp-replace transformation
-func (t *regexpReplace) Transform(in []byte) ([]byte, bool, error) {
+func (t *regexpReplace) Process(in []byte) ([]byte, bool, error) {
 	return t.re.ReplaceAll(in, t.template), false, nil
 }
 
@@ -107,7 +107,7 @@ func NewScriptCall(pathAndArgs []string, workDir string) (*scriptCall, error) {
 }
 
 // do script-call transformation
-func (t *scriptCall) Transform(in []byte) ([]byte, bool, error) {
+func (t *scriptCall) Process(in []byte) ([]byte, bool, error) {
 	// create command
 	cmd := exec.Command(t.path[0], t.path[1:]...)
 	cmd.Dir = t.wdir
