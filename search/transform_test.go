@@ -15,7 +15,7 @@ func TestRegexpMatch(t *testing.T) {
 			return
 		}
 
-		out, skip, err := tx.Transform([]byte(in))
+		out, skip, err := tx.Process([]byte(in))
 		if assert.NotNil(t, out) && assert.NoError(t, err) {
 			assert.EqualValues(t, expectedOut, out)
 			assert.EqualValues(t, expectedSkip, skip)
@@ -30,7 +30,7 @@ func TestRegexpMatch(t *testing.T) {
 			return
 		}
 
-		out, _, err := tx.Transform([]byte(in))
+		out, _, err := tx.Process([]byte(in))
 		if assert.Nil(t, out) && assert.Error(t, err) {
 			assert.Contains(t, err.Error(), expectedError)
 		}
@@ -50,7 +50,7 @@ func TestRegexpReplace(t *testing.T) {
 			return
 		}
 
-		out, skip, err := tx.Transform([]byte(in))
+		out, skip, err := tx.Process([]byte(in))
 		if assert.NotNil(t, out) && assert.NoError(t, err) {
 			assert.EqualValues(t, expectedOut, out)
 			assert.EqualValues(t, expectedSkip, skip)
@@ -65,7 +65,7 @@ func TestRegexpReplace(t *testing.T) {
 			return
 		}
 
-		out, _, err := tx.Transform([]byte(in))
+		out, _, err := tx.Process([]byte(in))
 		if assert.Nil(t, out) && assert.Error(t, err) {
 			assert.Contains(t, err.Error(), expectedError)
 		}
@@ -85,7 +85,7 @@ func TestScriptCall(t *testing.T) {
 			return
 		}
 
-		out, skip, err := tx.Transform([]byte(in))
+		out, skip, err := tx.Process([]byte(in))
 		if assert.NotNil(t, out) && assert.NoError(t, err) {
 			assert.EqualValues(t, expectedOut, out)
 			assert.EqualValues(t, expectedSkip, skip)
@@ -100,7 +100,7 @@ func TestScriptCall(t *testing.T) {
 			return
 		}
 
-		out, _, err := tx.Transform([]byte(in))
+		out, _, err := tx.Process([]byte(in))
 		if assert.Nil(t, out) && assert.Error(t, err) {
 			assert.Contains(t, err.Error(), expectedError)
 		}

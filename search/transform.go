@@ -64,6 +64,11 @@ func (t *regexpMatch) Process(in []byte) ([]byte, bool, error) {
 	return in, !t.re.Match(in), nil
 }
 
+// get string expression
+func (t *regexpMatch) String() string {
+	return fmt.Sprintf(`match("%s")`, t.re.String())
+}
+
 // regexp-replace transformation
 type regexpReplace struct {
 	re       *regexp.Regexp
@@ -84,6 +89,11 @@ func NewRegexpReplace(expr string, template string) (*regexpReplace, error) {
 // do regexp-replace transformation
 func (t *regexpReplace) Process(in []byte) ([]byte, bool, error) {
 	return t.re.ReplaceAll(in, t.template), false, nil
+}
+
+// get string expression
+func (t *regexpReplace) String() string {
+	return fmt.Sprintf(`replace("%s","%s")`, t.re.String(), t.template)
 }
 
 // script-call transformation
@@ -121,4 +131,9 @@ func (t *scriptCall) Process(in []byte) ([]byte, bool, error) {
 	}
 
 	return out, false, err
+}
+
+// get string expression
+func (t *scriptCall) String() string {
+	return fmt.Sprintf(`script(%s)`, t.path)
 }

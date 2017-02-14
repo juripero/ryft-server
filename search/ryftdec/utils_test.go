@@ -116,27 +116,3 @@ func TestFindFilter(t *testing.T) {
 	assert.EqualValues(t, "A", findFirstFilter(q))
 	assert.EqualValues(t, "B", findLastFilter(q))
 }
-
-// test call script
-func TestCallScript(t *testing.T) {
-	// good case
-	check := func(script []string, in string, expectedOut string) {
-		out, err := callScript(script, []byte(in))
-		if assert.NotNil(t, out) && assert.NoError(t, err) {
-			assert.EqualValues(t, expectedOut, out)
-		}
-	}
-
-	// bad case
-	bad := func(script []string, in string, expectedError string) {
-		out, err := callScript(script, []byte(in))
-		if assert.Nil(t, out) && assert.Error(t, err) {
-			assert.Contains(t, err.Error(), expectedError)
-		}
-	}
-
-	check([]string{"/bin/cat"}, "hello", "hello")
-	check([]string{"/bin/grep", "hell"}, "apple\nhello\norange\n", "hello\n")
-	bad([]string{"/bin/false"}, "hello", "skipped")
-	bad([]string{}, "hello", "no script provided")
-}
