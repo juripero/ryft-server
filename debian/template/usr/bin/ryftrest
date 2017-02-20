@@ -93,8 +93,8 @@ fail() {
 
 # default values
 MODE=
-FILES=
-CATALOGS=
+FILES=()
+CATALOGS=()
 CASE="true"
 REDUCE=true
 NODES=
@@ -187,19 +187,19 @@ while [[ $# > 0 ]]; do
         shift 2
         ;;
     -f=*|--file=*)
-        FILES="$FILES:${1#*=}"
+        FILES=("${FILES[@]}" "${1#*=}")
         shift
         ;;
     -f|--file)
-        FILES="$FILES:$2"
+        FILES=("${FILES[@]}" "$2")
         shift 2
         ;;
     -c=*|--catalog=*)
-        CATALOGS="$CATALOGS:${1#*=}"
+        CATALOGS=("${CATALOGS[@]}" "${1#*=}")
         shift
         ;;
     -c|--catalog)
-        CATALOGS="$CATALOGS:$2"
+        CATALOGS=("${CATALOGS[@]}" "$2")
         shift 2
         ;;
     -i)
@@ -388,18 +388,16 @@ while [[ $# > 0 ]]; do
 done
 
 [[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
-[[ -z "$FILES" && -z "$CATALOGS" ]] && fail "no file or catalog provided, run '$0 --help' for help"
+[[ -z "${FILES[@]}" && -z "${CATALOGS[@]}" ]] && fail "no file or catalog provided, run '$0 --help' for help"
 
 # build the URL
 URL_DATA=(--data-urlencode "local=$LOCAL")
 [[ ! -z "$AUTH_USER" ]] && URL_DATA=("${URL_DATA[@]}" -u "$AUTH_USER")
 [[ ! -z "$QUERY" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "query=$QUERY")
-IFS=':' read -r -a files <<< "$FILES"
-for file in "${files[@]}"; do
+for file in "${FILES[@]}"; do
     [[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "files=$file")
 done
-IFS=':' read -r -a catalogs <<< "$CATALOGS"
-for catalog in "${catalogs[@]}"; do
+for catalog in "${CATALOGS[@]}"; do
     [[ ! -z $catalog ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "catalog=$catalog")
 done
 [[ ! -z "$CASE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=$CASE")
