@@ -41,6 +41,7 @@ REST specific:
   |--auth
 --search         Use /search endpoint to print all found items.
 --count          Use /count endpoint instead of /search to print just statistics (default).
+--dry|--dry-run  Do a "dry-run" (do not call Ryft hardware).
 --limit=N        Specifies the limit on total number of records printed (used with /search).
 --local          Specifies the local search. Opposite to --cluster. (default)
 --cluster        Specifies the cluster search. Opposite to --local.
@@ -100,6 +101,7 @@ INDEX=
 ADDRESS=http://localhost:8765
 AUTH_USER=
 ENDPOINT=/count
+DRYRUN=
 LIMIT=
 LOCAL=true
 FORMAT=
@@ -288,6 +290,10 @@ while [[ $# > 0 ]]; do
         ENDPOINT="/count"
         shift
         ;;
+    --dry-run|--dry)
+        DRYRUN="/dry-run"
+        shift
+        ;;
     --limit=*)
         LIMIT="${1#*=}"
         shift
@@ -433,11 +439,17 @@ if [[ ! -z "$PRETTY" ]]; then
     fi
 fi
 
+# for "dry-run" always use jq .
+if [[ ! -z "$DRYRUN" ]]; then
+    PRETTY=true
+    JQ_STR="."
+fi
+
 # do the search and print error/results
 if [[ -z "$PRETTY" ]]; then
     # Flat output for feeding into other processes
-    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
+    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT$DRYRUN"
 else
     # Prettified output without data rate or details
-    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | jq "$JQ_STR"
+    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT$DRYRUN" | jq "$JQ_STR"
 fi
