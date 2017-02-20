@@ -54,6 +54,13 @@ REST specific:
                      - null|none - ignores all data
 --fields=<list>  Specifies comma-separated list of fields to return.
                  This parameter is useful with XML and JSON formats.
+--transform=<tx> Specifies custom post-process transformation.
+                 Should be one of:
+                     - match("expr") - regexp to match "expr"
+                     - replace("expr", "template") - regexp to replace
+                     - script("name") - call an external script
+                 Several transformations can be specified.
+                 Can be provided multiple
 --no-stats       Disable statistics output.
 --stream         Use stream output format. Provides a sequence of JSON
                  "tag-object" pairs to be able to decode input data on the fly
@@ -94,6 +101,7 @@ NODES=
 FUZZINESS=
 SURROUNDING=
 DELIMITER=$'\r\n'
+TRANSFORMS=()
 QUERY=
 DATA=
 INDEX=
@@ -327,6 +335,14 @@ while [[ $# > 0 ]]; do
         FIELDS="$2"
         shift 2
         ;;
+    --transform=*)
+        TRANSFORMS=("${TRANSFORMS[@]}" "${1#*=}")
+        shift
+        ;;
+    --transform)
+        TRANSFORMS=("${TRANSFORMS[@]}" "$2")
+        shift 2
+        ;;
     --no-stats)
         STATS="false"
         shift
@@ -398,6 +414,9 @@ done
 [[ ! -z "$INDEX" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "index=$INDEX")
 [[ ! -z "$FORMAT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "format=$FORMAT")
 [[ ! -z "$FIELDS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fields=$FIELDS")
+for tx in "${TRANSFORMS[@]}"; do
+    [[ ! -z $tx ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "transform=$tx")
+done
 [[ ! -z "$STATS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stats=$STATS")
 [[ ! -z "$STREAM" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stream=$STREAM")
 [[ ! -z "$SPARK" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "spark=$SPARK")
