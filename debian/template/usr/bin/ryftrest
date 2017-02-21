@@ -436,8 +436,8 @@ fi
 # do the search and print error/results
 if [[ -z "$PRETTY" ]]; then
     # Flat output for feeding into other processes
-    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
+    curl $VERBOSE --get "${URL_DATA[@]}" --compressed -H "Accept: application/json" "$ADDRESS$ENDPOINT"
 else
     # Prettified output without data rate or details
-    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | jq "$JQ_STR"
+    curl $VERBOSE --get "${URL_DATA[@]}" --compressed -H "Accept: application/json" "$ADDRESS$ENDPOINT" | jq "$JQ_STR"
 fi
