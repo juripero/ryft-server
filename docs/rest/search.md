@@ -235,7 +235,7 @@ The same is true for JSON data: `format=json&fields=Name,AlterEgo`.
 
 This parameter specifies a post-process transformation.
 Can be one of:
-- `match("<expression>")
+- `match("<expression>")`
 - `replace("<expression>", "<template>")`
 - `script("<script name>")`
 

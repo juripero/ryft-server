@@ -61,12 +61,12 @@ For example, we can use RECORD-based search and the `jq` tool:
 ```{.sh}
 ryftrest -q 'RECORD.text CONTAINS "hello"' -f test.json --format=utf8 --search -u admin:admin \
   --transform 'script("jq_ab")' \
-  | jq -c .results[].data
-"{\"a+b\":11,\"a\":10,\"b\":1}\n"
-"{\"a+b\":22,\"a\":20,\"b\":2}\n"
-"{\"a+b\":33,\"a\":30,\"b\":3}\n"
-"{\"a+b\":44,\"a\":40,\"b\":4}\n"
-"{\"a+b\":55,\"a\":50,\"b\":5}\n"
+  | jq -r -c .results[].data | jq -c .
+{"a+b":11,"a":10,"b":1}
+{"a+b":22,"a":20,"b":2}
+{"a+b":33,"a":30,"b":3}
+{"a+b":44,"a":40,"b":4}
+{"a+b":55,"a":50,"b":5}
 ```
 
 the `jq_ab` script adds two fields `a+b` and is configured as:
