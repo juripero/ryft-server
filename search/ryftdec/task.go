@@ -703,6 +703,7 @@ BuildItems:
 
 	// handle all index items
 	const reportRecords = true
+ItemsLoop:
 	for _, item := range items {
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
@@ -787,9 +788,9 @@ BuildItems:
 			recRawData, skip, err = tx.Process(recRawData)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to transform: %s", err))
-				continue // go to next
+				continue ItemsLoop // go to next item
 			} else if skip {
-				continue // go to next
+				continue ItemsLoop // go to next item
 			}
 		}
 
