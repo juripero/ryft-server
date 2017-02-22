@@ -29,7 +29,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
-| `transform`   | string  | [The post-process transformation](search-transform-parameter). |
+| `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
@@ -467,7 +467,7 @@ The list of supported query parameters are the following:
 | `fuzziness`   | uint8   | [The fuzziness distance](#search-fuzziness-parameter). |
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
-| `transform`   | string  | [The post-process transformation](search-transform-parameter). |
+| `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
