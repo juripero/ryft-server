@@ -67,6 +67,14 @@ There are two supported `Content-Type` headers:
 - `application/octet-stream`
 - `multipart/form-data` - actual file content should be provided via `file` key.
 
+For example:
+
+```{.sh}
+$ curl -X POST --data "hello" -H 'Content-Type: application/octet-stream' -s "http://localhost:8765/files?file=/test/file.txt" | jq .
+#   -- OR --
+$ curl -X POST -F file=@/path/to/file.txt -s "http://localhost:8765/files?file=/test/file.txt&length=100" | jq .
+```
+
 
 ### POST files `catalog` parameter
 
