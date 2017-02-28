@@ -147,10 +147,14 @@ func (fs *fakeServer) GET(url, accept string, cancelIn time.Duration) ([]byte, i
 }
 
 // POST request
-func (fs *fakeServer) POST(url, accept string, data string, cancelIn time.Duration) ([]byte, int, error) {
+func (fs *fakeServer) POST(url, accept string, contentType, data string, cancelIn time.Duration) ([]byte, int, error) {
 	req, err := http.NewRequest("POST", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), bytes.NewBufferString(data))
 	if err != nil {
 		return nil, 0, err // failed
+	}
+
+	if len(contentType) != 0 {
+		req.Header.Set("Content-Type", contentType)
 	}
 
 	return fs.do(req, accept, cancelIn)

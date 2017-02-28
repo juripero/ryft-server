@@ -60,6 +60,7 @@ type PostFilesParams struct {
 	Offset    int64  `form:"offset" json:"offset"`       // offset inside file, used to rewrite
 	Length    int64  `form:"length" json:"length"`       // data length
 	Lifetime  string `form:"lifetime" json:"lifetime"`   // optional file lifetime
+	Safe      bool   `form:"safe" json:"safe"`           // safe upload flag
 	Local     bool   `form:"local" json:"local"`
 
 	lifetime time.Duration
@@ -69,6 +70,51 @@ type PostFilesParams struct {
 func (p PostFilesParams) isEmpty() bool {
 	return len(p.Catalog) == 0 &&
 		len(p.File) == 0
+}
+
+// to string
+func (p PostFilesParams) String() string {
+	res := make([]string, 0)
+
+	// catalog
+	if p.Catalog != "" {
+		res = append(res, fmt.Sprintf("catalog:%s", p.Catalog))
+
+		// delimiter
+		if p.Delimiter != "" {
+			res = append(res, fmt.Sprintf("delim:%s", p.Delimiter))
+		}
+	}
+
+	// file
+	if p.File != "" {
+		res = append(res, fmt.Sprintf("file:%s", p.File))
+	}
+
+	// offset
+	if p.Offset >= 0 {
+		res = append(res, fmt.Sprintf("offset:%d", p.Offset))
+	}
+
+	// length
+	if p.Length >= 0 {
+		res = append(res, fmt.Sprintf("length:%d", p.Length))
+	}
+
+	// lifetime
+	if p.Lifetime != "" {
+		res = append(res, fmt.Sprintf("lifetime:%s", p.Lifetime))
+	}
+
+	if p.Safe {
+		res = append(res, "safe")
+	}
+
+	if p.Local {
+		res = append(res, "local")
+	}
+
+	return fmt.Sprintf("{%s}", strings.Join(res, ", "))
 }
 
 // POST /files method
@@ -150,8 +196,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		log.Debugf("saving octet-stream...")
 
 	default:
-		panic(NewError(http.StatusBadRequest,
-			contentType).WithDetails("unexpected content type"))
+		panic(NewError(http.StatusBadRequest, contentType).
+			WithDetails("unexpected content type"))
 	}
 
 	if len(params.Lifetime) > 0 {
@@ -391,12 +437,13 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 
 		return status, res, err
 	} else { // standalone file
-		path, length, err := createFile(mountPoint, params, file)
+		path, offset, length, err := createFile(mountPoint, params, file)
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
 			res["error"] = err.Error()
 			res["length"] = length
+			res["offset"] = offset
 		} else {
 			if params.lifetime > 0 {
 				s.addJob("delete-file",
@@ -405,6 +452,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			}
 			res["path"] = path
 			res["length"] = length
+			res["offset"] = offset
 		}
 
 		return status, res, err
@@ -559,7 +607,7 @@ func (fw *FileWriter) Append(length int64) (int64, error) {
 // createFile creates new file.
 // Unique file name could be generated if path contains special keywords.
 // Returns generated path (relative), length and error if any.
-func createFile(mountPoint string, params PostFilesParams, content io.Reader) (string, uint64, error) {
+func createFile(mountPoint string, params PostFilesParams, content io.Reader) (string, int64, int64, error) {
 	rbase := randomizePath(params.File) // first replace all {{random}} tokens
 	rpath := rbase
 
@@ -567,7 +615,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	pdir := filepath.Join(mountPoint, filepath.Dir(rpath))
 	err := os.MkdirAll(pdir, 0755)
 	if err != nil {
-		return rpath, 0, fmt.Errorf("failed to create parent directories: %s", err)
+		return rpath, 0, 0, fmt.Errorf("failed to create parent directories: %s", err)
 	}
 
 	var out *os.File
@@ -586,7 +634,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 
 				continue
 			}
-			return rpath, 0, err
+			return rpath, 0, 0, err
 		}
 
 		break
@@ -599,11 +647,11 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	// if no offset provided - data will append!
 	if params.Offset < 0 {
 		if params.Length < 0 {
-			return rpath, 0, fmt.Errorf("no valid length provided")
+			return rpath, 0, 0, fmt.Errorf("no valid length provided")
 		}
 		params.Offset, err = fw.Append(params.Length)
 		if err != nil {
-			return rpath, 0, err
+			return rpath, 0, 0, err
 		}
 	}
 
@@ -611,7 +659,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	if 0 <= params.Offset {
 		_, err = out.Seek(params.Offset, os.SEEK_SET /*TODO: io.SeekStart*/)
 		if err != nil {
-			return rpath, 0, err
+			return rpath, 0, 0, err
 		}
 	}
 
@@ -631,7 +679,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	}
 
 	// return path to file without mountpoint
-	return rpath, uint64(w), err
+	return rpath, params.Offset, w, err
 }
 
 // append file to catalog
