@@ -134,8 +134,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	}
 	b := binding.Default(ctx.Request.Method, ctx.ContentType())
 	if err := b.Bind(ctx.Request, &params); err != nil {
-		panic(NewError(http.StatusBadRequest,
-			err.Error()).WithDetails("failed to parse request parameters"))
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request parameters"))
 	}
 
 	// if delimiter is provided this value will be NOT NIL
@@ -156,8 +156,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
-		panic(NewError(http.StatusInternalServerError,
-			err.Error()).WithDetails("failed to get mount point"))
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
@@ -181,19 +181,18 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	case "multipart/form-data":
 		f, _, err := ctx.Request.FormFile("file")
 		if err != nil {
-			panic(NewError(http.StatusBadRequest,
-				err.Error()).WithDetails(`no "file" form data provided`))
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails(`no "file" form data provided`))
 		}
+		// Note, there is no automatic length
 		defer f.Close()
 		file = f
-		log.Debugf("saving multipart form data...")
 
 	case "application/octet-stream":
 		file = ctx.Request.Body
 		if params.Length < 0 { // if unspecified
 			params.Length = ctx.Request.ContentLength
 		}
-		log.Debugf("saving octet-stream...")
 
 	default:
 		panic(NewError(http.StatusBadRequest, contentType).
@@ -202,8 +201,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 	if len(params.Lifetime) > 0 {
 		if params.lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
-			panic(NewError(http.StatusBadRequest,
-				err.Error()).WithDetails("failed to parse lifetime"))
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse lifetime"))
 		}
 	}
 
@@ -211,7 +210,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	log.WithField("params", params).
 		WithField("user", userName).
 		WithField("home", homeDir).
-		Infof("saving new data...")
+		Infof("saving new %s data...", contentType)
 	status := http.StatusOK
 
 	if !params.Local && !s.Config.LocalOnly {
@@ -639,6 +638,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 
 		break
 	}
+	defer out.Close()
 
 	fw := getFileWriter(out.Name())
 	defer fw.Release()
@@ -655,7 +655,6 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 		}
 	}
 
-	defer out.Close()
 	if 0 <= params.Offset {
 		_, err = out.Seek(params.Offset, os.SEEK_SET /*TODO: io.SeekStart*/)
 		if err != nil {
