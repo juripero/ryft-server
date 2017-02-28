@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -58,8 +59,8 @@ func newFake() *fakeServer {
 	fs.server.Config.SearchBackend = testfake.TAG
 	fs.server.Config.BackendOptions = map[string]interface{}{
 		"instance-name": ".work",
-		"home-dir":      "/ryft",
-		"ryftone-mount": "/tmp",
+		"home-dir":      "/",
+		"ryftone-mount": "/tmp/ryft",
 		"host-name":     "",
 	}
 	fs.server.Config.SettingsPath = "/tmp/ryft/.settings"
@@ -74,6 +75,8 @@ func newFake() *fakeServer {
 	mux.GET("/search", fs.server.DoSearch)
 	mux.GET("/count", fs.server.DoCount)
 	mux.GET("/files", fs.server.DoGetFiles)
+	mux.POST("/files", fs.server.DoPostFiles)
+	mux.DELETE("/files", fs.server.DoDeleteFiles)
 
 	// DEBUG mode
 	mux.GET("/logging/level", fs.server.DoLoggingLevel)
@@ -90,20 +93,20 @@ func newFake() *fakeServer {
 	return fs
 }
 
-// cleanup - delete whole home directory
-func (fs *fakeServer) cleanup() {
+// get home's directory
+func (fs *fakeServer) homeDir() string {
 	mount := fmt.Sprintf("%v", fs.server.Config.BackendOptions["ryftone-mount"])
 	home := fmt.Sprintf("%v", fs.server.Config.BackendOptions["home-dir"])
-	os.RemoveAll(filepath.Join(mount, home))
+	return filepath.Join(mount, home)
 }
 
-// get request
-func (fs *fakeServer) get(url, accept string, cancelIn time.Duration) ([]byte, int, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), nil)
-	if err != nil {
-		return nil, 0, err // failed
-	}
+// cleanup - delete whole home directory
+func (fs *fakeServer) cleanup() {
+	os.RemoveAll(fs.homeDir())
+}
 
+// do a request
+func (fs *fakeServer) do(req *http.Request, accept string, cancelIn time.Duration) ([]byte, int, error) {
 	if len(accept) != 0 {
 		req.Header.Set("Accept", accept)
 	}
@@ -131,6 +134,36 @@ func (fs *fakeServer) get(url, accept string, cancelIn time.Duration) ([]byte, i
 
 	body, err := ioutil.ReadAll(resp.Body)
 	return body, resp.StatusCode, err
+}
+
+// GET request
+func (fs *fakeServer) GET(url, accept string, cancelIn time.Duration) ([]byte, int, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), nil)
+	if err != nil {
+		return nil, 0, err // failed
+	}
+
+	return fs.do(req, accept, cancelIn)
+}
+
+// POST request
+func (fs *fakeServer) POST(url, accept string, data string, cancelIn time.Duration) ([]byte, int, error) {
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), bytes.NewBufferString(data))
+	if err != nil {
+		return nil, 0, err // failed
+	}
+
+	return fs.do(req, accept, cancelIn)
+}
+
+// DELETE request
+func (fs *fakeServer) DELETE(url, accept string, cancelIn time.Duration) ([]byte, int, error) {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), nil)
+	if err != nil {
+		return nil, 0, err // failed
+	}
+
+	return fs.do(req, accept, cancelIn)
 }
 
 // create engine
