@@ -640,6 +640,13 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	}
 	defer out.Close()
 
+	// get "write" lock, fail if busy
+	if utils.SafeLockWrite(out.Name()) {
+		defer utils.SafeUnlockWrite(out.Name())
+	} else {
+		return rpath, 0, 0, fmt.Errorf("%s file is busy", out.Name())
+	}
+
 	fw := getFileWriter(out.Name())
 	defer fw.Release()
 
@@ -736,6 +743,13 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	data_dir, _ := filepath.Split(data_path)
 	if err := os.MkdirAll(data_dir, 0755); err != nil {
 		return "", 0, fmt.Errorf("failed to create parent directories: %s", err)
+	}
+
+	// get "write" lock, fail if busy
+	if utils.SafeLockWrite(data_path) {
+		defer utils.SafeUnlockWrite(data_path)
+	} else {
+		return "", 0, fmt.Errorf("%s file is busy", data_path)
 	}
 
 	// write file content
