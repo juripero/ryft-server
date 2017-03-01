@@ -32,7 +32,57 @@ package utils
 
 import (
 	"sync"
+
+	"github.com/Sirupsen/logrus"
 )
+
+var (
+	// logger instance
+	safeLog = logrus.New()
+
+	SAFE = "safe"
+)
+
+// SafeSetLogLevelString changes global module log level.
+func SafeSetLogLevelString(level string) error {
+	ll, err := logrus.ParseLevel(level)
+	if err != nil {
+		return err
+	}
+
+	SafeSetLogLevel(ll)
+	return nil // OK
+}
+
+// SafeSetLogLevel changes global module log level.
+func SafeSetLogLevel(level logrus.Level) {
+	safeLog.Level = level
+}
+
+// SafeGetLogLevel gets global module log level.
+func SafeGetLogLevel() logrus.Level {
+	return safeLog.Level
+}
+
+// SafeLockRead adds "read" reference to a named item.
+func SafeLockRead(name string) bool {
+	return globalSafeItems.LockRead(name)
+}
+
+// SafeUnlockRead removes "read" reference from a named item.
+func SafeUnlockRead(name string) {
+	globalSafeItems.UnlockRead(name)
+}
+
+// SafeLockWrite adds "write" reference to a named item.
+func SafeLockWrite(name string) bool {
+	return globalSafeItems.LockWrite(name)
+}
+
+// SafeUnlockWrite removes "write" reference from a named item.
+func SafeUnlockWrite(name string) {
+	globalSafeItems.UnlockWrite(name)
+}
 
 // Safe item
 type safeItem struct {
@@ -41,65 +91,89 @@ type safeItem struct {
 	rrefs int    // number of "read" references
 }
 
+// Safe items
+type safeItems struct {
+	items map[string]*safeItem
+	lock  sync.Mutex
+}
+
+// create new safe items
+func newSafeItems() *safeItems {
+	return &safeItems{items: make(map[string]*safeItem)}
+}
+
 var (
-	safeItems     = make(map[string]*safeItem)
-	safeItemsLock = sync.Mutex{}
+	globalSafeItems = newSafeItems()
 )
 
-// SafeLockRead adds "read" reference to a named item.
-func SafeLockRead(name string) bool {
-	safeItemsLock.Lock()
-	defer safeItemsLock.Unlock()
+// LockRead adds "read" reference to a named item.
+func (si *safeItems) LockRead(name string) bool {
+	si.lock.Lock()
+	defer si.lock.Unlock()
 
-	if item, ok := safeItems[name]; ok {
+	var item *safeItem
+	if item = si.items[name]; item != nil {
 		if item.wrefs > 0 {
+			safeLog.WithField("name", name).Warnf("[%s]: name is busy for reading (writers: %d)", SAFE, item.wrefs)
 			return false // failed, BUSY!
 		}
 		item.rrefs++
 	} else {
-		safeItems[name] = &safeItem{name, 0, 1}
+		item = &safeItem{name, 0, 1}
+		si.items[name] = item
 	}
 
+	safeLog.WithField("name", name).Infof("[%s]: read lock acquired (readers:%d)", SAFE, item.rrefs)
 	return true // OK
 }
 
-// SafeUnlockRead removes "read" reference from a named item.
-func SafeUnlockRead(name string) {
-	safeItemsLock.Lock()
-	defer safeItemsLock.Unlock()
+// UnlockRead removes "read" reference from a named item.
+func (si *safeItems) UnlockRead(name string) {
+	si.lock.Lock()
+	defer si.lock.Unlock()
 
-	if item, ok := safeItems[name]; ok {
-		if item.rrefs--; (item.rrefs + item.wrefs) == 0 {
-			delete(safeItems, name)
+	if item := si.items[name]; item != nil {
+		item.rrefs--
+		safeLog.WithField("name", name).Infof("[%s]: read lock released (readers:%d)", SAFE, item.rrefs)
+		if (item.rrefs + item.wrefs) == 0 {
+			delete(si.items, name)
+			safeLog.WithField("name", name).Debugf("[%s]: lock deleted (no references)", SAFE)
 		}
 	}
 }
 
-// SafeLockWrite adds "write" reference to a named item.
-func SafeLockWrite(name string) bool {
-	safeItemsLock.Lock()
-	defer safeItemsLock.Unlock()
+// LockWrite adds "write" reference to a named item.
+func (si *safeItems) LockWrite(name string) bool {
+	si.lock.Lock()
+	defer si.lock.Unlock()
 
-	if item, ok := safeItems[name]; ok {
+	var item *safeItem
+	if item = si.items[name]; item != nil {
 		if item.rrefs > 0 {
+			safeLog.WithField("name", name).Warnf("[%s]: name is busy for writing (readers:%d)", SAFE, item.rrefs)
 			return false // failed, BUSY!
 		}
 		item.wrefs++
 	} else {
-		safeItems[name] = &safeItem{name, 1, 0}
+		item = &safeItem{name, 1, 0}
+		si.items[name] = item
 	}
 
+	safeLog.WithField("name", name).Infof("[%s]: write lock acquired (writers:%d)", SAFE, item.wrefs)
 	return true // OK
 }
 
-// SafeUnlockWrite removes "write" reference from a named item.
-func SafeUnlockWrite(name string) {
-	safeItemsLock.Lock()
-	defer safeItemsLock.Unlock()
+// UnlockWrite removes "write" reference from a named item.
+func (si *safeItems) UnlockWrite(name string) {
+	si.lock.Lock()
+	defer si.lock.Unlock()
 
-	if item, ok := safeItems[name]; ok {
-		if item.wrefs--; (item.rrefs + item.wrefs) == 0 {
-			delete(safeItems, name)
+	if item := si.items[name]; item != nil {
+		item.wrefs--
+		safeLog.WithField("name", name).Infof("[%s]: write lock released (writers:%d)", SAFE, item.wrefs)
+		if (item.rrefs + item.wrefs) == 0 {
+			delete(si.items, name)
+			safeLog.WithField("name", name).Debugf("[%s]: lock deleted (no references)", SAFE)
 		}
 	}
 }
