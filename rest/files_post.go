@@ -59,11 +59,13 @@ type PostFilesParams struct {
 	File      string `form:"file" json:"file"`           // filename to save
 	Offset    int64  `form:"offset" json:"offset"`       // offset inside file, used to rewrite
 	Length    int64  `form:"length" json:"length"`       // data length
-	Lifetime  string `form:"lifetime" json:"lifetime"`   // optional file lifetime
-	Safe      bool   `form:"safe" json:"safe"`           // safe upload flag
 	Local     bool   `form:"local" json:"local"`
 
+	Lifetime string `form:"lifetime" json:"lifetime"` // optional file lifetime
 	lifetime time.Duration
+
+	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
+	shareMode utils.ShareMode
 }
 
 // is empty?
@@ -106,8 +108,8 @@ func (p PostFilesParams) String() string {
 		res = append(res, fmt.Sprintf("lifetime:%s", p.Lifetime))
 	}
 
-	if p.Safe {
-		res = append(res, "safe")
+	if len(p.ShareMode) != 0 {
+		res = append(res, fmt.Sprintf("share-mode:%s", p.ShareMode))
 	}
 
 	if p.Local {
@@ -203,6 +205,13 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		if params.lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()).
 				WithDetails("failed to parse lifetime"))
+		}
+	}
+
+	if len(params.ShareMode) > 0 {
+		if params.shareMode, err = utils.SafeParseMode(params.ShareMode); err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse share mode"))
 		}
 	}
 
@@ -486,6 +495,9 @@ func (s *Server) postRemoteFiles(address string, authToken string, params PostFi
 	if len(params.Lifetime) > 0 {
 		q.Add("lifetime", params.Lifetime)
 	}
+	if len(params.ShareMode) > 0 {
+		q.Add("share-mode", params.ShareMode)
+	}
 	u.RawQuery = q.Encode()
 	u.Path += "/files"
 
@@ -640,11 +652,13 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	}
 	defer out.Close()
 
-	// get "write" lock, fail if busy
-	if utils.SafeLockWrite(out.Name()) {
-		defer utils.SafeUnlockWrite(out.Name())
-	} else {
-		return rpath, 0, 0, fmt.Errorf("%s file is busy", out.Name())
+	if !params.shareMode.IsIgnore() {
+		// get "write" lock, fail if busy
+		if utils.SafeLockWrite(out.Name(), params.shareMode) {
+			defer utils.SafeUnlockWrite(out.Name())
+		} else {
+			return rpath, 0, 0, fmt.Errorf("%s file is busy", out.Name())
+		}
 	}
 
 	fw := getFileWriter(out.Name())
@@ -745,11 +759,13 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 		return "", 0, fmt.Errorf("failed to create parent directories: %s", err)
 	}
 
-	// get "write" lock, fail if busy
-	if utils.SafeLockWrite(data_path) {
-		defer utils.SafeUnlockWrite(data_path)
-	} else {
-		return "", 0, fmt.Errorf("%s file is busy", data_path)
+	if !params.shareMode.IsIgnore() {
+		// get "write" lock, fail if busy
+		if utils.SafeLockWrite(data_path, params.shareMode) {
+			defer utils.SafeUnlockWrite(data_path)
+		} else {
+			return "", 0, fmt.Errorf("%s file is busy", data_path)
+		}
 	}
 
 	// write file content

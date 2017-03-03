@@ -31,7 +31,10 @@
 package utils
 
 import (
+	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -41,6 +44,15 @@ var (
 	safeLog = logrus.New()
 
 	SAFE = "safe"
+)
+
+// MaxWaitTimeout maximum allowed timeout
+var MaxWaitTimeout = 30 * time.Second
+
+const (
+	// we can use negative values for special flags:
+	SM_IGNORE ShareMode = -1 // special value for "ignore" flag
+	SM_SKIP   ShareMode = -2 // special value for "skip" flag
 )
 
 // SafeSetLogLevelString changes global module log level.
@@ -64,9 +76,53 @@ func SafeGetLogLevel() logrus.Level {
 	return safeLog.Level
 }
 
+// ShareMode is share mode
+type ShareMode time.Duration
+
+// SafeParseMode checks the share mode is OK
+func SafeParseMode(mode string) (ShareMode, error) {
+	sm := strings.ToLower(strings.TrimSpace(mode))
+
+	switch sm {
+	case "ignore", "force-ignore":
+		return SM_IGNORE, nil
+	case "skip", "skip-busy":
+		return SM_SKIP, nil
+	case "":
+		return 0, nil // don't wait
+	}
+
+	sm = strings.TrimPrefix(sm, "wait-up-to-")
+	sm = strings.TrimPrefix(sm, "wait-")
+	if d, err := time.ParseDuration(sm); err != nil {
+		return 0, fmt.Errorf("bad timeout: %s", err)
+	} else if d < 0 {
+		return 0, fmt.Errorf("bad timeout: cannot be negative, found %s", d)
+	} else if d > MaxWaitTimeout {
+		return 0, fmt.Errorf("bad timeout: cannet be > %s, found %s", MaxWaitTimeout, d)
+	} else {
+		return ShareMode(d), nil // OK
+	}
+}
+
+// IsIgnore checks if share mode is "ignore".
+func (sm ShareMode) IsIgnore() bool {
+	return sm == SM_IGNORE
+}
+
+// IsSkipBusy checks if share mode is "skip-busy".
+func (sm ShareMode) IsSkipBusy() bool {
+	return sm == SM_SKIP
+}
+
+// WaitTimeout gets the wait timeout.
+func (sm ShareMode) Timeout() time.Duration {
+	return time.Duration(sm)
+}
+
 // SafeLockRead adds "read" reference to a named item.
-func SafeLockRead(name string) bool {
-	return globalSafeItems.LockRead(name)
+func SafeLockRead(name string, mode ShareMode) bool {
+	return globalSafeItems.LockRead(name, mode)
 }
 
 // SafeUnlockRead removes "read" reference from a named item.
@@ -75,8 +131,8 @@ func SafeUnlockRead(name string) {
 }
 
 // SafeLockWrite adds "write" reference to a named item.
-func SafeLockWrite(name string) bool {
-	return globalSafeItems.LockWrite(name)
+func SafeLockWrite(name string, mode ShareMode) bool {
+	return globalSafeItems.LockWrite(name, mode)
 }
 
 // SafeUnlockWrite removes "write" reference from a named item.
@@ -107,7 +163,7 @@ var (
 )
 
 // LockRead adds "read" reference to a named item.
-func (si *safeItems) LockRead(name string) bool {
+func (si *safeItems) LockRead(name string, mode ShareMode) bool {
 	si.lock.Lock()
 	defer si.lock.Unlock()
 
@@ -143,7 +199,7 @@ func (si *safeItems) UnlockRead(name string) {
 }
 
 // LockWrite adds "write" reference to a named item.
-func (si *safeItems) LockWrite(name string) bool {
+func (si *safeItems) LockWrite(name string, mode ShareMode) bool {
 	si.lock.Lock()
 	defer si.lock.Unlock()
 

@@ -121,12 +121,21 @@ func (engine *Engine) prepare(task *Task) error {
 	// files
 	for _, file := range cfg.Files {
 		path := filepath.Join(engine.MountPoint, engine.HomeDir, file)
-		args = append(args, "-f", engine.relativeToMountPoint(path))
 
-		if utils.SafeLockRead(path) {
-			task.lockedFiles = append(task.lockedFiles, path)
-		} else {
-			return fmt.Errorf("%s file is busy", path)
+		skip := false
+		if !cfg.ShareMode.IsIgnore() {
+			if utils.SafeLockRead(path, cfg.ShareMode) {
+				task.lockedFiles = append(task.lockedFiles, path)
+			} else if cfg.ShareMode.IsSkipBusy() {
+				task.log().WithField("file", path).Warnf("file is busy, skipped")
+				skip = true
+			} else {
+				return fmt.Errorf("%s file is busy", path)
+			}
+		}
+
+		if !skip {
+			args = append(args, "-f", engine.relativeToMountPoint(path))
 		}
 	}
 
