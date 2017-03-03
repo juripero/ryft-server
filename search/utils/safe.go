@@ -99,10 +99,22 @@ func SafeParseMode(mode string) (ShareMode, error) {
 	} else if d < 0 {
 		return 0, fmt.Errorf("bad timeout: cannot be negative, found %s", d)
 	} else if d > MaxWaitTimeout {
-		return 0, fmt.Errorf("bad timeout: cannet be > %s, found %s", MaxWaitTimeout, d)
+		return 0, fmt.Errorf("bad timeout: cannot be greater than %s, found %s", MaxWaitTimeout, d)
 	} else {
 		return ShareMode(d), nil // OK
 	}
+}
+
+// convert to string
+func (sm ShareMode) String() string {
+	switch sm {
+	case SM_IGNORE:
+		return "ignore"
+	case SM_SKIP:
+		return "skip"
+	}
+
+	return time.Duration(sm).String()
 }
 
 // IsIgnore checks if share mode is "ignore".
@@ -145,6 +157,8 @@ type safeItem struct {
 	name  string // name of the item
 	wrefs int    // number of "write" references
 	rrefs int    // number of "read" references
+
+	waitCh chan struct{}
 }
 
 // Safe items
@@ -162,24 +176,48 @@ var (
 	globalSafeItems = newSafeItems()
 )
 
+// get existing item or create new one [UNSAFE]
+func (si *safeItems) getItem(name string) *safeItem {
+	if item := si.items[name]; item != nil {
+		return item
+	}
+
+	// new one
+	item := &safeItem{name, 0, 0, make(chan struct{})}
+	si.items[name] = item
+	return item
+}
+
 // LockRead adds "read" reference to a named item.
 func (si *safeItems) LockRead(name string, mode ShareMode) bool {
 	si.lock.Lock()
-	defer si.lock.Unlock()
 
-	var item *safeItem
-	if item = si.items[name]; item != nil {
-		if item.wrefs > 0 {
-			safeLog.WithField("name", name).Warnf("[%s]: name is busy for reading (writers: %d)", SAFE, item.wrefs)
+	item := si.getItem(name)
+	if item.wrefs > 0 {
+		safeLog.WithField("name", name).Warnf("[%s]: name is busy for reading (writers: %d)", SAFE, item.wrefs)
+		si.lock.Unlock()
+
+		if wait := mode.Timeout(); wait > 0 {
+			safeLog.WithField("name", name).Debugf("[%s]: wait the lock for %s", SAFE, mode)
+			start := time.Now()
+			select {
+			case <-time.After(wait):
+				safeLog.WithField("name", name).Debugf("[%s]: after %s lock is still busy", SAFE, mode)
+				return false // failed, BUSY! (even after timeout)
+			case <-item.waitCh:
+				// update remaining wait time and try again
+				mode = ShareMode(wait - time.Since(start))
+				safeLog.WithField("name", name).Debugf("[%s]: lock released, try again up to %s", SAFE, mode)
+				return si.LockRead(name, mode) // recursion!
+			}
+		} else {
 			return false // failed, BUSY!
 		}
-		item.rrefs++
-	} else {
-		item = &safeItem{name, 0, 1}
-		si.items[name] = item
 	}
 
+	item.rrefs++
 	safeLog.WithField("name", name).Infof("[%s]: read lock acquired (readers:%d)", SAFE, item.rrefs)
+	si.lock.Unlock()
 	return true // OK
 }
 
@@ -192,6 +230,7 @@ func (si *safeItems) UnlockRead(name string) {
 		item.rrefs--
 		safeLog.WithField("name", name).Infof("[%s]: read lock released (readers:%d)", SAFE, item.rrefs)
 		if (item.rrefs + item.wrefs) == 0 {
+			close(item.waitCh) // notify all waiters
 			delete(si.items, name)
 			safeLog.WithField("name", name).Debugf("[%s]: lock deleted (no references)", SAFE)
 		}
@@ -201,21 +240,33 @@ func (si *safeItems) UnlockRead(name string) {
 // LockWrite adds "write" reference to a named item.
 func (si *safeItems) LockWrite(name string, mode ShareMode) bool {
 	si.lock.Lock()
-	defer si.lock.Unlock()
 
-	var item *safeItem
-	if item = si.items[name]; item != nil {
-		if item.rrefs > 0 {
-			safeLog.WithField("name", name).Warnf("[%s]: name is busy for writing (readers:%d)", SAFE, item.rrefs)
+	item := si.getItem(name)
+	if item.rrefs > 0 {
+		safeLog.WithField("name", name).Warnf("[%s]: name is busy for writing (readers:%d)", SAFE, item.rrefs)
+		si.lock.Unlock()
+
+		if wait := mode.Timeout(); wait > 0 {
+			safeLog.WithField("name", name).Debugf("[%s]: wait the lock for %s", SAFE, mode)
+			start := time.Now()
+			select {
+			case <-time.After(wait):
+				safeLog.WithField("name", name).Debugf("[%s]: after %s lock is still busy", SAFE, mode)
+				return false // failed, BUSY! (even after timeout)
+			case <-item.waitCh:
+				// update remaining wait time and try again
+				mode = ShareMode(wait - time.Since(start))
+				safeLog.WithField("name", name).Debugf("[%s]: lock released, try again up to %s", SAFE, mode)
+				return si.LockWrite(name, mode) // recursion!
+			}
+		} else {
 			return false // failed, BUSY!
 		}
-		item.wrefs++
-	} else {
-		item = &safeItem{name, 1, 0}
-		si.items[name] = item
 	}
 
+	item.wrefs++
 	safeLog.WithField("name", name).Infof("[%s]: write lock acquired (writers:%d)", SAFE, item.wrefs)
+	si.lock.Unlock()
 	return true // OK
 }
 
@@ -228,6 +279,7 @@ func (si *safeItems) UnlockWrite(name string) {
 		item.wrefs--
 		safeLog.WithField("name", name).Infof("[%s]: write lock released (writers:%d)", SAFE, item.wrefs)
 		if (item.rrefs + item.wrefs) == 0 {
+			close(item.waitCh) // notify all waiters
 			delete(si.items, name)
 			safeLog.WithField("name", name).Debugf("[%s]: lock deleted (no references)", SAFE)
 		}

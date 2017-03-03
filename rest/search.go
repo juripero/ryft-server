@@ -39,6 +39,8 @@ import (
 	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/getryft/ryft-server/rest/format"
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -68,7 +70,8 @@ type SearchParams struct {
 	Stream      bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 	ErrorPrefix bool   `form:"ep" json:"ep,omitempty" msgpack:"ep,omitempty"` // include host prefixes for error messages
 
-	Local bool `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
 }
 
 // Handle /search endpoint.
@@ -151,6 +154,11 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)
 	cfg.Limit = uint(params.Limit)
+	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse sharing mode"))
+	}
 
 	log.WithFields(map[string]interface{}{
 		"config":  cfg,
