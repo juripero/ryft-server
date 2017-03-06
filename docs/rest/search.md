@@ -32,6 +32,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
@@ -258,6 +259,25 @@ By default there is no any delimiter. To use Windows newline
 just pass url-encoded `delimiter=%0D%0A`.
 
 
+### Search `share-mode` parameter
+
+By default ryft-server protects data files from simultaneous read and write.
+The `share-mode` option is used to customize sharing mode.
+
+The following sharing modes are supported:
+- `share-mode=wait-up-to-10s` or `share-mode=wait-10s`.
+  If data file is busy ryft-server waits up to specified timeout.
+- `share-mode=skip-busy` or `share-mode=skip`.
+  If data file is busy then it is removed from input fileset.
+  Note, the input fileset might be empty - ryftprim reports error in this case.
+- `share-mode=force-ignore` or `share-mode=ignore`.
+  Force to ignore any sharing rules. Even if file is busy try to run the search.
+  Note, the result might be undefined.
+
+By default `share-mode=` is equal to `share-mode=wait-0ms` which means
+report error immediately if data file is busy.
+
+
 ### Search `nodes` parameter
 
 The number of Ryft processing nodes that the algorithm should use.
@@ -455,6 +475,7 @@ The list of supported query parameters are the following:
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 
