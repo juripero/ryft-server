@@ -275,3 +275,29 @@ func (cat *Catalog) newDataFilePath() string {
 		return absPath // fallback
 	}
 }
+
+// GetTotalDataSize gets the total length of data files.
+func (cat *Catalog) GetTotalDataSize() (int64, error) {
+	// TODO: several attempts if DB is locked
+	return cat.getTotalDataSizeSync()
+}
+
+// get total length of data files (synchronized)
+func (cat *Catalog) getTotalDataSizeSync() (int64, error) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.getTotalDataSize()
+}
+
+// get total length of data files (unsynchronized)
+func (cat *Catalog) getTotalDataSize() (int64, error) {
+	row := cat.db.QueryRow(`SELECT SUM(d.len) FROM data AS d;`)
+
+	var res int64
+	if err := row.Scan(&res); err != nil {
+		return 0, fmt.Errorf("failed to scan result: %s", err)
+	}
+
+	return res, nil // OK
+}

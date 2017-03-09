@@ -128,12 +128,7 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 		sort.Strings(info.Dirs)
 
 		// TODO: use transcoder/dedicated structure instead of simple map!
-		json := map[string]interface{}{
-			"dir":     info.Path,
-			"files":   info.Files,
-			"folders": info.Dirs,
-		}
-		ctx.JSON(http.StatusOK, json)
+		ctx.JSON(http.StatusOK, info)
 	} else { // catalog or regular file
 		cat, err := catalog.OpenCatalogReadOnly(path)
 		if err != nil {

@@ -32,52 +32,28 @@ package search
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"strings"
 )
 
-// TODO: replace with NodeInfo struct to support trees
-// TODO: report file sizes
-// TODO: report catalogs
+// NodeInfo is extended file/dir information.
+type NodeInfo struct {
+	Type   string `json:"type"`             // node type: "file", "dir" or "catalog"
+	Length int64  `json:"length,omitempty"` // file or catalog size, bytes.
+	Offset int64  `json:"offset,omitempty"` // optional file offset, bytes.
+	// TODO: report modification time
+	// TODO: report permissions
+}
 
 // DirInfo is directory's content.
 type DirInfo struct {
-	Path  string   `json:"dir"`               // directory path (relative to mount point)
-	Files []string `json:"files,omitempty"`   // list of files
-	Dirs  []string `json:"folders,omitempty"` // subdirectories
-}
+	Path     string   `json:"dir"`                // directory path (relative to mount point)
+	Files    []string `json:"files,omitempty"`    // list of files
+	Dirs     []string `json:"folders,omitempty"`  // subdirectories
+	Catalogs []string `json:"catalogs,omitempty"` // catalogs
 
-// ReadDir gets directory content from filesystem.
-// if hidden is `true` then all hidden files are also reported.
-func ReadDir(mountPoint, dirPath string, hidden bool) (*DirInfo, error) {
-	// read directory content
-	items, err := ioutil.ReadDir(filepath.Join(mountPoint, dirPath))
-	if err != nil {
-		return nil, err
-	}
-
-	// process directory content
-	res := NewDirInfo(dirPath)
-	for _, item := range items {
-		name := item.Name()
-
-		if hidden {
-			/*if name == "." || name == ".." {
-				continue // skip "." and ".."
-			}*/
-		} else if strings.HasPrefix(name, ".") {
-			continue // skip all hidden files
-		}
-
-		if item.IsDir() {
-			res.AddDir(name)
-		} else {
-			res.AddFile(name)
-		}
-	}
-
-	return res, nil // OK
+	// additional details [host] -> [name] -> info
+	Details map[string]map[string]NodeInfo `json:"details,omitempty"`
 }
 
 // NewDirInfo creates empty directory content.
@@ -96,6 +72,9 @@ func NewDirInfo(path string) *DirInfo {
 	res.Files = []string{}
 	res.Dirs = []string{}
 
+	// no details
+	res.Details = make(map[string]map[string]NodeInfo)
+
 	return res
 }
 
@@ -113,6 +92,20 @@ func (dir *DirInfo) AddFile(file ...string) {
 // AddDir adds a new subdirectory.
 func (dir *DirInfo) AddDir(subdir ...string) {
 	dir.Dirs = append(dir.Dirs, subdir...)
+}
+
+// AddCatalogs adds a new catalog.
+func (dir *DirInfo) AddCatalog(catalog ...string) {
+	dir.Catalogs = append(dir.Catalogs, catalog...)
+}
+
+// Add adds detail information.
+func (dir *DirInfo) AddDetails(host string, name string, info NodeInfo) {
+	if node := dir.Details[host]; node != nil {
+		node[name] = info
+	} else {
+		dir.Details[host] = map[string]NodeInfo{name: info}
+	}
 }
 
 // check if path is relative to home
