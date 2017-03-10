@@ -88,10 +88,10 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 	mountPoint, _ := server.getMountPoint(homeDir)
 	var path, relPath string
 	if len(params.Catalog) != 0 {
-		relPath = filepath.Join(params.Dir, params.Catalog)
+		relPath = strings.Join([]string{params.Dir, params.Catalog}, string(filepath.Separator))
 		path = filepath.Join(mountPoint, relPath)
 	} else {
-		relPath = filepath.Join(params.Dir, params.File)
+		relPath = strings.Join([]string{params.Dir, params.File}, string(filepath.Separator))
 		path = filepath.Join(mountPoint, relPath)
 	}
 
@@ -100,6 +100,7 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 		panic(NewError(http.StatusBadRequest,
 			fmt.Sprintf("path %q is not relative to home", path)))
 	}
+	relPath = filepath.Clean(relPath)
 
 	// stat the requested path...
 	if info, err := os.Stat(path); err != nil {

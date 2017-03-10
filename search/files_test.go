@@ -1,8 +1,6 @@
 package search
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,8 +8,8 @@ import (
 
 // test empty dir info
 func TestDirInfoEmpty(t *testing.T) {
-	info := NewDirInfo("")
-	assert.Equal(t, "/", info.Path) // path cannot be empty
+	info := NewDirInfo("", "")
+	assert.Equal(t, "/", info.DirPath) // path cannot be empty
 	assert.Empty(t, info.Files)
 	assert.Empty(t, info.Dirs)
 	assert.Equal(t, `Dir{path:"/", files:[], dirs:[]}`, info.String())
@@ -23,38 +21,19 @@ func TestDirInfoEmpty(t *testing.T) {
 	info.AddDir("foo", "bar")
 	assert.Equal(t, []string{"foo", "bar"}, info.Dirs)
 	assert.Equal(t, `Dir{path:"/", files:["a.txt" "b.txt"], dirs:["foo" "bar"]}`, info.String())
-}
 
-// test read dir info
-func TestDirInfoRead(t *testing.T) {
-	os.MkdirAll("/tmp/ryft/foo/dir", 0755)
-	ioutil.WriteFile("/tmp/ryft/foo/123.txt", []byte("hello"), 0644)
-	ioutil.WriteFile("/tmp/ryft/foo/456.txt", []byte("hello"), 0644)
-	ioutil.WriteFile("/tmp/ryft/foo/.789", []byte("hello"), 0644)
-	defer os.RemoveAll("/tmp/ryft/foo")
+	info.AddCatalog("1.cat", "2.cat")
+	assert.Equal(t, []string{"1.cat", "2.cat"}, info.Catalogs)
+	assert.Equal(t, `Dir{path:"/", files:["a.txt" "b.txt"], dirs:["foo" "bar"]}`, info.String())
 
-	info, err := ReadDir("/tmp/ryft", "foo", false)
-	if assert.NoError(t, err) {
-		assert.EqualValues(t, "foo", info.Path)
-		assert.EqualValues(t, []string{"123.txt", "456.txt"}, info.Files)
-		assert.EqualValues(t, []string{"dir"}, info.Dirs)
-	}
+	info.AddDetails("host", "1.txt", NodeInfo{Offset: 1, Length: 2, Type: "fake.file"})
+	info.AddDetails("host", "2.txt", NodeInfo{Offset: 2, Length: 3, Type: "fake.file"})
+	assert.Equal(t, 1, len(info.Details))
+	assert.Equal(t, 2, len(info.Details["host"]))
 
-	info, err = ReadDir("/tmp/ryft", "foo", true)
-	if assert.NoError(t, err) {
-		assert.EqualValues(t, "foo", info.Path)
-		assert.EqualValues(t, []string{".789", "123.txt", "456.txt"}, info.Files)
-		assert.EqualValues(t, []string{"dir"}, info.Dirs)
-	}
-}
+	assert.Equal(t, `Dir{catalog:"test.cat", files:[]}`, NewDirInfo("", "test.cat").String())
 
-// test read missing dir info
-func TestDirInfoReadBad(t *testing.T) {
-	info, err := ReadDir("/", "etc-missing-directory-name", false)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "no such file or directory")
-		assert.Nil(t, info)
-	}
+	assert.Equal(t, `Dir{path:"foo", files:[], dirs:[]}`, NewDirInfo("foo", "").String())
 }
 
 // test relative to home
