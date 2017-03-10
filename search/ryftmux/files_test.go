@@ -60,7 +60,7 @@ func TestEngineFiles(t *testing.T) {
 	if assert.NoError(t, f1.FilesReportError) {
 		info, err := engine.Files("foo", false)
 		if assert.Error(t, err) && assert.Nil(t, info) {
-			assert.Contains(t, err.Error(), "inconsistent path")
+			assert.Contains(t, err.Error(), "inconsistent directory path")
 		}
 	}
 	f1.FilesPathSuffix = ""
