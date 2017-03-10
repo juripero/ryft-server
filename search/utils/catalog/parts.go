@@ -37,6 +37,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/getryft/ryft-server/search"
 )
 
 // AddFilePart adds file part to catalog.
@@ -154,6 +156,67 @@ VALUES (?,?,?,?,?)`, filename, offset, length, d_id, d_pos)
 		"data-pos":  d_pos,
 	}).Debugf("[%s]: add new file part", TAG)
 	return d_file, d_pos, delim, nil // OK
+}
+
+// GetAllParts gets all file parts.
+func (cat *Catalog) GetAllParts() (map[string]search.NodeInfo, error) {
+	// TODO: several attempts if DB is locked
+	return cat.getAllPartsSync()
+}
+
+// gets all file parts (unsynchronized).
+func (cat *Catalog) getAllPartsSync() (map[string]search.NodeInfo, error) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.getAllParts()
+}
+
+// gets all file parts.
+func (cat *Catalog) getAllParts() (map[string]search.NodeInfo, error) {
+	rows, err := cat.db.Query(`SELECT p.name,p.pos,p.len FROM parts AS p;`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parts: %s", err)
+	}
+	defer rows.Close()
+
+	res := make(map[string]search.NodeInfo)
+	for rows.Next() {
+		var file string
+		var offset, length int64
+		if err := rows.Scan(&file, &offset, &length); err != nil {
+			return nil, fmt.Errorf("failed to scan parts data: %s", err)
+		}
+
+		if info, ok := res[file]; ok {
+			if len(info.Parts) == 0 {
+				// if no any parts yet, then add itself
+				info.Parts = append(info.Parts, search.PartInfo{
+					Offset: info.Offset,
+					Length: info.Length,
+				})
+			}
+
+			info.Parts = append(info.Parts, search.PartInfo{
+				Offset: offset,
+				Length: length,
+			})
+
+			info.Length += length
+			if offset < info.Offset {
+				info.Offset = offset
+			}
+			res[file] = info
+		} else {
+			res[file] = search.NodeInfo{
+				Type:   "file",
+				Offset: offset,
+				Length: length,
+			}
+		}
+	}
+
+	return res, nil // OK
 }
 
 // GetFile get file parts from catalog.

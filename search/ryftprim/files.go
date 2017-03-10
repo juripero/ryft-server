@@ -40,11 +40,20 @@ import (
 	"github.com/getryft/ryft-server/search/utils/catalog"
 )
 
+// ReadDirOrCatalog gets directory or catalog content from filesystem.
+func ReadDirOrCatalog(mountPoint, dirPath string, hidden, details bool, host string) (*search.DirInfo, error) {
+	// try to detect catalogs
+	if cat, err := catalog.OpenCatalogReadOnly(filepath.Join(mountPoint, dirPath)); err == nil {
+		defer cat.Close()
+		return ReadCatalog(mountPoint, dirPath, details, host)
+	}
+
+	return ReadDir(mountPoint, dirPath, hidden, details, host)
+}
+
 // ReadDir gets directory content from filesystem.
 // if hidden is `true` then all hidden files are also reported.
 func ReadDir(mountPoint, dirPath string, hidden, details bool, host string) (*search.DirInfo, error) {
-	// TODO: check if it's catalog
-
 	// read directory content
 	items, err := ioutil.ReadDir(filepath.Join(mountPoint, dirPath))
 	if err != nil {
@@ -116,7 +125,7 @@ func ReadDir(mountPoint, dirPath string, hidden, details bool, host string) (*se
 	}
 
 	// populate result
-	res := search.NewDirInfo(dirPath)
+	res := search.NewDirInfo(dirPath, "")
 	res.AddFile(files...)
 	res.AddCatalog(catalogs...)
 	for name := range dirs {
@@ -124,6 +133,38 @@ func ReadDir(mountPoint, dirPath string, hidden, details bool, host string) (*se
 	}
 	if details {
 		res.Details[host] = nodes
+	}
+
+	return res, nil // OK
+}
+
+// ReadCatalog gets catalog content.
+func ReadCatalog(mountPoint, catPath string, details bool, host string) (*search.DirInfo, error) {
+	// read directory content
+	cat, err := catalog.OpenCatalogReadOnly(filepath.Join(mountPoint, catPath))
+	if err != nil {
+		return nil, err
+	}
+	defer cat.Close()
+
+	parts, err := cat.GetAllParts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get catalog content: %s", err)
+	}
+	files := make(map[string]int)
+
+	// process catalog content
+	for name, _ := range parts {
+		files[name]++
+	}
+
+	// populate result
+	res := search.NewDirInfo("", catPath)
+	for name := range files {
+		res.AddFile(name)
+	}
+	if details {
+		res.Details[host] = parts
 	}
 
 	return res, nil // OK

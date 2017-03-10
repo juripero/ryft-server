@@ -70,15 +70,15 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 			if ok && res != nil {
 				// check directory path is consistent
 				if len(muxPath) == 0 {
-					muxPath = res.Path
+					muxPath = res.DirPath
 				}
-				if muxPath != res.Path {
+				if muxPath != res.DirPath {
 					task.log().WithFields(map[string]interface{}{
 						"mux-path": muxPath,
-						"res-path": res.Path,
+						"res-path": res.DirPath,
 					}).Warnf("path inconsistency detected!")
 					return nil, fmt.Errorf("inconsistent path %q != %q",
-						muxPath, res.Path)
+						muxPath, res.DirPath)
 				}
 
 				// merge files
@@ -95,7 +95,7 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	}
 
 	// prepare results
-	mux := search.NewDirInfo(muxPath)
+	mux := search.NewDirInfo(muxPath, "")
 	mux.Files = make([]string, 0, len(muxFiles))
 	mux.Dirs = make([]string, 0, len(muxDirs))
 	for f := range muxFiles {

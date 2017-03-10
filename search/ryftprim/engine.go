@@ -137,7 +137,7 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	}).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	info, err := ReadDir(home, path, hidden, true, engine.IndexHost)
+	info, err := ReadDirOrCatalog(home, path, hidden, true, engine.IndexHost)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)

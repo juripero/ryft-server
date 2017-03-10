@@ -36,18 +36,27 @@ import (
 	"strings"
 )
 
+type PartInfo struct {
+	Length int64 `json:"length"` // file part size, bytes.
+	Offset int64 `json:"offset"` // file part offset, bytes.
+}
+
 // NodeInfo is extended file/dir information.
 type NodeInfo struct {
-	Type   string `json:"type"`             // node type: "file", "dir" or "catalog"
+	Type   string `json:"type,omitempty"`   // node type: "file", "dir" or "catalog"
 	Length int64  `json:"length,omitempty"` // file or catalog size, bytes.
 	Offset int64  `json:"offset,omitempty"` // optional file offset, bytes.
 	// TODO: report modification time
 	// TODO: report permissions
+
+	Parts []PartInfo `json:"parts,omitempty"` // file parts
 }
 
 // DirInfo is directory's content.
 type DirInfo struct {
-	Path     string   `json:"dir"`                // directory path (relative to mount point)
+	DirPath string `json:"dir,omitempty"`     // directory path (relative to mount point)
+	Catalog string `json:"catalog,omitempty"` // catalog path (relative to mount point)
+
 	Files    []string `json:"files,omitempty"`    // list of files
 	Dirs     []string `json:"folders,omitempty"`  // subdirectories
 	Catalogs []string `json:"catalogs,omitempty"` // catalogs
@@ -57,18 +66,23 @@ type DirInfo struct {
 }
 
 // NewDirInfo creates empty directory content.
-func NewDirInfo(path string) *DirInfo {
+func NewDirInfo(dir string, catalog string) *DirInfo {
 	res := new(DirInfo)
 
-	// path cannot be empty
-	// so replace "" with "/"
-	if len(path) != 0 {
-		res.Path = filepath.Clean(path)
+	if len(catalog) != 0 {
+		res.Catalog = catalog
 	} else {
-		res.Path = "/"
+		// path cannot be empty
+		// so replace "" with "/"
+		if len(dir) != 0 {
+			res.DirPath = filepath.Clean(dir)
+		} else {
+			res.DirPath = "/"
+		}
 	}
 
 	// no files/dirs
+	res.Catalogs = []string{}
 	res.Files = []string{}
 	res.Dirs = []string{}
 
@@ -80,8 +94,13 @@ func NewDirInfo(path string) *DirInfo {
 
 // String gets string representation of directory content.
 func (dir *DirInfo) String() string {
+	if len(dir.Catalog) != 0 {
+		return fmt.Sprintf("Dir{catalog:%q, files:%q}",
+			dir.Catalog, dir.Files)
+	}
+
 	return fmt.Sprintf("Dir{path:%q, files:%q, dirs:%q}",
-		dir.Path, dir.Files, dir.Dirs)
+		dir.DirPath, dir.Files, dir.Dirs)
 }
 
 // AddFile adds a new file.

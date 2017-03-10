@@ -86,11 +86,13 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 
 	// auto-detect directory/catalog/file
 	mountPoint, _ := server.getMountPoint(homeDir)
-	var path string
+	var path, relPath string
 	if len(params.Catalog) != 0 {
-		path = filepath.Join(mountPoint, params.Dir, params.Catalog)
+		relPath = filepath.Join(params.Dir, params.Catalog)
+		path = filepath.Join(mountPoint, relPath)
 	} else {
-		path = filepath.Join(mountPoint, params.Dir, params.File)
+		relPath = filepath.Join(params.Dir, params.File)
+		path = filepath.Join(mountPoint, relPath)
 	}
 
 	// checks the input filename is relative to home
@@ -111,12 +113,12 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 		}
 	} else if info.IsDir() { // directory
 		log.WithFields(map[string]interface{}{
-			"dir":     params.Dir,
+			"dir":     relPath,
 			"user":    userName,
 			"home":    homeDir,
 			"cluster": userTag,
-		}).Infof("[%s]: start GET /files", CORE)
-		info, err := engine.Files(params.Dir, params.Hidden)
+		}).Infof("[%s]: start GET /files (directory content)", CORE)
+		info, err := engine.Files(relPath, params.Hidden)
 		if err != nil {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
 				WithDetails("failed to get files"))
@@ -124,6 +126,7 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 
 		// TODO: if params.Sort {
 		// sort names in the ascending order
+		sort.Strings(info.Catalogs)
 		sort.Strings(info.Files)
 		sort.Strings(info.Dirs)
 
@@ -141,7 +144,31 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 		} else {
 			defer cat.Close()
 
-			server.doGetCatalog(ctx, cat, params.File, info.ModTime())
+			if len(params.File) == 0 {
+				log.WithFields(map[string]interface{}{
+					"catalog": relPath,
+					"user":    userName,
+					"home":    homeDir,
+					"cluster": userTag,
+				}).Infof("[%s]: start GET /files (catalog content)", CORE)
+				info, err := engine.Files(relPath, params.Hidden)
+				if err != nil {
+					panic(NewError(http.StatusInternalServerError, err.Error()).
+						WithDetails("failed to get catalog parts"))
+				}
+
+				// TODO: if params.Sort {
+				// sort names in the ascending order
+				sort.Strings(info.Catalogs)
+				sort.Strings(info.Files)
+				sort.Strings(info.Dirs)
+
+				// TODO: use transcoder/dedicated structure instead of simple map!
+				ctx.JSON(http.StatusOK, info)
+
+			} else {
+				server.doGetCatalog(ctx, cat, params.File, info.ModTime())
+			}
 		}
 	}
 }
