@@ -35,6 +35,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
@@ -82,6 +83,8 @@ func ReadDir(mountPoint, dirPath string, hidden, details bool, host string) (*se
 		}
 
 		var info search.NodeInfo
+		info.ModTime = item.ModTime().Format(time.RFC3339)
+		info.Perm = item.Mode().String()
 		if item.IsDir() {
 			dirs[name]++
 			info.Type = "dir"

@@ -46,8 +46,9 @@ type NodeInfo struct {
 	Type   string `json:"type,omitempty"`   // node type: "file", "dir" or "catalog"
 	Length int64  `json:"length,omitempty"` // file or catalog size, bytes.
 	Offset int64  `json:"offset,omitempty"` // optional file offset, bytes.
-	// TODO: report modification time
-	// TODO: report permissions
+
+	ModTime string `json:"mtime,omitempty"` // modification time
+	Perm    string `json:"perm,omitempty"`  // permission flags
 
 	Parts []PartInfo `json:"parts,omitempty"` // file parts
 }
