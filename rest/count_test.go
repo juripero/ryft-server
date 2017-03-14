@@ -30,7 +30,7 @@ func TestCountUsual(t *testing.T) {
 	// test case
 	check := func(url, accept string, cancelIn time.Duration,
 		expectedStatus int, expectedErrors ...string) {
-		body, status, err := fs.get(url, accept, cancelIn)
+		body, status, err := fs.GET(url, accept, cancelIn)
 		if err != nil {
 			for _, msg := range expectedErrors {
 				assert.Contains(t, err.Error(), msg)

@@ -66,6 +66,10 @@ type Task struct {
 	config     *search.Config
 	results    *ResultsReader
 	resultWait sync.WaitGroup
+
+	// list of locked files
+	lockedFiles    []string
+	lockInProgress bool
 }
 
 // NewTask creates new task.

@@ -113,6 +113,13 @@
           },
           {
             "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint8",
             "maximum": 4,
@@ -263,6 +270,13 @@
           },
           {
             "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint8",
             "maximum": 4,
@@ -379,6 +393,13 @@
             "type": "string",
             "name": "lifetime",
             "description": "The file or catalog lifetime, for example '2h'."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
           },
           {
             "in": "query",

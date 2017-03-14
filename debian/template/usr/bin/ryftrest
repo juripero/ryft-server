@@ -61,6 +61,7 @@ REST specific:
                      - script("name") - call an external script
                  Several transformations can be specified.
                  Can be provided multiple
+--share-mode     Sharing mode. Can be "ignore", "skip" or "wait-10s".
 --no-stats       Disable statistics output.
 --stream         Use stream output format. Provides a sequence of JSON
                  "tag-object" pairs to be able to decode input data on the fly
@@ -102,6 +103,7 @@ FUZZINESS=
 SURROUNDING=
 DELIMITER=$'\r\n'
 TRANSFORMS=()
+SHARE_MODE=
 QUERY=
 DATA=
 INDEX=
@@ -343,6 +345,14 @@ while [[ $# > 0 ]]; do
         TRANSFORMS=("${TRANSFORMS[@]}" "$2")
         shift 2
         ;;
+    --share-mode=*)
+        SHARE_MODE="${1#*=}"
+        shift
+        ;;
+    --share-mode)
+        SHARE_MODE="$2"
+        shift 2
+        ;;
     --no-stats)
         STATS="false"
         shift
@@ -415,6 +425,7 @@ done
 for tx in "${TRANSFORMS[@]}"; do
     [[ ! -z $tx ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "transform=$tx")
 done
+[[ ! -z "$SHARE_MODE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "share-mode=$SHARE_MODE")
 [[ ! -z "$STATS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stats=$STATS")
 [[ ! -z "$STREAM" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stream=$STREAM")
 [[ ! -z "$SPARK" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "spark=$SPARK")
