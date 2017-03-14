@@ -24,6 +24,19 @@ The list of supported query parameters to get directory content are the followin
 | `hidden`  | boolean | [The report hidden files flag](#get-files-hidden-parameter). |
 | `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
 
+Note, the `dir` should specify valid directory path.
+
+
+The list of supported query parameters to get catalog's content are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `catalog` | string  | [The catalog name](#get-files-catalog-parameter). |
+| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
+
+Note, the `file` parameter should be empty and `catalog` should specify
+valid catalog path.
+
 
 The list of supported query parameters to download a standalone file are the following:
 
