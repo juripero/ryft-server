@@ -635,8 +635,15 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	// try to create file, if file already exists try with updated name
 	for k := 0; ; k++ {
 		fullpath := filepath.Join(mountPoint, rpath)
+		if !params.shareMode.IsIgnore() {
+			// get "write" lock, fail if busy
+			if !utils.SafeLockWrite(fullpath, params.shareMode) {
+				return rpath, 0, 0, fmt.Errorf("%s file is busy", out.Name())
+			}
+		}
 		out, err = os.OpenFile(fullpath, flags, 0644)
 		if err != nil {
+			utils.SafeUnlockWrite(fullpath)
 			if params.File != rbase && os.IsExist(err) {
 				// generate new unique name
 				ext := filepath.Ext(rbase)
@@ -650,16 +657,11 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 
 		break
 	}
-	defer out.Close()
 
 	if !params.shareMode.IsIgnore() {
-		// get "write" lock, fail if busy
-		if utils.SafeLockWrite(out.Name(), params.shareMode) {
-			defer utils.SafeUnlockWrite(out.Name())
-		} else {
-			return rpath, 0, 0, fmt.Errorf("%s file is busy", out.Name())
-		}
+		defer utils.SafeUnlockWrite(out.Name())
 	}
+	defer out.Close()
 
 	fw := getFileWriter(out.Name())
 	defer fw.Release()
@@ -762,6 +764,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	if !params.shareMode.IsIgnore() {
 		// get "write" lock, fail if busy
 		if utils.SafeLockWrite(data_path, params.shareMode) {
+			time.Sleep(10 * time.Second)
 			defer utils.SafeUnlockWrite(data_path)
 		} else {
 			return "", 0, fmt.Errorf("%s file is busy", data_path)
