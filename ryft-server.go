@@ -279,9 +279,14 @@ func main() {
 	private.GET("/search", server.DoSearch)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
+
+	// need to provide both URLs to disable redirecting
 	private.GET("/files", server.DoGetFiles)
+	private.GET("/files/*path", server.DoGetFiles)
 	private.DELETE("/files", server.DoDeleteFiles)
+	private.DELETE("/files/*path", server.DoDeleteFiles)
 	private.POST("/files", server.DoPostFiles)
+	private.POST("/files/*path", server.DoPostFiles)
 
 	// debug API endpoints
 	if server.Config.DebugMode {

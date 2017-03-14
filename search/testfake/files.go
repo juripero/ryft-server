@@ -35,6 +35,7 @@ import (
 	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftprim"
 )
 
 // Files starts synchronous "/files" operation.
@@ -46,7 +47,7 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 
 	// report pre-defined set of dirs/files?
 	if len(engine.FilesReportDirs)+len(engine.FilesReportFiles) > 0 {
-		info := search.NewDirInfo(path + engine.FilesPathSuffix)
+		info := search.NewDirInfo(path+engine.FilesPathSuffix, "")
 		info.AddFile(engine.FilesReportFiles...)
 		info.AddDir(engine.FilesReportDirs...)
 		return info, nil
@@ -60,7 +61,7 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	}).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	info, err := search.ReadDir(home, path, hidden)
+	info, err := ryftprim.ReadDir(home, path, hidden, true, engine.HostName)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)

@@ -33,7 +33,12 @@ package catalog
 import (
 	"database/sql"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
+	"sort"
+
+	"github.com/getryft/ryft-server/search"
 )
 
 // AddFilePart adds file part to catalog.
@@ -153,6 +158,127 @@ VALUES (?,?,?,?,?)`, filename, offset, length, d_id, d_pos)
 	return d_file, d_pos, delim, nil // OK
 }
 
+// GetAllParts gets all file parts.
+func (cat *Catalog) GetAllParts() (map[string]search.NodeInfo, error) {
+	// TODO: several attempts if DB is locked
+	return cat.getAllPartsSync()
+}
+
+// gets all file parts (unsynchronized).
+func (cat *Catalog) getAllPartsSync() (map[string]search.NodeInfo, error) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.getAllParts()
+}
+
+// gets all file parts.
+func (cat *Catalog) getAllParts() (map[string]search.NodeInfo, error) {
+	rows, err := cat.db.Query(`SELECT p.name,p.pos,p.len FROM parts AS p;`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parts: %s", err)
+	}
+	defer rows.Close()
+
+	res := make(map[string]search.NodeInfo)
+	for rows.Next() {
+		var file string
+		var offset, length int64
+		if err := rows.Scan(&file, &offset, &length); err != nil {
+			return nil, fmt.Errorf("failed to scan parts data: %s", err)
+		}
+
+		if info, ok := res[file]; ok {
+			if len(info.Parts) == 0 {
+				// if no any parts yet, then add itself
+				info.Parts = append(info.Parts, search.PartInfo{
+					Offset: info.Offset,
+					Length: info.Length,
+				})
+			}
+
+			info.Parts = append(info.Parts, search.PartInfo{
+				Offset: offset,
+				Length: length,
+			})
+
+			info.Length += length
+			if offset < info.Offset {
+				info.Offset = offset
+			}
+			res[file] = info
+		} else {
+			res[file] = search.NodeInfo{
+				Type:   "file",
+				Offset: offset,
+				Length: length,
+			}
+		}
+	}
+
+	return res, nil // OK
+}
+
+// GetFile get file parts from catalog.
+func (cat *Catalog) GetFile(filename string) (f *File, err error) {
+	// TODO: several attempts if DB is locked
+	f, err = cat.getFileSync(filename)
+	if err != nil {
+		return
+	}
+
+	// convert to absolute path
+	dir, _ := filepath.Split(cat.path)
+	for i := 0; i < len(f.parts); i++ {
+		f.parts[i].dataPath = filepath.Join(dir, f.parts[i].dataPath)
+	}
+
+	return // OK
+}
+
+// get file parts from catalog (synchronized).
+func (cat *Catalog) getFileSync(filename string) (*File, error) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.getFile(filename)
+}
+
+// get file parts from catalog (unsynchronized).
+func (cat *Catalog) getFile(filename string) (*File, error) {
+	rows, err := cat.db.Query(`SELECT
+p.pos,p.len,p.d_pos,d.file
+FROM parts AS p
+JOIN data AS d ON d.id = p.d_id
+WHERE p.name IS ?;`, filename)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// sql.ErrNoRows means no file part found
+			return nil, os.ErrNotExist
+		}
+		return nil, fmt.Errorf("failed to find %q file part: %s", filename, err)
+	}
+	defer rows.Close()
+
+	// scan all parts
+	var parts []filePart
+	for rows.Next() {
+		var p filePart
+		if err := rows.Scan(&p.offset, &p.length, &p.dataPos, &p.dataPath); err != nil {
+			return nil, fmt.Errorf("failed to scan file parts: %s", err)
+		} else {
+			parts = append(parts, p)
+		}
+	}
+
+	if len(parts) == 0 {
+		return nil, os.ErrNotExist
+	}
+
+	return &File{parts: parts}, nil // OK
+}
+
 // clear all tables
 func (cat *Catalog) ClearAll() error {
 	cat.mutex.Lock()
@@ -172,5 +298,110 @@ DELETE FROM data;
 		return fmt.Errorf("failed to delete data: %s", err)
 	}
 
+	return nil // OK
+}
+
+// File represents a catalog's file (split in parts around many data files)
+type File struct {
+	parts []filePart          // file parts
+	cache map[string]*os.File // cached data files
+	pos   int64               // current read position
+}
+
+// Part of a catalog's file.
+type filePart struct {
+	dataPath string // path of a data file
+	dataPos  int64  // part's position in data file
+	offset   int64  // part's offset in the "virtual" file
+	length   int64  // part's length
+}
+
+// find the part's index by offset
+func (f *File) findPart(pos int64) int {
+	return sort.Search(len(f.parts), func(i int) bool {
+		p := f.parts[i]
+		end := p.offset + p.length
+		return pos < end
+	})
+}
+
+// Read reads file content (io.Reader interface).
+func (f *File) Read(buf []byte) (n int, err error) {
+	if i := f.findPart(f.pos); i < len(f.parts) {
+		p := f.parts[i] // found part
+
+		off := f.pos - p.offset
+		if off < 0 {
+			// fill zeros
+			for ; off < 0; n++ {
+				buf[n] = 0
+				off++
+			}
+
+			f.pos += int64(n)
+			return n, nil
+		}
+
+		fd := f.cache[p.dataPath]
+		if fd == nil { // cache miss
+			// open data file...
+			fd, err = os.Open(p.dataPath)
+			if err != nil {
+				return 0, err
+			}
+
+			// ... put it to cache
+			if f.cache == nil {
+				f.cache = make(map[string]*os.File)
+			}
+			f.cache[p.dataPath] = fd
+		}
+
+		_, err = fd.Seek(p.dataPos+off, io.SeekStart)
+		if err != nil {
+			return 0, err
+		}
+
+		n = len(buf)
+		if (p.length - off) < int64(n) {
+			n = int(p.length - off)
+		}
+		n, err = fd.Read(buf[0:n])
+		f.pos += int64(n)
+		return n, err
+	}
+
+	return 0, io.EOF
+}
+
+// Seek changes the read position (io.Seeker interface).
+func (f *File) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+		f.pos = offset
+
+	case io.SeekCurrent:
+		f.pos += offset
+
+	case io.SeekEnd:
+		f.pos = offset
+		for _, p := range f.parts {
+			f.pos += p.length
+		}
+	}
+
+	return f.pos, nil // OK
+}
+
+// Close closes all open resources (io.Closer interface).
+func (f *File) Close() error {
+	// close all open files
+	for _, fd := range f.cache {
+		if err := fd.Close(); err != nil {
+			return err
+		}
+	}
+
+	f.cache = nil
 	return nil // OK
 }
