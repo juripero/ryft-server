@@ -444,7 +444,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 	status := http.StatusOK
 
 	if len(params.Catalog) != 0 { // append to catalog
-		catalog, length, err := updateCatalog(mountPoint, params, delim, file)
+		catalog, filePath, length, err := updateCatalog(mountPoint, params, delim, file)
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
@@ -457,6 +457,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 					time.Now().Add(params.lifetime))
 			}
 			res["catalog"] = catalog
+			res["file"] = filePath
 			res["length"] = length // not total, just this part
 		}
 
@@ -723,7 +724,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 
 // append file to catalog
 // Returns generated catalog path (relative), length and error if any.
-func updateCatalog(mountPoint string, params PostFilesParams, delim *string, content io.Reader) (string, uint64, error) {
+func updateCatalog(mountPoint string, params PostFilesParams, delim *string, content io.Reader) (string, string, uint64, error) {
 	catalogPath := randomizePath(params.Catalog)
 	filePath := randomizePath(params.File)
 
@@ -734,7 +735,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 		}
 		tmp, err := ioutil.TempFile(catalog.DefaultTempDirectory, filepath.Base(params.File))
 		if err != nil {
-			return "", 0, fmt.Errorf("failed to create temp file: %s", err)
+			return "", "", 0, fmt.Errorf("failed to create temp file: %s", err)
 		}
 		defer func() {
 			tmp.Close()
@@ -743,7 +744,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 
 		params.Length, err = io.Copy(tmp, content)
 		if err != nil {
-			return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
+			return "", "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
 		}
 		tmp.Seek(0, os.SEEK_SET /*TODO: io.SeekStart*/)
 		content = tmp
@@ -752,20 +753,20 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	// create all parent directories
 	pdir := filepath.Join(mountPoint, filepath.Dir(catalogPath))
 	if err := os.MkdirAll(pdir, 0755); err != nil {
-		return "", 0, fmt.Errorf("failed to create parent directories: %s", err)
+		return "", "", 0, fmt.Errorf("failed to create parent directories: %s", err)
 	}
 
 	// open catalog
 	cat, err := catalog.OpenCatalog(filepath.Join(mountPoint, catalogPath))
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to open catalog file: %s ", err)
+		return "", "", 0, fmt.Errorf("failed to open catalog file: %s ", err)
 	}
 	defer cat.Close()
 
 	// update catalog atomically
 	data_path, data_pos, data_delim, err := cat.AddFilePart(filePath, params.Offset, params.Length, delim)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
+		return "", "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
 	}
 
 	log.WithField("data_path", data_path).
@@ -775,53 +776,52 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 
 	data_dir, _ := filepath.Split(data_path)
 	if err := os.MkdirAll(data_dir, 0755); err != nil {
-		return "", 0, fmt.Errorf("failed to create parent directories: %s", err)
+		return "", "", 0, fmt.Errorf("failed to create parent directories: %s", err)
 	}
 
 	if !params.shareMode.IsIgnore() {
 		// get "write" lock, fail if busy
 		if utils.SafeLockWrite(data_path, params.shareMode) {
-			time.Sleep(10 * time.Second)
 			defer utils.SafeUnlockWrite(data_path)
 		} else {
-			return "", 0, fmt.Errorf("%s file is busy", data_path)
+			return "", "", 0, fmt.Errorf("%s file is busy", data_path)
 		}
 	}
 
 	// write file content
 	data, err := os.OpenFile(data_path, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to open data file: %s", err)
+		return "", "", 0, fmt.Errorf("failed to open data file: %s", err)
 	}
 	defer data.Close()
 
 	_, err = data.Seek(data_pos, os.SEEK_SET /*TODO: io.SeekStart*/)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to seek data file: %s", err)
+		return "", "", 0, fmt.Errorf("failed to seek data file: %s", err)
 	}
 
 	n, err := io.Copy(data, content)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to copy data: %s", err)
+		return "", "", 0, fmt.Errorf("failed to copy data: %s", err)
 	}
 	if n != params.Length {
-		return "", 0, fmt.Errorf("only %d bytes copied of %d", n, params.Length)
+		return "", "", 0, fmt.Errorf("only %d bytes copied of %d", n, params.Length)
 	}
 
 	// write data delimiter
 	if len(data_delim) > 0 {
 		nn, err := data.WriteString(data_delim)
 		if err != nil {
-			return "", 0, fmt.Errorf("failed to write delimiter: %s", err)
+			return "", "", 0, fmt.Errorf("failed to write delimiter: %s", err)
 		}
 		if nn != len(data_delim) {
-			return "", 0, fmt.Errorf("only %d bytes copied of %d", nn, len(data_delim))
+			return "", "", 0, fmt.Errorf("only %d bytes copied of %d", nn, len(data_delim))
 		}
 	}
 
 	// TODO: notify catalog write is done
 
-	return catalogPath, uint64(n), nil // OK
+	return catalogPath, filePath, uint64(n), nil // OK
 }
 
 // replace {{random}} sections of filename with random token.
