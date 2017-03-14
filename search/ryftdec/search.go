@@ -177,9 +177,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		"output": task.rootQuery.String(),
 	}).Infof("[%s]: decomposed as", TAG)
 
-	// in simple cases when there is only one subquery
+	// in simple cases when there is only one subquery and no transformations
 	// we can pass this query directly to the backend
-	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 {
+	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 && len(cfg.Transforms) == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
 		engine.updateConfig(cfg, sq)
 		return engine.Backend.Search(cfg)

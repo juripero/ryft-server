@@ -150,6 +150,16 @@
             "name": "limit",
             "x-go-name": "Limit",
             "description": "Limit the total number of records reported."
+          },
+          {
+            "in": "query",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "name": "transform",
+            "description": "Additional data transformation. Could be match(\"^.*$\"), replace(\"^(.*)apple(.*)$\", \"$1orange$2\") or script(\"filter_position\")"
           }
         ],
         "responses": {

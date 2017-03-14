@@ -56,6 +56,9 @@ type Config struct {
 	KeepIndexAs string
 	Delimiter   string
 
+	// post-processing transformations
+	Transforms []Transform
+
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)
 	ReportData  bool // if false, just indexes will be read (format=null)

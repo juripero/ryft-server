@@ -150,6 +150,13 @@ func main() {
 		log.WithError(err).Fatal("failed to prepare server configuration")
 	}
 
+	// be quiet and efficient in production
+	if !server.Config.DebugMode {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		log.Level = logrus.DebugLevel
+	}
+
 	log.WithFields(map[string]interface{}{
 		"version":  Version,
 		"git-hash": GitHash,
@@ -169,13 +176,9 @@ func main() {
 		"auth-type":          server.Config.AuthType,
 		"busyness-tolerance": server.Config.Busyness.Tolerance,
 	}).Debug("other configuration")
-
-	// be quiet and efficient in production
-	if !server.Config.DebugMode {
-		gin.SetMode(gin.ReleaseMode)
-	} else {
-		log.Level = logrus.DebugLevel
-	}
+	log.WithFields(map[string]interface{}{
+		"scripts": server.Config.PostProcScripts,
+	}).Debug("post-processing configuration")
 
 	// Create a router
 	router := gin.New()
