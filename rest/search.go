@@ -33,12 +33,15 @@ package rest
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/getryft/ryft-server/rest/format"
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -62,13 +65,17 @@ type SearchParams struct {
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 	Limit       int    `form:"limit" json:"limit,omitempty" msgpack:"limite,omitempty"`
 
+	// post-process transformations
+	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
+
 	Format      string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields      string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
 	Stats       bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
 	Stream      bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 	ErrorPrefix bool   `form:"ep" json:"ep,omitempty" msgpack:"ep,omitempty"` // include host prefixes for error messages
 
-	Local bool `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
 }
 
 // Handle /search endpoint.
@@ -151,12 +158,25 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)
 	cfg.Limit = uint(params.Limit)
+	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse sharing mode"))
+	}
+
+	// parse post-process transformations
+	cfg.Transforms, err = parseTransforms(params.Transforms, server.Config)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse transformations"))
+	}
 
 	log.WithFields(map[string]interface{}{
-		"config":  cfg,
-		"user":    userName,
-		"home":    homeDir,
-		"cluster": userTag,
+		"config":    cfg,
+		"user":      userName,
+		"home":      homeDir,
+		"cluster":   userTag,
+		"post-proc": cfg.Transforms,
 	}).Infof("[%s]: start GET /search", CORE)
 	res, err := engine.Search(cfg)
 	if err != nil {
@@ -305,4 +325,52 @@ func mustParseDelim(str string) string {
 	}
 
 	return delim
+}
+
+// parse transformation rules
+func parseTransforms(rules []string, cfg ServerConfig) ([]search.Transform, error) {
+	if len(rules) == 0 {
+		return nil, nil // OK, no transformations
+	}
+
+	match := regexp.MustCompile(`^\s*match\s*\(\s*"(.*)"\s*\)\s*$`)
+	replace := regexp.MustCompile(`^\s*replace\s*\(\s*"(.*)"\s*,\s*"(.*)"\s*\)\s*$`)
+	script := regexp.MustCompile(`^\s*script\s*\(\s*"(.*)"\s*\)\s*$`)
+
+	res := make([]search.Transform, 0, len(rules))
+	for _, rule := range rules {
+		var tx search.Transform
+		var err error
+
+		if m := match.FindStringSubmatch(rule); len(m) > 1 {
+			expression := m[1]
+			tx, err = search.NewRegexpMatch(expression)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create regexp-match transformation: %s", err)
+			}
+		} else if m := replace.FindStringSubmatch(rule); len(m) > 1 {
+			expression := m[1]
+			template := m[2]
+			tx, err = search.NewRegexpReplace(expression, template)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create regexp-replace transformation: %s", err)
+			}
+		} else if m := script.FindStringSubmatch(rule); len(m) > 1 {
+			name := m[1]
+			if info, ok := cfg.PostProcScripts[name]; ok {
+				tx, err = search.NewScriptCall(info.ExecPath, "/tmp")
+				if err != nil {
+					return nil, fmt.Errorf("failed to create script-call transformation: %s", err)
+				}
+			} else {
+				return nil, fmt.Errorf("%q is unknown script transformation", name)
+			}
+		} else {
+			return nil, fmt.Errorf("%q is unknown transformation", rule)
+		}
+
+		res = append(res, tx)
+	}
+
+	return res, nil // OK
 }

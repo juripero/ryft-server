@@ -47,6 +47,14 @@ var (
 	ErrCancelled = fmt.Errorf("cancelled by user")
 )
 
+// release all locked files
+func (task *Task) releaseLockedFiles() {
+	for _, path := range task.lockedFiles {
+		utils.SafeUnlockRead(path)
+	}
+	task.lockedFiles = nil
+}
+
 // Prepare `ryftprim` command line arguments.
 // This function converts search configuration to `ryftprim` command line arguments.
 // See `ryftprim -h` for option description.
@@ -113,7 +121,22 @@ func (engine *Engine) prepare(task *Task) error {
 	// files
 	for _, file := range cfg.Files {
 		path := filepath.Join(engine.MountPoint, engine.HomeDir, file)
-		args = append(args, "-f", engine.relativeToMountPoint(path))
+
+		skip := false
+		if !cfg.ShareMode.IsIgnore() {
+			if utils.SafeLockRead(path, cfg.ShareMode) {
+				task.lockedFiles = append(task.lockedFiles, path)
+			} else if cfg.ShareMode.IsSkipBusy() {
+				task.log().WithField("file", path).Warnf("file is busy, skipped")
+				skip = true
+			} else {
+				return fmt.Errorf("%s file is busy", path)
+			}
+		}
+
+		if !skip {
+			args = append(args, "-f", engine.relativeToMountPoint(path))
+		}
 	}
 
 	// data separator (should be hex-escaped)
@@ -211,6 +234,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	}
 
 	// do processing in background
+	task.lockInProgress = true // need to take care about locked files
 	go engine.process(task, res, minimizeLatency)
 
 	return nil // OK for now
@@ -275,6 +299,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// some futher cleanup
 	defer res.Close()
 	defer res.ReportDone()
+
+	// ryftprim is finished we can release locked files
+	task.lockInProgress = false
+	task.releaseLockedFiles()
 
 	// tool output
 	out := task.toolOut.Bytes()

@@ -86,6 +86,7 @@ The list of supported query parameters for the POST files to catalog:
 | `offset`  | integer | [The position of uploaded chunk](#post-files-offset-parameter). |
 | `length`  | integer | [The length of uploaded chunk](#post-files-length-parameter). |
 | `lifetime`| string  | [The optional lifetime of the uploaded file](#post-files-lifetime-parameter). |
+|`share-mode`| string | [The share mode used to access data files](#post-files-share-mode-parameter). |
 | `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
 
 
@@ -141,6 +142,14 @@ There are two supported `Content-Type` headers:
 
 - `application/octet-stream`
 - `multipart/form-data` - actual file content should be provided via `file` key.
+
+For example:
+
+```{.sh}
+$ curl -X POST --data "hello" -H 'Content-Type: application/octet-stream' -s "http://localhost:8765/files?file=/test/file.txt" | jq .
+#   -- OR --
+$ curl -X POST -F file=@/path/to/file.txt -s "http://localhost:8765/files?file=/test/file.txt&length=100" | jq .
+```
 
 
 ### POST files `catalog` parameter
@@ -211,6 +220,22 @@ This optional parameters is used to specify lifetime of the uploaded data.
 If this parameter is provided the file or catalog will be deleted after
 specified amount of time. For example if `lifetime=1h` is provided the file
 will be availeble during a hour and then will be automatically removed.
+
+
+### POST files `share-mode` parameter
+
+By default ryft-server protects data files from simultaneous read and write.
+The `share-mode` option is used to customize sharing mode.
+
+The following sharing modes are supported:
+- `share-mode=wait-up-to-10s` or `share-mode=wait-10s`.
+  If data file is busy ryft-server waits up to specified timeout.
+- `share-mode=force-ignore` or `share-mode=ignore`.
+  Force to ignore any sharing rules. Even if file is busy try to upload the data.
+  Note, it might be dangerous and data might be corrupted.
+
+By default `share-mode=` is equal to `share-mode=wait-0ms` which means
+report error immediately if data file is busy with search.
 
 
 ### DELETE files parameters

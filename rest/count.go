@@ -38,7 +38,9 @@ import (
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
+	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/query"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -61,7 +63,11 @@ type CountParams struct {
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 
-	Local bool `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	// post-process transformations
+	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
+
+	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
 }
 
 // Handle /count endpoint.
@@ -125,12 +131,25 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
 	// cfg.Limit = 0
+	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse sharing mode"))
+	}
+
+	// parse post-process transformations
+	cfg.Transforms, err = parseTransforms(params.Transforms, server.Config)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse transformations"))
+	}
 
 	log.WithFields(map[string]interface{}{
-		"config":  cfg,
-		"user":    userName,
-		"home":    homeDir,
-		"cluster": userTag,
+		"config":    cfg,
+		"user":      userName,
+		"home":      homeDir,
+		"cluster":   userTag,
+		"post-proc": cfg.Transforms,
 	}).Infof("[%s]: start GET /count", CORE)
 	res, err := engine.Search(cfg)
 	if err != nil {
@@ -263,11 +282,19 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.ReportData = false
 	// cfg.Limit = 0
 
+	// parse post-process transformations
+	cfg.Transforms, err = parseTransforms(params.Transforms, server.Config)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse transformations"))
+	}
+
 	log.WithFields(map[string]interface{}{
-		"config":  cfg,
-		"user":    userName,
-		"home":    homeDir,
-		"cluster": userTag,
+		"config":    cfg,
+		"user":      userName,
+		"home":      homeDir,
+		"cluster":   userTag,
+		"post-proc": cfg.Transforms,
 	}).Infof("[%s]: GET /count/dry-run", CORE)
 
 	// decompose query

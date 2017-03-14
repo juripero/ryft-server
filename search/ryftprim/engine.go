@@ -108,6 +108,14 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, err
 	}
 
+	defer func() {
+		// in case of errors release all "read" locks
+		// run() should set lockInProgress=true until ryftprim is finished
+		if !task.lockInProgress {
+			task.releaseLockedFiles()
+		}
+	}()
+
 	// prepare command line arguments
 	err := engine.prepare(task)
 	if err != nil {

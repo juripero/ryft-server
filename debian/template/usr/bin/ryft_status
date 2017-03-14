@@ -17,7 +17,7 @@ fi
 tailLines="-40"
 ryftoneLog=/var/log/ryft/ryftone.log
 ryft_server_dLog=/var/log/ryft/server.log
-ryftwebapidemoLog=/tmp/ryft-demo.log
+ryftwebapidemoLog=/var/log/ryft/ryft-demo.log
 ryftodbcdLog=/usr/local/ryft/bin/x8664/ryftone_server.log
 consulLog=/var/log/consul
 consulAlertsLog=/var/log/consul-alerts
