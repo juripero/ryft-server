@@ -28,75 +28,98 @@
  * ============
  */
 
-package codec
+package csv
 
 import (
-	"fmt"
 	"io"
-	"strings"
-
-	"github.com/getryft/ryft-server/rest/codec/csv"
-	"github.com/getryft/ryft-server/rest/codec/json"
-	"github.com/getryft/ryft-server/rest/codec/msgpack.v1"
+	backend "encoding/csv"
 )
+
+/* Stream CSV encoder uses tag prefixes for each item written
+
+rec;<record>
+err;<error message>
+stat;<statistics>
+
+*/
+type StreamEncoder struct{
+	encoder *backend.Writer
+}
 
 const (
-	MIME_JSON     = json.MIME
-	MIME_XMSGPACK = msgpack.X_MIME
-	MIME_MSGPACK  = msgpack.MIME
-	MIME_CSV      = csv.MIME
+	TAG_REC  = "rec"
+	TAG_ERR  = "err"
+	TAG_STAT = "stat"
+	TAG_EOF  = "end"
 )
 
-// Abstract Encoder interface.
-type Encoder interface {
-	EncodeRecord(rec interface{}) error
-	EncodeStat(stat interface{}) error
-	EncodeError(err error) error
-
-	io.Closer
+func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
+	enc := new(StreamEncoder)
+	enc.encoder = backend.NewWriter(w)
+	enc.encoder.Comma = rune(",")
+	enc.encoder.UseCRLF = true
+	return enc, nil
 }
 
-// Abstract Decoder interface.
-type Decoder interface {
-	io.Closer
-}
 
-// Get list of supported MIME types.
-func GetSupportedMimeTypes() []string {
-	return []string{
-		MIME_JSON,
-		MIME_MSGPACK,
-		MIME_XMSGPACK,
-		MIME_CSV,
+func (enc *StreamEncoder) encode(tag string, data interface{}) error {
+	if data == nil {
+		return nil
 	}
-}
-
-// Create new encoder instance by MIME type.
-func NewEncoder(w io.Writer, mime string, stream bool) (Encoder, error) {
-	switch strings.ToLower(mime) {
-	case MIME_JSON:
-		if stream {
-			return json.NewStreamEncoder(w)
-		} else {
-			return json.NewSimpleEncoder(w)
-		}
-
-	case MIME_XMSGPACK, MIME_MSGPACK:
-		if stream {
-			return msgpack.NewStreamEncoder(w)
-		} else {
-			return msgpack.NewSimpleEncoder(w)
-		}
-
-	case MIME_CSV:
-		return csv.NewStreamEncoder(w)
-
-	default:
-		return nil, fmt.Errorf("%q is unsupported MIME type", mime)
+	if err := enc.encoder.Write([]string{tag}); err != nil {
+		return err
 	}
+	if s, ok := data.([]string); ok {
+		if err := enc.encoder.Write(s); err != nil {
+			return err
+		}
+	}
+	enc.encoder.Flush()
+	if err := enc.encoder.Error(); err != nil {
+		return err
+	}
+	return nil
 }
 
-// Create new decoder instance by MIME type.
-func NewDecoder(r io.Reader, mime string, stream bool) (Decoder, error) {
-	return nil, fmt.Errorf("%q not implemented yet", mime)
+// Write a RECORD
+func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
+	return enc.encode(TAG_REC, rec)
+}
+
+// Write a STATISTICS
+func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
+	return enc.encode(TAG_STAT, stat)
+}
+
+// Write an ERROR
+func (enc *StreamEncoder) EncodeError(err_ error) error {
+	return enc.encode(TAG_ERR, err_)
+}
+
+// End writing, close CSV object.
+func (enc *StreamEncoder) Close() error {
+	return enc.encode(TAG_EOF, nil)
+}
+
+// CSV stream decoder.
+type StreamDecoder struct {
+	d *backend.Reader
+}
+
+// Create new stream CSV decoder instance.
+func NewStreamDecoder(r io.Reader) (*StreamDecoder, error) {
+	dec := new(StreamDecoder)
+	dec.d = backend.NewReader(r)
+	return dec, nil
+}
+
+// NextTag decodes next tag from the stream.
+func (dec *StreamDecoder) NextTag() (string, error) {
+	var tag string
+	return tag, nil // OK
+}
+
+// Next decodes next item from the stream.
+func (dec *StreamDecoder) Next(item interface{}) error {
+	return nil
 }

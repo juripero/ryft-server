@@ -3,5 +3,6 @@
 /cover.out
 *.deb
 *.orig
-/.vscode
+.vscode
+.idea/
 /docker-compose.yml
