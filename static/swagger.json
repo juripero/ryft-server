@@ -145,6 +145,13 @@
           },
           {
             "in": "query",
+            "type": "boolean",
+            "name": "performance",
+            "x-go-name": "Performance",
+            "description": "Include performance metrics in response. Default 'false'."
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint",
             "name": "limit",
@@ -292,6 +299,13 @@
             "name": "local",
             "x-go-name": "Local",
             "description": "Perform search only on this cluster member. Default 'false'."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "performance",
+            "x-go-name": "Performance",
+            "description": "Include performance metrics in response. Default 'false'."
           }
         ],
         "responses": {
