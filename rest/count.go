@@ -33,6 +33,7 @@ package rest
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	format "github.com/getryft/ryft-server/rest/format/raw"
@@ -75,6 +76,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
+	requestStartTime := time.Now() // performance metric
 	var err error
 
 	// parse request parameters
@@ -151,6 +153,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 		"cluster":   userTag,
 		"post-proc": cfg.Transforms,
 	}).Infof("[%s]: start GET /count", CORE)
+	searchStartTime := time.Now() // performance metric
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
@@ -167,6 +170,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	defer server.onSearchStopped(cfg)
 
 	// process results!
+	transferStartTime := time.Now() // performance metric
 	for {
 		select {
 		case <-ctx.Writer.CloseNotify(): // cancel processing
@@ -204,10 +208,21 @@ func (server *Server) DoCount(ctx *gin.Context) {
 				panic(err) // TODO: check this? no other ways to report errors
 			}
 
+			transferStopTime := time.Now() // performance metric
+
 			if res.Stat != nil {
 				if server.Config.ExtraRequest {
 					// save request parameters in "extra"
 					res.Stat.Extra["request"] = &params
+				}
+				if true {
+					res.Stat.AddPerfStat(server.Config.HostName,
+						"rest-search", map[string]interface{}{
+							"prepare":  searchStartTime.Sub(requestStartTime),
+							"engine":   transferStartTime.Sub(searchStartTime),
+							"transfer": transferStopTime.Sub(transferStartTime),
+							"total":    transferStopTime.Sub(requestStartTime),
+						})
 				}
 				xstat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)

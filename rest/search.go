@@ -36,6 +36,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/getryft/ryft-server/rest/format"
@@ -83,6 +84,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
+	requestStartTime := time.Now() // performance metric
 	var err error
 
 	// parse request parameters
@@ -178,6 +180,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 		"cluster":   userTag,
 		"post-proc": cfg.Transforms,
 	}).Infof("[%s]: start GET /search", CORE)
+	searchStartTime := time.Now() // performance metric
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
@@ -229,6 +232,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	}
 
 	// process results!
+	transferStartTime := time.Now() // performance metric
 	for {
 		select {
 		case <-ctx.Writer.CloseNotify(): // cancel processing
@@ -262,6 +266,8 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 				putErr(err)
 			}
 
+			transferStopTime := time.Now() // performance metric
+
 			// special case: if no records and no stats were received
 			// but just an error, we panic to return 500 status code
 			if res.RecordsReported() == 0 && res.Stat == nil &&
@@ -272,6 +278,15 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			if params.Stats && res.Stat != nil {
 				if server.Config.ExtraRequest {
 					res.Stat.Extra["request"] = &params
+				}
+				if true {
+					res.Stat.AddPerfStat(server.Config.HostName,
+						"rest-search", map[string]interface{}{
+							"prepare":  searchStartTime.Sub(requestStartTime),
+							"engine":   transferStartTime.Sub(searchStartTime),
+							"transfer": transferStopTime.Sub(transferStartTime),
+							"total":    transferStopTime.Sub(requestStartTime),
+						})
 				}
 				xstat := tcode.FromStat(res.Stat)
 				err := enc.EncodeStat(xstat)
