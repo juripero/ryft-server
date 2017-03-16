@@ -66,6 +66,7 @@ REST specific:
 --stream         Use stream output format. Provides a sequence of JSON
                  "tag-object" pairs to be able to decode input data on the fly
                  (is used for node communication within cluster).
+--performance    Add performance metrics to the output statistics.
 
 -v|--verbose     Tells curl to be verbose.
 -vv|--pretty     Get pretty (properly indented) formatting with jq tool.
@@ -119,6 +120,7 @@ FIELDS=
 STATS=true
 STREAM=
 SPARK=
+PERFORMANCE=
 
 # be silent by default
 
@@ -365,6 +367,10 @@ while [[ $# > 0 ]]; do
         SPARK="true"
         shift
         ;;
+    --performance)
+        PERFORMANCE="true"
+        shift
+        ;;
     -vv|--pretty)
         VERBOSE="-s" # tell curl to be silent
         PRETTY=true
@@ -429,6 +435,7 @@ done
 [[ ! -z "$STATS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stats=$STATS")
 [[ ! -z "$STREAM" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stream=$STREAM")
 [[ ! -z "$SPARK" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "spark=$SPARK")
+[[ ! -z "$PERFORMANCE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "performance=$PERFORMANCE")
 
 # check dependencies
 [[ -z `which curl` ]] && fail "no curl found, run 'apt-get install curl' to install it"

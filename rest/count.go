@@ -69,6 +69,8 @@ type CountParams struct {
 
 	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
 	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
+
+	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 }
 
 // Handle /count endpoint.
@@ -215,13 +217,13 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					// save request parameters in "extra"
 					res.Stat.Extra["request"] = &params
 				}
-				if true {
+				if params.Performance {
 					res.Stat.AddPerfStat(server.Config.HostName,
-						"rest-search", map[string]interface{}{
-							"prepare":  searchStartTime.Sub(requestStartTime),
-							"engine":   transferStartTime.Sub(searchStartTime),
-							"transfer": transferStopTime.Sub(transferStartTime),
-							"total":    transferStopTime.Sub(requestStartTime),
+						"rest-count", map[string]interface{}{
+							"prepare":  searchStartTime.Sub(requestStartTime).String(),
+							"engine":   transferStartTime.Sub(searchStartTime).String(),
+							"transfer": transferStopTime.Sub(transferStartTime).String(),
+							"total":    transferStopTime.Sub(requestStartTime).String(),
 						})
 				}
 				xstat := format.FromStat(res.Stat)
