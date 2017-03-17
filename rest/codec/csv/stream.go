@@ -34,6 +34,10 @@ import (
 	"io"
 	backend "encoding/csv"
 	"strconv"
+
+	"github.com/getryft/ryft-server/rest/format/utf8"
+	"fmt"
+	"log"
 )
 
 /* Stream CSV encoder uses tag prefixes for each item written
@@ -41,7 +45,7 @@ import (
 rec;<record>
 err;<error message>
 stat;<statistics>
-
+end
 */
 type StreamEncoder struct{
 	encoder *backend.Writer
@@ -67,16 +71,40 @@ func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 		return nil
 	}
 	record := []string{tag}
-	// Replace it somehow with the correct serializer. Looks weird.
+	// TODO: Replace it with the serializer. Looks weird.
 	switch data := data.(type) {
-	case string:
-		record = append(record, string(data))
-	case []string:
-		record = append(record, data...)
-	case int:
-		record = append(record, strconv.Itoa(data))
+	case *utf8.Record:
+		//filename,offset,length,fuzziness,data
+		tail := []string{
+			data.Index.File,
+			strconv.FormatUint(data.Index.Offset, 10),
+			strconv.FormatUint(data.Index.Length,10),
+			strconv.FormatInt(int64(data.Index.Fuzziness), 10),
+			string(data.RawData),
+		}
+		record = append(record, tail...)
+	case *utf8.Stat:
+		// TODO: expand it
+		// stat,total bytes,matches, etc...
+		tail := []string{
+			strconv.FormatUint(data.Matches, 10),
+			strconv.FormatUint(data.TotalBytes, 10),
+			strconv.FormatUint(data.Duration, 10),
+			strconv.FormatFloat(data.DataRate, 'f', -1, 64),
+			strconv.FormatUint(data.FabricDuration, 10),
+			strconv.FormatFloat(data.FabricDataRate, 'f', -1, 64),
+			data.Host,
+		}
+		record = append(record, tail...)
 	case error:
 		record = append(record, data.Error())
+	case string: // only for tests.
+		record = append(record, string(data))
+	case int: // only for tests.
+		record = append(record, strconv.Itoa(data))
+	default:
+		// for debug
+		fmt.Printf("%#v", data)
 	}
 	if err := enc.encoder.Write(record); err != nil {
 		return err
