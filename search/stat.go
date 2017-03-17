@@ -132,7 +132,7 @@ func (stat *Stat) Combine(other *Stat) {
 	stat.Details = append(stat.Details, other)
 }
 
-// AddPerfStat ands extra performance statistics.
+// AddPerfStat ands extra performance metrics.
 // grouped by cluster's host and custom name.
 func (stat *Stat) AddPerfStat(host string, name string, data interface{}) {
 	if perf_, ok := stat.Extra["performance"]; ok {
@@ -149,4 +149,9 @@ func (stat *Stat) AddPerfStat(host string, name string, data interface{}) {
 			host: map[string]interface{}{name: data},
 		}
 	}
+}
+
+// ClearPerfStat clears all performance metrics
+func (stat *Stat) ClearPerfStat() {
+	delete(stat.Extra, "performance")
 }

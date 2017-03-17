@@ -140,4 +140,8 @@ func TestStatPerf(t *testing.T) {
 	stat.AddPerfStat("hostB", "nameB", "statBB")
 	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
 		"extra": {"performance":{"hostA":{"nameA":"statAA", "nameB":"statAB"}, "hostB":{"nameA":"statBA", "nameB":"statBB"}}} }`, toJson(stat))
+
+	// clear all
+	stat.ClearPerfStat()
+	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost"}`, toJson(stat))
 }

@@ -289,6 +289,8 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 							"transfer": transferStopTime.Sub(transferStartTime).String(),
 							"total":    transferStopTime.Sub(requestStartTime).String(),
 						})
+				} else {
+					res.Stat.ClearPerfStat() // hide all available performance metrics
 				}
 				xstat := tcode.FromStat(res.Stat)
 				err := enc.EncodeStat(xstat)

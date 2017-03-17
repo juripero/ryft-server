@@ -225,6 +225,8 @@ func (server *Server) DoCount(ctx *gin.Context) {
 							"transfer": transferStopTime.Sub(transferStartTime).String(),
 							"total":    transferStopTime.Sub(requestStartTime).String(),
 						})
+				} else {
+					res.Stat.ClearPerfStat() // hide all available performance metrics
 				}
 				xstat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)
