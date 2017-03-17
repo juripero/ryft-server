@@ -33,6 +33,8 @@ package csv
 import (
 	"io"
 	backend "encoding/csv"
+	"fmt"
+	"strconv"
 )
 
 /* Stream CSV encoder uses tag prefixes for each item written
@@ -56,7 +58,7 @@ const (
 func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 	enc := new(StreamEncoder)
 	enc.encoder = backend.NewWriter(w)
-	enc.encoder.Comma = rune(",")
+	enc.encoder.Comma = ','
 	enc.encoder.UseCRLF = true
 	return enc, nil
 }
@@ -66,13 +68,22 @@ func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 	if data == nil {
 		return nil
 	}
-	if err := enc.encoder.Write([]string{tag}); err != nil {
-		return err
+
+	record := []string{tag}
+	switch data := data.(type) {
+	case string:
+		data := string(data)
+		record = append(record, string(data))
+	case []string:
+		record = append(record, data...)
+	case int:
+		record = append(record, strconv.Itoa(data))
+	case error:
+		record = append(record, data.Error())
+	default: fmt.Printf("type %v\n", data )
 	}
-	if s, ok := data.([]string); ok {
-		if err := enc.encoder.Write(s); err != nil {
-			return err
-		}
+	if err := enc.encoder.Write(record); err != nil {
+		return err
 	}
 	enc.encoder.Flush()
 	if err := enc.encoder.Error(); err != nil {
