@@ -34,6 +34,8 @@ import (
 	"io"
 	backend "encoding/csv"
 	"strconv"
+	"fmt"
+	"strings"
 )
 
 /* Stream CSV encoder uses tag prefixes for each item written
@@ -58,7 +60,6 @@ func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 	enc := new(StreamEncoder)
 	enc.encoder = backend.NewWriter(w)
 	enc.encoder.Comma = ','
-	enc.encoder.UseCRLF = true
 	return enc, nil
 }
 
@@ -68,6 +69,7 @@ func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 		return nil
 	}
 	record := []string{tag}
+	// Replace it somehow with the correct serializer. Looks weird.
 	switch data := data.(type) {
 	case string:
 		record = append(record, string(data))
@@ -112,28 +114,5 @@ func (enc *StreamEncoder) Close() error {
 	if err := enc.encoder.Error(); err != nil {
 		return err
 	}
-	return nil
-}
-
-// CSV stream decoder.
-type StreamDecoder struct {
-	d *backend.Reader
-}
-
-// Create new stream CSV decoder instance.
-func NewStreamDecoder(r io.Reader) (*StreamDecoder, error) {
-	dec := new(StreamDecoder)
-	dec.d = backend.NewReader(r)
-	return dec, nil
-}
-
-// NextTag decodes next tag from the stream.
-func (dec *StreamDecoder) NextTag() (string, error) {
-	var tag string
-	return tag, nil // OK
-}
-
-// Next decodes next item from the stream.
-func (dec *StreamDecoder) Next(item interface{}) error {
 	return nil
 }
