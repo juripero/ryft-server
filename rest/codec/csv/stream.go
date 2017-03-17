@@ -33,7 +33,6 @@ package csv
 import (
 	"io"
 	backend "encoding/csv"
-	"fmt"
 	"strconv"
 )
 
@@ -68,11 +67,9 @@ func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 	if data == nil {
 		return nil
 	}
-
 	record := []string{tag}
 	switch data := data.(type) {
 	case string:
-		data := string(data)
 		record = append(record, string(data))
 	case []string:
 		record = append(record, data...)
@@ -80,7 +77,6 @@ func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 		record = append(record, strconv.Itoa(data))
 	case error:
 		record = append(record, data.Error())
-	default: fmt.Printf("type %v\n", data )
 	}
 	if err := enc.encoder.Write(record); err != nil {
 		return err
@@ -109,7 +105,14 @@ func (enc *StreamEncoder) EncodeError(err_ error) error {
 
 // End writing, close CSV object.
 func (enc *StreamEncoder) Close() error {
-	return enc.encode(TAG_EOF, nil)
+	if err := enc.encoder.Write([]string{TAG_EOF}); err != nil {
+		return err
+	}
+	enc.encoder.Flush()
+	if err := enc.encoder.Error(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // CSV stream decoder.

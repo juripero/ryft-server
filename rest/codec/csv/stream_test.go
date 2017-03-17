@@ -7,7 +7,6 @@ import (
 	"io"
 
 	"github.com/stretchr/testify/assert"
-	"fmt"
 	"errors"
 )
 
@@ -25,7 +24,6 @@ func TestStreamEncoder(t *testing.T) {
 			assert.EqualValues(t, expected, buf.String())
 		}
 	}
-
 	// test stream encoder (bad case)
 	bad := func(populate func(enc *StreamEncoder) error, limit int, expectedError string) {
 		buf := &bytes.Buffer{}
@@ -37,39 +35,40 @@ func TestStreamEncoder(t *testing.T) {
 			if err == nil {
 				err = enc.Close()
 			}
+
 			if assert.Error(t, err) {
 				assert.Contains(t, err.Error(), expectedError)
 			}
 		}
 	}
-	fmt.Print(bad)
+
 	// empty
 	check(func(enc *StreamEncoder) {
 		// do nothing
-	}, "")
+	}, "end\r\n")
 	// one error
 	check(func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeError(nil)) // ignored
 		assert.NoError(t, enc.EncodeError(errors.New("err1")))
-	}, "err,err1\r\n")
+	}, "err,err1\r\nend\r\n")
 	// a few errors
 	check(func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeError(errors.New("err1")))
 		assert.NoError(t, enc.EncodeError(errors.New("err2")))
 		assert.NoError(t, enc.EncodeError(errors.New("err3")))
-	}, "err,err1\r\nerr,err2\r\nerr,err3\r\n")
+	}, "err,err1\r\nerr,err2\r\nerr,err3\r\nend\r\n")
 	// one record
 	check(func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeRecord(nil)) // ignored
 		assert.NoError(t, enc.EncodeRecord("rec1"))
-	}, "rec,rec1\r\n")
+	}, "rec,rec1\r\nend\r\n")
 
 	// a few records
 	check(func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeRecord("rec1"))
 		assert.NoError(t, enc.EncodeRecord("rec2"))
 		assert.NoError(t, enc.EncodeRecord("rec3"))
-	}, "rec,rec1\r\nrec,rec2\r\nrec,rec3\r\n")
+	}, "rec,rec1\r\nrec,rec2\r\nrec,rec3\r\nend\r\n")
 
 	// a few records and error
 	check(func(enc *StreamEncoder) {
@@ -77,13 +76,13 @@ func TestStreamEncoder(t *testing.T) {
 		assert.NoError(t, enc.EncodeRecord("rec1"))
 		assert.NoError(t, enc.EncodeRecord("rec2"))
 		assert.NoError(t, enc.EncodeRecord("rec3"))
-	}, "err,err1\r\nrec,rec1\r\nrec,rec2\r\nrec,rec3\r\n")
+	}, "err,err1\r\nrec,rec1\r\nrec,rec2\r\nrec,rec3\r\nend\r\n")
 
 	// stat
 	check(func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeStat(nil)) // ignored
 		assert.NoError(t, enc.EncodeStat(555))
-	}, "stat,555\r\n")
+	}, "stat,555\r\nend\r\n")
 	// bad cases
 	bad(func(enc *StreamEncoder) error {
 		if err := enc.EncodeRecord("rec1"); err != nil {
@@ -121,6 +120,9 @@ func TestStreamEncoder(t *testing.T) {
 		}
 		return nil
 	}, 8, "") // EncodeStat (record itself)
+	bad(func(enc *StreamEncoder) error {
+		return nil
+	}, 2, "EOF") // Close
 
 }
 
