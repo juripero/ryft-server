@@ -227,6 +227,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.toolCmd.Stdout = task.toolOut
 	task.toolCmd.Stderr = task.toolOut
 
+	task.toolStartTime = time.Now() // performance metric
 	err := task.toolCmd.Start()
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to start tool", TAG)
@@ -296,9 +297,20 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 
 // Finish the `ryftprim` tool processing.
 func (engine *Engine) finish(err error, task *Task, res *search.Result) {
+	task.toolStopTime = time.Now() // performance metric
+
 	// some futher cleanup
-	defer res.Close()
-	defer res.ReportDone()
+	defer func() {
+		if res.Stat != nil {
+			res.Stat.AddPerfStat(engine.IndexHost, "ryftprim", map[string]interface{}{
+				"prepare":   task.toolStartTime.Sub(task.taskStartTime).String(),
+				"tool-exec": task.toolStopTime.Sub(task.toolStartTime).String(),
+				"read-data": time.Since(task.readStartTime).String(),
+			})
+		}
+		res.ReportDone()
+		res.Close()
+	}()
 
 	// ryftprim is finished we can release locked files
 	task.lockInProgress = false
