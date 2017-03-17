@@ -34,8 +34,6 @@ import (
 	"io"
 	backend "encoding/csv"
 	"strconv"
-	"fmt"
-	"strings"
 )
 
 /* Stream CSV encoder uses tag prefixes for each item written
