@@ -35,6 +35,7 @@ import (
 	"fmt"
 
 	"github.com/getryft/ryft-server/search"
+	"strconv"
 )
 
 // RECORD format specific data.
@@ -44,6 +45,30 @@ const (
 	recFieldIndex = "_index"
 	recFieldError = "_error"
 )
+
+func (rec *Record) MarshalCSV() ([]string, error) {
+	//filename,offset,length,fuzziness,data
+	res := []string{
+		strconv.FormatUint(rec[recFieldIndex]["file"], 10),
+		strconv.FormatUint(rec[recFieldIndex]["offset"], 10),
+		strconv.FormatUint(rec[recFieldIndex]["length"], 10),
+		strconv.FormatInt(rec[recFieldIndex]["fuzziness"], 10),
+	}
+	filtered := Record{}
+	for i, v := range (map[string]interface{})(rec) {
+		if i == recFieldIndex || i == recFieldError {
+			continue
+		}
+		filtered[i] = v
+	}
+
+	jsonified, err := json.Marshal(filtered)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, string(jsonified))
+	return res, nil
+}
 
 // for future work...
 type Record_0 struct {
@@ -108,3 +133,5 @@ func ToRecord(rec *Record) *search.Record {
 	//res.Data = rec.RawData
 	//return res
 }
+
+

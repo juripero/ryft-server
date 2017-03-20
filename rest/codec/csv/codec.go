@@ -33,3 +33,8 @@ package csv
 const (
 	MIME = "text/csv"
 )
+
+// Marshaler interface is needed for the explicit encoding into CSV
+type Marshaler interface {
+	MarshalCSV() ([]string, error)
+}

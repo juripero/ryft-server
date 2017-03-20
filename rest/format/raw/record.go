@@ -37,6 +37,11 @@ import (
 // RECORD format specific data.
 type Record search.Record
 
+func (rec *Record) MarashalCSV() ([]string, error) {
+	res := []string{}
+	return res, nil
+}
+
 // NewRecord creates new format specific data.
 func NewRecord() *Record {
 	return (*Record)(search.NewRecord(nil, nil))

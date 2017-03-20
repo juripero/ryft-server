@@ -41,6 +41,11 @@ import (
 // RECORD format specific data.
 type Record map[string]interface{}
 
+func (rec *Record) MarashalCSV() ([]string, error) {
+	res := []string{}
+	return res, nil
+}
+
 const (
 	recFieldIndex = "_index"
 	recFieldError = "_error"
