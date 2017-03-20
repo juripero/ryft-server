@@ -36,13 +36,34 @@ import (
 	"github.com/getryft/ryft-server/search"
 
 	"github.com/clbanning/mxj"
+	"encoding/xml"
+	"strconv"
 )
 
 // RECORD format specific data.
 type Record map[string]interface{}
 
-func (rec *Record) MarashalCSV() ([]string, error) {
-	res := []string{}
+func (rec *Record) MarshalCSV() ([]string, error) {
+	//filename,offset,length,fuzziness,data
+	res := []string{
+		strconv.FormatUint(rec[recFieldIndex]["file"], 10),
+		strconv.FormatUint(rec[recFieldIndex]["offset"], 10),
+		strconv.FormatUint(rec[recFieldIndex]["length"], 10),
+		strconv.FormatInt(rec[recFieldIndex]["fuzziness"], 10),
+	}
+	filtered := Record{}
+	for i, v := range (map[string]interface{})(rec) {
+		if i == recFieldIndex || i == recFieldError {
+			continue
+		}
+		filtered[i] = v
+	}
+
+	xmled, err := xml.Marshal(filtered)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, string(xmled))
 	return res, nil
 }
 

@@ -1,14 +1,28 @@
 package csv
 
-
 import (
 	"testing"
 	"bytes"
 	"io"
-
 	"github.com/stretchr/testify/assert"
 	"errors"
+	"fmt"
+	"strconv"
 )
+
+type Int int
+func (i Int) MarshalCSV() ([]string, error) {
+	return []string{
+		strconv.Itoa(int(i)),
+	}, nil
+}
+
+type Record string
+func (rec Record) MarshalCSV() ([]string, error) {
+	return []string{
+		string(rec),
+	}, nil
+}
 
 // Test stream CSV encoder
 func TestStreamEncoder(t *testing.T) {
@@ -41,6 +55,7 @@ func TestStreamEncoder(t *testing.T) {
 			}
 		}
 	}
+	fmt.Println(bad)
 
 	// empty
 	check(func(enc *StreamEncoder) {
@@ -60,38 +75,38 @@ func TestStreamEncoder(t *testing.T) {
 	// one record
 	check(func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeRecord(nil)) // ignored
-		assert.NoError(t, enc.EncodeRecord("rec1"))
+		assert.NoError(t, enc.EncodeRecord(Record(Record("rec1"))))
 	}, "rec,rec1\nend\n")
 
 	// a few records
 	check(func(enc *StreamEncoder) {
-		assert.NoError(t, enc.EncodeRecord("rec1"))
-		assert.NoError(t, enc.EncodeRecord("rec2"))
-		assert.NoError(t, enc.EncodeRecord("rec3"))
+		assert.NoError(t, enc.EncodeRecord(Record("rec1")))
+		assert.NoError(t, enc.EncodeRecord(Record("rec2")))
+		assert.NoError(t, enc.EncodeRecord(Record("rec3")))
 	}, "rec,rec1\nrec,rec2\nrec,rec3\nend\n")
 
 	// a few records and error
 	check(func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeError(errors.New("err1")))
-		assert.NoError(t, enc.EncodeRecord("rec1"))
-		assert.NoError(t, enc.EncodeRecord("rec2"))
-		assert.NoError(t, enc.EncodeRecord("rec3"))
+		assert.NoError(t, enc.EncodeRecord(Record("rec1")))
+		assert.NoError(t, enc.EncodeRecord(Record("rec2")))
+		assert.NoError(t, enc.EncodeRecord(Record("rec3")))
 	}, "err,err1\nrec,rec1\nrec,rec2\nrec,rec3\nend\n")
 
 	// stat
 	check(func(enc *StreamEncoder) {
 		assert.NoError(t, enc.EncodeStat(nil)) // ignored
-		assert.NoError(t, enc.EncodeStat(555))
+		assert.NoError(t, enc.EncodeStat(Int(555)))
 	}, "stat,555\nend\n")
 	// bad cases
 	bad(func(enc *StreamEncoder) error {
-		if err := enc.EncodeRecord("rec1"); err != nil {
+		if err := enc.EncodeRecord(Record("rec1")); err != nil {
 			return err
 		}
 		return nil
 	}, 4, "") // EncodeRecord (tag)
 	bad(func(enc *StreamEncoder) error {
-		if err := enc.EncodeRecord("rec1"); err != nil {
+		if err := enc.EncodeRecord(Record("rec1")); err != nil {
 			return err
 		}
 		return nil

@@ -40,8 +40,8 @@ import (
 type Record search.Record
 
 func (rec *Record) MarashalCSV() ([]string, error) {
-	res := []string{}
-	return res, nil
+	baseRecord := search.Record(rec)
+	return baseRecord.MarshalCSV()
 }
 
 // NewRecord creates new format specific data.

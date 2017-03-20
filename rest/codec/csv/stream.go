@@ -33,9 +33,6 @@ package csv
 import (
 	"io"
 	backend "encoding/csv"
-	"strconv"
-
-	"fmt"
 )
 
 /* Stream CSV encoder uses tag prefixes for each item written
@@ -64,6 +61,17 @@ func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 }
 
 
+func (enc *StreamEncoder) write(record []string) error {
+	if err := enc.encoder.Write(record); err != nil {
+		return err
+	}
+	enc.encoder.Flush()
+	if err := enc.encoder.Error(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 	if data == nil {
 		return nil
@@ -77,81 +85,48 @@ func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 			return err
 		}
 		record = append(record, csv...)
-
-	} else {
-		switch data := data.(type) {
-		/*
-		case *utf8.Record:
-			//filename,offset,length,fuzziness,data
-			tail := []string{
-				data.Index.File,
-				strconv.FormatUint(data.Index.Offset, 10),
-				strconv.FormatUint(data.Index.Length,10),
-				strconv.FormatInt(int64(data.Index.Fuzziness), 10),
-				string(data.RawData),
-			}
-			record = append(record, tail...)
-		case *utf8.Stat:
-			// TODO: expand it
-			// stat,total bytes,matches, etc...
-			tail := []string{
-				strconv.FormatUint(data.Matches, 10),
-				strconv.FormatUint(data.TotalBytes, 10),
-				strconv.FormatUint(data.Duration, 10),
-				strconv.FormatFloat(data.DataRate, 'f', -1, 64),
-				strconv.FormatUint(data.FabricDuration, 10),
-				strconv.FormatFloat(data.FabricDataRate, 'f', -1, 64),
-				data.Host,
-			}
-			record = append(record, tail...)
-		*/
-		case []string:
-			record = append(record, data...)
-		case error:
-			record = append(record, data.Error())
-		case string: // only for tests.
-			record = append(record, string(data))
-		case int: // only for tests.
-			record = append(record, strconv.Itoa(data))
-		default:
-			// for debug
-			fmt.Printf("%#v", data)
-		}
 	}
-
-	if err := enc.encoder.Write(record); err != nil {
-		return err
-	}
-	enc.encoder.Flush()
-	if err := enc.encoder.Error(); err != nil {
-		return err
-	}
-	return nil
+	return enc.write(record)
 }
+/*
+case *utf8.Stat:
+	// TODO: expand it
+	// stat,total bytes,matches, etc...
+	tail := []string{
+		strconv.FormatUint(data.Matches, 10),
+		strconv.FormatUint(data.TotalBytes, 10),
+		strconv.FormatUint(data.Duration, 10),
+		strconv.FormatFloat(data.DataRate, 'f', -1, 64),
+		strconv.FormatUint(data.FabricDuration, 10),
+		strconv.FormatFloat(data.FabricDataRate, 'f', -1, 64),
+		data.Host,
+	}
+	record = append(record, tail...)
+*/
 
 // Write a RECORD
-func (enc *StreamEncoder) EncodeRecord(rec interface{}) error {
-	return enc.encode(TAG_REC, rec)
+func (enc *StreamEncoder) EncodeRecord(data interface{}) error {
+	return enc.encode(TAG_REC, data)
 }
 
 // Write a STATISTICS
-func (enc *StreamEncoder) EncodeStat(stat interface{}) error {
-	return enc.encode(TAG_STAT, stat)
+func (enc *StreamEncoder) EncodeStat(data interface{}) error {
+	return enc.encode(TAG_STAT, data)
 }
 
 // Write an ERROR
 func (enc *StreamEncoder) EncodeError(err_ error) error {
-	return enc.encode(TAG_ERR, err_)
+	if err_ == nil {
+		return nil
+	}
+	res := []string{
+		TAG_ERR,
+		string(err_.Error()),
+	}
+	return enc.write(res)
 }
 
 // End writing, close CSV object.
 func (enc *StreamEncoder) Close() error {
-	if err := enc.encoder.Write([]string{TAG_EOF}); err != nil {
-		return err
-	}
-	enc.encoder.Flush()
-	if err := enc.encoder.Error(); err != nil {
-		return err
-	}
-	return nil
+	return enc.write([]string{TAG_EOF})
 }
