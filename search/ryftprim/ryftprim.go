@@ -302,11 +302,17 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// some futher cleanup
 	defer func() {
 		if res.Stat != nil {
-			res.Stat.AddPerfStat(engine.IndexHost, "ryftprim", map[string]interface{}{
+			metrics := map[string]interface{}{
 				"prepare":   task.toolStartTime.Sub(task.taskStartTime).String(),
 				"tool-exec": task.toolStopTime.Sub(task.toolStartTime).String(),
-				"read-data": time.Since(task.readStartTime).String(),
-			})
+			}
+
+			if !task.readStartTime.IsZero() {
+				// for /count operation there is no "read-data"
+				metrics["read-data"] = time.Since(task.readStartTime).String()
+			}
+
+			res.Stat.AddPerfStat(engine.IndexHost, "ryftprim", metrics)
 		}
 		res.ReportDone()
 		res.Close()
