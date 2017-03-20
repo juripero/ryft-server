@@ -33,6 +33,7 @@ package search
 import (
 	"fmt"
 	"strconv"
+	"encoding/json"
 )
 
 // Stat is search processing statistics.
@@ -59,6 +60,10 @@ type Stat struct {
 
 // MarshalCSV converts STAT into csv-encoder compatible format.
 func (stat *Stat) MarshalCSV() ([]string, error) {
+	details, err := json.Marshal(stat.Details)
+	if err != nil {
+		return nil, err
+	}
 	res := []string {
 		strconv.FormatUint(stat.Matches, 10),
 		strconv.FormatUint(stat.TotalBytes, 10),
@@ -69,7 +74,7 @@ func (stat *Stat) MarshalCSV() ([]string, error) {
 		strconv.FormatUint(stat.FabricDuration, 10),
 		strconv.FormatFloat(stat.FabricDataRate, 'f', -1, 64),
 
-		fmt.Sprintf("%s", stat.Details),
+		fmt.Sprintf("%s", details),
 		stat.Host,
 	}
 	return res, nil

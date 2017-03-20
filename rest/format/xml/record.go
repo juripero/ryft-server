@@ -42,6 +42,11 @@ import (
 // RECORD format specific data.
 type Record map[string]interface{}
 
+const (
+	recFieldIndex = "_index"
+	recFieldError = "_error"
+)
+
 // MarshalCSV converts RECORD into csv-encoder compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
 	//filename,offset,length,fuzziness,data
@@ -51,6 +56,7 @@ func (rec *Record) MarshalCSV() ([]string, error) {
 		fmt.Sprintf("%d", m["offset"]),
 		fmt.Sprintf("%d", m["length"]),
 		fmt.Sprintf("%d", m["fuzziness"]),
+		fmt.Sprintf("%d", m["host"]),
 	}
 	filtered := Record{}
 	for i, v := range m {
@@ -67,11 +73,6 @@ func (rec *Record) MarshalCSV() ([]string, error) {
 	res = append(res, string(xmled))
 	return res, nil
 }
-
-const (
-	recFieldIndex = "_index"
-	recFieldError = "_error"
-)
 
 // for future work...
 type Record_0 struct {

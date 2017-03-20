@@ -40,7 +40,7 @@ import (
 type Record search.Record
 
 // MarshalCSV converts RECORD into csv-encoder compatible format
-func (rec *Record) MarashalCSV() ([]string, error) {
+func (rec *Record) MarshalCSV() ([]string, error) {
 	baseRecord := search.Record(*rec)
 	return baseRecord.MarshalCSV()
 }

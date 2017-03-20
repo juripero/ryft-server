@@ -54,6 +54,7 @@ func (rec *Record) MarshalCSV() ([]string, error) {
 		fmt.Sprintf("%d", m["offset"]),
 		fmt.Sprintf("%d", m["length"]),
 		fmt.Sprintf("%d", m["fuzziness"]),
+		fmt.Sprintf("%d", m["host"]),
 	}
 	filtered := Record{}
 	for i, v := range m {

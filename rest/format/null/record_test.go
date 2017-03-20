@@ -61,7 +61,7 @@ func TestRecord_MarshalCSV(t *testing.T) {
 	rec.Index.Length = 456
 	rec.Index.Fuzziness = 7
 	rec.Index.Host = "localhost"
-	result, err := rec.MarashalCSV()
+	result, err := rec.MarshalCSV()
 	assert.NoError(t, err)
 	assert.Equal(t, []string{
 		"foo.txt",
