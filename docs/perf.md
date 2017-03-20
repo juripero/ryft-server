@@ -72,3 +72,37 @@ response <--
 
 Note, in some cases the read operation might be started before `ryftprim` tool
 is finished. So `tool-exec` and `read-data` are done in parallel.
+
+
+## `ryftdec` search engine metrics
+
+The [ryftdec](./search/engine.md#ryftdec-search-engine) search engine does
+query decomposition and catalog data processing:
+- Parse request parameters and decompose query
+- Do several backend calls (usually ryftprim)
+- Process results and unwind indexes
+
+So the performance metrics `ryftdec` contain:
+- `prepare` time to decompose query and check input fileset for catalogs
+- `intermediate-steps` array of intermediate steps (backend calls):
+  - `ryftprim` - backend performance metrics
+  - `post-proc` - step post-processing time: read indexes
+  - `total` - total step time
+- `final-post-proc` final post-processing time: read data, unwind indexes, remove duplicates.
+
+
+```
+request  -->
+             ] "prepare" search operation
+             \                                          "intermediate-steps[0]"
+              ] "ryftprim" - backend call (Step 1)
+              ] "post-proc" - read indexes
+             /
+             ...
+             \                                          "intermediate-steps[N-1]"
+              ] "ryftprim" - backend call (Step N)
+              ] "post-proc" - read indexes
+             /
+             ] "final-post-proc" - index unwinding
+response <--
+```

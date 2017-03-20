@@ -155,3 +155,8 @@ func (stat *Stat) AddPerfStat(host string, name string, data interface{}) {
 func (stat *Stat) ClearPerfStat() {
 	delete(stat.Extra, "performance")
 }
+
+// GetAllPerfStat gets all performance metrics
+func (stat *Stat) GetAllPerfStat() interface{} {
+	return stat.Extra["performance"]
+}

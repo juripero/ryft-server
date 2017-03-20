@@ -62,6 +62,9 @@ type Task struct {
 	config *search.Config // input configuration
 	result PostProcessing // post processing engine
 
+	// intermediate performance metrics
+	perfStat []map[string]interface{} // ryft call -> metrics
+
 	UpdateHostTo string // for cluster mode
 }
 
