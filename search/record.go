@@ -60,7 +60,7 @@ func (rec *Record) MarshalCSV() ([]string, error) {
 		strconv.FormatUint(rec.Index.Offset, 10),
 		strconv.FormatUint(rec.Index.Length,10),
 		strconv.FormatInt(int64(rec.Index.Fuzziness), 10),
-		string(rec.RawData),
+		utils.DumpAsString(rec.RawData),
 	}
 	return res, nil
 }

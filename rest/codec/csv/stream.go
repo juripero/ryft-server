@@ -88,21 +88,6 @@ func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 	}
 	return enc.write(record)
 }
-/*
-case *utf8.Stat:
-	// TODO: expand it
-	// stat,total bytes,matches, etc...
-	tail := []string{
-		strconv.FormatUint(data.Matches, 10),
-		strconv.FormatUint(data.TotalBytes, 10),
-		strconv.FormatUint(data.Duration, 10),
-		strconv.FormatFloat(data.DataRate, 'f', -1, 64),
-		strconv.FormatUint(data.FabricDuration, 10),
-		strconv.FormatFloat(data.FabricDataRate, 'f', -1, 64),
-		data.Host,
-	}
-	record = append(record, tail...)
-*/
 
 // Write a RECORD
 func (enc *StreamEncoder) EncodeRecord(data interface{}) error {

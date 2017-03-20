@@ -37,22 +37,23 @@ import (
 
 	"github.com/clbanning/mxj"
 	"encoding/xml"
-	"strconv"
 )
 
 // RECORD format specific data.
 type Record map[string]interface{}
 
+// MarshalCSV converts RECORD into csv-encoder compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
 	//filename,offset,length,fuzziness,data
+	m := map[string]interface{}(*rec)
 	res := []string{
-		strconv.FormatUint(rec[recFieldIndex]["file"], 10),
-		strconv.FormatUint(rec[recFieldIndex]["offset"], 10),
-		strconv.FormatUint(rec[recFieldIndex]["length"], 10),
-		strconv.FormatInt(rec[recFieldIndex]["fuzziness"], 10),
+		fmt.Sprintf("%s", m["file"]),
+		fmt.Sprintf("%d", m["offset"]),
+		fmt.Sprintf("%d", m["length"]),
+		fmt.Sprintf("%d", m["fuzziness"]),
 	}
 	filtered := Record{}
-	for i, v := range (map[string]interface{})(rec) {
+	for i, v := range m {
 		if i == recFieldIndex || i == recFieldError {
 			continue
 		}

@@ -6,7 +6,6 @@ import (
 	"io"
 	"github.com/stretchr/testify/assert"
 	"errors"
-	"fmt"
 	"strconv"
 )
 
@@ -55,7 +54,6 @@ func TestStreamEncoder(t *testing.T) {
 			}
 		}
 	}
-	fmt.Println(bad)
 
 	// empty
 	check(func(enc *StreamEncoder) {
