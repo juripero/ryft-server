@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"fmt"
 )
 
 // compare two stats
@@ -57,4 +58,31 @@ func TestFormatStat(t *testing.T) {
 
 	stat.Host = "" // should be omitted
 	testStatMarshal(t, stat1, `{"matches":123, "totalBytes":456, "duration":11, "dataRate":11.11, "fabricDuration":22, "fabricDataRate":22.22}`)
+}
+
+func TestStat_MarshalCSV(t *testing.T) {
+	f, _ := New()
+	stat1 := f.NewStat()
+	stat := stat1.(*Stat)
+	stat.Matches = 123
+	stat.TotalBytes = 456
+	stat.Duration = 11
+	stat.DataRate = 11.11
+	stat.FabricDuration = 22
+	stat.FabricDataRate = 22.22
+	stat.Host = "localhost"
+
+	result, err := stat.MarshalCSV()
+	assert.NoError(t, err)
+	fmt.Println(result)
+	assert.Equal(t, []string{
+		"123",
+		"456",
+		"11",
+		"11.11",
+		"22",
+		"22.22",
+		"[]",
+		"localhost",
+	}, result)
 }

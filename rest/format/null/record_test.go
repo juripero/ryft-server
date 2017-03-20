@@ -3,7 +3,6 @@ package null
 import (
 	"encoding/json"
 	"testing"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,4 +48,26 @@ func TestFormatRecord(t *testing.T) {
 	assert.Nil(t, ToRecord(nil))
 	assert.Nil(t, FromRecord(nil))
 	assert.NotNil(t, fmt.NewRecord())
+}
+
+func TestRecord_MarshalCSV(t *testing.T) {
+	f, _ := New()
+	rec1 := f.NewRecord()
+	rec := rec1.(*Record)
+	rec.RawData = []byte("hello")
+	rec.Index = f.ToIndex(NewIndex())
+	rec.Index.File = "foo.txt"
+	rec.Index.Offset = 123
+	rec.Index.Length = 456
+	rec.Index.Fuzziness = 7
+	rec.Index.Host = "localhost"
+	result, err := rec.MarashalCSV()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{
+		"foo.txt",
+		"123",
+		"456",
+		"7",
+		"hello",
+	}, result)
 }
