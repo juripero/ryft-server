@@ -35,7 +35,6 @@ import (
 	"sync"
 
 	"github.com/getryft/ryft-server/search/utils"
-	"strconv"
 )
 
 // thread-safe pool of Record objects
@@ -52,17 +51,11 @@ type Record struct {
 	Data    interface{} `json:"data,omitempty" msgpack:"data,omitempty"`     // format specific data
 }
 
-
 // MarshalCSV converts search RECORD into the cvs-compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
-	res:= []string{
-		rec.Index.File,
-		strconv.FormatUint(rec.Index.Offset, 10),
-		strconv.FormatUint(rec.Index.Length,10),
-		strconv.FormatInt(int64(rec.Index.Fuzziness), 10),
-		rec.Index.Host,
-	}
-	return res, nil
+	res, err := rec.Index.MarshalCSV()
+	res = append(res, string(rec.RawData))
+	return res, err
 }
 
 // NewRecord creates a new Record object.

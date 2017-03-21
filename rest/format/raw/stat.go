@@ -40,8 +40,7 @@ type Stat search.Stat
 
 // MarshalCSV converts raw STAT into csv-encoder compatible format
 func (stat *Stat) MarshalCSV() ([]string, error) {
-	baseStat:= search.Stat(*stat)
-	return baseStat.MarshalCSV()
+	return (*search.Stat)(stat).MarshalCSV()
 }
 
 // NewStat creates new format specific data.

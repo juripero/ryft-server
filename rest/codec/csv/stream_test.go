@@ -1,15 +1,17 @@
 package csv
 
 import (
-	"testing"
 	"bytes"
-	"io"
-	"github.com/stretchr/testify/assert"
 	"errors"
+	"io"
 	"strconv"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type Int int
+
 func (i Int) MarshalCSV() ([]string, error) {
 	return []string{
 		strconv.Itoa(int(i)),
@@ -17,6 +19,7 @@ func (i Int) MarshalCSV() ([]string, error) {
 }
 
 type Record string
+
 func (rec Record) MarshalCSV() ([]string, error) {
 	return []string{
 		string(rec),

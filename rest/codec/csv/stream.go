@@ -31,18 +31,19 @@
 package csv
 
 import (
-	"io"
 	backend "encoding/csv"
+	"fmt"
+	"io"
 )
 
 /* Stream CSV encoder uses tag prefixes for each item written
 
-rec;<record>
-err;<error message>
-stat;<statistics>
+rec,<record>
+err,<error message>
+stat,<statistics>
 end
 */
-type StreamEncoder struct{
+type StreamEncoder struct {
 	encoder *backend.Writer
 }
 
@@ -53,6 +54,7 @@ const (
 	TAG_EOF  = "end"
 )
 
+// NewStreamEncoder creates new CSV stream encoder.
 func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 	enc := new(StreamEncoder)
 	enc.encoder = backend.NewWriter(w)
@@ -60,33 +62,25 @@ func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 	return enc, nil
 }
 
-
-func (enc *StreamEncoder) write(record []string) error {
-	if err := enc.encoder.Write(record); err != nil {
-		return err
-	}
-	enc.encoder.Flush()
-	if err := enc.encoder.Error(); err != nil {
-		return err
-	}
-	return nil
-}
-
+// write a CSV record
 func (enc *StreamEncoder) encode(tag string, data interface{}) error {
 	if data == nil {
 		return nil
 	}
+
 	record := []string{tag}
-	var i interface{} = data
-	dataCSV, ok := i.(Marshaler)
-	if ok == true {
-		csv, err := dataCSV.MarshalCSV()
+	if i, ok := data.(Marshaler); ok {
+		csv, err := i.MarshalCSV()
 		if err != nil {
 			return err
 		}
 		record = append(record, csv...)
+	} else {
+		// fallback: as a simple string
+		record = append(record, fmt.Sprintf("%s", data))
 	}
-	return enc.write(record)
+
+	return enc.encoder.Write(record)
 }
 
 // Write a RECORD
@@ -100,18 +94,24 @@ func (enc *StreamEncoder) EncodeStat(data interface{}) error {
 }
 
 // Write an ERROR
-func (enc *StreamEncoder) EncodeError(err_ error) error {
-	if err_ == nil {
+func (enc *StreamEncoder) EncodeError(err error) error {
+	if err == nil {
 		return nil
 	}
-	res := []string{
+	csv := []string{
 		TAG_ERR,
-		string(err_.Error()),
+		err.Error(),
 	}
-	return enc.write(res)
+	return enc.encoder.Write(csv)
 }
 
 // End writing, close CSV object.
 func (enc *StreamEncoder) Close() error {
-	return enc.write([]string{TAG_EOF})
+	err := enc.encoder.Write([]string{TAG_EOF})
+	if err != nil {
+		return err
+	}
+
+	enc.encoder.Flush()
+	return enc.encoder.Error()
 }

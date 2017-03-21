@@ -19,6 +19,33 @@ func TestStatEmpty(t *testing.T) {
 	assert.Equal(t, `Stat{0 matches on 0 bytes in 0 ms (fabric: 0 ms), details:[], host:"localhost"}`, stat.String())
 }
 
+// test CSV marshaling
+func TestStatMarshalCSV(t *testing.T) {
+	stat := NewStat("localhost")
+	stat.Matches = 1
+	stat.TotalBytes = 2
+	stat.Duration = 3
+	stat.DataRate = 4.5
+	stat.FabricDuration = 5
+	stat.FabricDataRate = 6.5
+	stat.Extra["foo"] = "bar"
+
+	data, err := stat.MarshalCSV()
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{
+			"1",
+			"2",
+			"3",
+			"4.5",
+			"5",
+			"6.5",
+			"localhost",
+			"null",
+			`{"foo":"bar"}`,
+		}, data)
+	}
+}
+
 // test merge statistics (cluster mode)
 func TestStatMerge(t *testing.T) {
 	s1 := NewStat("")

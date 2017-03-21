@@ -75,10 +75,10 @@ func TestFormatRecord(t *testing.T) {
 // test json RECORD to CSV serialization
 func TestRecord_MarshalCSV(t *testing.T) {
 	rec := search.NewRecord(search.NewIndex("foo.txt", 123, 456),
-		[]byte(`{"value": "hello"}`))
+		[]byte(` {  "value" :  "hello" }  `))
 	rec.Index.Fuzziness = 7
 	rec.Index.UpdateHost("localhost")
-	result, err := rec.MarshalCSV()
+	result, err := FromRecord(rec, nil).MarshalCSV()
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"foo.txt", "123", "456", "7", "localhost"}, result)
+	assert.Equal(t, []string{"foo.txt", "123", "456", "7", "localhost", `{"value":"hello"}`}, result)
 }

@@ -31,6 +31,8 @@
 package raw
 
 import (
+	"encoding/base64"
+
 	"github.com/getryft/ryft-server/search"
 )
 
@@ -39,8 +41,9 @@ type Record search.Record
 
 // MarshalCSV converts raw RECORD into csv-encoder compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
-	baseRecord := search.Record(*rec)
-	return baseRecord.MarshalCSV()
+	csv, err := rec.Index.MarshalCSV()
+	csv = append(csv, base64.RawStdEncoding.EncodeToString(rec.Data.([]byte)))
+	return csv, err
 }
 
 // NewRecord creates new format specific data.

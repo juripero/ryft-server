@@ -34,6 +34,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 )
 
@@ -130,6 +131,17 @@ func (idx *Index) SetFuzziness(d int32) *Index {
 func (idx Index) String() string {
 	return fmt.Sprintf("{%s#%d, len:%d, d:%d}",
 		idx.File, idx.Offset, idx.Length, idx.Fuzziness)
+}
+
+// MarshalCSV converts INDEX into the cvs-compatible record
+func (idx *Index) MarshalCSV() ([]string, error) {
+	return []string{
+		idx.File,
+		strconv.FormatUint(idx.Offset, 10),
+		strconv.FormatUint(idx.Length, 10),
+		strconv.FormatInt(int64(idx.Fuzziness), 10),
+		idx.Host,
+	}, nil
 }
 
 // IndexFile contains base indexes

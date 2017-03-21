@@ -31,9 +31,9 @@
 package search
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
-	"encoding/json"
 )
 
 // Stat is search processing statistics.
@@ -57,14 +57,21 @@ type Stat struct {
 	Extra map[string]interface{} `json:"extra,omitempty" msgpack:"extra,omitempty"`
 }
 
-
 // MarshalCSV converts search STAT into csv-encoder compatible format.
 func (stat *Stat) MarshalCSV() ([]string, error) {
+	// details as JSON
 	details, err := json.Marshal(stat.Details)
 	if err != nil {
 		return nil, err
 	}
-	res := []string {
+
+	// extra as JSON
+	extra, err := json.Marshal(stat.Extra)
+	if err != nil {
+		return nil, err
+	}
+
+	return []string{
 		strconv.FormatUint(stat.Matches, 10),
 		strconv.FormatUint(stat.TotalBytes, 10),
 
@@ -74,10 +81,10 @@ func (stat *Stat) MarshalCSV() ([]string, error) {
 		strconv.FormatUint(stat.FabricDuration, 10),
 		strconv.FormatFloat(stat.FabricDataRate, 'f', -1, 64),
 
-		fmt.Sprintf("%s", details),
 		stat.Host,
-	}
-	return res, nil
+		string(details),
+		string(extra),
+	}, nil
 }
 
 // NewStat creates empty statistics.

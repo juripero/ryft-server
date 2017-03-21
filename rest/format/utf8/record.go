@@ -41,8 +41,9 @@ type Record search.Record
 
 // MarshalCSV converts utf8 RECORD into csv-encoder compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
-	baseRecord := search.Record(*rec)
-	return baseRecord.MarshalCSV()
+	csv, err := rec.Index.MarshalCSV()
+	csv = append(csv, rec.Data.(string))
+	return csv, err
 }
 
 // NewRecord creates new format specific data.

@@ -31,12 +31,11 @@
 package xml
 
 import (
+	"encoding/json"
 	"fmt"
 
-	"github.com/getryft/ryft-server/search"
-
 	"github.com/clbanning/mxj"
-	"encoding/xml"
+	"github.com/getryft/ryft-server/search"
 )
 
 // RECORD format specific data.
@@ -49,29 +48,27 @@ const (
 
 // MarshalCSV converts xml RECORD into csv-encoder compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
-	//filename,offset,length,fuzziness,data
-	m := map[string]interface{}(*rec)
-	res := []string{
-		fmt.Sprintf("%s", m["file"]),
-		fmt.Sprintf("%d", m["offset"]),
-		fmt.Sprintf("%d", m["length"]),
-		fmt.Sprintf("%d", m["fuzziness"]),
-		fmt.Sprintf("%d", m["host"]),
-	}
-	filtered := Record{}
-	for i, v := range m {
-		if i == recFieldIndex || i == recFieldError {
-			continue
-		}
-		filtered[i] = v
-	}
-
-	xmled, err := xml.Marshal(filtered)
+	idx := (*rec)[recFieldIndex].(*Index)
+	csv, err := ToIndex(idx).MarshalCSV()
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, string(xmled))
-	return res, nil
+
+	filtered := Record{}
+	for k, v := range *rec {
+		// ignore "_error" and "_index" fields
+		if k == recFieldIndex || k == recFieldError {
+			continue
+		}
+		filtered[k] = v
+	}
+
+	jsonified, err := json.Marshal(filtered)
+	if err != nil {
+		return nil, err
+	}
+	csv = append(csv, string(jsonified))
+	return csv, nil
 }
 
 // for future work...

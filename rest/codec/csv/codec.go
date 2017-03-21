@@ -28,7 +28,7 @@
  * ============
  */
 
-package csv 
+package csv
 
 const (
 	MIME = "text/csv"
