@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"fmt"
+	"github.com/getryft/ryft-server/search"
 )
 
 // compare two stats
@@ -72,9 +72,11 @@ func TestStat_MarshalCSV(t *testing.T) {
 	stat.FabricDataRate = 22.22
 	stat.Host = "localhost"
 
+	stat2 := search.NewStat("localhost")
+	stat.Details = append(stat.Details , stat2)
+
 	result, err := stat.MarshalCSV()
 	assert.NoError(t, err)
-	fmt.Println(result)
 	assert.Equal(t, []string{
 		"123",
 		"456",
@@ -82,7 +84,7 @@ func TestStat_MarshalCSV(t *testing.T) {
 		"11.11",
 		"22",
 		"22.22",
-		"[]",
+		"[{\"matches\":0,\"totalBytes\":0,\"duration\":0,\"dataRate\":0,\"fabricDuration\":0,\"fabricDataRate\":0,\"host\":\"localhost\"}]",
 		"localhost",
 	}, result)
 }

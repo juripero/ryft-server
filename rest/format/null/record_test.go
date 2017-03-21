@@ -54,7 +54,6 @@ func TestRecord_MarshalCSV(t *testing.T) {
 	f, _ := New()
 	rec1 := f.NewRecord()
 	rec := rec1.(*Record)
-	rec.RawData = []byte("hello")
 	rec.Index = f.ToIndex(NewIndex())
 	rec.Index.File = "foo.txt"
 	rec.Index.Offset = 123
@@ -68,6 +67,6 @@ func TestRecord_MarshalCSV(t *testing.T) {
 		"123",
 		"456",
 		"7",
-		"hello",
+		"localhost",
 	}, result)
 }
