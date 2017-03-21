@@ -418,7 +418,7 @@ case "$ACCEPT" in
         ACCEPT="Accept: application/msgpack"
         ;;
     *)
-        fail "$ACCEPT is unknown accept mode"
+        fail "'$ACCEPT' is unknown accept mode, run '$0 --help' for help"
 esac
 
 [[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
