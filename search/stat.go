@@ -58,7 +58,7 @@ type Stat struct {
 }
 
 
-// MarshalCSV converts STAT into csv-encoder compatible format.
+// MarshalCSV converts search STAT into csv-encoder compatible format.
 func (stat *Stat) MarshalCSV() ([]string, error) {
 	details, err := json.Marshal(stat.Details)
 	if err != nil {

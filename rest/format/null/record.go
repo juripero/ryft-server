@@ -38,7 +38,7 @@ import (
 // Optimization: the rec.Data is just assigned to nil!
 type Record search.Record
 
-// MarshalCSV converts RECORD into csv-encoder compatible format
+// MarshalCSV converts null RECORD into csv-encoder compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
 	baseRecord := search.Record(*rec)
 	return baseRecord.MarshalCSV()

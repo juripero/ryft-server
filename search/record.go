@@ -53,7 +53,7 @@ type Record struct {
 }
 
 
-// MarshalCSV converts record into the cvs-compatible format
+// MarshalCSV converts search RECORD into the cvs-compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
 	res:= []string{
 		rec.Index.File,

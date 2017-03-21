@@ -38,7 +38,7 @@ import (
 // the same as search.Stat
 type Stat search.Stat
 
-// MarshalCSV converts STAT into csv-encoder compatible format
+// MarshalCSV converts utf8 STAT into csv-encoder compatible format
 func (stat *Stat) MarshalCSV() ([]string, error) {
 	baseStat:= search.Stat(*stat)
 	return baseStat.MarshalCSV()

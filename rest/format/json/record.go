@@ -45,7 +45,7 @@ const (
 	recFieldError = "_error"
 )
 
-// MarshalCSV converts RECORD into csv-encoder compatible format
+// MarshalCSV converts json RECORD into csv-encoder compatible format
 func (rec *Record) MarshalCSV() ([]string, error) {
 	//filename,offset,length,fuzziness,data
 	m := map[string]interface{}(*rec)
