@@ -57,6 +57,7 @@ func TestFormatRecord(t *testing.T) {
 }
 
 
+// test raw RECORD to CSV serialization
 func TestRecord_MarshalCSV(t *testing.T) {
 	// fake index
 	idx := search.NewIndex("foo.txt", 123, 456)
@@ -68,5 +69,5 @@ func TestRecord_MarshalCSV(t *testing.T) {
 
 	result, err := rec.MarshalCSV()
 	assert.NoError(t, err)
-	assert.Equal(t, []string{}, result)
+	assert.Equal(t, []string{"foo.txt", "123", "456", "7", "localhost",}, result)
 }
