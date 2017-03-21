@@ -464,6 +464,70 @@ will produce the following output:
 }
 ```
 
+## Search `Accept` header
+
+Search endpoint returns data encoded as `json`(default),`msgpack` or `csv`.
+
+### Accept: text/csv
+
+In this case it doesn't matter if you use `stream` parameter or not. Content will always be streamed.
+
+#### Fields order in the response
+
+Record:
+```
+rec,file,offset,length,fuzziness,host,data
+```
+
+Stat:
+```
+stat,matches,totalBytes,duration,dataRate,fabricDuration,fabricDataRate,host,details,extra
+```
+
+Response finishes with the `end` tag.
+
+#### Example:
+
+```
+curl -X GET "ryftone-313:9876/search?local=true&query=hello&files=test%2Ffoo%2F1.txt&cs=true&reduce=true&surrounding=10&delimiter=%0D%0A&format=utf8&stats=true" -H "Accept:text/csv"
+rec,test/foo/1.txt,0,15,0,ryftone-313,"hello world
+hel"
+rec,test/foo/1.txt,2,25,0,ryftone-313,"llo world
+hello worldhell"
+rec,test/foo/1.txt,13,25,0,ryftone-313,ello worldhello from curl
+rec,test/foo/1.txt,28,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,43,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,58,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,73,25,0,ryftone-313," from curlhello from curl"
+stat,16,233,520,0.00042731945331280044,0,0,ryftone-313,null,{}
+end
+```
+
+### Accept: application/msgpack
+
+This encode type is used only for communication between nodes.
+
+#### Example:
+```
+curl -X GET "ryftone-313:9786/search?local=true&query=hello&files=test%2Ffoo%2F1.txt&cs=true&reduce=true&surrounding=10&delimiter=%0D%0A&format=utf8&stats=true" -H "Accept:application/msgpack"
+��_index��file�test/foo/1.txt�fuzziness�host�ryftone-313�length�offset�data�hello world
+hel��_index��file�test/foo/1.txt�fuzziness�host�ryftone-313�length�offset�data�llo world
+```
+
+### Accept: application/json
+
+#### Example:
+```
+curl -X GET "ryftone-313:9786/search?local=true&query=hello&files=test%2Ffoo%2F1.txt&cs=true&reduce=true&surrounding=10&delimiter=%0D%0A&format=utf8&stats=true" -H "Accept:application/json"
+{"results":[{"_index":{"file":"test/foo/1.txt","offset":0,"length":15,"fuzziness":0,"host":"ryftone-313"},"data":"hello world\nhel"}
+,{"_index":{"file":"test/foo/1.txt","offset":2,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":"llo world\nhello worldhell"}
+,{"_index":{"file":"test/foo/1.txt","offset":13,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":"ello worldhello from curl"}
+,{"_index":{"file":"test/foo/1.txt","offset":28,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":" from curlhello from curl"}
+,{"_index":{"file":"test/foo/1.txt","offset":43,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":" from curlhello from curl"}
+,{"_index":{"file":"test/foo/1.txt","offset":58,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":" from curlhello from curl"}
+],"stats":{"matches":16,"totalBytes":233,"duration":484,"dataRate":0.0004591035448815212,"fabricDuration":0,"fabricDataRate":0,"host":"ryftone-313"}
+```
+
 
 # Count
 
