@@ -35,6 +35,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	json_codec "github.com/getryft/ryft-server/rest/codec/json"
 	codec "github.com/getryft/ryft-server/rest/codec/msgpack.v1"
@@ -123,6 +124,19 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 		case <-doneCh:
 			task.log().Debugf("[%s]: done", TAG)
 			return
+		}
+	}()
+
+	transferStart := time.Now()
+	defer func() {
+		// performance metrics
+		if res.Stat != nil && task.config.Performance {
+			metrics := map[string]interface{}{
+				"prepare":  transferStart.Sub(task.startTime).String(),
+				"transfer": time.Since(transferStart).String(),
+			}
+
+			res.Stat.AddPerfStat("ryfthttp", metrics)
 		}
 	}()
 
@@ -228,6 +242,19 @@ func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result)
 		case <-doneCh:
 			task.log().Debugf("[%s]: done", TAG)
 			return
+		}
+	}()
+
+	transferStart := time.Now()
+	defer func() {
+		// performance metrics
+		if res.Stat != nil && task.config.Performance {
+			metrics := map[string]interface{}{
+				"prepare":  transferStart.Sub(task.startTime).String(),
+				"transfer": time.Since(transferStart).String(),
+			}
+
+			res.Stat.AddPerfStat("ryfthttp", metrics)
 		}
 	}()
 

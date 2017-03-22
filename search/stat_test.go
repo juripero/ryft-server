@@ -117,29 +117,19 @@ func TestStatPerf(t *testing.T) {
 	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost"}`, toJson(stat))
 
 	// add new one
-	stat.AddPerfStat("hostA", "nameA", "statAA1")
+	stat.AddPerfStat("nameA", "statAA1")
 	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
-		"extra": {"performance":{"hostA":{"nameA":"statAA1"}}} }`, toJson(stat))
+		"extra": {"performance":{"nameA":"statAA1"}} }`, toJson(stat))
 
 	// replace existing
-	stat.AddPerfStat("hostA", "nameA", "statAA")
+	stat.AddPerfStat("nameA", "statAA")
 	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
-		"extra": {"performance":{"hostA":{"nameA":"statAA"}}} }`, toJson(stat))
+		"extra": {"performance":{"nameA":"statAA"}} }`, toJson(stat))
 
 	// one more new
-	stat.AddPerfStat("hostA", "nameB", "statAB")
+	stat.AddPerfStat("nameB", "statAB")
 	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
-		"extra": {"performance":{"hostA":{"nameA":"statAA", "nameB":"statAB"}}} }`, toJson(stat))
-
-	// new host
-	stat.AddPerfStat("hostB", "nameA", "statBA")
-	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
-		"extra": {"performance":{"hostA":{"nameA":"statAA", "nameB":"statAB"}, "hostB":{"nameA":"statBA"}}} }`, toJson(stat))
-
-	// new one to the host B
-	stat.AddPerfStat("hostB", "nameB", "statBB")
-	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
-		"extra": {"performance":{"hostA":{"nameA":"statAA", "nameB":"statAB"}, "hostB":{"nameA":"statBA", "nameB":"statBB"}}} }`, toJson(stat))
+		"extra": {"performance":{"nameA":"statAA", "nameB":"statAB"}} }`, toJson(stat))
 
 	// clear all
 	stat.ClearPerfStat()

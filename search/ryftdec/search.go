@@ -262,7 +262,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				"final-post-proc":    drainStop.Sub(drainStart).String(),
 			}
 
-			mux.Stat.AddPerfStat(task.UpdateHostTo, "ryftdec", metrics)
+			mux.Stat.AddPerfStat("ryftdec", metrics)
 		}
 	}()
 

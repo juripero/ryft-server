@@ -219,15 +219,13 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					res.Stat.Extra["request"] = &params
 				}
 				if params.Performance {
-					res.Stat.AddPerfStat(server.Config.HostName,
-						"rest-count", map[string]interface{}{
-							"prepare":  searchStartTime.Sub(requestStartTime).String(),
-							"engine":   transferStartTime.Sub(searchStartTime).String(),
-							"transfer": transferStopTime.Sub(transferStartTime).String(),
-							"total":    transferStopTime.Sub(requestStartTime).String(),
-						})
-				} else {
-					res.Stat.ClearPerfStat() // hide all available performance metrics
+					metrics := map[string]interface{}{
+						"prepare":  searchStartTime.Sub(requestStartTime).String(),
+						"engine":   transferStartTime.Sub(searchStartTime).String(),
+						"transfer": transferStopTime.Sub(transferStartTime).String(),
+						"total":    transferStopTime.Sub(requestStartTime).String(),
+					}
+					res.Stat.AddPerfStat("rest-count", metrics)
 				}
 				xstat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)

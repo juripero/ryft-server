@@ -133,21 +133,14 @@ func (stat *Stat) Combine(other *Stat) {
 }
 
 // AddPerfStat ands extra performance metrics.
-// grouped by cluster's host and custom name.
-func (stat *Stat) AddPerfStat(host string, name string, data interface{}) {
+func (stat *Stat) AddPerfStat(name string, data interface{}) {
 	if perf_, ok := stat.Extra["performance"]; ok {
-		if perf, ok := perf_.(map[string]map[string]interface{}); ok {
-			if hostPerf, ok := perf[host]; ok {
-				hostPerf[name] = data
-			} else {
-				perf[host] = map[string]interface{}{name: data}
-			}
+		if perf, ok := perf_.(map[string]interface{}); ok {
+			perf[name] = data
 		}
 	} else {
 		// put new item
-		stat.Extra["performance"] = map[string]map[string]interface{}{
-			host: map[string]interface{}{name: data},
-		}
+		stat.Extra["performance"] = map[string]interface{}{name: data}
 	}
 }
 

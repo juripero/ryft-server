@@ -312,7 +312,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 				metrics["read-data"] = time.Since(task.readStartTime).String()
 			}
 
-			res.Stat.AddPerfStat(engine.IndexHost, "ryftprim", metrics)
+			res.Stat.AddPerfStat("ryftprim", metrics)
 		}
 		res.ReportDone()
 		res.Close()
