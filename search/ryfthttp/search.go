@@ -93,6 +93,7 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 	var cancelled int32 // atomic
 
 	// do HTTP request
+	startTime := time.Now()
 	resp, err := engine.httpClient.Do(req)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to send request", TAG)
@@ -132,7 +133,8 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 		// performance metrics
 		if res.Stat != nil && task.config.Performance {
 			metrics := map[string]interface{}{
-				"prepare":  transferStart.Sub(task.startTime).String(),
+				"prepare":  startTime.Sub(task.startTime).String(),
+				"request":  transferStart.Sub(startTime).String(),
 				"transfer": time.Since(transferStart).String(),
 			}
 
@@ -215,6 +217,7 @@ func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result)
 	var cancelled int32 // atomic
 
 	// do HTTP request
+	startTime := time.Now()
 	resp, err := engine.httpClient.Do(req)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to send request", TAG)
@@ -250,7 +253,8 @@ func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result)
 		// performance metrics
 		if res.Stat != nil && task.config.Performance {
 			metrics := map[string]interface{}{
-				"prepare":  transferStart.Sub(task.startTime).String(),
+				"prepare":  startTime.Sub(task.startTime).String(),
+				"request":  transferStart.Sub(startTime).String(),
 				"transfer": time.Since(transferStart).String(),
 			}
 

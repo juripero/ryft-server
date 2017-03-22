@@ -106,3 +106,26 @@ request  -->
              ] "final-post-proc" - index unwinding
 response <--
 ```
+
+
+## `ryfthttp` search engine metrics
+
+The [ryfthttp](./search/engine.md#ryfthttp-search-engine) search engine forwards
+query to a remote ryft-server instance:
+- Parse request parameters and prepare URL
+- Send HTTP request
+- Receive HTTP response
+
+So the performance metrics `ryfthttp` contain:
+- `prepare` time to parse parameters and prepare URL
+- `request` time the HTTP request is processed (until transfer is started)
+- `transfer` time the HTTP response is read and processed.
+
+
+```
+request  -->
+             ] "prepare" search operation on remote node
+             ] send HTTP "request" to remote node and wait response status
+             ] "transfer" - read and parse HTTP response
+response <--
+```
