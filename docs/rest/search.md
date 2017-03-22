@@ -14,6 +14,12 @@ The GET `/search` endpoint is used to search data on Ryft boxes.
 Note, this endpoint is protected and user should provide valid credentials.
 See [authentication](../auth.md) for more details.
 
+There are a few [content types](#search-accept-header) that server can produce:
+- `Accept: application/json` which is used by default
+- `Accept: text/csv`
+- `Accept: application/msgpack` which is used internally in cluster mode
+
+
 ## Search query parameters
 
 The list of supported query parameters are the following (check detailed description below):
@@ -466,111 +472,60 @@ will produce the following output:
 
 ## Search `Accept` header
 
-Search endpoint returns data encoded as `json`(default),`msgpack` or `csv`.
+Search endpoint produces data encoded as:
+- `json` - used by default,
+- `msgpack` - used internally in cluster mode
+- `csv`
+
+The output type can be specified by `Accept` HTTP header.
+
 
 ### Accept: text/csv
 
 Ryft-server supports `csv` encoding accordingly to [RFC 4180](https://tools.ietf.org/html/rfc4180)
 
-#### Definition of the CSV Format
+A `csv` file contains zero or more records of one or more fields per record.
+Each record is separated by the newline character.
+The final record may optionally be followed by a newline character.
 
-While there are various specifications and implementations for the
-CSV format, there is no formal specification in existence, which allows
-for a wide variety of interpretations of CSV files.
-This section documents the format that seems to be followed by most implementations:
+A `csv` record can be the following types:
 
-   1.  Each record is located on a separate line, delimited by a line
-       break (CRLF).  For example:
+1. data record. The first field is "rec", then INDEX fields and data.
+   Data is reported according to selected format (utf8, json, etc).
 
-       aaa,bbb,ccc CRLF
-       zzz,yyy,xxx CRLF
-
-   2.  The last record in the file may or may not have an ending line
-       break.  For example:
-
-       aaa,bbb,ccc CRLF
-       zzz,yyy,xxx
-
-   3.  There maybe an optional header line appearing as the first line
-       of the file with the same format as normal record lines.  This
-       header will contain names corresponding to the fields in the file
-       and should contain the same number of fields as the records in
-       the rest of the file (the presence or absence of the header line
-       should be indicated via the optional "header" parameter of this
-       MIME type).  For example:
-
-       field_name,field_name,field_name CRLF
-       aaa,bbb,ccc CRLF
-       zzz,yyy,xxx CRLF
-
-   4.  Within the header and each record, there may be one or more
-       fields, separated by commas.  Each line should contain the same
-       number of fields throughout the file.  Spaces are considered part
-       of a field and should not be ignored.  The last field in the
-       record must not be followed by a comma.  For example:
-
-       aaa,bbb,ccc
-
-   5.  Each field may or may not be enclosed in double quotes (however
-       some programs, such as Microsoft Excel, do not use double quotes
-       at all).  If fields are not enclosed with double quotes, then
-       double quotes may not appear inside the fields.  For example:
-
-       "aaa","bbb","ccc" CRLF
-       zzz,yyy,xxx
-
-   6.  Fields containing line breaks (CRLF), double quotes, and commas
-       should be enclosed in double-quotes.  For example:
-
-       "aaa","b CRLF
-       bb","ccc" CRLF
-       zzz,yyy,xxx
-
-   7.  If double-quotes are used to enclose fields, then a double-quote
-       appearing inside a field must be escaped by preceding it with
-       another double quote.  For example:
-
-       "aaa","b""bb","ccc"
-
-   The ABNF grammar appears as follows:
-
-       file = [header CRLF] record *(CRLF record) [CRLF]
-       header = name *(COMMA name)
-       record = field *(COMMA field)
-       name = field
-       field = (escaped / non-escaped)
-       escaped = DQUOTE *(TEXTDATA / COMMA / CR / LF / 2DQUOTE) DQUOTE
-       non-escaped = *TEXTDATA
-       COMMA = %x2C
-       CR = %x0D ;as per section 6.1 of [RFC 2234](https://www.ietf.org/rfc/rfc2234.txt)
-       DQUOTE =  %x22 ;as per section 6.1 of [RFC 2234](https://www.ietf.org/rfc/rfc2234.txt)
-       LF = %x0A ;as per section 6.1 of [RFC 2234](https://www.ietf.org/rfc/rfc2234.txt)
-       CRLF = CR LF ;as per section 6.1 of [RFC 2234](https://www.ietf.org/rfc/rfc2234.txt)
-       TEXTDATA =  %x20-21 / %x23-2B / %x2D-7E
-
-
-#### Streaming with the `--stream` parameter
-
-In current implementation content will always be streamed.
-
-#### Fields order in the response
-
-Record:
 ```
 rec,file,offset,length,fuzziness,host,data
 ```
 
-Stat:
+2. statistics. The first field is "stat", then STAT fields:
+
 ```
 stat,matches,totalBytes,duration,dataRate,fabricDuration,fabricDataRate,host,details,extra
 ```
 
-Response finishes with the `end` tag.
-
-#### Example:
+3. error. The first field is "err", then error message:
 
 ```
-curl -X GET "ryftone-313:9876/search?local=true&query=hello&files=test%2Ffoo%2F1.txt&cs=true&reduce=true&surrounding=10&delimiter=%0D%0A&format=utf8&stats=true" -H "Accept:text/csv"
+err,message
+```
+
+4. End of file. The first field is "end".
+
+```
+end
+```
+
+Fields which start and stop with the quote character `"` are called quoted-fields.
+The beginning and ending quote are not part of the field.
+
+Within a quoted-field a quote character followed by a second quote character is
+considered a single quote. Newlines and commas may be included in a quoted-field.
+
+
+For example,
+
+```{.sh}
+$ ryftrest -q hello -f test/foo/1.txt -w=10 --format=utf8 --accept=csv
 rec,test/foo/1.txt,0,15,0,ryftone-313,"hello world
 hel"
 rec,test/foo/1.txt,2,25,0,ryftone-313,"llo world
@@ -584,30 +539,15 @@ stat,16,233,520,0.00042731945331280044,0,0,ryftone-313,null,{}
 end
 ```
 
-### Accept: application/msgpack
-
-This encode type is used only for communication between nodes.
-
-#### Example:
-```
-curl -X GET "ryftone-313:9786/search?local=true&query=hello&files=test%2Ffoo%2F1.txt&cs=true&reduce=true&surrounding=10&delimiter=%0D%0A&format=utf8&stats=true" -H "Accept:application/msgpack"
-��_index��file�test/foo/1.txt�fuzziness�host�ryftone-313�length�offset�data�hello world
-hel��_index��file�test/foo/1.txt�fuzziness�host�ryftone-313�length�offset�data�llo world
-```
-
 ### Accept: application/json
 
-#### Example:
-```
-curl -X GET "ryftone-313:9786/search?local=true&query=hello&files=test%2Ffoo%2F1.txt&cs=true&reduce=true&surrounding=10&delimiter=%0D%0A&format=utf8&stats=true" -H "Accept:application/json"
-{"results":[{"_index":{"file":"test/foo/1.txt","offset":0,"length":15,"fuzziness":0,"host":"ryftone-313"},"data":"hello world\nhel"}
-,{"_index":{"file":"test/foo/1.txt","offset":2,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":"llo world\nhello worldhell"}
-,{"_index":{"file":"test/foo/1.txt","offset":13,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":"ello worldhello from curl"}
-,{"_index":{"file":"test/foo/1.txt","offset":28,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":" from curlhello from curl"}
-,{"_index":{"file":"test/foo/1.txt","offset":43,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":" from curlhello from curl"}
-,{"_index":{"file":"test/foo/1.txt","offset":58,"length":25,"fuzziness":0,"host":"ryftone-313"},"data":" from curlhello from curl"}
-],"stats":{"matches":16,"totalBytes":233,"duration":484,"dataRate":0.0004591035448815212,"fabricDuration":0,"fabricDataRate":0,"host":"ryftone-313"}
-```
+This is default content type. It reports records, errors and statistics in
+an appropriate JSON object.
+
+
+### Accept: application/msgpack
+
+This content type is used internally for communication between nodes in cluster mode.
 
 
 # Count
