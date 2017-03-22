@@ -250,7 +250,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		drainStop := time.Now()
 
 		// performance metrics
-		if mux.Stat != nil {
+		if mux.Stat != nil && cfg.Performance {
 			if n := len(task.perfStat); n > 0 {
 				// update the last Ryft call metrics
 				task.perfStat[n-1]["post-proc"] = drainStart.Sub(addingStart).String()

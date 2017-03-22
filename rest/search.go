@@ -163,6 +163,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.ReportData = !format.IsNull(params.Format)
 	cfg.Limit = uint(params.Limit)
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
+	cfg.Performance = params.Performance
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse sharing mode"))

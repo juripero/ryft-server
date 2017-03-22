@@ -301,7 +301,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// some futher cleanup
 	defer func() {
-		if res.Stat != nil {
+		if res.Stat != nil && task.config.Performance {
 			metrics := map[string]interface{}{
 				"prepare":   task.toolStartTime.Sub(task.taskStartTime).String(),
 				"tool-exec": task.toolStopTime.Sub(task.toolStartTime).String(),

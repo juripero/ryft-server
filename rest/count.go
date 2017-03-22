@@ -136,6 +136,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.ReportData = false
 	// cfg.Limit = 0
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
+	cfg.Performance = params.Performance
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse sharing mode"))
