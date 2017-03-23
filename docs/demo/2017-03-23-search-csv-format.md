@@ -112,3 +112,25 @@ rec,test/foo/1.txt,230,22,0,ryftone-313,url310310 hello 310310
 stat,17,252,724,0.0003319418891358771,0,0,ryftone-313,null,{}
 end
 ```
+
+#### record in XML format
+
+Response has json-encoded `data` field
+
+```{.sh}
+
+bash ryftrest -q '(RECORD CONTAINS "electronic")' -i -w 10 -f regression/chicago.ryftpcrime --format=xml --search --address localhost:9786 --accept=csv --fields=Arrest,Beat
+rec,regression/chicago.ryftpcrime,71061,700,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""2432""}"
+rec,regression/chicago.ryftpcrime,71762,705,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""1731""}"
+rec,regression/chicago.ryftpcrime,91109,700,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""0531""}"
+rec,regression/chicago.ryftpcrime,173904,703,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""1421""}"
+rec,regression/chicago.ryftpcrime,184280,703,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""2423""}"
+rec,regression/chicago.ryftpcrime,344315,703,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""1622""}"
+rec,regression/chicago.ryftpcrime,353300,706,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""1821""}"
+rec,regression/chicago.ryftpcrime,400385,701,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""0834""}"
+...omitted...
+rec,regression/chicago.ryftpcrime,425869,699,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""2411""}"
+rec,regression/chicago.ryftpcrime,702628,705,-1,ryftone-313,"{""Arrest"":""false"",""Beat"":""2515""}"
+stat,72,6892667,306,21.48156695895725,1,6573.359375,ryftone-313,null,{}
+end
+```
