@@ -31,6 +31,8 @@
 package rest
 
 import (
+	"bytes"
+	"encoding/csv"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -335,7 +337,7 @@ func parseTransforms(rules []string, cfg ServerConfig) ([]search.Transform, erro
 
 	match := regexp.MustCompile(`^\s*match\s*\(\s*"(.*)"\s*\)\s*$`)
 	replace := regexp.MustCompile(`^\s*replace\s*\(\s*"(.*)"\s*,\s*"(.*)"\s*\)\s*$`)
-	script := regexp.MustCompile(`^\s*script\s*\(\s*"(.*)"\s*\)\s*$`)
+	script := regexp.MustCompile(`^\s*script\s*\((.*)\)\s*$`)
 
 	res := make([]search.Transform, 0, len(rules))
 	for _, rule := range rules {
@@ -356,9 +358,15 @@ func parseTransforms(rules []string, cfg ServerConfig) ([]search.Transform, erro
 				return nil, fmt.Errorf("failed to create regexp-replace transformation: %s", err)
 			}
 		} else if m := script.FindStringSubmatch(rule); len(m) > 1 {
-			name := m[1]
+			name, args, err := parseNameAndArgs(m[1])
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse script parameters: %s", err)
+			}
 			if info, ok := cfg.PostProcScripts[name]; ok {
-				tx, err = search.NewScriptCall(info.ExecPath, "/tmp")
+				pathAndArgs := make([]string, 0, len(info.ExecPath)+len(args))
+				pathAndArgs = append(pathAndArgs, info.ExecPath...)
+				pathAndArgs = append(pathAndArgs, args...)
+				tx, err = search.NewScriptCall(pathAndArgs, "/tmp")
 				if err != nil {
 					return nil, fmt.Errorf("failed to create script-call transformation: %s", err)
 				}
@@ -373,4 +381,23 @@ func parseTransforms(rules []string, cfg ServerConfig) ([]search.Transform, erro
 	}
 
 	return res, nil // OK
+}
+
+// parse script's name and arguments
+// use CSV format here
+func parseNameAndArgs(s string) (string, []string, error) {
+	buf := bytes.NewBufferString(s)
+	dec := csv.NewReader(buf)
+	rec, err := dec.Read()
+	if err != nil {
+		return "", nil, err
+	}
+
+	// TODO: check no more records
+
+	if len(rec) > 0 {
+		return rec[0], rec[1:], nil // OK
+	}
+
+	return "", nil, fmt.Errorf("no script name found")
 }
