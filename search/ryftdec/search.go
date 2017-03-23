@@ -323,7 +323,7 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 	task.log().WithField("output", result).Infof("Ryft call result")
 	stopTime := time.Now()
 
-	if perf := getHostPerfStat(res.Stat, task.UpdateHostTo); perf != nil {
+	if perf := getHostPerfStat(res.Stat); perf != nil {
 		metrics := map[string]interface{}{
 			"total": stopTime.Sub(startTime).String(),
 		}
@@ -338,16 +338,14 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 }
 
 // get host performance metrics
-func getHostPerfStat(stat *search.Stat, host string) map[string]interface{} {
+func getHostPerfStat(stat *search.Stat) map[string]interface{} {
 	if stat == nil {
 		return nil
 	}
 
 	if p := stat.GetAllPerfStat(); p != nil {
-		if pp, ok := p.(map[string]map[string]interface{}); ok {
-			if ppp, ok := pp[host]; ok {
-				return ppp
-			}
+		if pp, ok := p.(map[string]interface{}); ok {
+			return pp
 		}
 	}
 
