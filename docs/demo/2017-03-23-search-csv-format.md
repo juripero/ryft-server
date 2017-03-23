@@ -13,17 +13,22 @@ You can change response format sending `Accept` header with the appropriate enco
 For `csv` it is `text/csv`.
 We added support of this header into ryftrest script with the `--accept` parameter.
 
+Swagger web-ui also supports `accept` header selector.
+
 ## Short description of the CSV format
 
 Each row in a response represents one record from the search results.
+Thus in a response we have different types of data.
 
-Each row in CSV format starts with the type of a record.
+In order to differ these records each row in CSV format starts with the type of a record.
 
 Symbol of comma (',') is the separator.
 
 Each record ends with the newline character ('\n').
 
 Each record may contains quotes and newline characters.
+
+We used RFC 4180 as a base.
 
 
 1. data record has type `rec`. Then fields from INDEX (filename,offset,length,fuzziness)
