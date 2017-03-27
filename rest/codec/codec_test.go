@@ -33,6 +33,14 @@ func TestCodecEncoder(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, e4)
 
+	e5, err := NewEncoder(buf, "text/csv", true)
+	assert.NoError(t, err)
+	assert.NotNil(t, e5)
+
+	e6, err := NewEncoder(buf, "text/csv", false)
+	assert.NoError(t, err)
+	assert.NotNil(t, e6)
+
 	_, err = NewEncoder(buf, "application/octet-stream", true)
 	assert.Error(t, err)
 

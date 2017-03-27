@@ -28,56 +28,13 @@
  * ============
  */
 
-package utf8
+package csv
 
-import (
-	// "unicode/utf8"
-
-	"github.com/getryft/ryft-server/search"
+const (
+	MIME = "text/csv"
 )
 
-// RECORD format specific data.
-type Record search.Record
-
-// MarshalCSV converts utf8 RECORD into csv-encoder compatible format
-func (rec *Record) MarshalCSV() ([]string, error) {
-	csv, err := rec.Index.MarshalCSV()
-	csv = append(csv, rec.Data.(string))
-	return csv, err
-}
-
-// NewRecord creates new format specific data.
-func NewRecord() *Record {
-	return (*Record)(search.NewRecord(nil, nil))
-}
-
-// FromRecord converts RECORD to format specific data.
-// WARNING: the data of 'rec' is modified!
-func FromRecord(rec *search.Record) *Record {
-	if rec == nil {
-		return nil
-	}
-
-	// but it's stored in the "data" field
-	if rec.RawData != nil {
-		rec.Data = string(rec.RawData)
-		rec.RawData = nil
-	} else {
-		rec.Data = nil
-	}
-
-	return (*Record)(rec)
-}
-
-// ToRecord converts format specific data to RECORD.
-func ToRecord(rec *Record) *search.Record {
-	if rec == nil {
-		return nil
-	}
-
-	// assign raw data back
-	if s, ok := rec.Data.(string); ok {
-		rec.RawData = []byte(s)
-	}
-	return (*search.Record)(rec)
+// Marshaler interface is needed for the explicit encoding into CSV
+type Marshaler interface {
+	MarshalCSV() ([]string, error)
 }

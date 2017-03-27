@@ -14,6 +14,12 @@ The GET `/search` endpoint is used to search data on Ryft boxes.
 Note, this endpoint is protected and user should provide valid credentials.
 See [authentication](../auth.md) for more details.
 
+There are a few [content types](#search-accept-header) that server can produce:
+- `Accept: application/json` which is used by default
+- `Accept: text/csv`
+- `Accept: application/msgpack` which is used internally in cluster mode
+
+
 ## Search query parameters
 
 The list of supported query parameters are the following (check detailed description below):
@@ -471,6 +477,85 @@ will produce the following output:
 ],"stats":{"matches":9,"totalBytes":6902619,"duration":775,"dataRate":8.494000588693925,"fabricDataRate":8.494}
 }
 ```
+
+## Search `Accept` header
+
+Search endpoint produces data encoded as:
+- `json` - used by default,
+- `msgpack` - used internally in cluster mode
+- `csv`
+
+The output type can be specified by `Accept` HTTP header.
+
+
+### Accept: text/csv
+
+Ryft-server supports `csv` encoding accordingly to [RFC 4180](https://tools.ietf.org/html/rfc4180)
+
+A `csv` file contains zero or more records of one or more fields per record.
+Each record is separated by the newline character.
+The final record may optionally be followed by a newline character.
+
+A `csv` record can be the following types:
+
+1. data record. The first field is "rec", then INDEX fields and data.
+   Data is reported according to selected format (utf8, json, etc).
+
+```
+rec,file,offset,length,fuzziness,host,data
+```
+
+2. statistics. The first field is "stat", then STAT fields:
+
+```
+stat,matches,totalBytes,duration,dataRate,fabricDuration,fabricDataRate,host,details,extra
+```
+
+3. error. The first field is "err", then error message:
+
+```
+err,message
+```
+
+4. End of file. The first field is "end".
+
+```
+end
+```
+
+Fields which start and stop with the quote character `"` are called quoted-fields.
+The beginning and ending quote are not part of the field.
+
+Within a quoted-field a quote character followed by a second quote character is
+considered a single quote. Newlines and commas may be included in a quoted-field.
+
+
+For example,
+
+```{.sh}
+$ ryftrest -q hello -f test/foo/1.txt -w=10 --format=utf8 --accept=csv
+rec,test/foo/1.txt,0,15,0,ryftone-313,"hello world
+hel"
+rec,test/foo/1.txt,2,25,0,ryftone-313,"llo world
+hello worldhell"
+rec,test/foo/1.txt,13,25,0,ryftone-313,ello worldhello from curl
+rec,test/foo/1.txt,28,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,43,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,58,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,73,25,0,ryftone-313," from curlhello from curl"
+stat,16,233,520,0.00042731945331280044,0,0,ryftone-313,null,{}
+end
+```
+
+### Accept: application/json
+
+This is default content type. It reports records, errors and statistics in
+an appropriate JSON object.
+
+
+### Accept: application/msgpack
+
+This content type is used internally for communication between nodes in cluster mode.
 
 
 # Count

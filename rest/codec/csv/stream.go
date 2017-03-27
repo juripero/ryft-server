@@ -28,56 +28,90 @@
  * ============
  */
 
-package utf8
+package csv
 
 import (
-	// "unicode/utf8"
-
-	"github.com/getryft/ryft-server/search"
+	backend "encoding/csv"
+	"fmt"
+	"io"
 )
 
-// RECORD format specific data.
-type Record search.Record
+/* Stream CSV encoder uses tag prefixes for each item written
 
-// MarshalCSV converts utf8 RECORD into csv-encoder compatible format
-func (rec *Record) MarshalCSV() ([]string, error) {
-	csv, err := rec.Index.MarshalCSV()
-	csv = append(csv, rec.Data.(string))
-	return csv, err
+rec,<record>
+err,<error message>
+stat,<statistics>
+end
+*/
+type StreamEncoder struct {
+	encoder *backend.Writer
 }
 
-// NewRecord creates new format specific data.
-func NewRecord() *Record {
-	return (*Record)(search.NewRecord(nil, nil))
+const (
+	TAG_REC  = "rec"
+	TAG_ERR  = "err"
+	TAG_STAT = "stat"
+	TAG_EOF  = "end"
+)
+
+// NewStreamEncoder creates new CSV stream encoder.
+func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
+	enc := new(StreamEncoder)
+	enc.encoder = backend.NewWriter(w)
+	enc.encoder.Comma = ','
+	return enc, nil
 }
 
-// FromRecord converts RECORD to format specific data.
-// WARNING: the data of 'rec' is modified!
-func FromRecord(rec *search.Record) *Record {
-	if rec == nil {
+// write a CSV record
+func (enc *StreamEncoder) encode(tag string, data interface{}) error {
+	if data == nil {
 		return nil
 	}
 
-	// but it's stored in the "data" field
-	if rec.RawData != nil {
-		rec.Data = string(rec.RawData)
-		rec.RawData = nil
+	record := []string{tag}
+	if i, ok := data.(Marshaler); ok {
+		csv, err := i.MarshalCSV()
+		if err != nil {
+			return err
+		}
+		record = append(record, csv...)
 	} else {
-		rec.Data = nil
+		// fallback: as a simple string
+		record = append(record, fmt.Sprintf("%s", data))
 	}
 
-	return (*Record)(rec)
+	return enc.encoder.Write(record)
 }
 
-// ToRecord converts format specific data to RECORD.
-func ToRecord(rec *Record) *search.Record {
-	if rec == nil {
+// Write a RECORD
+func (enc *StreamEncoder) EncodeRecord(data interface{}) error {
+	return enc.encode(TAG_REC, data)
+}
+
+// Write a STATISTICS
+func (enc *StreamEncoder) EncodeStat(data interface{}) error {
+	return enc.encode(TAG_STAT, data)
+}
+
+// Write an ERROR
+func (enc *StreamEncoder) EncodeError(err error) error {
+	if err == nil {
 		return nil
 	}
-
-	// assign raw data back
-	if s, ok := rec.Data.(string); ok {
-		rec.RawData = []byte(s)
+	csv := []string{
+		TAG_ERR,
+		err.Error(),
 	}
-	return (*search.Record)(rec)
+	return enc.encoder.Write(csv)
+}
+
+// End writing, close CSV object.
+func (enc *StreamEncoder) Close() error {
+	err := enc.encoder.Write([]string{TAG_EOF})
+	if err != nil {
+		return err
+	}
+
+	enc.encoder.Flush()
+	return enc.encoder.Error()
 }

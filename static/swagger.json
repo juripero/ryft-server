@@ -12,6 +12,10 @@
         "tags": [
           "search"
         ],
+        "produces": [
+          "application/json",
+          "text/csv"
+        ],
         "summary": "Text or structured search",
         "operationId": "search",
         "parameters": [
