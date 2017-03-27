@@ -279,6 +279,7 @@ func main() {
 	private.GET("/files", server.DoGetFiles)
 	private.DELETE("/files", server.DoDeleteFiles)
 	private.POST("/files", server.DoPostFiles)
+	private.PUT("/files", server.DoUpdateFiles)
 
 	// debug API endpoints
 	if server.Config.DebugMode {
