@@ -43,6 +43,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
+| `performance` | boolean | [Flag to report performance metrics](#search-performance-parameter). |
 | `limit`       | int     | [Limit the total number of records reported](#search-limit-parameter). |
 | `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-parameters). |
 | `ep`          | boolean | **Internal** [The error prefix flag](#search-ep-parameter). |
@@ -322,6 +323,13 @@ The statistics is not reported **by default**.
 To check total number of matches and performance number just pass `stats=true`.
 
 
+### Search `performance` parameter
+
+The performance metrics are not reported **by default**.
+To get performance metrics in extra statistics just pass `performance=true`.
+See [this document](../perf.md) for detailed metrics description.
+
+
 ### Search `limit` parameter
 
 This parameter is used to limit the total number of records reported.
@@ -579,6 +587,7 @@ The list of supported query parameters are the following:
 | `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
+| `performance` | boolean | [Flag to report performance metrics](#search-performance-parameter). |
 
 NOTE: Most of the `/count` parameters are absolutely the same as `/search` parameters.
 Please check corresponding `/search` related sections.

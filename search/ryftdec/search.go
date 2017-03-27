@@ -35,6 +35,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
@@ -124,6 +125,8 @@ func needExtension(q query.Query) bool {
 
 // Search starts asynchronous "/search" with RyftDEC engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
+	taskStartTime := time.Now() // performance metrics
+
 	if cfg.ReportData && !cfg.ReportIndex {
 		return nil, fmt.Errorf("failed to report DATA without INDEX")
 		// or just be silent: cfg.ReportIndex = true
@@ -205,6 +208,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		keepIndexAs := cfg.KeepIndexAs
 		delimiter := cfg.Delimiter
 
+		searchStart := time.Now()
 		res, err := engine.doSearch(task, opts, task.rootQuery, cfg, mux)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to do search", TAG)
@@ -212,6 +216,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			return
 		}
 		mux.Stat = res.Stat
+		if mux.Stat != nil {
+			mux.Stat.ClearPerfStat()
+		}
 
 		if !engine.KeepResultFiles {
 			defer res.removeAll(opts.MountPoint, opts.HomeDir)
@@ -219,6 +226,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		// post-processing
 		task.log().WithField("output", res.Output).Infof("[%s]: final results", TAG)
+		addingStart := time.Now()
 		for _, out := range res.Output {
 			if err := task.result.AddRyftResults(
 				opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
@@ -229,6 +237,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			}
 		}
 
+		drainStart := time.Now()
 		err = task.result.DrainFinalResults(task, mux,
 			keepDataAs, keepIndexAs, delimiter,
 			filepath.Join(opts.MountPoint, opts.HomeDir),
@@ -237,6 +246,23 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			task.log().WithError(err).Errorf("[%s]: failed to drain search results", TAG)
 			mux.ReportError(fmt.Errorf("failed to drain search results: %s", err))
 			return
+		}
+		drainStop := time.Now()
+
+		// performance metrics
+		if mux.Stat != nil && cfg.Performance {
+			if n := len(task.perfStat); n > 0 {
+				// update the last Ryft call metrics
+				task.perfStat[n-1]["post-proc"] = drainStart.Sub(addingStart).String()
+			}
+
+			metrics := map[string]interface{}{
+				"prepare":            searchStart.Sub(taskStartTime).String(),
+				"intermediate-steps": task.perfStat,
+				"final-post-proc":    drainStop.Sub(drainStart).String(),
+			}
+
+			mux.Stat.AddPerfStat("ryftdec", metrics)
 		}
 	}()
 
@@ -248,6 +274,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Query,
 	cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.subtaskId++ // next subtask
+	startTime := time.Now()
 
 	if query.Simple != nil {
 		// OK, handle later...
@@ -294,7 +321,35 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 	task.drainResults(mux, res)
 	result.Stat = res.Stat
 	task.log().WithField("output", result).Infof("Ryft call result")
+	stopTime := time.Now()
+
+	if perf := getHostPerfStat(res.Stat); perf != nil {
+		metrics := map[string]interface{}{
+			"total": stopTime.Sub(startTime).String(),
+		}
+		for k, v := range perf {
+			metrics[k] = v
+		}
+
+		task.perfStat = append(task.perfStat, metrics)
+	}
+
 	return &result, nil // OK
+}
+
+// get host performance metrics
+func getHostPerfStat(stat *search.Stat) map[string]interface{} {
+	if stat == nil {
+		return nil
+	}
+
+	if p := stat.GetAllPerfStat(); p != nil {
+		if pp, ok := p.(map[string]interface{}); ok {
+			return pp
+		}
+	}
+
+	return nil // something wrong
 }
 
 // process and wait all AND subtasks
@@ -337,12 +392,19 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 		// dataset for the next Ryft call
 		if q1.Operator == "[]" {
 			// post-processing of intermediate results
+			startTime := time.Now()
 			for _, out := range res1.Output {
 				if err := task.result.AddRyftResults(
 					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
 					out.Delimiter, out.Width, 1 /*final*/); err != nil {
 					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
 				}
+			}
+			stopTime := time.Now()
+
+			if n := len(task.perfStat); n > 0 {
+				// update the last Ryft call metrics
+				task.perfStat[n-1]["post-proc"] = stopTime.Sub(startTime).String()
 			}
 
 			// get unique list of index files...
@@ -364,8 +426,14 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 				task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
 				return nil, fmt.Errorf("failed to check for catalogs: %s", err)
 			}
+
+			if n := len(task.perfStat); n > 0 {
+				// update the last Ryft call metrics
+				task.perfStat[n-1]["post-prepare"] = time.Since(stopTime).String()
+			}
 		} else {
 			// part of post-processing procedure:
+			startTime := time.Now()
 			for _, out := range res1.Output {
 				if err := task.result.AddRyftResults(
 					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
@@ -373,6 +441,12 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 					task.log().WithError(err).Warnf("[%s]: failed to add Ryft intermediate results", TAG)
 					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
 				}
+			}
+			stopTime := time.Now()
+
+			if n := len(task.perfStat); n > 0 {
+				// update the last Ryft call metrics
+				task.perfStat[n-1]["post-proc"] = stopTime.Sub(startTime).String()
 			}
 
 			// read input from temporary file

@@ -65,6 +65,9 @@ type Config struct {
 
 	// upload/search share mode
 	ShareMode utils.ShareMode
+
+	// report performance metrics
+	Performance bool
 }
 
 // NewEmptyConfig creates new empty search configuration.

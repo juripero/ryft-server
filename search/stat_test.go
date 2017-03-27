@@ -1,6 +1,7 @@
 package search
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -125,4 +126,39 @@ func TestStatCombine(t *testing.T) {
 	assert.EqualValues(t, []*Stat{s3, s1, s2}, stat.Details)
 
 	assert.Equal(t, `Stat{6 matches on 6000 bytes in 300 ms (fabric: 30 ms), details:[Stat{3 matches on 3000 bytes in 0 ms (fabric: 0 ms), details:[], host:""} Stat{1 matches on 1000 bytes in 100 ms (fabric: 10 ms), details:[], host:""} Stat{2 matches on 2000 bytes in 200 ms (fabric: 20 ms), details:[], host:""}], host:"localhost"}`, stat.String())
+}
+
+// test performance statistics
+func TestStatPerf(t *testing.T) {
+	stat := NewStat("localhost")
+
+	toJson := func(obj interface{}) string {
+		data, err := json.Marshal(obj)
+		if assert.NoError(t, err) {
+			return string(data)
+		}
+
+		return ""
+	}
+
+	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost"}`, toJson(stat))
+
+	// add new one
+	stat.AddPerfStat("nameA", "statAA1")
+	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
+		"extra": {"performance":{"nameA":"statAA1"}} }`, toJson(stat))
+
+	// replace existing
+	stat.AddPerfStat("nameA", "statAA")
+	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
+		"extra": {"performance":{"nameA":"statAA"}} }`, toJson(stat))
+
+	// one more new
+	stat.AddPerfStat("nameB", "statAB")
+	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost",
+		"extra": {"performance":{"nameA":"statAA", "nameB":"statAB"}} }`, toJson(stat))
+
+	// clear all
+	stat.ClearPerfStat()
+	assert.JSONEq(t, `{"matches":0, "totalBytes":0, "duration":0, "dataRate":0, "fabricDuration":0, "fabricDataRate":0, "host":"localhost"}`, toJson(stat))
 }
