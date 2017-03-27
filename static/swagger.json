@@ -678,6 +678,15 @@
             "type": "string"
           }
         },
+        "catalogs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "details": {
+          "type": "object"
+        },
         "dir": {
           "type": "string"
         }
