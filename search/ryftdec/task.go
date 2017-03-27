@@ -63,7 +63,8 @@ type Task struct {
 	result PostProcessing // post processing engine
 
 	// intermediate performance metrics
-	perfStat []map[string]interface{} // ryft call -> metrics
+	callPerfStat []map[string]interface{} // ryft call -> metrics
+	procPerfStat map[string]interface{}   // final post-processing
 
 	UpdateHostTo string // for cluster mode
 }
@@ -622,6 +623,8 @@ BuildItems:
 		}
 	}
 
+	stopBuildItems := time.Now()
+
 	// sort and remove duplicates
 	if 0 < len(items) {
 		// we must sort "copy" of indexes
@@ -645,6 +648,8 @@ BuildItems:
 			simple = false
 		}
 	}
+
+	stopSortItems := time.Now()
 
 	if len(task.config.Transforms) > 0 {
 		simple = false // if a transformation is enabled
@@ -703,6 +708,10 @@ BuildItems:
 		pos int64
 	}
 	files := make(map[string]*CachedFile)
+
+	var datFileTime time.Duration
+	var idxFileTime time.Duration
+	var transformTime time.Duration
 
 	// handle all index items
 	const reportRecords = true
@@ -785,6 +794,7 @@ ItemsLoop:
 		}
 
 		// post processing (index left unchanged)
+		txStart := time.Now()
 		for _, tx := range task.config.Transforms {
 			var skip bool
 			var err error
@@ -796,6 +806,8 @@ ItemsLoop:
 				continue ItemsLoop // go to next item
 			}
 		}
+		txStop := time.Now()
+		transformTime += txStop.Sub(txStart)
 
 		// output DATA file
 		if datFile != nil {
@@ -818,6 +830,9 @@ ItemsLoop:
 			}
 		}
 
+		datStop := time.Now()
+		datFileTime += datStop.Sub(txStop)
+
 		// output INDEX file
 		if idxFile != nil {
 			indexStr := fmt.Sprintf("%s,%d,%d,%d\n", item.Index.File, item.Index.Offset, item.Index.Length, item.Index.Fuzziness)
@@ -828,6 +843,9 @@ ItemsLoop:
 			}
 		}
 
+		idxStop := time.Now()
+		idxFileTime += idxStop.Sub(datStop)
+
 		if reportRecords {
 			idx := search.NewIndexCopy(item.Index)
 			idx.UpdateHost(task.UpdateHostTo)
@@ -835,6 +853,14 @@ ItemsLoop:
 			idx.DataPos = 0 // hide data position
 			mux.ReportRecord(rec)
 		}
+	}
+
+	task.procPerfStat = map[string]interface{}{
+		"build-items": stopBuildItems.Sub(start).String(),
+		"sort-items":  stopSortItems.Sub(stopBuildItems).String(),
+		"write-data":  datFileTime.String(),
+		"write-index": idxFileTime.String(),
+		"transform":   transformTime.String(),
 	}
 
 	return nil // OK

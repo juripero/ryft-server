@@ -88,7 +88,13 @@ So the performance metrics `ryftdec` contain:
   - `ryftprim` - backend performance metrics
   - `post-proc` - step post-processing time: read indexes
   - `total` - total step time
-- `final-post-proc` final post-processing time: read data, unwind indexes, remove duplicates.
+- `final-post-proc` final post-processing time:
+  - `build-items` time to unwind indexes
+  - `sort-items` time to sort items and remove duplicates
+  - `transform` call custom transformations
+  - `write-data` write output DATA file
+  - `write-index` write output INDEX file
+  - `total` total post-processing time
 
 
 ```

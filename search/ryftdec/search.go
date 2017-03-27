@@ -251,15 +251,19 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		// performance metrics
 		if mux.Stat != nil && cfg.Performance {
-			if n := len(task.perfStat); n > 0 {
+			if n := len(task.callPerfStat); n > 0 {
 				// update the last Ryft call metrics
-				task.perfStat[n-1]["post-proc"] = drainStart.Sub(addingStart).String()
+				task.callPerfStat[n-1]["post-proc"] = drainStart.Sub(addingStart).String()
+			}
+
+			if task.procPerfStat != nil {
+				task.procPerfStat["total"] = drainStop.Sub(drainStart).String()
 			}
 
 			metrics := map[string]interface{}{
 				"prepare":            searchStart.Sub(taskStartTime).String(),
-				"intermediate-steps": task.perfStat,
-				"final-post-proc":    drainStop.Sub(drainStart).String(),
+				"intermediate-steps": task.callPerfStat,
+				"final-post-proc":    task.procPerfStat,
 			}
 
 			mux.Stat.AddPerfStat("ryftdec", metrics)
@@ -331,7 +335,7 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 			metrics[k] = v
 		}
 
-		task.perfStat = append(task.perfStat, metrics)
+		task.callPerfStat = append(task.callPerfStat, metrics)
 	}
 
 	return &result, nil // OK
@@ -402,9 +406,9 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			}
 			stopTime := time.Now()
 
-			if n := len(task.perfStat); n > 0 {
+			if n := len(task.callPerfStat); n > 0 {
 				// update the last Ryft call metrics
-				task.perfStat[n-1]["post-proc"] = stopTime.Sub(startTime).String()
+				task.callPerfStat[n-1]["post-proc"] = stopTime.Sub(startTime).String()
 			}
 
 			// get unique list of index files...
@@ -427,9 +431,9 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 				return nil, fmt.Errorf("failed to check for catalogs: %s", err)
 			}
 
-			if n := len(task.perfStat); n > 0 {
+			if n := len(task.callPerfStat); n > 0 {
 				// update the last Ryft call metrics
-				task.perfStat[n-1]["post-prepare"] = time.Since(stopTime).String()
+				task.callPerfStat[n-1]["post-prepare"] = time.Since(stopTime).String()
 			}
 		} else {
 			// part of post-processing procedure:
@@ -444,9 +448,9 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			}
 			stopTime := time.Now()
 
-			if n := len(task.perfStat); n > 0 {
+			if n := len(task.callPerfStat); n > 0 {
 				// update the last Ryft call metrics
-				task.perfStat[n-1]["post-proc"] = stopTime.Sub(startTime).String()
+				task.callPerfStat[n-1]["post-proc"] = stopTime.Sub(startTime).String()
 			}
 
 			// read input from temporary file
