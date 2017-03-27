@@ -21,4 +21,20 @@ func TestRecordSimple(t *testing.T) {
 	assert.Nil(t, rec.Data)
 }
 
+// test CSV marshaling
+func TestRecordMarshalCSV(t *testing.T) {
+	rec := NewRecord(NewIndex("a.txt", 1, 2).UpdateHost("localhost").SetFuzziness(-1), []byte("hello"))
+	data, err := rec.MarshalCSV()
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{
+			"a.txt",
+			"1",
+			"2",
+			"-1",
+			"localhost",
+			"hello",
+		}, data)
+	}
+}
+
 // TODO: test record pool in many goroutines

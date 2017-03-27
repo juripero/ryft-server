@@ -50,3 +50,19 @@ func TestFormatRecord(t *testing.T) {
 	assert.Nil(t, FromRecord(nil))
 	assert.NotNil(t, fmt.NewRecord())
 }
+
+// test null RECORD to CSV serialization
+func TestRecord_MarshalCSV(t *testing.T) {
+	f, _ := New()
+	rec1 := f.NewRecord()
+	rec := rec1.(*Record)
+	rec.Index = f.ToIndex(NewIndex())
+	rec.Index.File = "foo.txt"
+	rec.Index.Offset = 123
+	rec.Index.Length = 456
+	rec.Index.Fuzziness = 7
+	rec.Index.Host = "localhost"
+	result, err := rec.MarshalCSV()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"foo.txt", "123", "456", "7", "localhost", ""}, result)
+}

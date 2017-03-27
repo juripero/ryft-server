@@ -66,6 +66,7 @@ REST specific:
 --stream         Use stream output format. Provides a sequence of JSON
                  "tag-object" pairs to be able to decode input data on the fly
                  (is used for node communication within cluster).
+--accept=<fmt>   Accept format can be "json" or "csv".
 
 -v|--verbose     Tells curl to be verbose.
 -vv|--pretty     Get pretty (properly indented) formatting with jq tool.
@@ -119,6 +120,7 @@ FIELDS=
 STATS=true
 STREAM=
 SPARK=
+ACCEPT=json
 
 # be silent by default
 
@@ -365,6 +367,14 @@ while [[ $# > 0 ]]; do
         SPARK="true"
         shift
         ;;
+    --accept=*)
+        ACCEPT="${1#*=}"
+        shift
+        ;;
+    --accept)
+        ACCEPT="$2"
+        shift 2
+        ;;
     -vv|--pretty)
         VERBOSE="-s" # tell curl to be silent
         PRETTY=true
@@ -396,6 +406,20 @@ while [[ $# > 0 ]]; do
         ;;
     esac
 done
+
+case "$ACCEPT" in
+    csv)
+        ACCEPT="Accept: text/csv"
+        ;;
+    json)
+        ACCEPT="Accept: application/json"
+        ;;
+    msgpack)
+        ACCEPT="Accept: application/msgpack"
+        ;;
+    *)
+        fail "'$ACCEPT' is unknown accept mode, run '$0 --help' for help"
+esac
 
 [[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
 [[ -z "${FILES[@]}" && -z "${CATALOGS[@]}" ]] && fail "no file or catalog provided, run '$0 --help' for help"
@@ -476,8 +500,8 @@ fi
 # do the search and print error/results
 if [[ -z "$PRETTY" ]]; then
     # Flat output for feeding into other processes
-    curl $VERBOSE --get "${URL_DATA[@]}" --compressed -H "Accept: application/json" "$ADDRESS$ENDPOINT$DRYRUN"
+    curl $VERBOSE --get "${URL_DATA[@]}" --compressed -H "$ACCEPT" "$ADDRESS$ENDPOINT$DRYRUN"
 else
     # Prettified output without data rate or details
-    curl $VERBOSE --get "${URL_DATA[@]}" --compressed -H "Accept: application/json" "$ADDRESS$ENDPOINT$DRYRUN" | jq "$JQ_STR"
+    curl $VERBOSE --get "${URL_DATA[@]}" --compressed -H "$ACCEPT" "$ADDRESS$ENDPOINT$DRYRUN" | jq "$JQ_STR"
 fi

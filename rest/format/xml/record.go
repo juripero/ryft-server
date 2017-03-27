@@ -31,11 +31,11 @@
 package xml
 
 import (
+	"encoding/json"
 	"fmt"
 
-	"github.com/getryft/ryft-server/search"
-
 	"github.com/clbanning/mxj"
+	"github.com/getryft/ryft-server/search"
 )
 
 // RECORD format specific data.
@@ -45,6 +45,31 @@ const (
 	recFieldIndex = "_index"
 	recFieldError = "_error"
 )
+
+// MarshalCSV converts xml RECORD into csv-encoder compatible format
+func (rec *Record) MarshalCSV() ([]string, error) {
+	idx := (*rec)[recFieldIndex].(*Index)
+	csv, err := ToIndex(idx).MarshalCSV()
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := Record{}
+	for k, v := range *rec {
+		// ignore "_error" and "_index" fields
+		if k == recFieldIndex || k == recFieldError {
+			continue
+		}
+		filtered[k] = v
+	}
+
+	jsonified, err := json.Marshal(filtered)
+	if err != nil {
+		return nil, err
+	}
+	csv = append(csv, string(jsonified))
+	return csv, nil
+}
 
 // for future work...
 type Record_0 struct {
