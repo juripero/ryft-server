@@ -30,20 +30,13 @@
 
 package rest
 
-/*
-TODO:
-	Move/rename
-		file
-		directory
-		catalog.
-	File extension couldn't be changed.
-*/
-
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -52,23 +45,32 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-// UpdateFileParams request body struct
-type UpdateFileParams struct {
-	SourcePath      string `form:"source_path" json:"source_path" binding:"required"`
-	DestinationPath string `form:"destination_path" json:"destination_path" binding:"required"`
-	Local           bool   `form:"local" json:"local"`
+// UpdateFilesParams request body struct
+type UpdateFilesParams struct {
+	File    string `form:"file" json:"file"`
+	Dir     string `form:"dir" json:"dir"`
+	Catalog string `form:"catalog" json:"catalog"`
+	New     string `form:"new" json:"new" binding:"required"`
+	Local   bool   `form:"local" json:"local"`
 }
 
-// String UpdateFilesParams string representation
-func (p UpdateFileParams) String() string {
-	return fmt.Sprintf("{source_path:%s, destination_path: %s", p.SourcePath, p.DestinationPath)
+// is empty?
+func (p UpdateFilesParams) isEmpty() bool {
+	return len(p.File) == 0 &&
+		len(p.Dir) == 0 &&
+		len(p.Catalog) == 0
+}
+
+// hasSameExt check if both source and destination files has the same extention
+func (p UpdateFilesParams) hasSameExt() bool {
+	return len(p.File) > 0 && filepath.Ext(p.File) == filepath.Ext(p.New)
 }
 
 // DoUpdateFiles UPDATE files method
 func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 	// parse request parameters
-	params := UpdateFileParams{}
+	params := UpdateFilesParams{}
 
 	b := binding.Default(ctx.Request.Method, ctx.ContentType())
 	if err := b.Bind(ctx.Request, &params); err != nil {
@@ -76,6 +78,9 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 			WithDetails("failed to parse request parameters"))
 	}
 
+	if !params.hasSameExt() {
+		panic(NewError(http.StatusBadRequest, "changing the file extention is not allowed"))
+	}
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
 	mountPoint, err := server.getMountPoint(homeDir)
 	if err != nil {
@@ -83,20 +88,31 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 			WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
-	files := []string{params.SourcePath, params.DestinationPath}
 
 	// checks all the input filenames are relative to home
-	for _, path := range files {
-		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, path)) {
+	if len(params.Catalog) > 0 {
+		panic(NewError(http.StatusNotImplemented, "Not implemented feature"))
+		/*
+			if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Catalog)) {
+				panic(NewError(http.StatusBadRequest,
+					fmt.Sprintf("catalog path %q is not relative to home", params.Catalog)))
+			}
+		*/
+	} else {
+		path := filepath.Join(mountPoint, params.Dir, params.File)
+		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.File)) {
 			panic(NewError(http.StatusBadRequest,
 				fmt.Sprintf("path %q is not relative to home", path)))
 		}
 	}
+
 	log.WithFields(map[string]interface{}{
-		"source_path":      params.SourcePath,
-		"destination_path": params.DestinationPath,
-		"user":             userName,
-		"home":             homeDir,
+		"file":    params.File,
+		"dir":     params.Dir,
+		"catalog": params.Catalog,
+		"new":     params.New,
+		"user":    userName,
+		"home":    homeDir,
 	}).Infof("[%s]: renaming...", CORE)
 
 	// for requested file|dir|catalog get list of tags from consul KV/partition.
@@ -104,13 +120,10 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 	// for each node (with non empty list) call PUT /files passing
 	// list of files whose tags are matched.
 
-	result := struct {
-		Error  string      `json:"error"`
-		Result interface{} `json:"result"`
-	}{}
+	result := make(map[string]interface{})
 
 	if !params.Local && !server.Config.LocalOnly {
-		services, tags, err := server.getConsulInfoForFiles(userTag, []string{params.SourcePath})
+		services, tags, err := server.getConsulInfoForFiles(userTag, []string{params.File})
 		if err != nil || len(tags) != 1 {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
 				WithDetails("failed to map files to tags"))
@@ -119,67 +132,141 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 			IsLocal bool
 			Name    string
 			Address string
-			Params  UpdateFileParams
+			Params  UpdateFilesParams
 
 			Result interface{}
 			Error  error
 		}
 		// build list of nodes to call
-		node := new(Node)
-		scheme := "http"
-		service := services[0]
-		if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-			node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
-		} else {
-			node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-		}
-		node.IsLocal = server.isLocalService(service)
-		node.Name = service.Node
-		node.Params.Local = true
-		node.Params.SourcePath = params.SourcePath
-		node.Params.DestinationPath = params.DestinationPath
-
-		// call each node in dedicated goroutine
-		var wg sync.WaitGroup
-
-		wg.Add(1)
-		go func(node *Node) {
-			defer wg.Done()
-			if node.IsLocal {
-				log.WithField("what", node.Params).Debugf("renaming on local node")
-				// move local file
-				node.Result, node.Error = server.MoveLocalFile(mountPoint, node.Params), nil
+		nodes := make([]*Node, len(services))
+		for i, service := range services {
+			node := new(Node)
+			scheme := "http"
+			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
+				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
 			} else {
-				log.WithField("what", node.Params).
-					WithField("node", node.Name).
-					WithField("addr", node.Address).
-					Debugf("renaming on remote node")
-				// move remote file
-				node.Result, node.Error = server.MoveRemoteFile(node.Address, authToken, node.Params)
+				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
 			}
-		}(node)
+
+			node.IsLocal = server.isLocalService(service)
+			node.Params = UpdateFilesParams{
+				File:    params.File,
+				Dir:     params.Dir,
+				Catalog: params.Catalog,
+				New:     params.New,
+				Local:   true,
+			}
+			node.Name = service.Node
+			nodes[i] = node
+		}
+
+		var wg sync.WaitGroup
+		for _, node := range nodes {
+			wg.Add(1)
+			go func(node *Node) {
+				defer wg.Done()
+				if node.IsLocal {
+					log.WithField("what", node.Params).Debugf("renaming on local node")
+					// move local file
+					node.Result, node.Error = server.MoveLocalFile(mountPoint, node.Params), nil
+				} else {
+					log.WithField("what", node.Params).
+						WithField("node", node.Name).
+						WithField("addr", node.Address).
+						Debugf("renaming on remote node")
+					// move remote file
+					node.Result, node.Error = server.MoveRemoteFile(node.Address, authToken, node.Params)
+				}
+			}(node)
+		}
 
 		// wait and report all results
 		wg.Wait()
-		if node.Error != nil {
-			result.Error = node.Error.Error()
-		} else {
-			result.Result = node.Result
+		for _, node := range nodes {
+			if node.Error != nil {
+				result[node.Name] = map[string]interface{}{
+					"error": node.Error.Error(),
+				}
+			} else {
+				result[node.Name] = node.Result
+			}
 		}
-
 	} else {
-		result.Result = server.MoveLocalFile(mountPoint, params)
+		result = server.MoveLocalFile(mountPoint, params)
 	}
 	ctx.JSON(http.StatusOK, result)
 }
 
 // MoveLocalFile move local file, directory, catalog
-func (server *Server) MoveLocalFile(mountPoint string, params UpdateFileParams) interface{} {
-	return nil
+func (server *Server) MoveLocalFile(mountPoint string, params UpdateFilesParams) map[string]interface{} {
+	res := make(map[string]interface{})
+	updateResult := func(name string, err error) {
+		if err != nil {
+			res[name] = err.Error()
+		} else {
+			res[name] = "OK" // "MOVED"
+		}
+	}
+
+	// move
+	item, err := move(mountPoint, params.File, params.Dir, params.Catalog, params.New)
+	updateResult(item, err)
+	return res
+}
+
+func move(mountPoint string, file string, dir string, catalog string, new string) (string, error) {
+	// What we want to move?
+	if len(catalog) != 0 { // do something with catalog
+		/*
+			catalogPath := filepath.Join(mountPoint, catalog)
+			if len(file) != 0 {
+				oldPath := filepath.Join(dir, file)
+				newPath := filepath.Join(dir, new)
+				// move file inside the catalog
+			} else {
+				newPath := filepath.Join(mountPoint, new)
+				// move catalog itself
+			}
+		*/
+	} else { // move file or dir
+		targetPath := filepath.Join(dir, file)
+		// check file path can be inherited
+		path, err := filepath.Rel(mountPoint, targetPath)
+		if err != nil {
+			return targetPath, err
+		}
+		// check source file exists
+		if _, err := os.Stat(path); err != nil {
+			return targetPath, err
+		}
+		// check file path can be inherited
+		newTargetPath := filepath.Join(dir, new)
+		newPath, err := filepath.Rel(mountPoint, newTargetPath)
+		if err != nil {
+			return path, err
+		}
+		// check destination path doesn't exist
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			return path, err
+		}
+		// check file extention
+		if len(file) != 0 && filepath.Ext(path) != filepath.Ext(newPath) {
+			return path, errors.New("file extention couldn't be changed")
+		}
+		if path == newPath {
+			return path, nil
+		}
+		// move file or dir
+		if err := os.Rename(path, newPath); err != nil {
+			return path, err
+		}
+		return path, nil
+	}
+	return "", nil
 }
 
 // MoveRemoteFile move remote file, directory, catalog
-func (server *Server) MoveRemoteFile(address string, authToken string, params UpdateFileParams) (interface{}, error) {
+func (server *Server) MoveRemoteFile(address string, authToken string, params UpdateFilesParams) (map[string]interface{}, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {
@@ -187,8 +274,10 @@ func (server *Server) MoveRemoteFile(address string, authToken string, params Up
 	}
 	q := url.Values{}
 	q.Set("local", fmt.Sprintf("%t", params.Local))
-	q.Set("source_path", fmt.Sprintf("%s", params.SourcePath))
-	q.Set("destination_path", fmt.Sprintf("%s", params.DestinationPath))
+	q.Set("new", fmt.Sprintf("%s", params.New))
+	q.Set("file", fmt.Sprintf("%s", params.File))
+	q.Set("dir", fmt.Sprintf("%s", params.Dir))
+	q.Set("catalog", fmt.Sprintf("%s", params.Catalog))
 
 	u.RawQuery = q.Encode()
 	u.Path += "/files"
