@@ -230,7 +230,7 @@ func move(mountPoint string, file string, dir string, catalog string, new string
 		*/
 	} else { // move file or dir
 		targetPath := filepath.Join(dir, file)
-		// check file path can be inherited
+		// check file path can be derived
 		path, err := filepath.Rel(mountPoint, targetPath)
 		if err != nil {
 			return targetPath, err
@@ -239,7 +239,7 @@ func move(mountPoint string, file string, dir string, catalog string, new string
 		if _, err := os.Stat(path); err != nil {
 			return targetPath, err
 		}
-		// check file path can be inherited
+		// check file path can be derived
 		newTargetPath := filepath.Join(dir, new)
 		newPath, err := filepath.Rel(mountPoint, newTargetPath)
 		if err != nil {
