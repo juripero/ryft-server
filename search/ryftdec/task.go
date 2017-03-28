@@ -680,7 +680,7 @@ BuildItems:
 		if err != nil {
 			return fmt.Errorf("failed to create DATA file: %s", err)
 		}
-		datFile = bufio.NewWriter(f)
+		datFile = bufio.NewWriterSize(f, 256*1024)
 		defer func() {
 			datFile.Flush()
 			f.Close()
@@ -694,7 +694,7 @@ BuildItems:
 		if err != nil {
 			return fmt.Errorf("failed to create INDEX file: %s", err)
 		}
-		idxFile = bufio.NewWriter(f)
+		idxFile = bufio.NewWriterSize(f, 256*1024)
 		defer func() {
 			idxFile.Flush()
 			f.Close()
@@ -726,7 +726,7 @@ ItemsLoop:
 			} else {
 				cf = &CachedFile{
 					f:   f,
-					rd:  bufio.NewReader(f),
+					rd:  bufio.NewReaderSize(f, 256*1024),
 					pos: 0,
 				}
 				files[item.dataFile] = cf // put to cache
@@ -794,23 +794,25 @@ ItemsLoop:
 		}
 
 		// post processing (index left unchanged)
-		txStart := time.Now()
-		for _, tx := range task.config.Transforms {
-			var skip bool
-			var err error
-			recRawData, skip, err = tx.Process(recRawData)
-			if err != nil {
-				mux.ReportError(fmt.Errorf("failed to transform: %s", err))
-				continue ItemsLoop // go to next item
-			} else if skip {
-				continue ItemsLoop // go to next item
+		if recRawData != nil {
+			start := time.Now()
+			for _, tx := range task.config.Transforms {
+				var skip bool
+				var err error
+				recRawData, skip, err = tx.Process(recRawData)
+				if err != nil {
+					mux.ReportError(fmt.Errorf("failed to transform: %s", err))
+					continue ItemsLoop // go to next item
+				} else if skip {
+					continue ItemsLoop // go to next item
+				}
 			}
+			transformTime += time.Since(start)
 		}
-		txStop := time.Now()
-		transformTime += txStop.Sub(txStart)
 
 		// output DATA file
 		if datFile != nil {
+			start := time.Now()
 			n, err := datFile.Write(recRawData)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write DATA file: %s", err))
@@ -828,23 +830,20 @@ ItemsLoop:
 					// file is corrupted, any sense to continue?
 				}
 			}
+			datFileTime += time.Since(start)
 		}
-
-		datStop := time.Now()
-		datFileTime += datStop.Sub(txStop)
 
 		// output INDEX file
 		if idxFile != nil {
+			start := time.Now()
 			indexStr := fmt.Sprintf("%s,%d,%d,%d\n", item.Index.File, item.Index.Offset, item.Index.Length, item.Index.Fuzziness)
 			_, err := idxFile.WriteString(indexStr)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write INDEX: %s", err))
 				// file is corrupted, any sense to continue?
 			}
+			idxFileTime += time.Since(start)
 		}
-
-		idxStop := time.Now()
-		idxFileTime += idxStop.Sub(datStop)
 
 		if reportRecords {
 			idx := search.NewIndexCopy(item.Index)
