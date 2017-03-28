@@ -32,6 +32,7 @@ package msgpack
 
 import (
 	"io"
+	"reflect"
 
 	backend "github.com/ugorji/go/codec"
 )
@@ -58,6 +59,7 @@ const (
 func NewStreamEncoder(w io.Writer) (*StreamEncoder, error) {
 	enc := new(StreamEncoder)
 	h := new(backend.MsgpackHandle)
+	h.WriteExt = true
 	enc.encoder = backend.NewEncoder(w, h)
 	return enc, nil
 }
@@ -145,6 +147,8 @@ type StreamDecoder struct {
 func NewStreamDecoder(r io.Reader) (*StreamDecoder, error) {
 	dec := new(StreamDecoder)
 	h := new(backend.MsgpackHandle)
+	h.MapType = reflect.TypeOf(map[string]interface{}(nil))
+	h.RawToString = true
 	dec.decoder = backend.NewDecoder(r, h)
 	return dec, nil
 }

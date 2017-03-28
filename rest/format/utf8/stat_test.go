@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,4 +58,33 @@ func TestFormatStat(t *testing.T) {
 
 	stat.Host = "" // should be omitted
 	testStatMarshal(t, stat1, `{"matches":123, "totalBytes":456, "duration":11, "dataRate":11.11, "fabricDuration":22, "fabricDataRate":22.22}`)
+}
+
+// test utf8 STAT to CSV serialization
+func TestStat_MarshalCSV(t *testing.T) {
+	fmt, _ := New()
+	stat1 := fmt.NewStat()
+	stat := stat1.(*Stat)
+	stat.Matches = 123
+	stat.TotalBytes = 456
+	stat.Duration = 11
+	stat.DataRate = 11.11
+	stat.FabricDuration = 22
+	stat.FabricDataRate = 22.22
+	stat.Host = "localhost"
+	stat2 := search.NewStat("localhost")
+	stat.Details = append(stat.Details, stat2)
+	result, err := stat.MarshalCSV()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{
+		"123",
+		"456",
+		"11",
+		"11.11",
+		"22",
+		"22.22",
+		"localhost",
+		`[{"matches":0,"totalBytes":0,"duration":0,"dataRate":0,"fabricDuration":0,"fabricDataRate":0,"host":"localhost"}]`,
+		`{}`,
+	}, result)
 }

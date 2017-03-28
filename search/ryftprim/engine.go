@@ -108,6 +108,14 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, err
 	}
 
+	defer func() {
+		// in case of errors release all "read" locks
+		// run() should set lockInProgress=true until ryftprim is finished
+		if !task.lockInProgress {
+			task.releaseLockedFiles()
+		}
+	}()
+
 	// prepare command line arguments
 	err := engine.prepare(task)
 	if err != nil {
@@ -137,7 +145,7 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	}).Infof("[%s]: start /files", TAG)
 
 	// read directory content
-	info, err := search.ReadDir(home, path, hidden)
+	info, err := ReadDirOrCatalog(home, path, hidden, true, engine.IndexHost)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to read directory content", TAG)
 		return nil, fmt.Errorf("failed to read directory content: %s", err)

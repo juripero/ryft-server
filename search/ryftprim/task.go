@@ -66,6 +66,16 @@ type Task struct {
 	config     *search.Config
 	results    *ResultsReader
 	resultWait sync.WaitGroup
+
+	// list of locked files
+	lockedFiles    []string
+	lockInProgress bool
+
+	// performance metrics
+	taskStartTime time.Time // task start time
+	toolStartTime time.Time
+	toolStopTime  time.Time
+	readStartTime time.Time
 }
 
 // NewTask creates new task.
@@ -74,6 +84,7 @@ func NewTask(config *search.Config) *Task {
 
 	task := new(Task)
 	task.Identifier = fmt.Sprintf("%016x", id)
+	task.taskStartTime = time.Now() // performance metric
 
 	task.config = config
 	return task
@@ -103,6 +114,7 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	rr.ReadFilePollLimit = engine.ReadFilePollLimit
 
 	task.resultWait.Add(1)
+	task.readStartTime = time.Now() // performance metric
 	go func() {
 		defer task.resultWait.Done()
 		rr.process(res)

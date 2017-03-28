@@ -47,6 +47,14 @@ var (
 	ErrCancelled = fmt.Errorf("cancelled by user")
 )
 
+// release all locked files
+func (task *Task) releaseLockedFiles() {
+	for _, path := range task.lockedFiles {
+		utils.SafeUnlockRead(path)
+	}
+	task.lockedFiles = nil
+}
+
 // Prepare `ryftprim` command line arguments.
 // This function converts search configuration to `ryftprim` command line arguments.
 // See `ryftprim -h` for option description.
@@ -113,7 +121,22 @@ func (engine *Engine) prepare(task *Task) error {
 	// files
 	for _, file := range cfg.Files {
 		path := filepath.Join(engine.MountPoint, engine.HomeDir, file)
-		args = append(args, "-f", engine.relativeToMountPoint(path))
+
+		skip := false
+		if !cfg.ShareMode.IsIgnore() {
+			if utils.SafeLockRead(path, cfg.ShareMode) {
+				task.lockedFiles = append(task.lockedFiles, path)
+			} else if cfg.ShareMode.IsSkipBusy() {
+				task.log().WithField("file", path).Warnf("file is busy, skipped")
+				skip = true
+			} else {
+				return fmt.Errorf("%s file is busy", path)
+			}
+		}
+
+		if !skip {
+			args = append(args, "-f", engine.relativeToMountPoint(path))
+		}
 	}
 
 	// data separator (should be hex-escaped)
@@ -204,6 +227,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.toolCmd.Stdout = task.toolOut
 	task.toolCmd.Stderr = task.toolOut
 
+	task.toolStartTime = time.Now() // performance metric
 	err := task.toolCmd.Start()
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to start tool", TAG)
@@ -211,6 +235,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	}
 
 	// do processing in background
+	task.lockInProgress = true // need to take care about locked files
 	go engine.process(task, res, minimizeLatency)
 
 	return nil // OK for now
@@ -272,9 +297,30 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 
 // Finish the `ryftprim` tool processing.
 func (engine *Engine) finish(err error, task *Task, res *search.Result) {
+	task.toolStopTime = time.Now() // performance metric
+
 	// some futher cleanup
-	defer res.Close()
-	defer res.ReportDone()
+	defer func() {
+		if res.Stat != nil && task.config.Performance {
+			metrics := map[string]interface{}{
+				"prepare":   task.toolStartTime.Sub(task.taskStartTime).String(),
+				"tool-exec": task.toolStopTime.Sub(task.toolStartTime).String(),
+			}
+
+			if !task.readStartTime.IsZero() {
+				// for /count operation there is no "read-data"
+				metrics["read-data"] = time.Since(task.readStartTime).String()
+			}
+
+			res.Stat.AddPerfStat("ryftprim", metrics)
+		}
+		res.ReportDone()
+		res.Close()
+	}()
+
+	// ryftprim is finished we can release locked files
+	task.lockInProgress = false
+	task.releaseLockedFiles()
 
 	// tool output
 	out := task.toolOut.Bytes()

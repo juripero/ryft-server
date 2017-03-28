@@ -1,5 +1,6 @@
-The GET `/files` endpoint is used to get Ryft box directory content.
+The GET `/files` endpoint is used to get Ryft box directory content
 The name of all subdirectories and files are reported.
+Also this method is used to download standalone file or catalog's part.
 
 The POST `/files` endpoint is used to upload a file to Ryft box.
 The catalog feature is supported to upload a bunch of small files.
@@ -10,14 +11,73 @@ Note, these endpoints are protected and user should provide valid credentials.
 See [authentication](../auth.md) for more details.
 
 
-## Files query parameters
+## GET Files
 
-The list of supported query parameters for the GET endpoint are the following:
+The same GET `/files` method is used to get directory content
+or to download a file.
+
+The list of supported query parameters to get directory content are the following:
 
 | Parameter | Type    | Description |
 | --------- | ------- | ----------- |
 | `dir`     | string  | [The directory to get content of](#get-files-dir-parameter). |
+| `hidden`  | boolean | [The report hidden files flag](#get-files-hidden-parameter). |
 | `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
+
+Note, the `dir` should specify valid directory path.
+
+
+The list of supported query parameters to get catalog's content are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `catalog` | string  | [The catalog name](#get-files-catalog-parameter). |
+| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
+
+Note, the `file` parameter should be empty and `catalog` should specify
+valid catalog path.
+
+
+The list of supported query parameters to download a standalone file are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `dir`     | string  | [The directory where the file is located](#get-files-dir-parameter). |
+| `file`    | string  | [The filename to download](#get-files-file-parameter). |
+
+The following queries are the same:
+
+```{.sh}
+curl 'http://localhost:8765/files?dir=foo&file=test.txt'
+curl 'http://localhost:8765/files?file=foo/test.txt'
+curl 'http://localhost:8765/files/foo?file=test.txt'
+```
+
+
+The list of supported query parameters to download a file from catalog are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `dir`     | string  | [The directory where the catalog is located](#get-files-dir-parameter). |
+| `catalog` | string  | [The catalog name](#get-files-catalog-parameter). |
+| `file`    | string  | [The filename (inside catalog)](#get-files-file-parameter). |
+
+The following queries are the same:
+
+```{.sh}
+curl 'http://localhost:8765/files?dir=foo&catalog=test.catalog&file=test.txt'
+curl 'http://localhost:8765/files?catalog=foo/test.catalog&file=test.txt'
+curl 'http://localhost:8765/files/foo?catalog=test.catalog&file=test.txt'
+```
+
+
+Moreover the [Content-Range](https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html)
+and [If-Modified-Since](https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html)
+headers are supported for downloading.
+So it's possible to download only required part of a file.
+
+
+## POST Files
 
 The list of supported query parameters for the POST standalone files are the following:
 
@@ -39,7 +99,11 @@ The list of supported query parameters for the POST files to catalog:
 | `offset`  | integer | [The position of uploaded chunk](#post-files-offset-parameter). |
 | `length`  | integer | [The length of uploaded chunk](#post-files-length-parameter). |
 | `lifetime`| string  | [The optional lifetime of the uploaded file](#post-files-lifetime-parameter). |
+|`share-mode`| string | [The share mode used to access data files](#post-files-share-mode-parameter). |
 | `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
+
+
+## DELETE Files
 
 The list of supported query parameters for the DELETE endpoint are the following:
 
@@ -55,8 +119,33 @@ The list of supported query parameters for the DELETE endpoint are the following
 
 The directory to get content of. Root directory `dir=/` is used **by default**.
 
+This parameter also can be used for downloading and it specifies the path
+where requested file or catalog is located.
+
 The directory name should be relative to the Ryft volume and user's home.
 The `dir=/foo` request will report content of `/ryftone/test/foo` directory on the Ryft box.
+
+
+### GET files `hidden` parameter
+
+The flag to report hidden files. The `hidden=false` is used **by default**.
+That means all the hidden files are not reported.
+
+
+### GET files `file` parameter
+
+The filename to download.
+
+For standalone file it is the full file path relative to directory `dir` specified.
+
+For catalog it is the filename within catalog specified.
+
+
+### GET files `catalog` parameter
+
+The catalog to download a part of.
+
+It is the full catalog path relative to directory `dir` specified.
 
 
 ### POST files content
@@ -66,6 +155,14 @@ There are two supported `Content-Type` headers:
 
 - `application/octet-stream`
 - `multipart/form-data` - actual file content should be provided via `file` key.
+
+For example:
+
+```{.sh}
+$ curl -X POST --data "hello" -H 'Content-Type: application/octet-stream' -s "http://localhost:8765/files?file=/test/file.txt" | jq .
+#   -- OR --
+$ curl -X POST -F file=@/path/to/file.txt -s "http://localhost:8765/files?file=/test/file.txt&length=100" | jq .
+```
 
 
 ### POST files `catalog` parameter
@@ -136,6 +233,22 @@ This optional parameters is used to specify lifetime of the uploaded data.
 If this parameter is provided the file or catalog will be deleted after
 specified amount of time. For example if `lifetime=1h` is provided the file
 will be availeble during a hour and then will be automatically removed.
+
+
+### POST files `share-mode` parameter
+
+By default ryft-server protects data files from simultaneous read and write.
+The `share-mode` option is used to customize sharing mode.
+
+The following sharing modes are supported:
+- `share-mode=wait-up-to-10s` or `share-mode=wait-10s`.
+  If data file is busy ryft-server waits up to specified timeout.
+- `share-mode=force-ignore` or `share-mode=ignore`.
+  Force to ignore any sharing rules. Even if file is busy try to upload the data.
+  Note, it might be dangerous and data might be corrupted.
+
+By default `share-mode=` is equal to `share-mode=wait-0ms` which means
+report error immediately if data file is busy with search.
 
 
 ### DELETE files parameters

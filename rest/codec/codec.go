@@ -35,6 +35,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/getryft/ryft-server/rest/codec/csv"
 	"github.com/getryft/ryft-server/rest/codec/json"
 	"github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 )
@@ -43,6 +44,7 @@ const (
 	MIME_JSON     = json.MIME
 	MIME_XMSGPACK = msgpack.X_MIME
 	MIME_MSGPACK  = msgpack.MIME
+	MIME_CSV      = csv.MIME
 )
 
 // Abstract Encoder interface.
@@ -65,6 +67,7 @@ func GetSupportedMimeTypes() []string {
 		MIME_JSON,
 		MIME_MSGPACK,
 		MIME_XMSGPACK,
+		MIME_CSV,
 	}
 }
 
@@ -84,6 +87,9 @@ func NewEncoder(w io.Writer, mime string, stream bool) (Encoder, error) {
 		} else {
 			return msgpack.NewSimpleEncoder(w)
 		}
+
+	case MIME_CSV:
+		return csv.NewStreamEncoder(w)
 
 	default:
 		return nil, fmt.Errorf("%q is unsupported MIME type", mime)

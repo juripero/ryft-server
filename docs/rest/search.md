@@ -14,6 +14,12 @@ The GET `/search` endpoint is used to search data on Ryft boxes.
 Note, this endpoint is protected and user should provide valid credentials.
 See [authentication](../auth.md) for more details.
 
+There are a few [content types](#search-accept-header) that server can produce:
+- `Accept: application/json` which is used by default
+- `Accept: text/csv`
+- `Accept: application/msgpack` which is used internally in cluster mode
+
+
 ## Search query parameters
 
 The list of supported query parameters are the following (check detailed description below):
@@ -29,12 +35,15 @@ The list of supported query parameters are the following (check detailed descrip
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
+| `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
+| `performance` | boolean | [Flag to report performance metrics](#search-performance-parameter). |
 | `limit`       | int     | [Limit the total number of records reported](#search-limit-parameter). |
 | `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-parameters). |
 | `ep`          | boolean | **Internal** [The error prefix flag](#search-ep-parameter). |
@@ -230,6 +239,20 @@ For example, to get identifier and date from a `*.pcrime` file pass `format=xml&
 The same is true for JSON data: `format=json&fields=Name,AlterEgo`.
 
 
+### Search `transform` parameter
+
+This parameter specifies a post-process transformation.
+Can be one of:
+- `match("<expression>")`
+- `replace("<expression>", "<template>")`
+- `script("<script name>")`
+
+A few transformations can be specified with several `transform` parameters.
+In this case all tranformations are combined into transformation chain.
+
+See [more details](./README.md#post-process-transformations).
+
+
 ### Search `data` and `index` parameters
 
 By default, all search results are deleted from the Ryft server once they are delivered to user.
@@ -258,6 +281,25 @@ By default there is no any delimiter. To use Windows newline
 just pass url-encoded `delimiter=%0D%0A`.
 
 
+### Search `share-mode` parameter
+
+By default ryft-server protects data files from simultaneous read and write.
+The `share-mode` option is used to customize sharing mode.
+
+The following sharing modes are supported:
+- `share-mode=wait-up-to-10s` or `share-mode=wait-10s`.
+  If data file is busy ryft-server waits up to specified timeout.
+- `share-mode=skip-busy` or `share-mode=skip`.
+  If data file is busy then it is removed from input fileset.
+  Note, the input fileset might be empty - ryftprim reports error in this case.
+- `share-mode=force-ignore` or `share-mode=ignore`.
+  Force to ignore any sharing rules. Even if file is busy try to run the search.
+  Note, the result might be undefined.
+
+By default `share-mode=` is equal to `share-mode=wait-0ms` which means
+report error immediately if data file is busy.
+
+
 ### Search `nodes` parameter
 
 The number of Ryft processing nodes that the algorithm should use.
@@ -279,6 +321,13 @@ To execute a search on single node just pass `local=true`.
 
 The statistics is not reported **by default**.
 To check total number of matches and performance number just pass `stats=true`.
+
+
+### Search `performance` parameter
+
+The performance metrics are not reported **by default**.
+To get performance metrics in extra statistics just pass `performance=true`.
+See [this document](../perf.md) for detailed metrics description.
 
 
 ### Search `limit` parameter
@@ -429,6 +478,85 @@ will produce the following output:
 }
 ```
 
+## Search `Accept` header
+
+Search endpoint produces data encoded as:
+- `json` - used by default,
+- `msgpack` - used internally in cluster mode
+- `csv`
+
+The output type can be specified by `Accept` HTTP header.
+
+
+### Accept: text/csv
+
+Ryft-server supports `csv` encoding accordingly to [RFC 4180](https://tools.ietf.org/html/rfc4180)
+
+A `csv` file contains zero or more records of one or more fields per record.
+Each record is separated by the newline character.
+The final record may optionally be followed by a newline character.
+
+A `csv` record can be the following types:
+
+1. data record. The first field is "rec", then INDEX fields and data.
+   Data is reported according to selected format (utf8, json, etc).
+
+```
+rec,file,offset,length,fuzziness,host,data
+```
+
+2. statistics. The first field is "stat", then STAT fields:
+
+```
+stat,matches,totalBytes,duration,dataRate,fabricDuration,fabricDataRate,host,details,extra
+```
+
+3. error. The first field is "err", then error message:
+
+```
+err,message
+```
+
+4. End of file. The first field is "end".
+
+```
+end
+```
+
+Fields which start and stop with the quote character `"` are called quoted-fields.
+The beginning and ending quote are not part of the field.
+
+Within a quoted-field a quote character followed by a second quote character is
+considered a single quote. Newlines and commas may be included in a quoted-field.
+
+
+For example,
+
+```{.sh}
+$ ryftrest -q hello -f test/foo/1.txt -w=10 --format=utf8 --accept=csv
+rec,test/foo/1.txt,0,15,0,ryftone-313,"hello world
+hel"
+rec,test/foo/1.txt,2,25,0,ryftone-313,"llo world
+hello worldhell"
+rec,test/foo/1.txt,13,25,0,ryftone-313,ello worldhello from curl
+rec,test/foo/1.txt,28,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,43,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,58,25,0,ryftone-313," from curlhello from curl"
+rec,test/foo/1.txt,73,25,0,ryftone-313," from curlhello from curl"
+stat,16,233,520,0.00042731945331280044,0,0,ryftone-313,null,{}
+end
+```
+
+### Accept: application/json
+
+This is default content type. It reports records, errors and statistics in
+an appropriate JSON object.
+
+
+### Accept: application/msgpack
+
+This content type is used internally for communication between nodes in cluster mode.
+
 
 # Count
 
@@ -452,11 +580,14 @@ The list of supported query parameters are the following:
 | `fuzziness`   | uint8   | [The fuzziness distance](#search-fuzziness-parameter). |
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
+| `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
+| `performance` | boolean | [Flag to report performance metrics](#search-performance-parameter). |
 
 NOTE: Most of the `/count` parameters are absolutely the same as `/search` parameters.
 Please check corresponding `/search` related sections.

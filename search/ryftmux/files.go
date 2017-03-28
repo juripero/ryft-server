@@ -61,24 +61,40 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	}
 
 	// wait for all subtasks and merge results
-	muxPath := ""
-	muxFiles := map[string]int{}
-	muxDirs := map[string]int{}
+	muxDirPath := ""
+	muxCatPath := ""
+	muxFiles := make(map[string]int)
+	muxDirs := make(map[string]int)
+	muxCats := make(map[string]int)
+	muxDetails := make(map[string]map[string]search.NodeInfo)
 	for _ = range engine.Backends {
 		select {
 		case res, ok := <-resCh:
 			if ok && res != nil {
 				// check directory path is consistent
-				if len(muxPath) == 0 {
-					muxPath = res.Path
+				if len(muxDirPath) == 0 {
+					muxDirPath = res.DirPath
 				}
-				if muxPath != res.Path {
+				if muxDirPath != res.DirPath {
 					task.log().WithFields(map[string]interface{}{
-						"mux-path": muxPath,
-						"res-path": res.Path,
-					}).Warnf("path inconsistency detected!")
-					return nil, fmt.Errorf("inconsistent path %q != %q",
-						muxPath, res.Path)
+						"mux-path": muxDirPath,
+						"res-path": res.DirPath,
+					}).Warnf("directory path inconsistency detected!")
+					return nil, fmt.Errorf("inconsistent directory path %q != %q",
+						muxDirPath, res.DirPath)
+				}
+
+				// check catalog path is consistent
+				if len(muxCatPath) == 0 {
+					muxCatPath = res.Catalog
+				}
+				if muxCatPath != res.Catalog {
+					task.log().WithFields(map[string]interface{}{
+						"mux-path": muxCatPath,
+						"res-path": res.Catalog,
+					}).Warnf("catalog path inconsistency detected!")
+					return nil, fmt.Errorf("inconsistent catalog path %q != %q",
+						muxCatPath, res.Catalog)
 				}
 
 				// merge files
@@ -90,12 +106,26 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 				for _, d := range res.Dirs {
 					muxDirs[d]++
 				}
+
+				// merge catalogs
+				for _, c := range res.Catalogs {
+					muxCats[c]++
+				}
+
+				// merge details
+				for host, info := range res.Details {
+					if _, ok := muxDetails[host]; ok {
+						task.log().WithField("host", host).Warnf("detailed information already exists, will be replaced!")
+					}
+					muxDetails[host] = info
+				}
 			}
 		}
 	}
 
 	// prepare results
-	mux := search.NewDirInfo(muxPath)
+	mux := search.NewDirInfo(muxDirPath, muxCatPath)
+	mux.Catalogs = make([]string, 0, len(muxCats))
 	mux.Files = make([]string, 0, len(muxFiles))
 	mux.Dirs = make([]string, 0, len(muxDirs))
 	for f := range muxFiles {
@@ -104,6 +134,10 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	for d := range muxDirs {
 		mux.Dirs = append(mux.Dirs, d)
 	}
+	for c := range muxCats {
+		mux.Catalogs = append(mux.Catalogs, c)
+	}
+	mux.Details = muxDetails
 
 	return mux, nil // OK
 }

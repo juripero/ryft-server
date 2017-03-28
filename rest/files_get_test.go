@@ -29,7 +29,7 @@ func TestFilesGetUsual(t *testing.T) {
 
 	// test case
 	check := func(url, accept string, cancelIn time.Duration, expectedStatus int, expectedErrors ...string) {
-		body, status, err := fs.get(url, accept, cancelIn)
+		body, status, err := fs.GET(url, accept, cancelIn)
 		if err != nil {
 			for _, msg := range expectedErrors {
 				assert.Contains(t, err.Error(), msg)
@@ -46,9 +46,6 @@ func TestFilesGetUsual(t *testing.T) {
 
 	if all {
 		check("/files1", "", 0, http.StatusNotFound, "page not found")
-
-		check("/files?dir=foo", "application/msgpack", 0,
-			http.StatusUnsupportedMediaType, "only JSON format is supported for now")
 	}
 
 	if oldSearchBackend := fs.server.Config.SearchBackend; all {
@@ -72,5 +69,28 @@ func TestFilesGetUsual(t *testing.T) {
 			0, http.StatusOK, `"dir":"foo"`, `"files":["1.txt","2.txt","3.txt"]`, `"folders":["abc","def"]`)
 		delete(fs.server.Config.BackendOptions, "files-report-files")
 		delete(fs.server.Config.BackendOptions, "files-report-dirs")
+	}
+
+	if all {
+		check("/files/foo?dir=../..", "", 0, http.StatusBadRequest, "is not relative to home")
+	}
+
+	if all {
+		check("/files/foo?dir=..&file=missing.txt", "", 0, http.StatusNotFound, "no such file or directory")
+	}
+
+	if all {
+		check("/files/foo?dir=..&file=bad.dat", "", 0, http.StatusInternalServerError, "failed to open file", "permission denied")
+	}
+
+	if all {
+		check("/files/foo?dir=..&file=1.txt", "", 0, http.StatusOK,
+			"11111-hello-11111", "22222-hello-22222", "33333-hello-33333",
+			"44444-hello-44444", "55555-hello-55555")
+	}
+
+	if all {
+		check("/files/foo?dir=..&catalog=catalog.test&file=1.txt", "", 0, http.StatusOK,
+			"11111-hello-11111", "aaaaa-hello-aaaaa")
 	}
 }

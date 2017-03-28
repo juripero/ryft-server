@@ -41,6 +41,7 @@ REST specific:
   |--auth
 --search         Use /search endpoint to print all found items.
 --count          Use /count endpoint instead of /search to print just statistics (default).
+--dry|--dry-run  Do a "dry-run" (do not call Ryft hardware).
 --limit=N        Specifies the limit on total number of records printed (used with /search).
 --local          Specifies the local search. Opposite to --cluster. (default)
 --cluster        Specifies the cluster search. Opposite to --local.
@@ -53,10 +54,20 @@ REST specific:
                      - null|none - ignores all data
 --fields=<list>  Specifies comma-separated list of fields to return.
                  This parameter is useful with XML and JSON formats.
+--transform=<tx> Specifies custom post-process transformation.
+                 Should be one of:
+                     - match("expr") - regexp to match "expr"
+                     - replace("expr", "template") - regexp to replace
+                     - script("name") - call an external script
+                 Several transformations can be specified.
+                 Can be provided multiple
+--share-mode     Sharing mode. Can be "ignore", "skip" or "wait-10s".
 --no-stats       Disable statistics output.
 --stream         Use stream output format. Provides a sequence of JSON
                  "tag-object" pairs to be able to decode input data on the fly
                  (is used for node communication within cluster).
+--performance    Add performance metrics to the output statistics.
+--accept=<fmt>   Accept format can be "json" or "csv".
 
 -v|--verbose     Tells curl to be verbose.
 -vv|--pretty     Get pretty (properly indented) formatting with jq tool.
@@ -85,14 +96,16 @@ fail() {
 
 # default values
 MODE=
-FILES=
-CATALOGS=
+FILES=()
+CATALOGS=()
 CASE="true"
 REDUCE=true
 NODES=
 FUZZINESS=
 SURROUNDING=
 DELIMITER=$'\r\n'
+TRANSFORMS=()
+SHARE_MODE=
 QUERY=
 DATA=
 INDEX=
@@ -100,6 +113,7 @@ INDEX=
 ADDRESS=http://localhost:8765
 AUTH_USER=
 ENDPOINT=/count
+DRYRUN=
 LIMIT=
 LOCAL=true
 FORMAT=
@@ -107,6 +121,8 @@ FIELDS=
 STATS=true
 STREAM=
 SPARK=
+PERFORMANCE=
+ACCEPT=json
 
 # be silent by default
 
@@ -177,19 +193,19 @@ while [[ $# > 0 ]]; do
         shift 2
         ;;
     -f=*|--file=*)
-        FILES="$FILES:${1#*=}"
+        FILES=("${FILES[@]}" "${1#*=}")
         shift
         ;;
     -f|--file)
-        FILES="$FILES:$2"
+        FILES=("${FILES[@]}" "$2")
         shift 2
         ;;
     -c=*|--catalog=*)
-        CATALOGS="$CATALOGS:${1#*=}"
+        CATALOGS=("${CATALOGS[@]}" "${1#*=}")
         shift
         ;;
     -c|--catalog)
-        CATALOGS="$CATALOGS:$2"
+        CATALOGS=("${CATALOGS[@]}" "$2")
         shift 2
         ;;
     -i)
@@ -288,6 +304,10 @@ while [[ $# > 0 ]]; do
         ENDPOINT="/count"
         shift
         ;;
+    --dry-run|--dry)
+        DRYRUN="/dry-run"
+        shift
+        ;;
     --limit=*)
         LIMIT="${1#*=}"
         shift
@@ -321,6 +341,22 @@ while [[ $# > 0 ]]; do
         FIELDS="$2"
         shift 2
         ;;
+    --transform=*)
+        TRANSFORMS=("${TRANSFORMS[@]}" "${1#*=}")
+        shift
+        ;;
+    --transform)
+        TRANSFORMS=("${TRANSFORMS[@]}" "$2")
+        shift 2
+        ;;
+    --share-mode=*)
+        SHARE_MODE="${1#*=}"
+        shift
+        ;;
+    --share-mode)
+        SHARE_MODE="$2"
+        shift 2
+        ;;
     --no-stats)
         STATS="false"
         shift
@@ -332,6 +368,18 @@ while [[ $# > 0 ]]; do
     --spark)
         SPARK="true"
         shift
+        ;;
+    --performance)
+        PERFORMANCE="true"
+        shift
+        ;;
+    --accept=*)
+        ACCEPT="${1#*=}"
+        shift
+        ;;
+    --accept)
+        ACCEPT="$2"
+        shift 2
         ;;
     -vv|--pretty)
         VERBOSE="-s" # tell curl to be silent
@@ -365,19 +413,31 @@ while [[ $# > 0 ]]; do
     esac
 done
 
+case "$ACCEPT" in
+    csv)
+        ACCEPT="Accept: text/csv"
+        ;;
+    json)
+        ACCEPT="Accept: application/json"
+        ;;
+    msgpack)
+        ACCEPT="Accept: application/msgpack"
+        ;;
+    *)
+        fail "'$ACCEPT' is unknown accept mode, run '$0 --help' for help"
+esac
+
 [[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
-[[ -z "$FILES" && -z "$CATALOGS" ]] && fail "no file or catalog provided, run '$0 --help' for help"
+[[ -z "${FILES[@]}" && -z "${CATALOGS[@]}" ]] && fail "no file or catalog provided, run '$0 --help' for help"
 
 # build the URL
 URL_DATA=(--data-urlencode "local=$LOCAL")
 [[ ! -z "$AUTH_USER" ]] && URL_DATA=("${URL_DATA[@]}" -u "$AUTH_USER")
 [[ ! -z "$QUERY" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "query=$QUERY")
-IFS=':' read -r -a files <<< "$FILES"
-for file in "${files[@]}"; do
+for file in "${FILES[@]}"; do
     [[ ! -z $file ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "files=$file")
 done
-IFS=':' read -r -a catalogs <<< "$CATALOGS"
-for catalog in "${catalogs[@]}"; do
+for catalog in "${CATALOGS[@]}"; do
     [[ ! -z $catalog ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "catalog=$catalog")
 done
 [[ ! -z "$CASE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "cs=$CASE")
@@ -392,9 +452,14 @@ done
 [[ ! -z "$INDEX" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "index=$INDEX")
 [[ ! -z "$FORMAT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "format=$FORMAT")
 [[ ! -z "$FIELDS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fields=$FIELDS")
+for tx in "${TRANSFORMS[@]}"; do
+    [[ ! -z $tx ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "transform=$tx")
+done
+[[ ! -z "$SHARE_MODE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "share-mode=$SHARE_MODE")
 [[ ! -z "$STATS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stats=$STATS")
 [[ ! -z "$STREAM" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "stream=$STREAM")
 [[ ! -z "$SPARK" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "spark=$SPARK")
+[[ ! -z "$PERFORMANCE" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "performance=$PERFORMANCE")
 
 # check dependencies
 [[ -z `which curl` ]] && fail "no curl found, run 'apt-get install curl' to install it"
@@ -433,11 +498,17 @@ if [[ ! -z "$PRETTY" ]]; then
     fi
 fi
 
+# for "dry-run" always use jq .
+if [[ ! -z "$DRYRUN" ]]; then
+    PRETTY=true
+    JQ_STR="."
+fi
+
 # do the search and print error/results
 if [[ -z "$PRETTY" ]]; then
     # Flat output for feeding into other processes
-    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT"
+    curl $VERBOSE --get "${URL_DATA[@]}" --compressed -H "$ACCEPT" "$ADDRESS$ENDPOINT$DRYRUN"
 else
     # Prettified output without data rate or details
-    curl $VERBOSE --get "${URL_DATA[@]}" -H "Accept: application/json" "$ADDRESS$ENDPOINT" | jq "$JQ_STR"
+    curl $VERBOSE --get "${URL_DATA[@]}" --compressed -H "$ACCEPT" "$ADDRESS$ENDPOINT$DRYRUN" | jq "$JQ_STR"
 fi

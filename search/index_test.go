@@ -31,6 +31,21 @@ func TestIndexSimple(t *testing.T) {
 	assert.Empty(t, idx.Host)
 }
 
+// test CSV marshaling
+func TestIndexMarshalCSV(t *testing.T) {
+	idx := NewIndex("a.txt", 1, 2)
+	data, err := idx.MarshalCSV()
+	if assert.NoError(t, err) {
+		assert.Equal(t, []string{
+			"a.txt",
+			"1",
+			"2",
+			"0",
+			"",
+		}, data)
+	}
+}
+
 // TODO: test index pool in many goroutines
 
 // test IndexFile

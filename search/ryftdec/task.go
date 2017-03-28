@@ -62,6 +62,9 @@ type Task struct {
 	config *search.Config // input configuration
 	result PostProcessing // post processing engine
 
+	// intermediate performance metrics
+	perfStat []map[string]interface{} // ryft call -> metrics
+
 	UpdateHostTo string // for cluster mode
 }
 
@@ -643,6 +646,10 @@ BuildItems:
 		}
 	}
 
+	if len(task.config.Transforms) > 0 {
+		simple = false // if a transformation is enabled
+	}
+
 	// optimization: if possible just use the DATA file from RyftCall
 	if len(keepDataAs) > 0 && simple && len(ryftCalls) == 1 {
 		defer func(dataPath string) {
@@ -699,6 +706,7 @@ BuildItems:
 
 	// handle all index items
 	const reportRecords = true
+ItemsLoop:
 	for _, item := range items {
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
@@ -717,7 +725,7 @@ BuildItems:
 			}
 		}
 
-		var data, recRawData []byte
+		var recRawData []byte
 		if cf != nil && (reportRecords || datFile != nil) {
 			// record's data read position in the file
 			rpos := int64(item.dataPos)
@@ -772,24 +780,31 @@ BuildItems:
 			} else if uint64(n) != item.Index.Length {
 				mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Index.Length))
 			} else {
-				data = recRawData
+				// OK, use recRawData later
+			}
+		}
+
+		// post processing (index left unchanged)
+		for _, tx := range task.config.Transforms {
+			var skip bool
+			var err error
+			recRawData, skip, err = tx.Process(recRawData)
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to transform: %s", err))
+				continue ItemsLoop // go to next item
+			} else if skip {
+				continue ItemsLoop // go to next item
 			}
 		}
 
 		// output DATA file
 		if datFile != nil {
-			if data == nil {
-				// fill by zeros
-				task.log().Warnf("[%s]: no data, report zeros", TAG)
-				data = make([]byte, int(item.Index.Length))
-			}
-
-			n, err := datFile.Write(data)
+			n, err := datFile.Write(recRawData)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write DATA file: %s", err))
 				// file is corrupted, any sense to continue?
-			} else if n != len(data) {
-				mux.ReportError(fmt.Errorf("not all DATA are written: %d of %d", n, len(data)))
+			} else if n != len(recRawData) {
+				mux.ReportError(fmt.Errorf("not all DATA are written: %d of %d", n, len(recRawData)))
 				// file is corrupted, any sense to continue?
 			} else if len(delimiter) > 0 {
 				n, err = datFile.WriteString(delimiter)

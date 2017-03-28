@@ -33,6 +33,77 @@ search uses the following options by default:
 - "." for the `DECIMAL` option
 
 
+# Post-process transformations
+
+The output data can be transformed on the server side just before
+it is reported to the client. A regular expression or custom
+application/script can be used to perform transformations.
+
+The [transform](./search.md#search-transform-parameter) query option defines
+a custom transformation. There may be a few transformations joined to the
+transformation chain - where the output of the first transformation goes
+to the input of the second transformation.
+
+A single transformation can be one of:
+- [match](#match-transformation) for regular expression match
+- [replace](#replace-transformation) for regular expression replace
+- [script](#script-transformation) for custom application/script
+
+Note, the output statistic contains initial number of matches.
+So we can check the number of dropped records as difference between
+`Matches` and the actual number of records received.
+
+The same is true for indexes. Indexes contain initial data position and length
+without any transformations reflected.
+
+This [page](https://regex-golang.appspot.com/assets/html/index.html)
+can be used to design and check regular expressions.
+
+
+## Match transformation
+
+The regular expression `match` transformation is used as a filter.
+If a record does not match the regular expression then the record is just dropped.
+
+This transformation is defined as `transform=match("expression")` where `expression`
+is a valid regular expression applied to the found record. For example, the
+following transformation will report only records containing `markX` where `X`
+is a digit: `transform=match("^.*mark[0-9].*$")`.
+
+
+## Replace transformation
+
+The regular expression `replace` transformation is used as a simple "match and replace".
+If a record does match the regular expression then it is replaced with a template.
+If a record does not match then it is leaved "as is".
+
+This transformation is defines as `transform=replace("expression", "template")`
+where `expression` is a valid regular expression and the `template` is a
+replacement text. The template can use special variables `$1`, `$2`, etc. to
+refer to the matched text.
+
+For example, the following transformation will replace all `apple`s with `orange`s:
+`transform=replace("^(.*)apple(.*)$", "${1}orange${2}")`.
+
+
+## Script transformation
+
+The `script` transformation uses external application or script to transform
+a record. Note, this transformation is much slower comparing to regexp above.
+A found record is written to the `STDIN` of the `script` and transformed record
+is read from the `STDOUT`. If exit status of the `script` is non zero then
+the record is dropped.
+
+This transformation is defined as `transform=script("name")` where `name` is
+a predefined script name. Valid script names should be configured via
+[server's configuration file](../run.md#script-transformation-configuration).
+
+For example, the following transformation will use `cat` to print input:
+`transform=script("cat")`.
+
+More useful scripts can be developed using `jq` or similar utilities.
+
+
 # Version
 
 The GET `/version` endpoint is used to check current `ryft-server` version.

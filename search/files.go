@@ -32,77 +32,76 @@ package search
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"strings"
 )
 
-// TODO: replace with NodeInfo struct to support trees
-// TODO: report file sizes
-// TODO: report catalogs
+type PartInfo struct {
+	Length int64 `json:"length"` // file part size, bytes.
+	Offset int64 `json:"offset"` // file part offset, bytes.
+}
+
+// NodeInfo is extended file/dir information.
+type NodeInfo struct {
+	Type   string `json:"type,omitempty"`   // node type: "file", "dir" or "catalog"
+	Length int64  `json:"length,omitempty"` // file or catalog size, bytes.
+	Offset int64  `json:"offset,omitempty"` // optional file offset, bytes.
+
+	ModTime string `json:"mtime,omitempty"` // modification time
+	Perm    string `json:"perm,omitempty"`  // permission flags
+
+	Parts []PartInfo `json:"parts,omitempty"` // file parts
+}
 
 // DirInfo is directory's content.
 type DirInfo struct {
-	Path  string   `json:"dir"`               // directory path (relative to mount point)
-	Files []string `json:"files,omitempty"`   // list of files
-	Dirs  []string `json:"folders,omitempty"` // subdirectories
-}
+	DirPath string `json:"dir,omitempty"`     // directory path (relative to mount point)
+	Catalog string `json:"catalog,omitempty"` // catalog path (relative to mount point)
 
-// ReadDir gets directory content from filesystem.
-// if hidden is `true` then all hidden files are also reported.
-func ReadDir(mountPoint, dirPath string, hidden bool) (*DirInfo, error) {
-	// read directory content
-	items, err := ioutil.ReadDir(filepath.Join(mountPoint, dirPath))
-	if err != nil {
-		return nil, err
-	}
+	Files    []string `json:"files,omitempty"`    // list of files
+	Dirs     []string `json:"folders,omitempty"`  // subdirectories
+	Catalogs []string `json:"catalogs,omitempty"` // catalogs
 
-	// process directory content
-	res := NewDirInfo(dirPath)
-	for _, item := range items {
-		name := item.Name()
-
-		if hidden {
-			/*if name == "." || name == ".." {
-				continue // skip "." and ".."
-			}*/
-		} else if strings.HasPrefix(name, ".") {
-			continue // skip all hidden files
-		}
-
-		if item.IsDir() {
-			res.AddDir(name)
-		} else {
-			res.AddFile(name)
-		}
-	}
-
-	return res, nil // OK
+	// additional details [host] -> [name] -> info
+	Details map[string]map[string]NodeInfo `json:"details,omitempty"`
 }
 
 // NewDirInfo creates empty directory content.
-func NewDirInfo(path string) *DirInfo {
+func NewDirInfo(dir string, catalog string) *DirInfo {
 	res := new(DirInfo)
 
-	// path cannot be empty
-	// so replace "" with "/"
-	if len(path) != 0 {
-		res.Path = filepath.Clean(path)
+	if len(catalog) != 0 {
+		res.Catalog = catalog
 	} else {
-		res.Path = "/"
+		// path cannot be empty
+		// so replace "" with "/"
+		if len(dir) != 0 {
+			res.DirPath = filepath.Clean(dir)
+		} else {
+			res.DirPath = "/"
+		}
 	}
 
 	// no files/dirs
+	res.Catalogs = []string{}
 	res.Files = []string{}
 	res.Dirs = []string{}
+
+	// no details
+	res.Details = make(map[string]map[string]NodeInfo)
 
 	return res
 }
 
 // String gets string representation of directory content.
 func (dir *DirInfo) String() string {
+	if len(dir.Catalog) != 0 {
+		return fmt.Sprintf("Dir{catalog:%q, files:%q}",
+			dir.Catalog, dir.Files)
+	}
+
 	return fmt.Sprintf("Dir{path:%q, files:%q, dirs:%q}",
-		dir.Path, dir.Files, dir.Dirs)
+		dir.DirPath, dir.Files, dir.Dirs)
 }
 
 // AddFile adds a new file.
@@ -113,6 +112,20 @@ func (dir *DirInfo) AddFile(file ...string) {
 // AddDir adds a new subdirectory.
 func (dir *DirInfo) AddDir(subdir ...string) {
 	dir.Dirs = append(dir.Dirs, subdir...)
+}
+
+// AddCatalogs adds a new catalog.
+func (dir *DirInfo) AddCatalog(catalog ...string) {
+	dir.Catalogs = append(dir.Catalogs, catalog...)
+}
+
+// Add adds detail information.
+func (dir *DirInfo) AddDetails(host string, name string, info NodeInfo) {
+	if node := dir.Details[host]; node != nil {
+		node[name] = info
+	} else {
+		dir.Details[host] = map[string]NodeInfo{name: info}
+	}
 }
 
 // check if path is relative to home
