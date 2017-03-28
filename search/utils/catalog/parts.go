@@ -219,6 +219,37 @@ func (cat *Catalog) getAllParts() (map[string]search.NodeInfo, error) {
 	return res, nil // OK
 }
 
+// UpdateFilename rename file in data and parts tables (synchronized)
+func (cat *Catalog) UpdateFilename(filename string, newFilename string) error {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+	return cat.updateFilename(filename, newFilename)
+}
+
+// updateFilename rename file in data and parts tables
+func (cat *Catalog) updateFilename(filename string, newFilename string) error {
+	tx, err := cat.db.Begin()
+	if err != nil {
+		return err
+	}
+	rowsParts, err := tx.Query(`UPDATE parts as p SET p.name=? WHERE p.name=? LIMIT 1`, filename, newFilename)
+	defer rowsParts.Close()
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	rowsData, err := tx.Query(`UPDATE data as d SET d.file=? WHERE d.file=? LIMIT 1`, filename, newFilename)
+	defer rowsData.Close()
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetFile get file parts from catalog.
 func (cat *Catalog) GetFile(filename string) (f *File, err error) {
 	// TODO: several attempts if DB is locked

@@ -41,6 +41,7 @@ import (
 	"sync"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -56,9 +57,7 @@ type UpdateFilesParams struct {
 
 // is empty?
 func (p UpdateFilesParams) isEmpty() bool {
-	return len(p.File) == 0 &&
-		len(p.Dir) == 0 &&
-		len(p.Catalog) == 0
+	return len(p.File) != 0 || len(p.Dir) != 0 || len(p.Catalog) != 0
 }
 
 // hasSameExt check if both source and destination files has the same extention
@@ -122,7 +121,7 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 
 	result := make(map[string]interface{})
 
-	if !params.Local && !server.Config.LocalOnly {
+	if !params.Local && !server.Config.LocalOnly && !params.isEmpty() {
 		services, tags, err := server.getConsulInfoForFiles(userTag, []string{params.File})
 		if err != nil || len(tags) != 1 {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
@@ -162,6 +161,9 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 
 		var wg sync.WaitGroup
 		for _, node := range nodes {
+			if node.Params.isEmpty() {
+				continue // nothing to do
+			}
 			wg.Add(1)
 			go func(node *Node) {
 				defer wg.Done()
@@ -183,6 +185,9 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 		// wait and report all results
 		wg.Wait()
 		for _, node := range nodes {
+			if node.Params.isEmpty() {
+				continue // nothing to do
+			}
 			if node.Error != nil {
 				result[node.Name] = map[string]interface{}{
 					"error": node.Error.Error(),
@@ -214,38 +219,86 @@ func (server *Server) MoveLocalFile(mountPoint string, params UpdateFilesParams)
 	return res
 }
 
-func move(mountPoint string, file string, dir string, catalog string, new string) (string, error) {
+func move(mountPoint string, file string, dir string, cat string, new string) (string, error) {
 	// What we want to move?
-	if len(catalog) != 0 { // do something with catalog
-		/*
-			catalogPath := filepath.Join(mountPoint, catalog)
-			if len(file) != 0 {
-				oldPath := filepath.Join(dir, file)
-				newPath := filepath.Join(dir, new)
-				// move file inside the catalog
-			} else {
-				newPath := filepath.Join(mountPoint, new)
-				// move catalog itself
-			}
-		*/
-	} else { // move file or dir
-		targetPath := filepath.Join(dir, file)
-		// check file path can be derived
-		path, err := filepath.Rel(mountPoint, targetPath)
+	if len(cat) != 0 { // do something with catalog
+		catPath, err := filepath.Rel(mountPoint, cat)
 		if err != nil {
-			return targetPath, err
+			return cat, err
 		}
-		// check source file exists
-		if _, err := os.Stat(path); err != nil {
-			return targetPath, err
+
+		if len(file) != 0 {
+			// move file inside the catalog
+			c, err := catalog.OpenCatalogNoCache(catPath)
+			if err != nil {
+				return catPath, err
+			}
+			if err := c.UpdateFilename(file, new); err != nil {
+				return file, err
+			}
+		} else {
+			// move catalog itself
+			newCatPath, err := filepath.Rel(mountPoint, new)
+			if err != nil {
+				return catPath, err
+			}
+			if err := os.Rename(catPath, newCatPath); err != nil {
+				return catPath, err
+			}
 		}
-		// check file path can be derived
-		newTargetPath := filepath.Join(dir, new)
-		newPath, err := filepath.Rel(mountPoint, newTargetPath)
+	} else if len(dir) != 0 { // move dir
+		// check dir path can be derived
+		path, err := filepath.Rel(mountPoint, dir)
+		if err != nil {
+			return dir, err
+		}
+		// check dir exists
+		pathStat, err := os.Stat(path)
+		if err != nil {
+			return dir, err
+		}
+		// check is dir
+		if !pathStat.IsDir() {
+			return dir, errors.New("Not a directory")
+		}
+
+		// check new dir path can be derived
+		newPath, err := filepath.Rel(mountPoint, new)
 		if err != nil {
 			return path, err
 		}
 		// check destination path doesn't exist
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			return path, err
+		}
+		if path == newPath {
+			return path, nil
+		}
+		// move dir
+		if err := os.Rename(path, newPath); err != nil {
+			return path, err
+		}
+		return path, nil
+	} else if len(file) != 0 { // move file
+		// check file path can be derived
+		path, err := filepath.Rel(mountPoint, file)
+		if err != nil {
+			return file, err
+		}
+		// check file exists
+		pathStat, err := os.Stat(path)
+		if err != nil {
+			return file, err
+		}
+		if pathStat.IsDir() {
+			return file, errors.New("is not a file")
+		}
+		// check file path can be derived
+		newPath, err := filepath.Rel(mountPoint, new)
+		if err != nil {
+			return path, err
+		}
+		// check destination path doesn't exist or is not directory
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			return path, err
 		}
