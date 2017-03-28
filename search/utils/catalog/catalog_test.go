@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -255,4 +256,27 @@ func TestCatalogAddFilePart(t *testing.T) {
 
 	// time.Sleep(2 * DefaultCacheDropTimeout)
 	assert.Empty(t, globalCache.cached)
+}
+
+func TestCatalog_fileRename(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+	SetDefaultCacheDropTimeout(100 * time.Millisecond)
+	DefaultDataDelimiter = "\n\f\n"
+	DefaultDataSizeLimit = 10 * 1024
+
+	os.MkdirAll("/tmp/ryft/", 0755)
+	defer os.RemoveAll("/tmp/ryft/")
+	catName = "/tmp/ryft/test-catalog-rename-file"
+	cat, err := catalog.OpenCatalogNoCache()
+	// open catalog
+	if assert.NoError(t, err) && assert.NotNil(t, cat) {
+		defer cat.Close()
+
+		dataPath, dataPos, delim, err := cat.AddFilePart(filename, offset, length, nil)
+		return addFilePartResult{
+			Path:  dataPath,
+			Delim: delim,
+			Part:  addFilePart{dataPos, length},
+		}
+	}
 }

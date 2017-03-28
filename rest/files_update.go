@@ -51,7 +51,7 @@ type UpdateFilesParams struct {
 	File    string `form:"file" json:"file"`
 	Dir     string `form:"dir" json:"dir"`
 	Catalog string `form:"catalog" json:"catalog"`
-	New     string `form:"new" json:"new" binding:"required"`
+	New     string `form:"new" json:"new"` // binding:"required"`
 	Local   bool   `form:"local" json:"local"`
 }
 

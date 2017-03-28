@@ -383,6 +383,64 @@
           }
         }
       },
+      "put": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Update file/directory/catalog name or filename in catalog",
+        "description": "Endpoint to update file name",
+        "operationId": "updateFiles",
+        "parameters": [
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The uploading filename.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "dir",
+            "type": "string",
+            "description": "Directory name.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "Catalog name.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "new",
+            "type": "string",
+            "description": "New name for a file/directore/catalog or file inside catalog.",
+            "required": true,
+            "in": "query"
+          },
+          {
+          "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "description": "Perform action only on this cluster member. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of file/dir/catalog and its status",
+            "schema": {
+              "$ref": "#/definitions/FilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "files"

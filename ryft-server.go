@@ -288,6 +288,7 @@ func main() {
 	private.POST("/files", server.DoPostFiles)
 	private.POST("/files/*path", server.DoPostFiles)
 	private.PUT("/files", server.DoUpdateFiles)
+	private.PUT("/files/*path", server.DoUpdateFiles)
 
 	// debug API endpoints
 	if server.Config.DebugMode {
