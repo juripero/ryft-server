@@ -217,6 +217,7 @@ func (server *Server) RenameLocalFile(mountPoint string, params UpdateFilesParam
 	return res
 }
 
+// rename change name of a file, directory, catalog or file inside catalog
 func rename(mountPoint string, file string, dir string, cat string, new string) (string, error) {
 	path := ""
 	// What do we want to rename?
@@ -232,24 +233,23 @@ func rename(mountPoint string, file string, dir string, cat string, new string) 
 				return file, err
 			}
 		} else {
-			// rename catalog. Code listed below is naive and wrong
-			// write function inside catalog package
+			// rename catalog
 			newPath := filepath.Join(mountPoint, new)
-			if err := os.Rename(path, newPath); err != nil {
+			if err := catalog.RenameCatalog(path, newPath); err != nil {
 				return path, err
 			}
 			return path, nil
 		}
 	} else if len(dir) != 0 { // rename dir
-		path := filepath.Join(mountPoint, dir)
+		path = filepath.Join(mountPoint, dir)
 		// check dir exists
 		pathStat, err := os.Stat(path)
 		if err != nil {
-			return dir, err
+			return path, err
 		}
 		// check is dir
 		if !pathStat.IsDir() {
-			return dir, errors.New("Not a directory")
+			return path, errors.New("Not a directory")
 		}
 
 		newPath := filepath.Join(mountPoint, new)
@@ -266,14 +266,14 @@ func rename(mountPoint string, file string, dir string, cat string, new string) 
 		}
 	} else if len(file) != 0 { // rename file
 		// check file path can be derived
-		path := filepath.Join(mountPoint, file)
+		path = filepath.Join(mountPoint, file)
 		// check file exists
 		pathStat, err := os.Stat(path)
 		if err != nil {
 			return file, err
 		}
 		if pathStat.IsDir() {
-			return file, errors.New("is not a file")
+			return path, errors.New("is not a file")
 		}
 		// check file path can be derived
 		newPath := filepath.Join(mountPoint, new)
@@ -287,6 +287,11 @@ func rename(mountPoint string, file string, dir string, cat string, new string) 
 		}
 		if path == newPath {
 			return path, nil
+		}
+		// create directory if it does not exist
+		newDir := filepath.Dir(newPath)
+		if err := os.MkdirAll(newDir, 0755); err != nil {
+			return path, err
 		}
 		// rename file or dir
 		if err := os.Rename(path, newPath); err != nil {
