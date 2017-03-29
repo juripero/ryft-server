@@ -232,14 +232,14 @@ func (cat *Catalog) updateFilename(filename string, newFilename string) error {
 	if err != nil {
 		return err
 	}
-	rowsParts, err := tx.Query(`UPDATE parts as p SET p.name=? WHERE p.name=? LIMIT 1`, filename, newFilename)
+	rowsParts, err := tx.Query(`UPDATE parts SET name=? WHERE name=?`, newFilename, filename)
 	defer rowsParts.Close()
 	if err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	rowsData, err := tx.Query(`UPDATE data as d SET d.file=? WHERE d.file=? LIMIT 1`, filename, newFilename)
-	defer rowsData.Close()
+	rowsData2, err := tx.Query(`UPDATE data SET file=? WHERE file=?`, newFilename, filename)
+	defer rowsData2.Close()
 	if err != nil {
 		_ = tx.Rollback()
 		return err

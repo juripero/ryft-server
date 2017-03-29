@@ -51,18 +51,13 @@ type UpdateFilesParams struct {
 	File    string `form:"file" json:"file"`
 	Dir     string `form:"dir" json:"dir"`
 	Catalog string `form:"catalog" json:"catalog"`
-	New     string `form:"new" json:"new"` // binding:"required"`
+	New     string `form:"new" json:"new" binding:"required"`
 	Local   bool   `form:"local" json:"local"`
 }
 
 // is empty?
 func (p UpdateFilesParams) isEmpty() bool {
 	return len(p.File) != 0 || len(p.Dir) != 0 || len(p.Catalog) != 0
-}
-
-// hasSameExt check if both source and destination files has the same extention
-func (p UpdateFilesParams) hasSameExt() bool {
-	return len(p.File) > 0 && filepath.Ext(p.File) == filepath.Ext(p.New)
 }
 
 // DoUpdateFiles UPDATE files method
@@ -77,9 +72,6 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 			WithDetails("failed to parse request parameters"))
 	}
 
-	if !params.hasSameExt() {
-		panic(NewError(http.StatusBadRequest, "changing the file extention is not allowed"))
-	}
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
 	mountPoint, err := server.getMountPoint(homeDir)
 	if err != nil {
@@ -90,15 +82,21 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 
 	// checks all the input filenames are relative to home
 	if len(params.Catalog) > 0 {
-		panic(NewError(http.StatusNotImplemented, "Not implemented feature"))
-		/*
-			if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Catalog)) {
-				panic(NewError(http.StatusBadRequest,
-					fmt.Sprintf("catalog path %q is not relative to home", params.Catalog)))
-			}
-		*/
-	} else {
-		path := filepath.Join(mountPoint, params.Dir, params.File)
+		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Catalog)) {
+			panic(NewError(http.StatusBadRequest,
+				fmt.Sprintf("catalog path %q is not relative to home", params.Catalog)))
+		}
+	} else if len(params.Dir) > 0 {
+		path := filepath.Join(mountPoint, params.Dir)
+		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Dir)) {
+			panic(NewError(http.StatusBadRequest,
+				fmt.Sprintf("path %q is not relative to home", path)))
+		}
+	} else if len(params.File) > 0 {
+		if filepath.Ext(params.File) != filepath.Ext(params.New) {
+			panic(NewError(http.StatusBadRequest, "changing the file extention is not allowed"))
+		}
+		path := filepath.Join(mountPoint, params.File)
 		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.File)) {
 			panic(NewError(http.StatusBadRequest,
 				fmt.Sprintf("path %q is not relative to home", path)))
@@ -220,38 +218,30 @@ func (server *Server) MoveLocalFile(mountPoint string, params UpdateFilesParams)
 }
 
 func move(mountPoint string, file string, dir string, cat string, new string) (string, error) {
+	path := ""
 	// What we want to move?
 	if len(cat) != 0 { // do something with catalog
-		catPath, err := filepath.Rel(mountPoint, cat)
-		if err != nil {
-			return cat, err
-		}
-
+		path = filepath.Join(mountPoint, cat)
 		if len(file) != 0 {
 			// move file inside the catalog
-			c, err := catalog.OpenCatalogNoCache(catPath)
+			c, err := catalog.OpenCatalogNoCache(path)
 			if err != nil {
-				return catPath, err
+				return path, err
 			}
 			if err := c.UpdateFilename(file, new); err != nil {
 				return file, err
 			}
 		} else {
-			// move catalog itself
-			newCatPath, err := filepath.Rel(mountPoint, new)
-			if err != nil {
-				return catPath, err
+			// move catalog. Code listed below is naive and wrong
+			// write function inside catalog package
+			newPath := filepath.Join(mountPoint, new)
+			if err := os.Rename(path, newPath); err != nil {
+				return path, err
 			}
-			if err := os.Rename(catPath, newCatPath); err != nil {
-				return catPath, err
-			}
+			return path, nil
 		}
 	} else if len(dir) != 0 { // move dir
-		// check dir path can be derived
-		path, err := filepath.Rel(mountPoint, dir)
-		if err != nil {
-			return dir, err
-		}
+		path := filepath.Join(mountPoint, dir)
 		// check dir exists
 		pathStat, err := os.Stat(path)
 		if err != nil {
@@ -262,13 +252,9 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 			return dir, errors.New("Not a directory")
 		}
 
-		// check new dir path can be derived
-		newPath, err := filepath.Rel(mountPoint, new)
-		if err != nil {
-			return path, err
-		}
+		newPath := filepath.Join(mountPoint, new)
 		// check destination path doesn't exist
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
+		if _, err := os.Stat(newPath); !os.IsNotExist(err) {
 			return path, err
 		}
 		if path == newPath {
@@ -278,13 +264,9 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 		if err := os.Rename(path, newPath); err != nil {
 			return path, err
 		}
-		return path, nil
 	} else if len(file) != 0 { // move file
 		// check file path can be derived
-		path, err := filepath.Rel(mountPoint, file)
-		if err != nil {
-			return file, err
-		}
+		path := filepath.Join(mountPoint, file)
 		// check file exists
 		pathStat, err := os.Stat(path)
 		if err != nil {
@@ -294,12 +276,9 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 			return file, errors.New("is not a file")
 		}
 		// check file path can be derived
-		newPath, err := filepath.Rel(mountPoint, new)
-		if err != nil {
-			return path, err
-		}
+		newPath := filepath.Join(mountPoint, new)
 		// check destination path doesn't exist or is not directory
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
+		if _, err := os.Stat(newPath); !os.IsNotExist(err) {
 			return path, err
 		}
 		// check file extention
@@ -313,9 +292,8 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 		if err := os.Rename(path, newPath); err != nil {
 			return path, err
 		}
-		return path, nil
 	}
-	return "", nil
+	return path, nil
 }
 
 // MoveRemoteFile move remote file, directory, catalog
