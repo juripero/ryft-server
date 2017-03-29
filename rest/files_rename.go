@@ -60,8 +60,8 @@ func (p UpdateFilesParams) isEmpty() bool {
 	return len(p.File) != 0 || len(p.Dir) != 0 || len(p.Catalog) != 0
 }
 
-// DoUpdateFiles UPDATE files method
-func (server *Server) DoUpdateFiles(ctx *gin.Context) {
+// DoRenameFiles RENAME files method
+func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 	// parse request parameters
 	params := UpdateFilesParams{}
@@ -167,15 +167,15 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 				defer wg.Done()
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("renaming on local node")
-					// move local file
-					node.Result, node.Error = server.MoveLocalFile(mountPoint, node.Params), nil
+					// rename local file
+					node.Result, node.Error = server.RenameLocalFile(mountPoint, node.Params), nil
 				} else {
 					log.WithField("what", node.Params).
 						WithField("node", node.Name).
 						WithField("addr", node.Address).
 						Debugf("renaming on remote node")
-					// move remote file
-					node.Result, node.Error = server.MoveRemoteFile(node.Address, authToken, node.Params)
+					// rename remote file
+					node.Result, node.Error = server.RenameRemoteFile(node.Address, authToken, node.Params)
 				}
 			}(node)
 		}
@@ -195,35 +195,35 @@ func (server *Server) DoUpdateFiles(ctx *gin.Context) {
 			}
 		}
 	} else {
-		result = server.MoveLocalFile(mountPoint, params)
+		result = server.RenameLocalFile(mountPoint, params)
 	}
 	ctx.JSON(http.StatusOK, result)
 }
 
-// MoveLocalFile move local file, directory, catalog
-func (server *Server) MoveLocalFile(mountPoint string, params UpdateFilesParams) map[string]interface{} {
+// RenameLocalFile rename local file, directory, catalog
+func (server *Server) RenameLocalFile(mountPoint string, params UpdateFilesParams) map[string]interface{} {
 	res := make(map[string]interface{})
 	updateResult := func(name string, err error) {
 		if err != nil {
 			res[name] = err.Error()
 		} else {
-			res[name] = "OK" // "MOVED"
+			res[name] = "OK" // "RENAMED"
 		}
 	}
 
-	// move
-	item, err := move(mountPoint, params.File, params.Dir, params.Catalog, params.New)
+	// rename
+	item, err := rename(mountPoint, params.File, params.Dir, params.Catalog, params.New)
 	updateResult(item, err)
 	return res
 }
 
-func move(mountPoint string, file string, dir string, cat string, new string) (string, error) {
+func rename(mountPoint string, file string, dir string, cat string, new string) (string, error) {
 	path := ""
-	// What we want to move?
+	// What do we want to rename?
 	if len(cat) != 0 { // do something with catalog
 		path = filepath.Join(mountPoint, cat)
 		if len(file) != 0 {
-			// move file inside the catalog
+			// rename file in the catalog
 			c, err := catalog.OpenCatalogNoCache(path)
 			if err != nil {
 				return path, err
@@ -232,7 +232,7 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 				return file, err
 			}
 		} else {
-			// move catalog. Code listed below is naive and wrong
+			// rename catalog. Code listed below is naive and wrong
 			// write function inside catalog package
 			newPath := filepath.Join(mountPoint, new)
 			if err := os.Rename(path, newPath); err != nil {
@@ -240,7 +240,7 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 			}
 			return path, nil
 		}
-	} else if len(dir) != 0 { // move dir
+	} else if len(dir) != 0 { // rename dir
 		path := filepath.Join(mountPoint, dir)
 		// check dir exists
 		pathStat, err := os.Stat(path)
@@ -260,11 +260,11 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 		if path == newPath {
 			return path, nil
 		}
-		// move dir
+		// rename dir
 		if err := os.Rename(path, newPath); err != nil {
 			return path, err
 		}
-	} else if len(file) != 0 { // move file
+	} else if len(file) != 0 { // rename file
 		// check file path can be derived
 		path := filepath.Join(mountPoint, file)
 		// check file exists
@@ -288,7 +288,7 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 		if path == newPath {
 			return path, nil
 		}
-		// move file or dir
+		// rename file or dir
 		if err := os.Rename(path, newPath); err != nil {
 			return path, err
 		}
@@ -296,8 +296,8 @@ func move(mountPoint string, file string, dir string, cat string, new string) (s
 	return path, nil
 }
 
-// MoveRemoteFile move remote file, directory, catalog
-func (server *Server) MoveRemoteFile(address string, authToken string, params UpdateFilesParams) (map[string]interface{}, error) {
+// RenameRemoteFile rename remote file, directory, catalog
+func (server *Server) RenameRemoteFile(address string, authToken string, params UpdateFilesParams) (map[string]interface{}, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {

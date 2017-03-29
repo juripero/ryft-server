@@ -232,16 +232,16 @@ func (cat *Catalog) updateFilename(filename string, newFilename string) error {
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
+
 	rowsParts, err := tx.Query(`UPDATE parts SET name=? WHERE name=?`, newFilename, filename)
 	defer rowsParts.Close()
 	if err != nil {
-		_ = tx.Rollback()
 		return err
 	}
 	rowsData2, err := tx.Query(`UPDATE data SET file=? WHERE file=?`, newFilename, filename)
 	defer rowsData2.Close()
 	if err != nil {
-		_ = tx.Rollback()
 		return err
 	}
 	if err := tx.Commit(); err != nil {
