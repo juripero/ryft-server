@@ -57,7 +57,7 @@ type UpdateFilesParams struct {
 
 // is empty?
 func (p UpdateFilesParams) isEmpty() bool {
-	return len(p.File) != 0 || len(p.Dir) != 0 || len(p.Catalog) != 0
+	return len(p.File) == 0 && len(p.Dir) == 0 && len(p.Catalog) == 0
 }
 
 // DoRenameFiles RENAME files method
@@ -72,6 +72,10 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			WithDetails("failed to parse request parameters"))
 	}
 
+	if params.isEmpty() {
+		panic(NewError(http.StatusBadRequest, "missing source filename"))
+	}
+
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
 	mountPoint, err := server.getMountPoint(homeDir)
 	if err != nil {
@@ -80,7 +84,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
-	// checks all the input filenames are relative to home
+	// checks all the inputs are relative to home
 	if len(params.Catalog) > 0 {
 		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Catalog)) {
 			panic(NewError(http.StatusBadRequest,
@@ -119,7 +123,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 
 	result := make(map[string]interface{})
 
-	if !params.Local && !server.Config.LocalOnly && !params.isEmpty() {
+	if !params.Local && !server.Config.LocalOnly {
 		services, tags, err := server.getConsulInfoForFiles(userTag, []string{params.File})
 		if err != nil || len(tags) != 1 {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
@@ -203,17 +207,12 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 // RenameLocalFile rename local file, directory, catalog
 func (server *Server) RenameLocalFile(mountPoint string, params UpdateFilesParams) map[string]interface{} {
 	res := make(map[string]interface{})
-	updateResult := func(name string, err error) {
-		if err != nil {
-			res[name] = err.Error()
-		} else {
-			res[name] = "OK" // "RENAMED"
-		}
-	}
-
 	// rename
-	item, err := rename(mountPoint, params.File, params.Dir, params.Catalog, params.New)
-	updateResult(item, err)
+	if item, err := rename(mountPoint, params.File, params.Dir, params.Catalog, params.New); err != nil {
+		res[item] = err.Error()
+	} else {
+		res[item] = "OK"
+	}
 	return res
 }
 

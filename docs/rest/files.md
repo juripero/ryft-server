@@ -268,7 +268,7 @@ If file moves outside from the current directory corresponding directory will be
 For catalog it is the filename within catalog specified
 
 
-### PUT `directory` parameter
+### PUT `dir` parameter
 
 The directory name to change.
 
@@ -282,7 +282,12 @@ If `file` parameters is set it means file name should be changed inside this `ca
 
 ### PUT `new` parameter
 
-This parameter is for new name of file, directory or catalog.
+This parameter is for new name of file, directory or catalog. It is required.
+
+
+### PUT `local` parameter
+
+This parameter allows massive renaming throught the all cluster machines. Default is `false`.
 
 
 
