@@ -228,24 +228,20 @@ func (cat *Catalog) UpdateFilename(filename string, newFilename string) error {
 
 // updateFilename rename file in data and parts tables
 func (cat *Catalog) updateFilename(filename string, newFilename string) error {
-	tx, err := cat.db.Begin()
+	stmt, err := cat.db.Prepare("update parts set name=? where name=?")
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-
-	rowsParts, err := tx.Query(`UPDATE parts SET name=? WHERE name=?`, newFilename, filename)
-	defer rowsParts.Close()
+	rows, err := stmt.Exec(newFilename, filename)
 	if err != nil {
 		return err
 	}
-	rowsData2, err := tx.Query(`UPDATE data SET file=? WHERE file=?`, newFilename, filename)
-	defer rowsData2.Close()
+	affected, err := rows.RowsAffected()
 	if err != nil {
 		return err
 	}
-	if err := tx.Commit(); err != nil {
-		return err
+	if affected == 0 {
+		return fmt.Errorf("file not found")
 	}
 	return nil
 }

@@ -60,6 +60,200 @@ func (p UpdateFilesParams) isEmpty() bool {
 	return len(p.File) == 0 && len(p.Dir) == 0 && len(p.Catalog) == 0
 }
 
+// filesRenamer represents ways to rename for a different types of queries
+type filesRenamer interface {
+	Rename() (string, error)
+	Validate() error
+}
+
+// getRename factory method that creates fileRenamer instance
+func getRename(mountPoint string, params UpdateFilesParams) (filesRenamer, error) {
+	if len(params.Catalog) > 0 {
+		if len(params.File) > 0 {
+			return &catalogFileRename{
+				mountPoint:  mountPoint,
+				catalogPath: params.Catalog,
+				path:        params.File,
+				newPath:     params.New,
+			}, nil
+		}
+		return &catalogRename{
+			mountPoint: mountPoint,
+			path:       params.Catalog,
+			newPath:    params.New,
+		}, nil
+	} else if len(params.Dir) > 0 {
+		return &dirRename{
+			mountPoint: mountPoint,
+			path:       params.Dir,
+			newPath:    params.New,
+		}, nil
+	} else if len(params.File) > 0 {
+		return &fileRename{
+			mountPoint: mountPoint,
+			path:       params.File,
+			newPath:    params.New,
+		}, nil
+	}
+	return nil, errors.New("not allowed")
+}
+
+// fileRename rename one file on FS
+type fileRename struct {
+	mountPoint string
+	path       string
+	newPath    string
+}
+
+// Rename change name of a file on FS
+func (r fileRename) Rename() (string, error) {
+	// check file path can be derived
+	path := filepath.Join(r.mountPoint, r.path)
+	// check file exists
+	pathStat, err := os.Stat(path)
+	if err != nil {
+		return r.path, err
+	}
+	if pathStat.IsDir() {
+		return path, errors.New("is not a file")
+	}
+	// check file path can be derived
+	newPath := filepath.Join(r.mountPoint, r.newPath)
+	// check destination path doesn't exist or is not directory
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+		return path, err
+	}
+	// check file extention
+	if len(r.path) != 0 && filepath.Ext(path) != filepath.Ext(newPath) {
+		return path, errors.New("file extention couldn't be changed")
+	}
+	if path == newPath {
+		return path, nil
+	}
+	// create directory if it does not exist
+	newDir := filepath.Dir(newPath)
+	if err := os.MkdirAll(newDir, 0755); err != nil {
+		return path, err
+	}
+	// rename file or dir
+	if err := os.Rename(path, newPath); err != nil {
+		return path, err
+	}
+	return path, nil
+}
+
+// Validate file extention and path
+func (r fileRename) Validate() error {
+	if filepath.Ext(r.path) != filepath.Ext(r.newPath) {
+		return fmt.Errorf("changing the file extention is not allowed")
+	}
+	path := filepath.Join(r.mountPoint, r.path)
+	if !search.IsRelativeToHome(r.mountPoint, path) {
+		return fmt.Errorf("path %q is not relative to home", path)
+	}
+	return nil
+}
+
+// dirRename rename directory on FS
+type dirRename struct {
+	mountPoint string
+	path       string
+	newPath    string
+}
+
+// Rename change directory name of one directory on FS
+func (r dirRename) Rename() (string, error) {
+	path := filepath.Join(r.mountPoint, r.path)
+	// check dir exists
+	pathStat, err := os.Stat(path)
+	if err != nil {
+		return path, err
+	}
+	// check is dir
+	if !pathStat.IsDir() {
+		return path, errors.New("not a directory")
+	}
+
+	newPath := filepath.Join(r.mountPoint, r.newPath)
+	// check destination path doesn't exist
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+		return path, err
+	}
+	if path == newPath {
+		return path, nil
+	}
+	// rename dir
+	if err := os.Rename(path, newPath); err != nil {
+		return path, err
+	}
+	return path, nil
+}
+
+//Validate directory path
+func (r dirRename) Validate() error {
+	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.path)) {
+		return fmt.Errorf("path %q is not relative to home", r.path)
+	}
+	return nil
+}
+
+// catalogRename rename catalog
+type catalogRename struct {
+	mountPoint string
+	path       string
+	newPath    string
+}
+
+// Rename catalog (sql database and data directory)
+func (r catalogRename) Rename() (string, error) {
+	// rename catalog
+	path := filepath.Join(r.mountPoint, r.path)
+	newPath := filepath.Join(r.mountPoint, r.newPath)
+	if err := catalog.RenameCatalog(path, newPath); err != nil {
+		return r.path, err
+	}
+	return r.path, nil
+}
+
+// Validate catalog path
+func (r catalogRename) Validate() error {
+	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.path)) {
+		return fmt.Errorf("catalog path %q is not relative to home", r.path)
+	}
+	return nil
+}
+
+// catalogFileRename
+type catalogFileRename struct {
+	mountPoint  string
+	catalogPath string
+	path        string
+	newPath     string
+}
+
+// Rename change file name in catalog
+func (r catalogFileRename) Rename() (string, error) {
+	path := filepath.Join(r.mountPoint, r.catalogPath)
+	// rename file in the catalog
+	c, err := catalog.OpenCatalogNoCache(path)
+	if err != nil {
+		return r.path, err
+	}
+	defer c.Close()
+	if err := c.UpdateFilename(r.path, r.newPath); err != nil {
+		return r.path, err
+	}
+	return r.path, nil
+}
+
+// Validate catalog path
+func (r catalogFileRename) Validate() error {
+	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.path)) {
+		return fmt.Errorf("catalog path %q is not relative to home", r.path)
+	}
+	return nil
+}
+
 // DoRenameFiles RENAME files method
 func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
@@ -84,27 +278,13 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
+	fileRename, err := getRename(mountPoint, params)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()))
+	}
 	// checks all the inputs are relative to home
-	if len(params.Catalog) > 0 {
-		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Catalog)) {
-			panic(NewError(http.StatusBadRequest,
-				fmt.Sprintf("catalog path %q is not relative to home", params.Catalog)))
-		}
-	} else if len(params.Dir) > 0 {
-		path := filepath.Join(mountPoint, params.Dir)
-		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.Dir)) {
-			panic(NewError(http.StatusBadRequest,
-				fmt.Sprintf("path %q is not relative to home", path)))
-		}
-	} else if len(params.File) > 0 {
-		if filepath.Ext(params.File) != filepath.Ext(params.New) {
-			panic(NewError(http.StatusBadRequest, "changing the file extention is not allowed"))
-		}
-		path := filepath.Join(mountPoint, params.File)
-		if !search.IsRelativeToHome(mountPoint, filepath.Join(mountPoint, params.File)) {
-			panic(NewError(http.StatusBadRequest,
-				fmt.Sprintf("path %q is not relative to home", path)))
-		}
+	if err := fileRename.Validate(); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()))
 	}
 
 	log.WithFields(map[string]interface{}{
@@ -172,7 +352,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("renaming on local node")
 					// rename local file
-					node.Result, node.Error = server.RenameLocalFile(mountPoint, node.Params), nil
+					node.Result, node.Error = server.RenameLocalFile(fileRename), nil
 				} else {
 					log.WithField("what", node.Params).
 						WithField("node", node.Name).
@@ -199,105 +379,21 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			}
 		}
 	} else {
-		result = server.RenameLocalFile(mountPoint, params)
+		result = server.RenameLocalFile(fileRename)
 	}
 	ctx.JSON(http.StatusOK, result)
 }
 
 // RenameLocalFile rename local file, directory, catalog
-func (server *Server) RenameLocalFile(mountPoint string, params UpdateFilesParams) map[string]interface{} {
+func (server *Server) RenameLocalFile(fileRename filesRenamer) map[string]interface{} {
 	res := make(map[string]interface{})
 	// rename
-	if item, err := rename(mountPoint, params.File, params.Dir, params.Catalog, params.New); err != nil {
+	if item, err := fileRename.Rename(); err != nil {
 		res[item] = err.Error()
 	} else {
 		res[item] = "OK"
 	}
 	return res
-}
-
-// rename change name of a file, directory, catalog or file inside catalog
-func rename(mountPoint string, file string, dir string, cat string, new string) (string, error) {
-	path := ""
-	// What do we want to rename?
-	if len(cat) != 0 { // do something with catalog
-		path = filepath.Join(mountPoint, cat)
-		if len(file) != 0 {
-			// rename file in the catalog
-			c, err := catalog.OpenCatalogNoCache(path)
-			if err != nil {
-				return path, err
-			}
-			if err := c.UpdateFilename(file, new); err != nil {
-				return file, err
-			}
-		} else {
-			// rename catalog
-			newPath := filepath.Join(mountPoint, new)
-			if err := catalog.RenameCatalog(path, newPath); err != nil {
-				return path, err
-			}
-			return path, nil
-		}
-	} else if len(dir) != 0 { // rename dir
-		path = filepath.Join(mountPoint, dir)
-		// check dir exists
-		pathStat, err := os.Stat(path)
-		if err != nil {
-			return path, err
-		}
-		// check is dir
-		if !pathStat.IsDir() {
-			return path, errors.New("Not a directory")
-		}
-
-		newPath := filepath.Join(mountPoint, new)
-		// check destination path doesn't exist
-		if _, err := os.Stat(newPath); !os.IsNotExist(err) {
-			return path, err
-		}
-		if path == newPath {
-			return path, nil
-		}
-		// rename dir
-		if err := os.Rename(path, newPath); err != nil {
-			return path, err
-		}
-	} else if len(file) != 0 { // rename file
-		// check file path can be derived
-		path = filepath.Join(mountPoint, file)
-		// check file exists
-		pathStat, err := os.Stat(path)
-		if err != nil {
-			return file, err
-		}
-		if pathStat.IsDir() {
-			return path, errors.New("is not a file")
-		}
-		// check file path can be derived
-		newPath := filepath.Join(mountPoint, new)
-		// check destination path doesn't exist or is not directory
-		if _, err := os.Stat(newPath); !os.IsNotExist(err) {
-			return path, err
-		}
-		// check file extention
-		if len(file) != 0 && filepath.Ext(path) != filepath.Ext(newPath) {
-			return path, errors.New("file extention couldn't be changed")
-		}
-		if path == newPath {
-			return path, nil
-		}
-		// create directory if it does not exist
-		newDir := filepath.Dir(newPath)
-		if err := os.MkdirAll(newDir, 0755); err != nil {
-			return path, err
-		}
-		// rename file or dir
-		if err := os.Rename(path, newPath); err != nil {
-			return path, err
-		}
-	}
-	return path, nil
 }
 
 // RenameRemoteFile rename remote file, directory, catalog
