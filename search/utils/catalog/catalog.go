@@ -123,48 +123,36 @@ type Catalog struct {
 	cacheDrop *time.Timer // pending drop from cache
 }
 
-var renameMutex = &sync.Mutex{}
-
-// RenameCatalog change name of catalog's database and data storage
-func RenameCatalog(path string, newPath string) error {
-	// TODO: lock via utils.Safe*
-	renameMutex.Lock()
-	defer renameMutex.Unlock()
-
-	// check if catalog exists
-	if info, err := os.Stat(path); os.IsNotExist(err) || info.IsDir() {
-		return ErrNotACatalog
-	}
-
-	dataDir := getDataDir(path)
-	if info, err := os.Stat(dataDir); os.IsNotExist(err) || !info.IsDir() {
-		return ErrNotACatalogData
-	}
-
+// RenameAndClose changes name of catalog and it's data files.
+// current catalog is closed.
+func (cat *Catalog) RenameAndClose(newPath string) error {
+	oldPath := cat.path
+	oldDataDir := getDataDir(oldPath)
 	newDataDir := getDataDir(newPath)
-	if _, err := os.Stat(dataDir); os.IsExist(err) {
-		return errors.New("new catalog data directory already exists")
+
+	// check new path doesn't exist
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+		return fmt.Errorf("new catalog path already exists")
+	}
+	if _, err := os.Stat(newDataDir); !os.IsNotExist(err) {
+		return fmt.Errorf("new catalog data directory already exists")
 	}
 
-	if err := os.Rename(path, newPath); err != nil {
-		return err
-	}
-	if err := os.Rename(dataDir, newDataDir); err != nil {
-		os.Rename(newPath, path)
-		return err
+	// update 'data' table
+	if _, err := cat.renameDataDirSync(newPath); err != nil {
+		return fmt.Errorf("failed to rename data files: %s", err)
 	}
 
-	cat, _, err := getCatalog(newPath, false)
-	defer cat.Close()
-	if err != nil {
-		os.Rename(newDataDir, dataDir)
-		os.Rename(newPath, path)
-		return err
+	// to move files, we need to close database
+	cat.Close()
+	cat.DropFromCache()
+
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("failed to move catalog: %s", err)
 	}
-	if err := cat.RenameDataDir(dataDir, newDataDir); err != nil {
-		os.Rename(newDataDir, dataDir)
-		os.Rename(newPath, path)
-		return err
+	if err := os.Rename(oldDataDir, newDataDir); err != nil {
+		// os.Rename(newPath, oldPath) // rollback?
+		return fmt.Errorf("failed to move catalog data: %s", err)
 	}
 
 	return nil // OK
