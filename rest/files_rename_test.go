@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -25,5 +26,38 @@ func TestFiles_DoRename(t *testing.T) {
 		fs.worker.Stop(0)
 		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
 	}()
+	// test case
+	check := func(url, accept string, contentType, data string, cancelIn time.Duration, expectedStatus int, expectedErrors ...string) {
+		body, status, err := fs.PUT(url, accept, contentType, data, cancelIn)
+		if err != nil {
+			for _, msg := range expectedErrors {
+				assert.Contains(t, err.Error(), msg)
+			}
+		} else {
+			assert.EqualValues(t, expectedStatus, status)
+			for _, msg := range expectedErrors {
+				assert.Contains(t, string(body), msg)
+			}
+		}
+	}
+
+	/* Empty! Why?
+	body, status, err := fs.GET("/files?catalog=catalog.test", "", 0)
+	fmt.Println(err)
+	fmt.Println(status)
+	fmt.Println(string(body))
+	*/
+
+	check("/rename2", "", "", "", 0, http.StatusNotFound, "page not found")
+
+	check("/rename/?new=1.txt", "", "", "", 0, http.StatusBadRequest, "missing source filename")
+
+	check("/rename/?file=1.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
+	check("/rename/?file=1.txt&new=2.pdf", "", "", "", 0, http.StatusBadRequest, "changing the file extention is not allowed")
+	check("/rename/?dir=/foo&new=/bar", "", "", "", 0, http.StatusOK, `{"/foo":"OK"}`)
+	check("/rename/?catalog=/foo.txt&new=/bar.txt", "", "", "", 0, http.StatusOK, `{"/foo.txt":"not a catalog"}`)
+	check("/rename/?catalog=/catalog.test&new=/catalog2.test2", "", "", "", 0, http.StatusOK, `{"/catalog.test":"OK"}`)
+	check("/rename/?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file not found"}`)
+	// check("/rename/?catalog=catalog.test&file=1.txt&new=4.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
 
 }

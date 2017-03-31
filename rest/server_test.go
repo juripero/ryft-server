@@ -80,6 +80,8 @@ func newFake() *fakeServer {
 	mux.POST("/files/*path", fs.server.DoPostFiles)
 	mux.DELETE("/files", fs.server.DoDeleteFiles)
 	mux.DELETE("/files/*path", fs.server.DoDeleteFiles)
+	mux.PUT("/rename", fs.server.DoRenameFiles)
+	mux.PUT("/rename/*path", fs.server.DoRenameFiles)
 
 	// DEBUG mode
 	mux.GET("/logging/level", fs.server.DoLoggingLevel)
@@ -201,6 +203,16 @@ func (fs *fakeServer) POST(url, accept string, contentType, data string, cancelI
 // DELETE request
 func (fs *fakeServer) DELETE(url, accept string, cancelIn time.Duration) ([]byte, int, error) {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), nil)
+	if err != nil {
+		return nil, 0, err // failed
+	}
+
+	return fs.do(req, accept, cancelIn)
+}
+
+// PUT request
+func (fs *fakeServer) PUT(url, accept string, contentType, data string, cancelIn time.Duration) ([]byte, int, error) {
+	req, err := http.NewRequest("PUT", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), bytes.NewBufferString(data))
 	if err != nil {
 		return nil, 0, err // failed
 	}
