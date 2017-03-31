@@ -219,41 +219,57 @@ func (cat *Catalog) getAllParts() (map[string]search.NodeInfo, error) {
 	return res, nil // OK
 }
 
-// UpdateFilename rename file in data and parts tables (synchronized)
-func (cat *Catalog) UpdateFilename(filename string, newFilename string) error {
+// RenameFileParts renames file parts (synchronized)
+func (cat *Catalog) RenameFileParts(filename string, newname string) (int, error) {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()
-	return cat.updateFilename(filename, newFilename)
+
+	return cat.renameFileParts(filename, newname)
 }
 
-// updateFilename rename file in data and parts tables
-func (cat *Catalog) updateFilename(filename string, newFilename string) error {
+// renameFileParts renames file parts.
+// return number of parts affected.
+func (cat *Catalog) renameFileParts(filename string, newname string) (int, error) {
+	// should be done under exclusive transaction
 	tx, err := cat.db.Begin()
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("failed to begin transaction: %s", err)
 	}
-	defer tx.Rollback()
-	// there should be no rows for the newFilename
-	var newFilenameCnt int
-	err = tx.QueryRow("SELECT count(id) FROM parts WHERE name=?", newFilename).Scan(&newFilenameCnt)
-	if err != nil {
-		return nil
-	} else if newFilenameCnt != 0 {
-		return fmt.Errorf("file %v already exists in DB", newFilename)
+	defer tx.Rollback() // just in case
+
+	if true { // there should be no rows for the 'newname'
+		row := tx.QueryRow("SELECT count(id) FROM parts WHERE name=?", newname)
+
+		var count int64
+		if err := row.Scan(&count); err != nil {
+			return 0, fmt.Errorf("failed to check new filename: %s", err)
+		} else if count > 0 {
+			return 0, fmt.Errorf("file '%s' already exists", newname)
+		}
 	}
+
 	// rename file
-	rows, err := tx.Exec("UPDATE parts SET name=? WHERE name=?", newFilename, filename)
+	rows, err := tx.Exec("UPDATE parts SET name=? WHERE name=?", newname, filename)
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("failed to rename parts: %s", err)
 	}
 	affected, err := rows.RowsAffected()
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("failed to get number of rows affected: %s", err)
 	}
-	if affected == 0 {
-		return fmt.Errorf("file not found")
+
+	// commit transaction
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %s", err)
 	}
-	return tx.Commit()
+
+	cat.log().WithFields(map[string]interface{}{
+		"filename": filename,
+		"newname":  newname,
+		"affected": affected,
+	}).Debugf("[%s]: rename file part", TAG)
+
+	return int(affected), nil // OK
 }
 
 // GetFile get file parts from catalog.
