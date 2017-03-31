@@ -137,6 +137,46 @@ func getDataDir(path string) string {
 	return dataDir
 }
 
+// RenameDataDir rename data directory on FS and in DB
+func (cat *Catalog) RenameDataDir(dataDir string, newDataDir string) error {
+	// check file exists
+	var numFiles int
+	tx, err := cat.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	err = tx.QueryRow("SELECT count(id) FROM data WHERE file=?", newDataDir).Scan(&numFiles)
+	if err != nil {
+		return err
+	}
+	if numFiles != 0 {
+		return fmt.Errorf("destination filepath already exists in database: %v", newDataDir)
+	}
+
+	newBaseDir := filepath.Base(newDataDir)
+	// fetch file name
+	baseDir := filepath.Base(dataDir)
+	var fileName string
+	if err := tx.QueryRow("SELECT file FROM data WHERE file LIKE ? || '%' LIMIT 1;", baseDir).Scan(&fileName); err != nil {
+		return err
+	}
+	newFileName := filepath.Join(
+		newBaseDir,
+		filepath.Base(fileName),
+	)
+	rows, err := tx.Exec("UPDATE data SET file=? WHERE file=?", newFileName, fileName)
+	if err != nil {
+		return err
+	}
+	if affected, err := rows.RowsAffected(); err != nil {
+		return err
+	} else if affected == 0 {
+		return fmt.Errorf("directory %v wasn't found, nothing to update", dataDir)
+	}
+	return tx.Commit()
+}
+
 // GetDataDir gets the data directory (absolute path)
 func (cat *Catalog) GetDataDir() string {
 	return getDataDir(cat.path)

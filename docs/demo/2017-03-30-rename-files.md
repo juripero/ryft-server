@@ -1,6 +1,6 @@
 # Demo - REST API change filename endpoint - March 30, 2017
 
-New `PUT files/name` protected endpoint provides an ability to change name of
+New `PUT rename` protected endpoint provides an ability to change name of
 - file
 - directory
 - catalog
@@ -43,42 +43,21 @@ This parameter is the only required.
 #### Change file name:
 
 ```{.sh}
-curl -X PUT "http://localhost:8675/files/name?file=/test/secrets/a.txt&new=/test/secrets/a2.txt"
-{
-  "/ryftone/test/secrets/a.txt": "OK"
-}
 ```
 
 #### Change directory name:
 
 ```{.sh}
-curl -X PUT "http://localhost:8675/files/name?dir=/test/foo&new=/test/foo2"
-{
-  "/ryftone/test/foo": "OK"
-}
 ```
 
 #### Change catalog name:
 ```{.sh}
-curl -X PUT "http://localhost:8675/files/name?catalog=test/foo/secrets.txt&new=/test/foo/secrets2.txt"
-{
-  "/ryftone/test/foo/secrets.txt": "OK"
-}
 ```
 
 #### Change file name inside a catalog:
 ```{.sh}
-curl -X PUT "http://localhost:8675/files/name?catalog=test/foo/secrets.txt&file=a.txt&new=a2.txt"
-{
-  "/ryftone/test/foo/secrets.txt": "OK"
-}
 ```
 
 #### Empty request
 ```{.sh}
-curl -X PUT "http://localhost:8675/files/name?new=/test/foo2"
-{
-  "status": 400,
-  "message": "missing source filename"
-}
 ```

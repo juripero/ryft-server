@@ -254,7 +254,7 @@ report error immediately if data file is busy with search.
 
 
 
-### PUT `files/name` parameters
+### PUT `rename` parameters
 
 
 ### PUT `file` parameter

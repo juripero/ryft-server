@@ -228,11 +228,21 @@ func (cat *Catalog) UpdateFilename(filename string, newFilename string) error {
 
 // updateFilename rename file in data and parts tables
 func (cat *Catalog) updateFilename(filename string, newFilename string) error {
-	stmt, err := cat.db.Prepare("update parts set name=? where name=?")
+	tx, err := cat.db.Begin()
 	if err != nil {
 		return err
 	}
-	rows, err := stmt.Exec(newFilename, filename)
+	defer tx.Rollback()
+	// there should be no rows for the newFilename
+	var newFilenameCnt int
+	err = tx.QueryRow("SELECT count(id) FROM parts WHERE name=?", newFilename).Scan(&newFilenameCnt)
+	if err != nil {
+		return nil
+	} else if newFilenameCnt != 0 {
+		return fmt.Errorf("file %v already exists in DB", newFilename)
+	}
+	// rename file
+	rows, err := tx.Exec("UPDATE parts SET name=? WHERE name=?", newFilename, filename)
 	if err != nil {
 		return err
 	}
@@ -243,7 +253,7 @@ func (cat *Catalog) updateFilename(filename string, newFilename string) error {
 	if affected == 0 {
 		return fmt.Errorf("file not found")
 	}
-	return nil
+	return tx.Commit()
 }
 
 // GetFile get file parts from catalog.

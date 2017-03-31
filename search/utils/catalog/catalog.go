@@ -127,6 +127,7 @@ var renameMutex = &sync.Mutex{}
 
 // RenameCatalog change name of catalog's database and data storage
 func RenameCatalog(path string, newPath string) error {
+	// TODO: lock via utils.Safe*
 	renameMutex.Lock()
 	defer renameMutex.Unlock()
 
@@ -134,13 +135,6 @@ func RenameCatalog(path string, newPath string) error {
 	if info, err := os.Stat(path); os.IsNotExist(err) || info.IsDir() {
 		return ErrNotACatalog
 	}
-	// drop from cache
-	cat, _, err := getCatalog(path, true)
-	if err != nil {
-		return err
-	}
-	cat.Close()
-	cat.DropFromCache()
 
 	dataDir := getDataDir(path)
 	if info, err := os.Stat(dataDir); os.IsNotExist(err) || !info.IsDir() {
@@ -151,10 +145,24 @@ func RenameCatalog(path string, newPath string) error {
 	if _, err := os.Stat(dataDir); os.IsExist(err) {
 		return errors.New("new catalog data directory already exists")
 	}
+
 	if err := os.Rename(path, newPath); err != nil {
 		return err
 	}
 	if err := os.Rename(dataDir, newDataDir); err != nil {
+		os.Rename(newPath, path)
+		return err
+	}
+
+	cat, _, err := getCatalog(newPath, false)
+	defer cat.Close()
+	if err != nil {
+		os.Rename(newDataDir, dataDir)
+		os.Rename(newPath, path)
+		return err
+	}
+	if err := cat.RenameDataDir(dataDir, newDataDir); err != nil {
+		os.Rename(newDataDir, dataDir)
 		os.Rename(newPath, path)
 		return err
 	}

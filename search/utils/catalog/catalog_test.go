@@ -5,12 +5,12 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -258,25 +258,45 @@ func TestCatalogAddFilePart(t *testing.T) {
 	assert.Empty(t, globalCache.cached)
 }
 
-func TestCatalog_fileRename(t *testing.T) {
+func TestCatalog_Rename(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 	SetDefaultCacheDropTimeout(100 * time.Millisecond)
-	DefaultDataDelimiter = "\n\f\n"
-	DefaultDataSizeLimit = 10 * 1024
 
-	os.MkdirAll("/tmp/ryft/", 0755)
-	defer os.RemoveAll("/tmp/ryft/")
-	catName = "/tmp/ryft/test-catalog-rename-file"
-	cat, err := catalog.OpenCatalogNoCache()
+	rootPath := "/tmp/ryft"
+	os.MkdirAll(rootPath, 0755)
+	defer os.RemoveAll(rootPath)
+	catName := filepath.Join(rootPath, "test-catalog")
+	newCatName := filepath.Join(rootPath, "test-catalog-new")
+
+	cat, err := OpenCatalogNoCache(catName)
+	dataDir := cat.GetDataDir()
+
 	// open catalog
-	if assert.NoError(t, err) && assert.NotNil(t, cat) {
-		defer cat.Close()
+	assert.NoError(t, err)
+	assert.NotNil(t, cat)
 
-		dataPath, dataPos, delim, err := cat.AddFilePart(filename, offset, length, nil)
-		return addFilePartResult{
-			Path:  dataPath,
-			Delim: delim,
-			Part:  addFilePart{dataPos, length},
-		}
-	}
+	// fill with data
+	_, _, _, err = cat.AddFilePart("1.txt", 0, 0, nil)
+	cat.Close()
+	assert.NoError(t, err)
+	err = os.MkdirAll(dataDir, 0755)
+	assert.NoError(t, err)
+
+	// rename catalog
+	err = RenameCatalog(catName, newCatName)
+	assert.NoError(t, err)
+	cat, err = OpenCatalogNoCache(newCatName)
+	defer cat.Close()
+	assert.NoError(t, err)
+	assert.NotNil(t, cat)
+
+	f, err := cat.GetFile("1.txt")
+	assert.NoError(t, err)
+	defer f.Close()
+	assert.Equal(t, 1, len(f.parts))
+	part := f.parts[0]
+	assert.Contains(t, part.dataPath, "test-catalog-new")
+
+	_, err = cat.GetFile("2.txt")
+	assert.NotEmpty(t, err)
 }

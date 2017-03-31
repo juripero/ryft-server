@@ -46,8 +46,8 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-// UpdateFilesParams request body struct
-type UpdateFilesParams struct {
+// RenameFileParams request body struct
+type RenameFileParams struct {
 	File    string `form:"file" json:"file"`
 	Dir     string `form:"dir" json:"dir"`
 	Catalog string `form:"catalog" json:"catalog"`
@@ -56,7 +56,7 @@ type UpdateFilesParams struct {
 }
 
 // is empty?
-func (p UpdateFilesParams) isEmpty() bool {
+func (p RenameFileParams) isEmpty() bool {
 	return len(p.File) == 0 && len(p.Dir) == 0 && len(p.Catalog) == 0
 }
 
@@ -67,7 +67,7 @@ type filesRenamer interface {
 }
 
 // getRename factory method that creates fileRenamer instance
-func getRename(mountPoint string, params UpdateFilesParams) (filesRenamer, error) {
+func getRename(mountPoint string, params RenameFileParams) (filesRenamer, error) {
 	if len(params.Catalog) > 0 {
 		if len(params.File) > 0 {
 			return &catalogFileRename{
@@ -115,31 +115,31 @@ func (r fileRename) Rename() (string, error) {
 		return r.path, err
 	}
 	if pathStat.IsDir() {
-		return path, errors.New("is not a file")
+		return r.path, errors.New("is not a file")
 	}
 	// check file path can be derived
 	newPath := filepath.Join(r.mountPoint, r.newPath)
 	// check destination path doesn't exist or is not directory
 	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
-		return path, err
+		return r.path, err
 	}
 	// check file extention
 	if len(r.path) != 0 && filepath.Ext(path) != filepath.Ext(newPath) {
-		return path, errors.New("file extention couldn't be changed")
+		return r.path, errors.New("file extention couldn't be changed")
 	}
 	if path == newPath {
-		return path, nil
+		return r.path, nil
 	}
 	// create directory if it does not exist
 	newDir := filepath.Dir(newPath)
 	if err := os.MkdirAll(newDir, 0755); err != nil {
-		return path, err
+		return r.path, err
 	}
 	// rename file or dir
 	if err := os.Rename(path, newPath); err != nil {
-		return path, err
+		return r.path, err
 	}
-	return path, nil
+	return r.path, nil
 }
 
 // Validate file extention and path
@@ -150,6 +150,10 @@ func (r fileRename) Validate() error {
 	path := filepath.Join(r.mountPoint, r.path)
 	if !search.IsRelativeToHome(r.mountPoint, path) {
 		return fmt.Errorf("path %q is not relative to home", path)
+	}
+	newPath := filepath.Join(r.mountPoint, r.newPath)
+	if !search.IsRelativeToHome(r.mountPoint, newPath) {
+		return fmt.Errorf("path %q is not relative to home", newPath)
 	}
 	return nil
 }
@@ -167,26 +171,26 @@ func (r dirRename) Rename() (string, error) {
 	// check dir exists
 	pathStat, err := os.Stat(path)
 	if err != nil {
-		return path, err
+		return r.path, err
 	}
 	// check is dir
 	if !pathStat.IsDir() {
-		return path, errors.New("not a directory")
+		return r.path, errors.New("not a directory")
 	}
 
 	newPath := filepath.Join(r.mountPoint, r.newPath)
 	// check destination path doesn't exist
 	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
-		return path, err
+		return r.path, err
 	}
 	if path == newPath {
-		return path, nil
+		return r.path, nil
 	}
 	// rename dir
 	if err := os.Rename(path, newPath); err != nil {
-		return path, err
+		return r.path, err
 	}
-	return path, nil
+	return r.path, nil
 }
 
 //Validate directory path
@@ -258,7 +262,7 @@ func (r catalogFileRename) Validate() error {
 func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
 	// parse request parameters
-	params := UpdateFilesParams{}
+	params := RenameFileParams{}
 
 	b := binding.Default(ctx.Request.Method, ctx.ContentType())
 	if err := b.Bind(ctx.Request, &params); err != nil {
@@ -313,7 +317,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			IsLocal bool
 			Name    string
 			Address string
-			Params  UpdateFilesParams
+			Params  RenameFileParams
 
 			Result interface{}
 			Error  error
@@ -330,7 +334,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			}
 
 			node.IsLocal = server.isLocalService(service)
-			node.Params = UpdateFilesParams{
+			node.Params = RenameFileParams{
 				File:    params.File,
 				Dir:     params.Dir,
 				Catalog: params.Catalog,
@@ -397,7 +401,7 @@ func (server *Server) RenameLocalFile(fileRename filesRenamer) map[string]interf
 }
 
 // RenameRemoteFile rename remote file, directory, catalog
-func (server *Server) RenameRemoteFile(address string, authToken string, params UpdateFilesParams) (map[string]interface{}, error) {
+func (server *Server) RenameRemoteFile(address string, authToken string, params RenameFileParams) (map[string]interface{}, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {
