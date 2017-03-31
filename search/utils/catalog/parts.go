@@ -219,15 +219,15 @@ func (cat *Catalog) getAllParts() (map[string]search.NodeInfo, error) {
 	return res, nil // OK
 }
 
-// UpdateFilename rename file in data and parts tables (synchronized)
-func (cat *Catalog) UpdateFilename(filename string, newFilename string) error {
+// RenameFileParts rename file in data and parts tables (synchronized)
+func (cat *Catalog) RenameFileParts(filename string, newFilename string) error {
 	cat.mutex.Lock()
 	defer cat.mutex.Unlock()
-	return cat.updateFilename(filename, newFilename)
+	return cat.renameFileParts(filename, newFilename)
 }
 
-// updateFilename rename file in data and parts tables
-func (cat *Catalog) updateFilename(filename string, newFilename string) error {
+// renameFileParts rename file in data and parts tables
+func (cat *Catalog) renameFileParts(filename string, newFilename string) error {
 	tx, err := cat.db.Begin()
 	if err != nil {
 		return err

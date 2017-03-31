@@ -123,10 +123,6 @@ func (r fileRename) Rename() (string, error) {
 	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
 		return r.path, err
 	}
-	// check file extention
-	if len(r.path) != 0 && filepath.Ext(path) != filepath.Ext(newPath) {
-		return r.path, errors.New("file extention couldn't be changed")
-	}
 	if path == newPath {
 		return r.path, nil
 	}
@@ -198,6 +194,9 @@ func (r dirRename) Validate() error {
 	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.path)) {
 		return fmt.Errorf("path %q is not relative to home", r.path)
 	}
+	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.newPath)) {
+		return fmt.Errorf("path %q is not relative to home", r.newPath)
+	}
 	return nil
 }
 
@@ -224,6 +223,9 @@ func (r catalogRename) Validate() error {
 	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.path)) {
 		return fmt.Errorf("catalog path %q is not relative to home", r.path)
 	}
+	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.newPath)) {
+		return fmt.Errorf("catalog path %q is not relative to home", r.newPath)
+	}
 	return nil
 }
 
@@ -244,7 +246,7 @@ func (r catalogFileRename) Rename() (string, error) {
 		return r.path, err
 	}
 	defer c.Close()
-	if err := c.UpdateFilename(r.path, r.newPath); err != nil {
+	if err := c.RenameFileParts(r.path, r.newPath); err != nil {
 		return r.path, err
 	}
 	return r.path, nil
@@ -286,10 +288,6 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()))
 	}
-	// checks all the inputs are relative to home
-	if err := fileRename.Validate(); err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()))
-	}
 
 	log.WithFields(map[string]interface{}{
 		"file":    params.File,
@@ -308,7 +306,14 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	result := make(map[string]interface{})
 
 	if !params.Local && !server.Config.LocalOnly {
-		services, tags, err := server.getConsulInfoForFiles(userTag, []string{params.File})
+		files := []string{}
+		if len(params.File) != 0 {
+			files = append(files, params.File)
+		}
+		if len(params.Catalog) != 0 {
+			files = append(files, params.Catalog)
+		}
+		services, tags, err := server.getConsulInfoForFiles(userTag, files)
 		if err != nil || len(tags) != 1 {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
 				WithDetails("failed to map files to tags"))
@@ -355,6 +360,10 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 				defer wg.Done()
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("renaming on local node")
+					// checks all the inputs are relative to home
+					if err := fileRename.Validate(); err != nil {
+						panic(NewError(http.StatusBadRequest, err.Error()))
+					}
 					// rename local file
 					node.Result, node.Error = server.RenameLocalFile(fileRename), nil
 				} else {
@@ -383,6 +392,10 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			}
 		}
 	} else {
+		// checks all the inputs are relative to home
+		if err := fileRename.Validate(); err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()))
+		}
 		result = server.RenameLocalFile(fileRename)
 	}
 	ctx.JSON(http.StatusOK, result)
@@ -415,7 +428,7 @@ func (server *Server) RenameRemoteFile(address string, authToken string, params 
 	q.Set("catalog", fmt.Sprintf("%s", params.Catalog))
 
 	u.RawQuery = q.Encode()
-	u.Path += "/files"
+	u.Path += "/rename"
 
 	// prepare request
 	req, err := http.NewRequest("PUT", u.String(), nil)
