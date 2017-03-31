@@ -94,6 +94,14 @@ func newFake() *fakeServer {
 44444-hello-44444
 55555-hello-55555
 `), 0644)
+
+	ioutil.WriteFile("/tmp/ryft/foo/a.txt", []byte(`
+11111-hello-11111
+22222-hello-22222
+33333-hello-33333
+44444-hello-44444
+55555-hello-55555
+`), 0644)
 	ioutil.WriteFile("/tmp/ryft/bad.dat", []byte(`hello`), 0222)
 
 	if cat, err := catalog.OpenCatalogNoCache("/tmp/ryft/catalog.test"); err != nil {

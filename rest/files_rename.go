@@ -38,6 +38,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/getryft/ryft-server/search"
@@ -67,32 +68,43 @@ type filesRenamer interface {
 }
 
 // getRename factory method that creates fileRenamer instance
-func getRename(mountPoint string, params RenameFileParams) (filesRenamer, error) {
+func getRename(mountPoint string, params RenameFileParams, prefix string) (filesRenamer, error) {
+	// get directory prefix from "path" parameter
+	// so the following URLs are the same:
+	// - DELETE http://host:port/files/foo/dir/
+	// - DELETE http://host:port/files?dir=/foo/dir
+	addPathPrefix := func(prefix, path string) string {
+		if len(prefix) > 0 {
+			return filepath.Clean(
+				strings.Join([]string{prefix, path}, string(filepath.Separator)))
+		}
+		return path
+	}
 	if len(params.Catalog) > 0 {
 		if len(params.File) > 0 {
 			return &catalogFileRename{
 				mountPoint:  mountPoint,
-				catalogPath: params.Catalog,
+				catalogPath: addPathPrefix(prefix, params.Catalog),
 				path:        params.File,
 				newPath:     params.New,
 			}, nil
 		}
 		return &catalogRename{
 			mountPoint: mountPoint,
-			path:       params.Catalog,
-			newPath:    params.New,
+			path:       addPathPrefix(prefix, params.Catalog),
+			newPath:    addPathPrefix(prefix, params.New),
 		}, nil
 	} else if len(params.Dir) > 0 {
 		return &dirRename{
 			mountPoint: mountPoint,
-			path:       params.Dir,
-			newPath:    params.New,
+			path:       addPathPrefix(prefix, params.Dir),
+			newPath:    addPathPrefix(prefix, params.New),
 		}, nil
 	} else if len(params.File) > 0 {
 		return &fileRename{
 			mountPoint: mountPoint,
-			path:       params.File,
-			newPath:    params.New,
+			path:       addPathPrefix(prefix, params.File),
+			newPath:    addPathPrefix(prefix, params.New),
 		}, nil
 	}
 	return nil, errors.New("not allowed")
@@ -284,7 +296,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
-	fileRename, err := getRename(mountPoint, params)
+	fileRename, err := getRename(mountPoint, params, ctx.Param("path"))
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()))
 	}

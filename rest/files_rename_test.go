@@ -41,23 +41,20 @@ func TestFiles_DoRename(t *testing.T) {
 		}
 	}
 
-	/* Empty! Why?
-	body, status, err := fs.GET("/files?catalog=catalog.test", "", 0)
-	fmt.Println(err)
-	fmt.Println(status)
-	fmt.Println(string(body))
-	*/
-
 	check("/rename2", "", "", "", 0, http.StatusNotFound, "page not found")
-
-	check("/rename/?new=1.txt", "", "", "", 0, http.StatusBadRequest, "missing source filename")
-
-	check("/rename/?file=1.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
-	check("/rename/?file=1.txt&new=2.pdf", "", "", "", 0, http.StatusBadRequest, "changing the file extention is not allowed")
-	check("/rename/?dir=/foo&new=/bar", "", "", "", 0, http.StatusOK, `{"/foo":"OK"}`)
-	check("/rename/?catalog=/foo.txt&new=/bar.txt", "", "", "", 0, http.StatusOK, `{"/foo.txt":"not a catalog"}`)
-	check("/rename/?catalog=/catalog.test&new=/catalog2.test2", "", "", "", 0, http.StatusOK, `{"/catalog.test":"OK"}`)
-	check("/rename/?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file not found"}`)
-	// check("/rename/?catalog=catalog.test&file=1.txt&new=4.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
-
+	check("/rename?new=1.txt", "", "", "", 0, http.StatusBadRequest, "missing source filename")
+	check("/rename?file=1.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
+	check("/rename?file=1.txt&new=2.pdf", "", "", "", 0, http.StatusBadRequest, "changing the file extention is not allowed")
+	check("/rename/foo?file=a.txt&new=b.txt", "", "", "", 0, http.StatusOK, `{"/foo/a.txt":"OK"}`)
+	check("/rename/foo?file=b.txt&new=../b.txt", "", "", "", 0, http.StatusOK, `{"/foo/b.txt":"OK"}`)
+	check("/rename?dir=/foo&new=/bar", "", "", "", 0, http.StatusOK, `{"/foo":"OK"}`)
+	check("/rename/bar?dir=/&new=../bar2", "", "", "", 0, http.StatusOK, `{"/bar":"OK"}`)
+	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", 0, http.StatusOK, `{"/foo.txt":"not a catalog"}`)
+	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file 2.txt already exists in DB"}`)
+	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=100.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file not found"}`)
+	check("/rename?catalog=/catalog.test&new=/catalog2.test2", "", "", "", 0, http.StatusOK, `{"/catalog.test":"OK"}`)
+	check("/rename?catalog=/catalog2.test2&new=/bar2/catalog.test", "", "", "", 0, http.StatusOK, `{"/catalog2.test2":"OK"}`)
+	check("/rename/bar2?catalog=catalog.test&new=catalog2.test2", "", "", "", 0, http.StatusOK, `{"/bar2/catalog.test":"OK"}`)
+	check("/rename?catalog=/bar2/catalog2.test2&file=1.txt&new=4.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
+	check("/rename/bar2?catalog=catalog2.test2&file=4.txt&new=1.txt", "", "", "", 0, http.StatusOK, `{"4.txt":"OK"}`)
 }
