@@ -1,6 +1,6 @@
-# Demo - REST API change filename endpoint - March 30, 2017
+# Demo - REST API change filename endpoint - April 6, 2017
 
-New `PUT rename` protected endpoint provides an ability to change name of
+New `PUT /rename` protected endpoint provides an ability to change name of
 - file
 - directory
 - catalog
