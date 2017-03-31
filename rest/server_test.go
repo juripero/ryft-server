@@ -225,6 +225,10 @@ func (fs *fakeServer) PUT(url, accept string, contentType, data string, cancelIn
 		return nil, 0, err // failed
 	}
 
+	if len(contentType) != 0 {
+		req.Header.Set("Content-Type", contentType)
+	}
+
 	return fs.do(req, accept, cancelIn)
 }
 

@@ -224,9 +224,16 @@ func (r catalogRename) Rename() (string, error) {
 	// rename catalog
 	path := filepath.Join(r.mountPoint, r.path)
 	newPath := filepath.Join(r.mountPoint, r.newPath)
-	if err := catalog.RenameCatalog(path, newPath); err != nil {
+
+	cat, err := catalog.OpenCatalogNoCache(path)
+	if err != nil {
 		return r.path, err
 	}
+	err = cat.RenameAndClose(newPath)
+	if err != nil {
+		return r.path, err
+	}
+
 	return r.path, nil
 }
 
@@ -258,7 +265,7 @@ func (r catalogFileRename) Rename() (string, error) {
 		return r.path, err
 	}
 	defer c.Close()
-	if err := c.RenameFileParts(r.path, r.newPath); err != nil {
+	if _, err := c.RenameFileParts(r.path, r.newPath); err != nil {
 		return r.path, err
 	}
 	return r.path, nil

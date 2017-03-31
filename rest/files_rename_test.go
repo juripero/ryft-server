@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFiles_DoRename(t *testing.T) {
-
+// PUT /rename test
+func TestRenameFiles(t *testing.T) {
 	for k, v := range makeDefaultLoggingOptions(testLogLevel) {
 		setLoggingLevel(k, v)
 	}
@@ -26,6 +26,7 @@ func TestFiles_DoRename(t *testing.T) {
 		fs.worker.Stop(0)
 		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
 	}()
+
 	// test case
 	check := func(url, accept string, contentType, data string, cancelIn time.Duration, expectedStatus int, expectedErrors ...string) {
 		body, status, err := fs.PUT(url, accept, contentType, data, cancelIn)
@@ -49,12 +50,16 @@ func TestFiles_DoRename(t *testing.T) {
 	check("/rename/foo?file=b.txt&new=../b.txt", "", "", "", 0, http.StatusOK, `{"/foo/b.txt":"OK"}`)
 	check("/rename?dir=/foo&new=/bar", "", "", "", 0, http.StatusOK, `{"/foo":"OK"}`)
 	check("/rename/bar?dir=/&new=../bar2", "", "", "", 0, http.StatusOK, `{"/bar":"OK"}`)
-	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", 0, http.StatusOK, `{"/foo.txt":"not a catalog"}`)
-	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file 2.txt already exists in DB"}`)
+	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", 0, http.StatusOK, `failed to move catalog data`, `no such file or directory`)
+	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file 2.txt already exists"}`)
 	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=100.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file not found"}`)
-	check("/rename?catalog=/catalog.test&new=/catalog2.test2", "", "", "", 0, http.StatusOK, `{"/catalog.test":"OK"}`)
+	check("/rename?catalog=/catalog.test&new=/catalog2.test2", "", "", "", 0, http.StatusBadRequest, `changing the file extention is not allowed`)
 	check("/rename?catalog=/catalog2.test2&new=/bar2/catalog.test", "", "", "", 0, http.StatusOK, `{"/catalog2.test2":"OK"}`)
 	check("/rename/bar2?catalog=catalog.test&new=catalog2.test2", "", "", "", 0, http.StatusOK, `{"/bar2/catalog.test":"OK"}`)
 	check("/rename?catalog=/bar2/catalog2.test2&file=1.txt&new=4.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
 	check("/rename/bar2?catalog=catalog2.test2&file=4.txt&new=1.txt", "", "", "", 0, http.StatusOK, `{"4.txt":"OK"}`)
+
+	// TODO: bad cases:
+	// - destination file is out of home directory
+	// - destination catalog is out of home directory
 }
