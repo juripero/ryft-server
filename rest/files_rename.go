@@ -194,6 +194,10 @@ func (r dirRename) Rename() (string, error) {
 	if path == newPath {
 		return r.path, nil
 	}
+	newDir := filepath.Dir(newPath)
+	if err := os.MkdirAll(newDir, 0755); err != nil {
+		return r.path, err
+	}
 	// rename dir
 	if err := os.Rename(path, newPath); err != nil {
 		return r.path, err
@@ -203,6 +207,9 @@ func (r dirRename) Rename() (string, error) {
 
 //Validate directory path
 func (r dirRename) Validate() error {
+	if filepath.Ext(r.path) != filepath.Ext(r.newPath) {
+		return fmt.Errorf("changing directory extention is not allowed")
+	}
 	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.path)) {
 		return fmt.Errorf("path %q is not relative to home", r.path)
 	}
@@ -224,7 +231,10 @@ func (r catalogRename) Rename() (string, error) {
 	// rename catalog
 	path := filepath.Join(r.mountPoint, r.path)
 	newPath := filepath.Join(r.mountPoint, r.newPath)
-
+	newDir := filepath.Dir(newPath)
+	if err := os.MkdirAll(newDir, 0755); err != nil {
+		return r.path, err
+	}
 	cat, err := catalog.OpenCatalogNoCache(path)
 	if err != nil {
 		return r.path, err
@@ -233,12 +243,14 @@ func (r catalogRename) Rename() (string, error) {
 	if err != nil {
 		return r.path, err
 	}
-
 	return r.path, nil
 }
 
 // Validate catalog path
 func (r catalogRename) Validate() error {
+	if filepath.Ext(r.path) != filepath.Ext(r.newPath) {
+		return fmt.Errorf("changing catalog extention is not allowed")
+	}
 	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.path)) {
 		return fmt.Errorf("catalog path %q is not relative to home", r.path)
 	}
