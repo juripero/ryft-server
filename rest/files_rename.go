@@ -207,9 +207,6 @@ func (r dirRename) Rename() (string, error) {
 
 //Validate directory path
 func (r dirRename) Validate() error {
-	if filepath.Ext(r.path) != filepath.Ext(r.newPath) {
-		return fmt.Errorf("changing directory extention is not allowed")
-	}
 	if !search.IsRelativeToHome(r.mountPoint, filepath.Join(r.mountPoint, r.path)) {
 		return fmt.Errorf("path %q is not relative to home", r.path)
 	}

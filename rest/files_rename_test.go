@@ -54,7 +54,6 @@ func TestRenameFiles(t *testing.T) {
 	check("/rename?dir=/foo&new=/bar", "", "", "", 0, http.StatusOK, `{"/foo":"OK"}`)
 	check("/rename?dir=/foo&new=/../../var/data/bar", "", "", "", 0, http.StatusBadRequest, `path \"/../../var/data/bar\" is not relative to home`)
 	check("/rename/bar?dir=/&new=../bar2", "", "", "", 0, http.StatusOK, `{"/bar":"OK"}`)
-	check("/rename?dir=/bar&new=/bar.2", "", "", "", 0, http.StatusBadRequest, `changing directory extention is not allowed`)
 	// catalog and file
 	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", 0, http.StatusOK, `failed to move catalog data`, `no such file or directory`)
 	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file '2.txt' already exists"}`)
