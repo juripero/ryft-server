@@ -205,7 +205,7 @@ func (f *IndexFile) Find(offset uint64) int {
 }
 
 // Unwind unwinds the index
-func (f *IndexFile) Unwind(index *Index) (*Index, int) {
+func (f *IndexFile) Unwind(index *Index) (*Index, int, bool) {
 	// we should take into account surrounding width.
 	// in common case data are surrounded: [w]data[w]
 	// but at begin or end of file no surrounding
@@ -261,8 +261,8 @@ func (f *IndexFile) Unwind(index *Index) (*Index, int) {
 		res.Fuzziness = index.Fuzziness
 		res.DataPos = index.DataPos
 		res.Host = index.Host
-		return res, int(shift)
+		return res, int(shift), true
 	}
 
-	return index, 0 // "as is" fallback
+	return index, 0, false // "as is" fallback
 }

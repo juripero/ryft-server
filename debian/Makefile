@@ -19,7 +19,7 @@ DEBNAME=ryft-server-${VERSION}_amd64.deb
 DESTDIR=.build
 
 .PHONY: package
-package: control
+package-content: control
 	cp "${RYFT_SERVER_BIN}" "${DESTDIR}/usr/bin/"
 	cp "../ryft-server.conf" "${DESTDIR}/etc/ryft-server.conf"
 	cp "../ryft-users.yaml" "${DESTDIR}/etc/ryft-users.yaml"
@@ -29,6 +29,8 @@ package: control
 	rm "${DESTDIR}/var/ryft/.keep"
 	echo "Installed-Size: $$(du -k -s ${DESTDIR} | awk '{print 1024*$$1}')" >> "${CONTROLFILE}"
 # chown -R ryftuser.ryftuser "${DESTDIR}"
+
+package: package-content
 	dpkg-deb --build "${DESTDIR}" "${DEBNAME}"
 	rm -rf "${DESTDIR}"
 

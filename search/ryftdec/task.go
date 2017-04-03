@@ -478,6 +478,13 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 		}
 	}
 
+	// check DATA file consistency
+	if info, err := os.Stat(dataPath); err == nil {
+		if expected, actual := dataPos, info.Size(); expected != uint64(actual) {
+			return fmt.Errorf("inconsistent data file '%s' size: expected:%d, actual:%d", dataPath, expected, actual)
+		}
+	}
+
 	return nil // OK
 }
 
@@ -506,10 +513,11 @@ func (mpp *InMemoryPostProcessing) AddCatalog(base *catalog.Catalog) error {
 // unwind index recursively
 func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, int) {
 	if f, ok := mpp.indexes[index.File]; ok && f != nil {
-		tmp, shift := f.Unwind(index)
-		// task.log().Debugf("unwind %s => %s", index, tmp)
-		res, n := mpp.unwind(tmp)
-		return res, n + shift
+		if tmp, shift, ok := f.Unwind(index); ok {
+			// log.Debugf("unwind %s => %s", index, tmp)
+			res, n := mpp.unwind(tmp)
+			return res, n + shift
+		}
 	}
 
 	return index, 0 // done
