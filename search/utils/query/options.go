@@ -217,7 +217,7 @@ func (o *Options) SetMode(mode string) *Options {
 
 	// HAMMING
 	case "fhs":
-		if o.Dist == 0 {
+		if o.Dist == 0 && false {
 			mode = "es" // back to EXACT if no distance provided
 		}
 		//o.Width = 0
@@ -232,7 +232,7 @@ func (o *Options) SetMode(mode string) *Options {
 
 	// EDIT DISTANCE
 	case "feds":
-		if o.Dist == 0 {
+		if o.Dist == 0 && false {
 			mode = "es" // back to EXACT if no distance provided
 			o.Reduce = false
 		}
