@@ -139,8 +139,12 @@ func (engine *Engine) prepare(task *Task) error {
 		}
 	}
 
-	// data separator (should be hex-escaped)
-	args = append(args, "-e", utils.HexEscape([]byte(cfg.Delimiter)))
+	if len(cfg.Delimiter) != 0 {
+		// data separator (should be hex-escaped)
+		args = append(args, "-e", utils.HexEscape([]byte(cfg.Delimiter)))
+	} else {
+		args = append(args, "-en") // NULL delimiter
+	}
 
 	// enable verbose mode to grab statistics
 	args = append(args, "-v")
