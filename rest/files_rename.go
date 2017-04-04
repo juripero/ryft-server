@@ -65,6 +65,7 @@ func (p RenameFileParams) isEmpty() bool {
 type filesRenamer interface {
 	Rename() (string, error)
 	Validate() error
+	GetPath() string
 }
 
 // getRename factory method that creates fileRenamer instance
@@ -115,6 +116,10 @@ type fileRename struct {
 	mountPoint string
 	path       string
 	newPath    string
+}
+
+func (r fileRename) GetPath() string {
+	return r.path
 }
 
 // Rename change name of a file on FS
@@ -173,6 +178,10 @@ type dirRename struct {
 	newPath    string
 }
 
+func (r dirRename) GetPath() string {
+	return r.path
+}
+
 // Rename change directory name of one directory on FS
 func (r dirRename) Rename() (string, error) {
 	path := filepath.Join(r.mountPoint, r.path)
@@ -223,6 +232,10 @@ type catalogRename struct {
 	newPath    string
 }
 
+func (r catalogRename) GetPath() string {
+	return r.path
+}
+
 // Rename catalog (sql database and data directory)
 func (r catalogRename) Rename() (string, error) {
 	// rename catalog
@@ -263,6 +276,10 @@ type catalogFileRename struct {
 	catalogPath string
 	path        string
 	newPath     string
+}
+
+func (r catalogFileRename) GetPath() string {
+	return r.catalogPath
 }
 
 // Rename change file name in catalog
@@ -334,17 +351,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	result := make(map[string]interface{})
 
 	if !params.Local && !server.Config.LocalOnly {
-		files := []string{}
-		if len(params.File) != 0 {
-			files = append(files, params.File)
-		}
-		if len(params.Catalog) != 0 {
-			files = append(files, params.Catalog)
-		}
-		if len(params.Dir) != 0 {
-			files = append(files, params.Dir)
-		}
-
+		files := []string{fileRename.GetPath()}
 		services, tags, err := server.getConsulInfoForFiles(userTag, files)
 		if err != nil || len(tags) != len(files) {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
