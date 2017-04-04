@@ -341,8 +341,12 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 		if len(params.Catalog) != 0 {
 			files = append(files, params.Catalog)
 		}
+		if len(params.Dir) != 0 {
+			files = append(files, params.Dir)
+		}
+
 		services, tags, err := server.getConsulInfoForFiles(userTag, files)
-		if err != nil || len(tags) != 1 {
+		if err != nil || len(tags) != len(files) {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
 				WithDetails("failed to map files to tags"))
 		}
