@@ -395,7 +395,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 				continue // nothing to do
 			}
 			wg.Add(1)
-			go func(node *Node) {
+			go func(node *Node, path string) {
 				defer wg.Done()
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("renaming on local node")
@@ -411,9 +411,9 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 						WithField("addr", node.Address).
 						Debugf("renaming on remote node")
 					// rename remote file
-					node.Result, node.Error = server.RenameRemoteFile(node.Address, authToken, node.Params)
+					node.Result, node.Error = server.RenameRemoteFile(node.Address, authToken, node.Params, path)
 				}
-			}(node)
+			}(node, ctx.Param("path"))
 		}
 
 		// wait and report all results
@@ -453,7 +453,7 @@ func (server *Server) RenameLocalFile(fileRename filesRenamer) map[string]interf
 }
 
 // RenameRemoteFile rename remote file, directory, catalog
-func (server *Server) RenameRemoteFile(address string, authToken string, params RenameFileParams) (map[string]interface{}, error) {
+func (server *Server) RenameRemoteFile(address string, authToken string, params RenameFileParams, path string) (map[string]interface{}, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {
@@ -468,7 +468,7 @@ func (server *Server) RenameRemoteFile(address string, authToken string, params 
 
 	u.RawQuery = q.Encode()
 	u.Path += "/rename"
-
+	u.Path = filepath.Join(u.Path, path)
 	// prepare request
 	req, err := http.NewRequest("PUT", u.String(), nil)
 	if err != nil {
