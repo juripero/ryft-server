@@ -48,6 +48,7 @@ We start ryft-server in local-only mode. It equals to execution queries with `lo
 
 #### Response format
 Response usually looks like 
+
 Status code: `200`
 ```{.json}
 {
@@ -77,7 +78,7 @@ Here we change filename from `a.txt` to `a2.txt` and move it from `secrets` dire
 `secrets2` directory doesn't exist and it will be created during request.
 
 ```{.sh}
-curl -X PUT "http://localhost:8675/rename?file=/secrets/a.txt&new=/secrets2/a2.txt" | jq .
+curl -s -X PUT "http://localhost:8675/rename?file=/secrets/a.txt&new=/secrets2/a2.txt" | jq .
 {
   "/secrets/a.txt": "OK"
 }
@@ -85,7 +86,7 @@ curl -X PUT "http://localhost:8675/rename?file=/secrets/a.txt&new=/secrets2/a2.t
 
 We can also set path to the directory that contains the file directly in the URL path string. 
 ```{.sh}
-curl -X PUT "http://localhost:8675/rename/secrets?file=a.txt&new=a2.txt&local=true" | jq .
+curl -s -X PUT "http://localhost:8675/rename/secrets?file=a.txt&new=a2.txt" | jq .
 {
   "/secrets/a.txt": "OK"
 }
@@ -95,7 +96,7 @@ curl -X PUT "http://localhost:8675/rename/secrets?file=a.txt&new=a2.txt&local=tr
 Then we rename directory `foo` into `foo2`. 
 
 ```{.sh}
-curl -X PUT  "http://localhost:8675/rename?dir=/foo&new=/foo2" | jq .
+curl -s -X PUT  "http://localhost:8675/rename?dir=/foo&new=/foo2" | jq .
 {
   "/foo": "OK"
 }
@@ -105,7 +106,7 @@ curl -X PUT  "http://localhost:8675/rename?dir=/foo&new=/foo2" | jq .
 Rename catalog from `/foo/secrets.txt` to `/foo/secrets2.txt`. 
 
 ```{.sh}
-curl -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&new=/foo/secrets2.txt" | jq .
+curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&new=/foo/secrets2.txt" | jq .
 {
   "/foo/secrets.txt": "OK"
 }
@@ -115,10 +116,80 @@ curl -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&new=/foo/secr
 Now we rename file `c.txt` to `c2.txt` that lays inside `/foo/secrets.txt` catalog.
 Here we update records in SQL database and catalog-directory. If SQL query fails transaction will not be commited.
 If something happens with the filesystem and we can't rename directory we don't try to rollback this operation somehow. 
+
+Show files inside catalog
+```
+curl -X GET "http://localhost:8675/files?catalog=/foo/secrets2.txt" | jq .
+{
+  "catalog": "/foo/secrets2.txt",
+  "files": [
+    "c.txt",
+    "d.txt"
+  ],
+  "details": {
+    "ryftone-310": {
+      "c.txt": {
+        "type": "file",
+        "length": 18
+      },
+      "d.txt": {
+        "type": "file",
+        "length": 18
+      }
+    },
+    "ryftone-313": {
+      "c.txt": {
+        "type": "file",
+        "length": 18
+      },
+      "d.txt": {
+        "type": "file",
+        "length": 18
+      }
+    }
+  }
+}
+```
+
+Then rename file
 ```{.sh}
-curl -X PUT "http://localhost:8675/rename?catalog=/foo/secrets2.txt&file=c.txt&new=c2.txt" | jq .
+curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets2.txt&file=c.txt&new=c2.txt" | jq .
 {
   "c.txt": "OK"
+}
+```
+
+Check files
+```
+curl -X GET "http://localhost:8675/files?catalog=/foo/secrets2.txt" | jq .
+{
+  "catalog": "/foo/secrets2.txt",
+  "files": [
+    "c2.txt",
+    "d.txt"
+  ],
+  "details": {
+    "ryftone-310": {
+      "c2.txt": {
+        "type": "file",
+        "length": 18
+      },
+      "d.txt": {
+        "type": "file",
+        "length": 18
+      }
+    },
+    "ryftone-313": {
+      "c2.txt": {
+        "type": "file",
+        "length": 18
+      },
+      "d.txt": {
+        "type": "file",
+        "length": 18
+      }
+    }
+  }
 }
 ```
 
@@ -169,7 +240,7 @@ It is possible to get response like. It means one node can be corrupted, but we 
 Change name from `a.txt` to `a2.txt` and move file from `secrets` to `secrets2`
 
 ```{.sh}
-curl -X PUT "http://localhost:8675/rename?file=/secrets/a.txt&new=/secrets2/a2.txt" | jq .
+curl -s -X PUT "http://localhost:8675/rename?file=/secrets/a.txt&new=/secrets2/a2.txt" | jq .
 {
   "ryftone-310": {
     "/secrets/a.txt": "OK"
@@ -185,7 +256,7 @@ curl -X PUT "http://localhost:8675/rename?file=/secrets/a.txt&new=/secrets2/a2.t
 Rename directory from `foo` to `foo2`
 
 ```{.sh}
-curl -X PUT  "http://localhost:8675/rename?dir=/foo&new=/foo2" | jq .
+curl -s -X PUT  "http://localhost:8675/rename?dir=/foo&new=/foo2" | jq .
 {
   "ryftone-310": {
     "/foo": "OK"
@@ -201,7 +272,7 @@ curl -X PUT  "http://localhost:8675/rename?dir=/foo&new=/foo2" | jq .
 Rename catalog from `/foo/secrets.txt` to `/foo/secrets2.txt`
 
 ```{.sh}
-curl -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&new=/foo/secrets2.txt" | jq .
+curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&new=/foo/secrets2.txt" | jq .
 {
   "ryftone-310": {
     "/foo/secrets.txt": "OK"
@@ -216,7 +287,7 @@ curl -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&new=/foo/secr
 
 Rename file `c.txt` to `c2.txt` inside catalog `/foo/secrets.txt`
 ```{.sh}
-curl -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&file=c.txt&new=c2.txt" | jq .
+curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&file=c.txt&new=c2.txt" | jq .
 {
   "ryftone-310": {
     "c.txt": "OK"
@@ -232,7 +303,7 @@ curl -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&file=c.txt&ne
 Here we execute rename method just for one node and response will be the same as when we run server in `local-only` mode
 
 ```{.sh}
- curl -X PUT "http://localhost:8675/rename?file=/secrets/a.txt&new=/secrets2/a2.txt&local=true" | jq .
+ curl -s -X PUT "http://localhost:8675/rename?file=/secrets/a.txt&new=/secrets2/a2.txt&local=true" | jq .
 {
   "/secrets/a.txt": "OK"
 }
