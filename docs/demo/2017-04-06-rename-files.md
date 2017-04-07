@@ -117,41 +117,6 @@ Now we rename file `c.txt` to `c2.txt` that lays inside `/foo/secrets.txt` catal
 Here we update records in SQL database and catalog-directory. If SQL query fails transaction will not be commited.
 If something happens with the filesystem and we can't rename directory we don't try to rollback this operation somehow. 
 
-Show files inside catalog
-```
-curl -X GET "http://localhost:8675/files?catalog=/foo/secrets2.txt" | jq .
-{
-  "catalog": "/foo/secrets2.txt",
-  "files": [
-    "c.txt",
-    "d.txt"
-  ],
-  "details": {
-    "ryftone-310": {
-      "c.txt": {
-        "type": "file",
-        "length": 18
-      },
-      "d.txt": {
-        "type": "file",
-        "length": 18
-      }
-    },
-    "ryftone-313": {
-      "c.txt": {
-        "type": "file",
-        "length": 18
-      },
-      "d.txt": {
-        "type": "file",
-        "length": 18
-      }
-    }
-  }
-}
-```
-
-Then rename file
 ```{.sh}
 curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets2.txt&file=c.txt&new=c2.txt" | jq .
 {
@@ -159,39 +124,6 @@ curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets2.txt&file=c.tx
 }
 ```
 
-Check files
-```
-curl -X GET "http://localhost:8675/files?catalog=/foo/secrets2.txt" | jq .
-{
-  "catalog": "/foo/secrets2.txt",
-  "files": [
-    "c2.txt",
-    "d.txt"
-  ],
-  "details": {
-    "ryftone-310": {
-      "c2.txt": {
-        "type": "file",
-        "length": 18
-      },
-      "d.txt": {
-        "type": "file",
-        "length": 18
-      }
-    },
-    "ryftone-313": {
-      "c2.txt": {
-        "type": "file",
-        "length": 18
-      },
-      "d.txt": {
-        "type": "file",
-        "length": 18
-      }
-    }
-  }
-}
-```
 
 ### Rename in a `cluster` mode
 #### Response format
@@ -285,7 +217,42 @@ curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&new=/foo/s
 
 #### Change file name inside a catalog:
 
-Rename file `c.txt` to `c2.txt` inside catalog `/foo/secrets.txt`
+Show files inside catalog
+```
+curl -X GET "http://localhost:8675/files?catalog=/foo/secrets2.txt" | jq .
+{
+  "catalog": "/foo/secrets2.txt",
+  "files": [
+    "c.txt",
+    "d.txt"
+  ],
+  "details": {
+    "ryftone-310": {
+      "c.txt": {
+        "type": "file",
+        "length": 18
+      },
+      "d.txt": {
+        "type": "file",
+        "length": 18
+      }
+    },
+    "ryftone-313": {
+      "c.txt": {
+        "type": "file",
+        "length": 18
+      },
+      "d.txt": {
+        "type": "file",
+        "length": 18
+      }
+    }
+  }
+}
+```
+
+
+Then rename file `c.txt` to `c2.txt` inside catalog `/foo/secrets.txt`
 ```{.sh}
 curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&file=c.txt&new=c2.txt" | jq .
 {
@@ -294,6 +261,40 @@ curl -s -X PUT "http://localhost:8675/rename?catalog=/foo/secrets.txt&file=c.txt
   },
   "ryftone-313": {
     "c.txt": "OK"
+  }
+}
+```
+
+Check files
+```
+curl -X GET "http://localhost:8675/files?catalog=/foo/secrets2.txt" | jq .
+{
+  "catalog": "/foo/secrets2.txt",
+  "files": [
+    "c2.txt",
+    "d.txt"
+  ],
+  "details": {
+    "ryftone-310": {
+      "c2.txt": {
+        "type": "file",
+        "length": 18
+      },
+      "d.txt": {
+        "type": "file",
+        "length": 18
+      }
+    },
+    "ryftone-313": {
+      "c2.txt": {
+        "type": "file",
+        "length": 18
+      },
+      "d.txt": {
+        "type": "file",
+        "length": 18
+      }
+    }
   }
 }
 ```
