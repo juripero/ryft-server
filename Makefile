@@ -1,6 +1,7 @@
 GOBINDATA = ${GOPATH}/bin/go-bindata
 ASSETS = bindata.go
 BINARIES = ryft-server
+HINT=ryft-server
 
 all: $(ASSETS) build
 
@@ -21,7 +22,8 @@ $(GOBINDATA):
 
 .PHONY: $(ASSETS)
 $(ASSETS): $(GOBINDATA)
-	${GOBINDATA} -o bindata.go -prefix static/ static/...
+	@echo "[${HINT}]: updating bindata..."
+	@${GOBINDATA} -o bindata.go -prefix static/ static/...
 
 .PHONY: update
 update:
@@ -29,15 +31,17 @@ update:
 
 .PHONY: build
 build:
-	go build -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
+	@echo "[${HINT}]: building ryft-server..."
+	@go build -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
 .PHONY: install
 install: $(ASSETS)
-	go install -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
+	@echo "[${HINT}]: installing ryft-server..."
+	@go install -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
 .PHONY: debian
 debian: install
-	make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
+	@make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
 
 .PHONY: docker-build docker_build
 docker_build: docker-build
