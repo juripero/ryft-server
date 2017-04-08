@@ -157,7 +157,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 		}
 
 		defer f.Close() // close at the end
-		idxRd = bufio.NewReader(f)
+		idxRd = bufio.NewReaderSize(f, 256*1024)
 	}
 
 	// INDEX line can be read partially
@@ -227,7 +227,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 						}
 
 						defer f.Close() // close at the end
-						datRd = bufio.NewReader(f)
+						datRd = bufio.NewReaderSize(f, 256*1024)
 					}
 
 					// try to read data: if operation is cancelled `data` is nil

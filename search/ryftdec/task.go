@@ -284,7 +284,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			} else {
 				cf = &CachedFile{
 					f:   f,
-					rd:  bufio.NewReader(f),
+					rd:  bufio.NewReaderSize(f, 256*1024),
 					pos: 0,
 				}
 				files[item.DataFile] = cf // put to cache
@@ -453,7 +453,7 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 	defer file.Close() // close at the end
 
 	// read all index records
-	rd := bufio.NewReader(file)
+	rd := bufio.NewReaderSize(file, 256*1024)
 	delimLen := uint64(len(delim))
 	dataPos := uint64(0)
 	for {
