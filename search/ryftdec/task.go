@@ -794,7 +794,7 @@ ItemsLoop:
 		}
 
 		// post processing (index left unchanged)
-		if recRawData != nil {
+		if recRawData != nil && len(task.config.Transforms) > 0 {
 			start := time.Now()
 			for _, tx := range task.config.Transforms {
 				var skip bool

@@ -128,20 +128,43 @@ done
 false && {
 FILES="-f RC_2016-01.data"
 do_test -q '(RAW_TEXT CONTAINS ES("Hello"))' -i $FILES --count
-do_test -q '(RAW_TEXT CONTAINS ES("Hello"))' -i $FILES --search
+#do_test -q '(RAW_TEXT CONTAINS ES("Hello"))' -i $FILES --search
 do_test -q '(RAW_TEXT CONTAINS ES("Bill"))'  -i $FILES --count
-do_test -q '(RAW_TEXT CONTAINS ES("Bill"))'  -i $FILES --search
 do_test -q '(RAW_TEXT CONTAINS ES("Trump"))' -i $FILES --count
-do_test -q '(RAW_TEXT CONTAINS ES("Trump"))' -i $FILES --search
 }
 
 # Reddit data + RECORD search
 false && {
 FILES="-f RC_2016-01.data"
-do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --format=utf8 --count
-do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --format=utf8 --search
-do_test -q '(RECORD CONTAINS ES("Bill"))'  -i $FILES --format=utf8 --count
-do_test -q '(RECORD CONTAINS ES("Bill"))'  -i $FILES --format=utf8 --search
-do_test -q '(RECORD CONTAINS ES("Trump"))' -i $FILES --format=utf8 --count
-do_test -q '(RECORD CONTAINS ES("Trump"))' -i $FILES --format=utf8 --search
+#do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --count
+do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --format=raw
+do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --format=utf8
+do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --format=json
+do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --format=null
+#do_test -q '(RECORD CONTAINS ES("Bill"))'  -i $FILES --format=utf8 --search
+#do_test -q '(RECORD CONTAINS ES("Trump"))' -i $FILES --format=utf8 --search
+}
+
+false && {
+FILES="-f RC_2016-01.data"
+#do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --accept=json
+#do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --accept=csv
+#do_test -q '{RECORD CONTAINS ES("Hello")} AND {RECORD CONTAINS ES("Hello")}' -i $FILES --search
+#do_test -q '{RECORD CONTAINS ES("Hello")} OR {RECORD CONTAINS ES("Hello")}' -i $FILES --search
+do_test -q '{RECORD CONTAINS ES("Hello")} OR {RECORD CONTAINS ES("Hello")}' -i $FILES --search -oi p-test.txt
+do_test -q '{RECORD CONTAINS ES("Hello")} OR {RECORD CONTAINS ES("Hello")}' -i $FILES --search -od p-test.data
+do_test -q '{RECORD CONTAINS ES("Hello")} OR {RECORD CONTAINS ES("Hello")}' -i $FILES --search -oi p-test.txt -od p-test.data
+}
+
+false && {
+FILES="-f RC_2016-01.data"
+do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --transform 'match("^.*$")'
+do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --transform 'replace("^(.*)$", "$1")'
+do_test -q '(RECORD CONTAINS ES("Hello"))' -i $FILES --search --transform 'script("cat",-)'
+}
+
+false && {
+FILES="-c twitter1.json"
+do_test -q '(RAW_TEXT CONTAINS ES("Trump"))' -i $FILES --search
+do_test -q '(RECORD CONTAINS ES("Trump"))' -i $FILES --search
 }
