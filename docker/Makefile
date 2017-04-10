@@ -12,7 +12,7 @@ build:
 	cd builder && \
 	mkdir -p .tmp && \
 	rsync -avz --exclude=".tmp" --exclude="debian" --exclude="docker" ${SOURCE} .tmp/ && \
-	docker run -v ${SOURCE}:/go/src/github.com/getryft ryft/builder:${VERSION}
+	docker run -v ${SOURCE}:/go/src/github.com/getryft ryft/builder:${VERSION} && \
 	rm -rf .tmp
 
 app:

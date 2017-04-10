@@ -1,0 +1,3 @@
+#!/bin/bash
+
+ssh -C ${RYFTPRIM_REMOTE_USER}@${RYFTPRIM_REMOTE_HOST} $@

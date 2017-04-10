@@ -1,19 +1,24 @@
-version: '3'
-services:
-  app1:
-    image: ryft/app:latest
-    ports:
-      - 8801:8765
-  app2:
-    image: ryft/app:latest
-    ports:
-      - 8802:8765
-  consul:
-    image: consul:0.8.0
-    container_name: "consul"
-    hostname: "consul"
-    ports:
-      - "8400:8400"
-      - "8500:8500"
-      - "8600:53"
+app1:
+  image: ryft/app:latest
+  ports:
+    - 8801:8765
+  volumes:
+    - ~/.ssh:/root/.ssh
+    - /ryftone:/ryftone
+  command:  /ryft-server --config=/etc/ryft-server.conf --address :8765 --debug --local-only
+app2:
+  image: ryft/app:latest
+  ports:
+    - 8802:8765
+  volumes:
+    - ~/.ssh:/root/.ssh
+    - /ryftone:/ryftone
+consul:
+  image: consul:0.8.0
+  container_name: "consul"
+  hostname: "consul"
+  ports:
+    - "8400:8400"
+    - "8500:8500"
+    - "8600:53"
     
