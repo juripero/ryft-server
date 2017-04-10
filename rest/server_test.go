@@ -80,12 +80,22 @@ func newFake() *fakeServer {
 	mux.POST("/files/*path", fs.server.DoPostFiles)
 	mux.DELETE("/files", fs.server.DoDeleteFiles)
 	mux.DELETE("/files/*path", fs.server.DoDeleteFiles)
+	mux.PUT("/rename", fs.server.DoRenameFiles)
+	mux.PUT("/rename/*path", fs.server.DoRenameFiles)
 
 	// DEBUG mode
 	mux.GET("/logging/level", fs.server.DoLoggingLevel)
 
 	os.MkdirAll("/tmp/ryft/foo", 0755) // see BackendOptions above!
 	ioutil.WriteFile("/tmp/ryft/1.txt", []byte(`
+11111-hello-11111
+22222-hello-22222
+33333-hello-33333
+44444-hello-44444
+55555-hello-55555
+`), 0644)
+
+	ioutil.WriteFile("/tmp/ryft/foo/a.txt", []byte(`
 11111-hello-11111
 22222-hello-22222
 33333-hello-33333
@@ -203,6 +213,20 @@ func (fs *fakeServer) DELETE(url, accept string, cancelIn time.Duration) ([]byte
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), nil)
 	if err != nil {
 		return nil, 0, err // failed
+	}
+
+	return fs.do(req, accept, cancelIn)
+}
+
+// PUT request
+func (fs *fakeServer) PUT(url, accept string, contentType, data string, cancelIn time.Duration) ([]byte, int, error) {
+	req, err := http.NewRequest("PUT", fmt.Sprintf("http://localhost%s%s", fs.worker.Addr, url), bytes.NewBufferString(data))
+	if err != nil {
+		return nil, 0, err // failed
+	}
+
+	if len(contentType) != 0 {
+		req.Header.Set("Content-Type", contentType)
 	}
 
 	return fs.do(req, accept, cancelIn)

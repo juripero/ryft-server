@@ -287,6 +287,8 @@ func main() {
 	private.DELETE("/files/*path", server.DoDeleteFiles)
 	private.POST("/files", server.DoPostFiles)
 	private.POST("/files/*path", server.DoPostFiles)
+	private.PUT("/rename", server.DoRenameFiles)
+	private.PUT("/rename/*path", server.DoRenameFiles)
 
 	// debug API endpoints
 	if server.Config.DebugMode {

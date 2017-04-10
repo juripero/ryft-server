@@ -116,5 +116,43 @@ func TestParts(t *testing.T) {
 			assert.NoError(t, err)
 			assert.EqualValues(t, string([]byte{0, 0})+"11111-hello-11111"+"aaaaa-hello-aaaaa"+strings.Repeat("1", 200), string(data))
 		}
+
+		if true { // check rename files
+			// bad new filename
+			x, err := cat.RenameFileParts("0.txt", "1.txt")
+			if assert.Error(t, err) {
+				assert.EqualValues(t, 0, x)
+				assert.Contains(t, err.Error(), "already exists")
+			}
+
+			// 1.txt -> 9.txt
+			x, err = cat.RenameFileParts("1.txt", "/foo/bar/9.txt")
+			if assert.NoError(t, err) {
+				assert.EqualValues(t, 3, x) // 3 parts
+			}
+
+			f, err := cat.GetFile("/foo/bar/9.txt")
+			if assert.NoError(t, err) && assert.NotNil(t, f) {
+				defer f.Close()
+
+				if assert.EqualValues(t, 3, len(f.parts)) {
+					assert.EqualValues(t, 0, f.parts[0].dataPos)
+					assert.EqualValues(t, 0, f.parts[0].offset)
+					assert.EqualValues(t, 17, f.parts[0].length)
+					assert.EqualValues(t, 17+2, f.parts[1].dataPos)
+					assert.EqualValues(t, 17, f.parts[1].offset)
+					assert.EqualValues(t, 17, f.parts[1].length)
+					assert.EqualValues(t, 0, f.parts[2].dataPos)
+					assert.EqualValues(t, 2*17, f.parts[2].offset)
+					assert.EqualValues(t, 200, f.parts[2].length)
+				}
+			}
+
+			// rename it back
+			x, err = cat.RenameFileParts("/foo/bar/9.txt", "1.txt")
+			if assert.NoError(t, err) {
+				assert.EqualValues(t, 3, x) // 3 parts
+			}
+		}
 	}
 }

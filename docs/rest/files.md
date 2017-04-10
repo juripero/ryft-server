@@ -5,7 +5,8 @@ Also this method is used to download standalone file or catalog's part.
 The POST `/files` endpoint is used to upload a file to Ryft box.
 The catalog feature is supported to upload a bunch of small files.
 
-To delete any file, directory ot catalog the DELETE `/files` endpoint is used.
+To delete any file, directory or catalog the DELETE `/files` endpoint is used.
+
 
 Note, these endpoints are protected and user should provide valid credentials.
 See [authentication](../auth.md) for more details.

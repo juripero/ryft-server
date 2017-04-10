@@ -132,9 +132,60 @@ func regexpMatch(pattern, str string) (bool, error) {
 // return absollute path!
 func getDataDir(path string) string {
 	// take a look at Catalog.newDataFilePath() function!
-	base, file := filepath.Split(path)
-	dataDir := filepath.Join(base, fmt.Sprintf(".%s.catalog", file))
-	return dataDir
+	base, _ := filepath.Split(path)
+	dataDir := getRelativeDataDir(path)
+	return filepath.Join(base, dataDir)
+}
+
+// get relative (to catalog) data directory
+func getRelativeDataDir(path string) string {
+	_, file := filepath.Split(path)
+	return fmt.Sprintf(".%s.catalog", file)
+}
+
+// renameDataDir renames data files in DB (synchronized).
+func (cat *Catalog) renameDataDirSync(newPath string) (int, error) {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.renameDataDir(newPath)
+}
+
+// renameDataDir renames data files in DB.
+func (cat *Catalog) renameDataDir(newPath string) (int, error) {
+	// should be done under exclusive transaction
+	tx, err := cat.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %s", err)
+	}
+	defer tx.Rollback() // just in case
+
+	oldDir := getRelativeDataDir(cat.path)
+	newDir := getRelativeDataDir(newPath)
+
+	// do rename data files
+	rows, err := tx.Exec("UPDATE data SET file=replace(file,?,?)", oldDir, newDir)
+	if err != nil {
+		return 0, fmt.Errorf("failed to rename data files: %s", err)
+	}
+
+	affected, err := rows.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get number of rows affected: %s", err)
+	}
+
+	// commit transaction
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %s", err)
+	}
+
+	cat.log().WithFields(map[string]interface{}{
+		"old":      oldDir,
+		"new":      newDir,
+		"affected": affected,
+	}).Debugf("[%s]: rename data files", TAG)
+
+	return int(affected), nil // OK
 }
 
 // GetDataDir gets the data directory (absolute path)

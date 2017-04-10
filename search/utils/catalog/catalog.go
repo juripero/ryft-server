@@ -65,6 +65,9 @@ var DefaultTempDirectory string = "/tmp/"
 // ErrNotACatalog is used to indicate the file is not a catalog meta-data file.
 var ErrNotACatalog = errors.New("not a catalog")
 
+// ErrNotACatalogData is used to indicate the file is not a catalog data directory.
+var ErrNotACatalogData = errors.New("not a catalog datafile")
+
 func init() {
 	sql.Register("ryft_sqlite3", &sqlite.SQLiteDriver{
 		ConnectHook: func(conn *sqlite.SQLiteConn) error {
@@ -118,6 +121,41 @@ type Catalog struct {
 	cache     *Cache      // nil or cache binded
 	cacheRef  int32       // number of references from cache
 	cacheDrop *time.Timer // pending drop from cache
+}
+
+// RenameAndClose changes name of catalog and it's data files.
+// current catalog is closed.
+func (cat *Catalog) RenameAndClose(newPath string) error {
+	oldPath := cat.path
+	oldDataDir := getDataDir(oldPath)
+	newDataDir := getDataDir(newPath)
+
+	// check new path doesn't exist
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+		return fmt.Errorf("new catalog path already exists")
+	}
+	if _, err := os.Stat(newDataDir); !os.IsNotExist(err) {
+		return fmt.Errorf("new catalog data directory already exists")
+	}
+
+	// update 'data' table
+	if _, err := cat.renameDataDirSync(newPath); err != nil {
+		return fmt.Errorf("failed to rename data files: %s", err)
+	}
+
+	// to move files, we need to close database
+	cat.Close()
+	cat.DropFromCache()
+
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("failed to move catalog: %s", err)
+	}
+	if err := os.Rename(oldDataDir, newDataDir); err != nil {
+		// os.Rename(newPath, oldPath) // rollback?
+		return fmt.Errorf("failed to move catalog data: %s", err)
+	}
+
+	return nil // OK
 }
 
 // OpenCatalog opens catalog file in write mode.
