@@ -1,4 +1,4 @@
-SOURCE ?= ${GOPATH}/src/github.com/getryft
+SOURCE ?= `cd ../../../ && pwd`
 VERSION ?= latest
 REGISTRY = 172.16.34.3:5000
 

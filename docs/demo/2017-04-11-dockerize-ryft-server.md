@@ -15,11 +15,6 @@ And we want to be able to run ryft-server in a single node mode and in a cluster
 We use consul for a service discovery.
 We can also run several clusters on one machine. 
 
-
-### Details:
-
-Coming soon
-
 ### Example:
 
 Run cluster with the name `cluster1`
