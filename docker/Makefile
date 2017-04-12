@@ -27,5 +27,5 @@ app:
 clear:
 	rm -rfv app/.tmp
 	rm -rfv builder/.tmp
-	docker rm `docker ps -qa`
-	docker rmi `docker images -f "dangling=true" -q`
+	-docker rm `docker ps -qa`
+	-docker rmi `docker images -f "dangling=true" -q`

@@ -1,18 +1,20 @@
-app:
-  image: ${REGISTRY}/ryft/app:${APP_VERSION}
-  container_name: "consul"
-  hostname: "consul"
-  ports:
-    - 8801:8765
-  volumes:
-    - ~/.ssh:/root/.ssh
-    - /ryftone:/ryftone
-  command:  /ryft-server --config=/etc/ryft-server.conf --address :8765 --debug --local-only
-consul:
-  image: consul:0.8.0
-  container_name: "consul"
-  hostname: "consul"
-  ports:
-    - "8400:8400"
-    - "8500:8500"
-    - "8600:53"
+version: '3.1'
+services:
+  app:
+    image: ${REGISTRY}/ryft/app:${APP_VERSION}
+    ports:
+      - 8765
+    env_file: # because of docker-compose bug
+      - .env
+    volumes:
+      - ~/.ssh:/root/.ssh
+      - /ryftone:/ryftone
+    command:  /ryft-server --config=/etc/ryft-server.conf --address :8765 --debug
+  consul:
+    image: consul:0.8.0
+    container_name: "consul"
+    hostname: "consul"
+    ports:
+      - 8400
+      - 8500
+      - 8600
