@@ -2,9 +2,12 @@
 
 echo "RUNNER"
 cd ${RYFTPATH}
+
 # get deps
 govendor sync
-# install into gopath
-make install 
-# build go binary file 
+
+# build go binary file
 make build
+
+# build Debian package
+make debian

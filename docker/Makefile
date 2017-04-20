@@ -1,6 +1,6 @@
 SOURCE ?= `cd ../../../ && pwd`
 VERSION ?= latest
-REGISTRY = 172.16.34.3:5000
+REGISTRY ?= 172.16.34.3:5000
 
 .PHONY: builder build app clear
 
