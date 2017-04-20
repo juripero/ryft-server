@@ -5,7 +5,9 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -255,4 +257,88 @@ func TestCatalogAddFilePart(t *testing.T) {
 
 	// time.Sleep(2 * DefaultCacheDropTimeout)
 	assert.Empty(t, globalCache.cached)
+}
+
+// test Rename catalog
+func TestCatalogRename(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+	SetDefaultCacheDropTimeout(100 * time.Millisecond)
+
+	rootPath := "/tmp/ryft"
+	os.MkdirAll(filepath.Join(rootPath, "foo"), 0755)
+	defer os.RemoveAll(rootPath)
+	oldCatPath := filepath.Join(rootPath, "test-catalog.txt")
+	newCatPath := filepath.Join(rootPath, "foo/test-catalog-new.txt")
+
+	cat, err := OpenCatalogNoCache(oldCatPath)
+	if assert.NoError(t, err) && assert.NotNil(t, cat) {
+		cat.DataSizeLimit = 50
+		DefaultDataDelimiter = "\r\n"
+		// defer cat.Close()
+
+		putData := func(filename string, data string) {
+			dataPath, dataPos, delim, err := cat.AddFilePart(filename, -1, int64(len(data)), nil)
+			if assert.NoError(t, err) {
+				dir, _ := filepath.Split(dataPath)
+				assert.NoError(t, os.MkdirAll(dir, 0755))
+				f, err := os.OpenFile(dataPath, os.O_WRONLY|os.O_CREATE, 0644)
+				if assert.NoError(t, err) {
+					defer f.Close()
+					_, err = f.Seek(dataPos, os.SEEK_SET)
+					assert.NoError(t, err)
+					n, err := f.Write([]byte(data))
+					assert.NoError(t, err)
+					assert.EqualValues(t, len(data), n)
+					n, err = f.Write([]byte(delim))
+					assert.NoError(t, err)
+					assert.EqualValues(t, len(delim), n)
+				}
+			}
+		}
+
+		// put 3 file parts to separate data files
+		putData("1.txt", "11111-hello-11111")
+		putData("2.txt", "22222-hello-22222")
+		putData("3.txt", "33333-hello-33333")
+		putData("1.txt", "aaaaa-hello-aaaaa")
+		putData("2.txt", "bbbbb-hello-bbbbb")
+		putData("3.txt", "ccccc-hello-ccccc")
+		putData("1.txt", strings.Repeat("1", 200))
+		putData("2.txt", strings.Repeat("2", 200))
+		putData("3.txt", strings.Repeat("3", 200))
+
+		// save old data files
+		oldDataDir := cat.GetDataDir()
+		oldDataFiles, err := cat.GetDataFiles("", false)
+		if assert.NoError(t, err) {
+			assert.Equal(t, 6, len(oldDataFiles))
+		}
+
+		// rename and close
+		err = cat.RenameAndClose(newCatPath)
+		if assert.NoError(t, err) {
+			// old files should gone
+			if _, err := os.Stat(oldCatPath); err != nil {
+				assert.True(t, os.IsNotExist(err))
+			}
+			if _, err := os.Stat(oldDataDir); err != nil {
+				assert.True(t, os.IsNotExist(err))
+			}
+
+			cat, err := OpenCatalogNoCache(newCatPath)
+			if assert.NoError(t, err) && assert.NotNil(t, cat) {
+				defer cat.Close()
+
+				newDataFiles, err := cat.GetDataFiles("", false)
+				if assert.NoError(t, err) {
+					assert.Equal(t, len(oldDataFiles), len(newDataFiles))
+					for i := 0; i < len(newDataFiles); i++ {
+						newDataFiles[i] = strings.Replace(newDataFiles[i], "/foo/", "/", -1)
+						newDataFiles[i] = strings.Replace(newDataFiles[i], "test-catalog-new.txt", "test-catalog.txt", -1)
+					}
+					assert.EqualValues(t, oldDataFiles, newDataFiles)
+				}
+			}
+		}
+	}
 }

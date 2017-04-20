@@ -59,16 +59,64 @@ type PostFilesParams struct {
 	File      string `form:"file" json:"file"`           // filename to save
 	Offset    int64  `form:"offset" json:"offset"`       // offset inside file, used to rewrite
 	Length    int64  `form:"length" json:"length"`       // data length
-	Lifetime  string `form:"lifetime" json:"lifetime"`   // optional file lifetime
 	Local     bool   `form:"local" json:"local"`
 
+	Lifetime string `form:"lifetime" json:"lifetime"` // optional file lifetime
 	lifetime time.Duration
+
+	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
+	shareMode utils.ShareMode
 }
 
 // is empty?
 func (p PostFilesParams) isEmpty() bool {
 	return len(p.Catalog) == 0 &&
 		len(p.File) == 0
+}
+
+// to string
+func (p PostFilesParams) String() string {
+	res := make([]string, 0)
+
+	// catalog
+	if p.Catalog != "" {
+		res = append(res, fmt.Sprintf("catalog:%s", p.Catalog))
+
+		// delimiter
+		if p.Delimiter != "" {
+			res = append(res, fmt.Sprintf("delim:%s", p.Delimiter))
+		}
+	}
+
+	// file
+	if p.File != "" {
+		res = append(res, fmt.Sprintf("file:%s", p.File))
+	}
+
+	// offset
+	if p.Offset >= 0 {
+		res = append(res, fmt.Sprintf("offset:%d", p.Offset))
+	}
+
+	// length
+	if p.Length >= 0 {
+		res = append(res, fmt.Sprintf("length:%d", p.Length))
+	}
+
+	// lifetime
+	if p.Lifetime != "" {
+		res = append(res, fmt.Sprintf("lifetime:%s", p.Lifetime))
+	}
+
+	if len(p.ShareMode) != 0 {
+		res = append(res, fmt.Sprintf("share-mode:%s", p.ShareMode))
+	}
+
+	if p.Local {
+		res = append(res, "local")
+	}
+
+	return fmt.Sprintf("{%s}", strings.Join(res, ", "))
 }
 
 // POST /files method
@@ -88,8 +136,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	}
 	b := binding.Default(ctx.Request.Method, ctx.ContentType())
 	if err := b.Bind(ctx.Request, &params); err != nil {
-		panic(NewError(http.StatusBadRequest,
-			err.Error()).WithDetails("failed to parse request parameters"))
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request parameters"))
 	}
 
 	// if delimiter is provided this value will be NOT NIL
@@ -102,6 +150,23 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		// delim is nil
 	}
 
+	// get directory prefix from "path" parameter
+	// so the following URLs are the same:
+	// - POST http://host:port/files/foo/test.txt
+	// - POST http://host:port/files/foo?file=test.txt
+	// - POST http://host:port/files?file=/foo/test.txt
+	if prefix := ctx.Param("path"); len(prefix) != 0 {
+		if len(params.Catalog) != 0 {
+			params.Catalog = strings.Join([]string{prefix, params.Catalog},
+				string(filepath.Separator))
+			// filepath.Join() cleans the path, we don't need it yet!
+		} else {
+			params.File = strings.Join([]string{prefix, params.File},
+				string(filepath.Separator))
+			// filepath.Join() cleans the path, we don't need it yet!
+		}
+	}
+
 	if len(params.File) == 0 {
 		panic(NewError(http.StatusBadRequest,
 			"no valid filename provided"))
@@ -110,8 +175,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
 	mountPoint, err := s.getMountPoint(homeDir)
 	if err != nil {
-		panic(NewError(http.StatusInternalServerError,
-			err.Error()).WithDetails("failed to get mount point"))
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get mount point"))
 	}
 	mountPoint = filepath.Join(mountPoint, homeDir)
 
@@ -135,29 +200,35 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	case "multipart/form-data":
 		f, _, err := ctx.Request.FormFile("file")
 		if err != nil {
-			panic(NewError(http.StatusBadRequest,
-				err.Error()).WithDetails(`no "file" form data provided`))
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails(`no "file" form data provided`))
 		}
+		// Note, there is no automatic length
 		defer f.Close()
 		file = f
-		log.Debugf("saving multipart form data...")
 
 	case "application/octet-stream":
 		file = ctx.Request.Body
 		if params.Length < 0 { // if unspecified
 			params.Length = ctx.Request.ContentLength
 		}
-		log.Debugf("saving octet-stream...")
 
 	default:
-		panic(NewError(http.StatusBadRequest,
-			contentType).WithDetails("unexpected content type"))
+		panic(NewError(http.StatusBadRequest, contentType).
+			WithDetails("unexpected content type"))
 	}
 
 	if len(params.Lifetime) > 0 {
 		if params.lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
-			panic(NewError(http.StatusBadRequest,
-				err.Error()).WithDetails("failed to parse lifetime"))
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse lifetime"))
+		}
+	}
+
+	if len(params.ShareMode) > 0 {
+		if params.shareMode, err = utils.SafeParseMode(params.ShareMode); err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse share mode"))
 		}
 	}
 
@@ -165,7 +236,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	log.WithField("params", params).
 		WithField("user", userName).
 		WithField("home", homeDir).
-		Infof("saving new data...")
+		Infof("saving new %s data...", contentType)
 	status := http.StatusOK
 
 	if !params.Local && !s.Config.LocalOnly {
@@ -373,7 +444,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 	status := http.StatusOK
 
 	if len(params.Catalog) != 0 { // append to catalog
-		catalog, length, err := updateCatalog(mountPoint, params, delim, file)
+		catalog, filePath, length, err := updateCatalog(mountPoint, params, delim, file)
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
@@ -386,17 +457,19 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 					time.Now().Add(params.lifetime))
 			}
 			res["catalog"] = catalog
+			res["file"] = filePath
 			res["length"] = length // not total, just this part
 		}
 
 		return status, res, err
 	} else { // standalone file
-		path, length, err := createFile(mountPoint, params, file)
+		path, offset, length, err := createFile(mountPoint, params, file)
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
 			res["error"] = err.Error()
 			res["length"] = length
+			res["offset"] = offset
 		} else {
 			if params.lifetime > 0 {
 				s.addJob("delete-file",
@@ -405,6 +478,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			}
 			res["path"] = path
 			res["length"] = length
+			res["offset"] = offset
 		}
 
 		return status, res, err
@@ -438,6 +512,9 @@ func (s *Server) postRemoteFiles(address string, authToken string, params PostFi
 	}
 	if len(params.Lifetime) > 0 {
 		q.Add("lifetime", params.Lifetime)
+	}
+	if len(params.ShareMode) > 0 {
+		q.Add("share-mode", params.ShareMode)
 	}
 	u.RawQuery = q.Encode()
 	u.Path += "/files"
@@ -559,7 +636,7 @@ func (fw *FileWriter) Append(length int64) (int64, error) {
 // createFile creates new file.
 // Unique file name could be generated if path contains special keywords.
 // Returns generated path (relative), length and error if any.
-func createFile(mountPoint string, params PostFilesParams, content io.Reader) (string, uint64, error) {
+func createFile(mountPoint string, params PostFilesParams, content io.Reader) (string, int64, int64, error) {
 	rbase := randomizePath(params.File) // first replace all {{random}} tokens
 	rpath := rbase
 
@@ -567,7 +644,7 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	pdir := filepath.Join(mountPoint, filepath.Dir(rpath))
 	err := os.MkdirAll(pdir, 0755)
 	if err != nil {
-		return rpath, 0, fmt.Errorf("failed to create parent directories: %s", err)
+		return rpath, 0, 0, fmt.Errorf("failed to create parent directories: %s", err)
 	}
 
 	var out *os.File
@@ -576,8 +653,15 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	// try to create file, if file already exists try with updated name
 	for k := 0; ; k++ {
 		fullpath := filepath.Join(mountPoint, rpath)
+		if !params.shareMode.IsIgnore() {
+			// get "write" lock, fail if busy
+			if !utils.SafeLockWrite(fullpath, params.shareMode) {
+				return rpath, 0, 0, fmt.Errorf("%s file is busy", out.Name())
+			}
+		}
 		out, err = os.OpenFile(fullpath, flags, 0644)
 		if err != nil {
+			utils.SafeUnlockWrite(fullpath)
 			if params.File != rbase && os.IsExist(err) {
 				// generate new unique name
 				ext := filepath.Ext(rbase)
@@ -586,11 +670,16 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 
 				continue
 			}
-			return rpath, 0, err
+			return rpath, 0, 0, err
 		}
 
 		break
 	}
+
+	if !params.shareMode.IsIgnore() {
+		defer utils.SafeUnlockWrite(out.Name())
+	}
+	defer out.Close()
 
 	fw := getFileWriter(out.Name())
 	defer fw.Release()
@@ -599,19 +688,18 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	// if no offset provided - data will append!
 	if params.Offset < 0 {
 		if params.Length < 0 {
-			return rpath, 0, fmt.Errorf("no valid length provided")
+			return rpath, 0, 0, fmt.Errorf("no valid length provided")
 		}
 		params.Offset, err = fw.Append(params.Length)
 		if err != nil {
-			return rpath, 0, err
+			return rpath, 0, 0, err
 		}
 	}
 
-	defer out.Close()
 	if 0 <= params.Offset {
 		_, err = out.Seek(params.Offset, os.SEEK_SET /*TODO: io.SeekStart*/)
 		if err != nil {
-			return rpath, 0, err
+			return rpath, 0, 0, err
 		}
 	}
 
@@ -631,12 +719,12 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	}
 
 	// return path to file without mountpoint
-	return rpath, uint64(w), err
+	return rpath, params.Offset, w, err
 }
 
 // append file to catalog
 // Returns generated catalog path (relative), length and error if any.
-func updateCatalog(mountPoint string, params PostFilesParams, delim *string, content io.Reader) (string, uint64, error) {
+func updateCatalog(mountPoint string, params PostFilesParams, delim *string, content io.Reader) (string, string, uint64, error) {
 	catalogPath := randomizePath(params.Catalog)
 	filePath := randomizePath(params.File)
 
@@ -647,7 +735,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 		}
 		tmp, err := ioutil.TempFile(catalog.DefaultTempDirectory, filepath.Base(params.File))
 		if err != nil {
-			return "", 0, fmt.Errorf("failed to create temp file: %s", err)
+			return "", "", 0, fmt.Errorf("failed to create temp file: %s", err)
 		}
 		defer func() {
 			tmp.Close()
@@ -656,7 +744,7 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 
 		params.Length, err = io.Copy(tmp, content)
 		if err != nil {
-			return "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
+			return "", "", 0, fmt.Errorf("failed to copy content to temp file: %s", err)
 		}
 		tmp.Seek(0, os.SEEK_SET /*TODO: io.SeekStart*/)
 		content = tmp
@@ -665,20 +753,20 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 	// create all parent directories
 	pdir := filepath.Join(mountPoint, filepath.Dir(catalogPath))
 	if err := os.MkdirAll(pdir, 0755); err != nil {
-		return "", 0, fmt.Errorf("failed to create parent directories: %s", err)
+		return "", "", 0, fmt.Errorf("failed to create parent directories: %s", err)
 	}
 
 	// open catalog
 	cat, err := catalog.OpenCatalog(filepath.Join(mountPoint, catalogPath))
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to open catalog file: %s ", err)
+		return "", "", 0, fmt.Errorf("failed to open catalog file: %s ", err)
 	}
 	defer cat.Close()
 
 	// update catalog atomically
 	data_path, data_pos, data_delim, err := cat.AddFilePart(filePath, params.Offset, params.Length, delim)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
+		return "", "", 0, fmt.Errorf("failed to add file to catalog: %s", err)
 	}
 
 	log.WithField("data_path", data_path).
@@ -688,43 +776,52 @@ func updateCatalog(mountPoint string, params PostFilesParams, delim *string, con
 
 	data_dir, _ := filepath.Split(data_path)
 	if err := os.MkdirAll(data_dir, 0755); err != nil {
-		return "", 0, fmt.Errorf("failed to create parent directories: %s", err)
+		return "", "", 0, fmt.Errorf("failed to create parent directories: %s", err)
+	}
+
+	if !params.shareMode.IsIgnore() {
+		// get "write" lock, fail if busy
+		if utils.SafeLockWrite(data_path, params.shareMode) {
+			defer utils.SafeUnlockWrite(data_path)
+		} else {
+			return "", "", 0, fmt.Errorf("%s file is busy", data_path)
+		}
 	}
 
 	// write file content
 	data, err := os.OpenFile(data_path, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to open data file: %s", err)
+		return "", "", 0, fmt.Errorf("failed to open data file: %s", err)
 	}
 	defer data.Close()
 
 	_, err = data.Seek(data_pos, os.SEEK_SET /*TODO: io.SeekStart*/)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to seek data file: %s", err)
+		return "", "", 0, fmt.Errorf("failed to seek data file: %s", err)
 	}
 
 	n, err := io.Copy(data, content)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to copy data: %s", err)
+		return "", "", 0, fmt.Errorf("failed to copy data: %s", err)
 	}
 	if n != params.Length {
-		return "", 0, fmt.Errorf("only %d bytes copied of %d", n, params.Length)
+		return "", "", 0, fmt.Errorf("only %d bytes copied of %d", n, params.Length)
 	}
 
 	// write data delimiter
 	if len(data_delim) > 0 {
 		nn, err := data.WriteString(data_delim)
 		if err != nil {
-			return "", 0, fmt.Errorf("failed to write delimiter: %s", err)
+			return "", "", 0, fmt.Errorf("failed to write delimiter: %s", err)
 		}
 		if nn != len(data_delim) {
-			return "", 0, fmt.Errorf("only %d bytes copied of %d", nn, len(data_delim))
+			return "", "", 0, fmt.Errorf("only %d bytes copied of %d", nn, len(data_delim))
 		}
 	}
 
 	// TODO: notify catalog write is done
 
-	return catalogPath, uint64(n), nil // OK
+	return catalogPath, filePath, uint64(n), nil // OK
 }
 
 // replace {{random}} sections of filename with random token.

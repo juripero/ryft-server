@@ -37,6 +37,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/getryft/ryft-server/search"
@@ -85,6 +86,18 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 	params.Catalogs = nil // reset
 	params.Files = append(params.Files, params.Dirs...)
 	params.Dirs = nil // reset
+
+	// get directory prefix from "path" parameter
+	// so the following URLs are the same:
+	// - DELETE http://host:port/files/foo/dir/
+	// - DELETE http://host:port/files?dir=/foo/dir
+	if prefix := ctx.Param("path"); len(prefix) != 0 {
+		for i := 0; i < len(params.Files); i++ {
+			params.Files[i] = strings.Join([]string{prefix, params.Files[i]},
+				string(filepath.Separator))
+			// filepath.Join() cleans the path, we don't need it yet!
+		}
+	}
 
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
 	mountPoint, err := server.getMountPoint(homeDir)

@@ -40,7 +40,7 @@ func TestEngineFiles(t *testing.T) {
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		info, err := engine.Files("foo", false)
 		if assert.NoError(t, err) && assert.NotNil(t, info) {
-			assert.EqualValues(t, "foo", info.Path)
+			assert.EqualValues(t, "foo", info.DirPath)
 
 			sort.Strings(info.Files)
 			assert.EqualValues(t, []string{"1.txt", "2.txt"}, info.Files)

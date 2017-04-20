@@ -39,6 +39,7 @@ import (
 	"github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
 	"github.com/getryft/ryft-server/search/ryftprim"
+	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 
 	"github.com/Sirupsen/logrus"
@@ -76,6 +77,7 @@ func (server *Server) DoLoggingLevel(ctx *gin.Context) {
 	// print current levels
 	info := map[string]interface{}{
 		"core":              log.Level.String(),
+		"core/safe":         utils.SafeGetLogLevel().String(),
 		"core/catalogs":     catalog.GetLogLevel().String(),
 		"core/pending-jobs": jobsLog.Level.String(),
 		"core/busyness":     busyLog.Level.String(),
@@ -100,6 +102,8 @@ func setLoggingLevel(logger string, level string) error {
 	switch strings.ToLower(logger) {
 	case "core":
 		log.Level = ll
+	case "core/safe":
+		utils.SafeSetLogLevel(ll)
 	case "core/catalogs":
 		catalog.SetLogLevel(ll)
 	case "core/pending-jobs":
@@ -126,6 +130,7 @@ func setLoggingLevel(logger string, level string) error {
 func makeDefaultLoggingOptions(level string) map[string]string {
 	return map[string]string{
 		"core":              level,
+		"core/safe":         level,
 		"core/catalogs":     level,
 		"core/pending-jobs": level,
 		"core/busyness":     level,

@@ -150,6 +150,13 @@ func main() {
 		log.WithError(err).Fatal("failed to prepare server configuration")
 	}
 
+	// be quiet and efficient in production
+	if !server.Config.DebugMode {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		log.Level = logrus.DebugLevel
+	}
+
 	log.WithFields(map[string]interface{}{
 		"version":  Version,
 		"git-hash": GitHash,
@@ -169,13 +176,9 @@ func main() {
 		"auth-type":          server.Config.AuthType,
 		"busyness-tolerance": server.Config.Busyness.Tolerance,
 	}).Debug("other configuration")
-
-	// be quiet and efficient in production
-	if !server.Config.DebugMode {
-		gin.SetMode(gin.ReleaseMode)
-	} else {
-		log.Level = logrus.DebugLevel
-	}
+	log.WithFields(map[string]interface{}{
+		"scripts": server.Config.PostProcScripts,
+	}).Debug("post-processing configuration")
 
 	// Create a router
 	router := gin.New()
@@ -276,9 +279,16 @@ func main() {
 	private.GET("/search", server.DoSearch)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
+
+	// need to provide both URLs to disable redirecting
 	private.GET("/files", server.DoGetFiles)
+	private.GET("/files/*path", server.DoGetFiles)
 	private.DELETE("/files", server.DoDeleteFiles)
+	private.DELETE("/files/*path", server.DoDeleteFiles)
 	private.POST("/files", server.DoPostFiles)
+	private.POST("/files/*path", server.DoPostFiles)
+	private.PUT("/rename", server.DoRenameFiles)
+	private.PUT("/rename/*path", server.DoRenameFiles)
 
 	// debug API endpoints
 	if server.Config.DebugMode {

@@ -38,6 +38,13 @@ import (
 // Optimization: the rec.Data is just assigned to nil!
 type Record search.Record
 
+// MarshalCSV converts null RECORD into csv-encoder compatible format
+func (rec *Record) MarshalCSV() ([]string, error) {
+	csv, err := rec.Index.MarshalCSV()
+	csv = append(csv, "") // no data
+	return csv, err
+}
+
 // NewRecord creates new format specific data.
 func NewRecord() *Record {
 	return (*Record)(search.NewRecord(nil, nil))

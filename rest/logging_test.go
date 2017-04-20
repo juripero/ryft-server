@@ -48,7 +48,7 @@ func TestLogging(t *testing.T) {
 
 	// test case
 	check := func(url string, expectedStatus int, expectedErrors ...string) {
-		body, status, err := fs.get(url, "application/json", 0)
+		body, status, err := fs.GET(url, "application/json", 0)
 		if err != nil {
 			for _, msg := range expectedErrors {
 				assert.Contains(t, err.Error(), msg)

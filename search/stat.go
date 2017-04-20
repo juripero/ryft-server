@@ -31,7 +31,9 @@
 package search
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 // Stat is search processing statistics.
@@ -53,6 +55,36 @@ type Stat struct {
 
 	// some extra information (request, performance stats, etc)
 	Extra map[string]interface{} `json:"extra,omitempty" msgpack:"extra,omitempty"`
+}
+
+// MarshalCSV converts search STAT into csv-encoder compatible format.
+func (stat *Stat) MarshalCSV() ([]string, error) {
+	// details as JSON
+	details, err := json.Marshal(stat.Details)
+	if err != nil {
+		return nil, err
+	}
+
+	// extra as JSON
+	extra, err := json.Marshal(stat.Extra)
+	if err != nil {
+		return nil, err
+	}
+
+	return []string{
+		strconv.FormatUint(stat.Matches, 10),
+		strconv.FormatUint(stat.TotalBytes, 10),
+
+		strconv.FormatUint(stat.Duration, 10),
+		strconv.FormatFloat(stat.DataRate, 'f', -1, 64),
+
+		strconv.FormatUint(stat.FabricDuration, 10),
+		strconv.FormatFloat(stat.FabricDataRate, 'f', -1, 64),
+
+		stat.Host,
+		string(details),
+		string(extra),
+	}, nil
 }
 
 // NewStat creates empty statistics.
@@ -130,4 +162,26 @@ func (stat *Stat) Combine(other *Stat) {
 
 	// save details
 	stat.Details = append(stat.Details, other)
+}
+
+// AddPerfStat ands extra performance metrics.
+func (stat *Stat) AddPerfStat(name string, data interface{}) {
+	if perf_, ok := stat.Extra["performance"]; ok {
+		if perf, ok := perf_.(map[string]interface{}); ok {
+			perf[name] = data
+		}
+	} else {
+		// put new item
+		stat.Extra["performance"] = map[string]interface{}{name: data}
+	}
+}
+
+// ClearPerfStat clears all performance metrics
+func (stat *Stat) ClearPerfStat() {
+	delete(stat.Extra, "performance")
+}
+
+// GetAllPerfStat gets all performance metrics
+func (stat *Stat) GetAllPerfStat() interface{} {
+	return stat.Extra["performance"]
 }

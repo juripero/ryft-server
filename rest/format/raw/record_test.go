@@ -55,3 +55,18 @@ func TestFormatRecord(t *testing.T) {
 	assert.Nil(t, FromRecord(nil))
 	assert.NotNil(t, fmt.NewRecord())
 }
+
+// test raw RECORD to CSV serialization
+func TestRecord_MarshalCSV(t *testing.T) {
+	// fake index
+	idx := search.NewIndex("foo.txt", 123, 456)
+	idx.Fuzziness = 7
+	idx.UpdateHost("localhost")
+
+	// base record
+	rec := search.NewRecord(idx, []byte("hello"))
+
+	result, err := FromRecord(rec).MarshalCSV()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"foo.txt", "123", "456", "7", "localhost", "aGVsbG8"}, result)
+}

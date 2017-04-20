@@ -62,6 +62,10 @@ type Task struct {
 	config *search.Config // input configuration
 	result PostProcessing // post processing engine
 
+	// intermediate performance metrics
+	callPerfStat []map[string]interface{} // ryft call -> metrics
+	procPerfStat map[string]interface{}   // final post-processing
+
 	UpdateHostTo string // for cluster mode
 }
 
@@ -280,7 +284,7 @@ func (cpp *CatalogPostProcessing) DrainFinalResults(task *Task, mux *search.Resu
 			} else {
 				cf = &CachedFile{
 					f:   f,
-					rd:  bufio.NewReader(f),
+					rd:  bufio.NewReaderSize(f, 256*1024),
 					pos: 0,
 				}
 				files[item.DataFile] = cf // put to cache
@@ -449,7 +453,7 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 	defer file.Close() // close at the end
 
 	// read all index records
-	rd := bufio.NewReader(file)
+	rd := bufio.NewReaderSize(file, 256*1024)
 	delimLen := uint64(len(delim))
 	dataPos := uint64(0)
 	for {
@@ -619,6 +623,8 @@ BuildItems:
 		}
 	}
 
+	stopBuildItems := time.Now()
+
 	// sort and remove duplicates
 	if 0 < len(items) {
 		// we must sort "copy" of indexes
@@ -641,6 +647,12 @@ BuildItems:
 			items = sortedItems
 			simple = false
 		}
+	}
+
+	stopSortItems := time.Now()
+
+	if len(task.config.Transforms) > 0 {
+		simple = false // if a transformation is enabled
 	}
 
 	// optimization: if possible just use the DATA file from RyftCall
@@ -668,7 +680,7 @@ BuildItems:
 		if err != nil {
 			return fmt.Errorf("failed to create DATA file: %s", err)
 		}
-		datFile = bufio.NewWriter(f)
+		datFile = bufio.NewWriterSize(f, 256*1024)
 		defer func() {
 			datFile.Flush()
 			f.Close()
@@ -682,7 +694,7 @@ BuildItems:
 		if err != nil {
 			return fmt.Errorf("failed to create INDEX file: %s", err)
 		}
-		idxFile = bufio.NewWriter(f)
+		idxFile = bufio.NewWriterSize(f, 256*1024)
 		defer func() {
 			idxFile.Flush()
 			f.Close()
@@ -697,8 +709,13 @@ BuildItems:
 	}
 	files := make(map[string]*CachedFile)
 
+	var datFileTime time.Duration
+	var idxFileTime time.Duration
+	var transformTime time.Duration
+
 	// handle all index items
 	const reportRecords = true
+ItemsLoop:
 	for _, item := range items {
 		cf := files[item.dataFile]
 		if cf == nil && (reportRecords || datFile != nil) {
@@ -709,7 +726,7 @@ BuildItems:
 			} else {
 				cf = &CachedFile{
 					f:   f,
-					rd:  bufio.NewReader(f),
+					rd:  bufio.NewReaderSize(f, 256*1024),
 					pos: 0,
 				}
 				files[item.dataFile] = cf // put to cache
@@ -717,7 +734,7 @@ BuildItems:
 			}
 		}
 
-		var data, recRawData []byte
+		var recRawData []byte
 		if cf != nil && (reportRecords || datFile != nil) {
 			// record's data read position in the file
 			rpos := int64(item.dataPos)
@@ -772,24 +789,36 @@ BuildItems:
 			} else if uint64(n) != item.Index.Length {
 				mux.ReportError(fmt.Errorf("not all data read: %d of %d", n, item.Index.Length))
 			} else {
-				data = recRawData
+				// OK, use recRawData later
 			}
+		}
+
+		// post processing (index left unchanged)
+		if recRawData != nil && len(task.config.Transforms) > 0 {
+			start := time.Now()
+			for _, tx := range task.config.Transforms {
+				var skip bool
+				var err error
+				recRawData, skip, err = tx.Process(recRawData)
+				if err != nil {
+					mux.ReportError(fmt.Errorf("failed to transform: %s", err))
+					continue ItemsLoop // go to next item
+				} else if skip {
+					continue ItemsLoop // go to next item
+				}
+			}
+			transformTime += time.Since(start)
 		}
 
 		// output DATA file
 		if datFile != nil {
-			if data == nil {
-				// fill by zeros
-				task.log().Warnf("[%s]: no data, report zeros", TAG)
-				data = make([]byte, int(item.Index.Length))
-			}
-
-			n, err := datFile.Write(data)
+			start := time.Now()
+			n, err := datFile.Write(recRawData)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write DATA file: %s", err))
 				// file is corrupted, any sense to continue?
-			} else if n != len(data) {
-				mux.ReportError(fmt.Errorf("not all DATA are written: %d of %d", n, len(data)))
+			} else if n != len(recRawData) {
+				mux.ReportError(fmt.Errorf("not all DATA are written: %d of %d", n, len(recRawData)))
 				// file is corrupted, any sense to continue?
 			} else if len(delimiter) > 0 {
 				n, err = datFile.WriteString(delimiter)
@@ -801,16 +830,19 @@ BuildItems:
 					// file is corrupted, any sense to continue?
 				}
 			}
+			datFileTime += time.Since(start)
 		}
 
 		// output INDEX file
 		if idxFile != nil {
+			start := time.Now()
 			indexStr := fmt.Sprintf("%s,%d,%d,%d\n", item.Index.File, item.Index.Offset, item.Index.Length, item.Index.Fuzziness)
 			_, err := idxFile.WriteString(indexStr)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write INDEX: %s", err))
 				// file is corrupted, any sense to continue?
 			}
+			idxFileTime += time.Since(start)
 		}
 
 		if reportRecords {
@@ -820,6 +852,14 @@ BuildItems:
 			idx.DataPos = 0 // hide data position
 			mux.ReportRecord(rec)
 		}
+	}
+
+	task.procPerfStat = map[string]interface{}{
+		"build-items": stopBuildItems.Sub(start).String(),
+		"sort-items":  stopSortItems.Sub(stopBuildItems).String(),
+		"write-data":  datFileTime.String(),
+		"write-index": idxFileTime.String(),
+		"transform":   transformTime.String(),
 	}
 
 	return nil // OK

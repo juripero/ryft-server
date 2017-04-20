@@ -3,7 +3,7 @@
   "info": {
     "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "RyftOne REST API",
-    "version": "0.10.0"
+    "version": "0.11.0"
   },
   "paths": {
     "/search": {
@@ -11,6 +11,10 @@
         "description": "Endpoint for the search. Does the text or structured search.",
         "tags": [
           "search"
+        ],
+        "produces": [
+          "application/json",
+          "text/csv"
         ],
         "summary": "Text or structured search",
         "operationId": "search",
@@ -113,6 +117,13 @@
           },
           {
             "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint8",
             "maximum": 4,
@@ -138,11 +149,28 @@
           },
           {
             "in": "query",
+            "type": "boolean",
+            "name": "performance",
+            "x-go-name": "Performance",
+            "description": "Include performance metrics in response. Default 'false'."
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint",
             "name": "limit",
             "x-go-name": "Limit",
             "description": "Limit the total number of records reported."
+          },
+          {
+            "in": "query",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "name": "transform",
+            "description": "Additional data transformation. Could be match(\"^.*$\"), replace(\"^(.*)apple(.*)$\", \"$1orange$2\") or script(\"filter_position\")"
           }
         ],
         "responses": {
@@ -253,6 +281,13 @@
           },
           {
             "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
+          },
+          {
+            "in": "query",
             "type": "integer",
             "format": "uint8",
             "maximum": 4,
@@ -268,6 +303,13 @@
             "name": "local",
             "x-go-name": "Local",
             "description": "Perform search only on this cluster member. Default 'false'."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "performance",
+            "x-go-name": "Performance",
+            "description": "Include performance metrics in response. Default 'false'."
           }
         ],
         "responses": {
@@ -286,13 +328,73 @@
         }
       }
     },
+    "/rename": {
+      "put": {
+        "tags": [
+          "rename"
+        ],
+        "summary": "Change file/directory/catalog name or file name in catalog",
+        "description": "Endpoint for the file renaming",
+        "operationId": "updateFiles",
+        "parameters": [
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The uploading filename.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "dir",
+            "type": "string",
+            "description": "Directory name.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "Catalog name.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "new",
+            "type": "string",
+            "description": "New name for a file/directore/catalog or file inside catalog.",
+            "required": true,
+            "in": "query"
+          },
+          {
+          "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "description": "Perform action only on this cluster member. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of file/dir/catalog and its status",
+            "schema": {
+              "$ref": "#/definitions/FilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/files": {
       "get": {
         "tags": [
           "files"
         ],
-        "summary": "List a directory content",
-        "description": "Endpoint to query node/cluster file system structure",
+        "summary": "List a directory content or download a file",
+        "description": "Endpoint to query node/cluster file system structure or download a file",
         "operationId": "getFiles",
         "parameters": [
           {
@@ -302,9 +404,27 @@
             "in": "query"
           },
           {
+            "name": "hidden",
+            "type": "boolean",
+            "description": "Report hidden files",
+            "in": "query"
+          },
+          {
             "name": "local",
             "type": "boolean",
             "description": "Return file structure from local node only or whole cluster",
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The path to catalog to download file of",
+            "in": "query"
+          },
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The filepath to download",
             "in": "query"
           }
         ],
@@ -369,6 +489,13 @@
             "type": "string",
             "name": "lifetime",
             "description": "The file or catalog lifetime, for example '2h'."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
           },
           {
             "in": "query",
@@ -610,6 +737,15 @@
           "items": {
             "type": "string"
           }
+        },
+        "catalogs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "details": {
+          "type": "object"
         },
         "dir": {
           "type": "string"

@@ -33,12 +33,15 @@ package rest
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
+	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/query"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -61,7 +64,13 @@ type CountParams struct {
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 
-	Local bool `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	// post-process transformations
+	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
+
+	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
+
+	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 }
 
 // Handle /count endpoint.
@@ -69,6 +78,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
+	requestStartTime := time.Now() // performance metric
 	var err error
 
 	// parse request parameters
@@ -125,13 +135,28 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
 	// cfg.Limit = 0
+	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
+	cfg.Performance = params.Performance
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse sharing mode"))
+	}
+
+	// parse post-process transformations
+	cfg.Transforms, err = parseTransforms(params.Transforms, server.Config)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse transformations"))
+	}
 
 	log.WithFields(map[string]interface{}{
-		"config":  cfg,
-		"user":    userName,
-		"home":    homeDir,
-		"cluster": userTag,
+		"config":    cfg,
+		"user":      userName,
+		"home":      homeDir,
+		"cluster":   userTag,
+		"post-proc": cfg.Transforms,
 	}).Infof("[%s]: start GET /count", CORE)
+	searchStartTime := time.Now() // performance metric
 	res, err := engine.Search(cfg)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
@@ -148,6 +173,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	defer server.onSearchStopped(cfg)
 
 	// process results!
+	transferStartTime := time.Now() // performance metric
 	for {
 		select {
 		case <-ctx.Writer.CloseNotify(): // cancel processing
@@ -185,10 +211,21 @@ func (server *Server) DoCount(ctx *gin.Context) {
 				panic(err) // TODO: check this? no other ways to report errors
 			}
 
+			transferStopTime := time.Now() // performance metric
+
 			if res.Stat != nil {
 				if server.Config.ExtraRequest {
 					// save request parameters in "extra"
 					res.Stat.Extra["request"] = &params
+				}
+				if params.Performance {
+					metrics := map[string]interface{}{
+						"prepare":  searchStartTime.Sub(requestStartTime).String(),
+						"engine":   transferStartTime.Sub(searchStartTime).String(),
+						"transfer": transferStopTime.Sub(transferStartTime).String(),
+						"total":    transferStopTime.Sub(requestStartTime).String(),
+					}
+					res.Stat.AddPerfStat("rest-count", metrics)
 				}
 				xstat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)
@@ -263,11 +300,19 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.ReportData = false
 	// cfg.Limit = 0
 
+	// parse post-process transformations
+	cfg.Transforms, err = parseTransforms(params.Transforms, server.Config)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse transformations"))
+	}
+
 	log.WithFields(map[string]interface{}{
-		"config":  cfg,
-		"user":    userName,
-		"home":    homeDir,
-		"cluster": userTag,
+		"config":    cfg,
+		"user":      userName,
+		"home":      homeDir,
+		"cluster":   userTag,
+		"post-proc": cfg.Transforms,
 	}).Infof("[%s]: GET /count/dry-run", CORE)
 
 	// decompose query

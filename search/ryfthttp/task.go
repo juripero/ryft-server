@@ -47,7 +47,8 @@ var (
 type Task struct {
 	Identifier string // unique
 
-	config *search.Config
+	config    *search.Config // search configuration
+	startTime time.Time      // task start time
 }
 
 // NewTask creates new task.
@@ -56,6 +57,7 @@ func NewTask(cfg *search.Config) *Task {
 
 	task := new(Task)
 	task.Identifier = fmt.Sprintf("http-%08x", id)
+	task.startTime = time.Now()
 
 	task.config = cfg
 	return task

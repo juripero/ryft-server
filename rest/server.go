@@ -138,6 +138,11 @@ type ServerConfig struct {
 
 	SettingsPath string `yaml:"settings-path,omitempty"`
 	HostName     string `yaml:"hostname,omitempty"`
+
+	// post-processing scripts/actions
+	PostProcScripts map[string]struct {
+		ExecPath []string `yaml:"path"`
+	} `yaml:"post-processing-scripts,omitempty"`
 }
 
 // Server instance

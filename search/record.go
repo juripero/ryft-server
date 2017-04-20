@@ -51,6 +51,13 @@ type Record struct {
 	Data    interface{} `json:"data,omitempty" msgpack:"data,omitempty"`     // format specific data
 }
 
+// MarshalCSV converts search RECORD into the cvs-compatible format
+func (rec *Record) MarshalCSV() ([]string, error) {
+	res, err := rec.Index.MarshalCSV()
+	res = append(res, string(rec.RawData))
+	return res, err
+}
+
 // NewRecord creates a new Record object.
 // This object can be utilized by Release method.
 func NewRecord(index *Index, data []byte) *Record {

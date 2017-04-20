@@ -80,7 +80,7 @@ func (engine *Engine) doFiles(task *Task, req *http.Request) (*search.DirInfo, e
 	}
 
 	// decode body
-	res := search.NewDirInfo("")
+	res := search.NewDirInfo("", "")
 	dec := json.NewDecoder(resp.Body)
 	err = dec.Decode(res)
 	if err != nil {

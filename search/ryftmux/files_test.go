@@ -29,7 +29,7 @@ func TestEngineFiles(t *testing.T) {
 	if assert.NoError(t, err) && assert.NotNil(t, engine) {
 		info, err := engine.Files("foo", false)
 		if assert.NoError(t, err) && assert.NotNil(t, info) {
-			assert.EqualValues(t, "foo", info.Path)
+			assert.EqualValues(t, "foo", info.DirPath)
 
 			sort.Strings(info.Files)
 			assert.EqualValues(t, []string{"1.txt", "2.txt", "3.txt", "4.txt"}, info.Files)
@@ -44,7 +44,7 @@ func TestEngineFiles(t *testing.T) {
 	if assert.Error(t, f1.FilesReportError) {
 		info, err := engine.Files("foo", false)
 		if assert.NoError(t, err) && assert.NotNil(t, info) {
-			assert.EqualValues(t, "foo", info.Path)
+			assert.EqualValues(t, "foo", info.DirPath)
 
 			sort.Strings(info.Files)
 			assert.EqualValues(t, []string{ /*"1.txt",*/ "2.txt", "3.txt", "4.txt"}, info.Files)
@@ -60,7 +60,7 @@ func TestEngineFiles(t *testing.T) {
 	if assert.NoError(t, f1.FilesReportError) {
 		info, err := engine.Files("foo", false)
 		if assert.Error(t, err) && assert.Nil(t, info) {
-			assert.Contains(t, err.Error(), "inconsistent path")
+			assert.Contains(t, err.Error(), "inconsistent directory path")
 		}
 	}
 	f1.FilesPathSuffix = ""

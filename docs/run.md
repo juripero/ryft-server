@@ -252,7 +252,7 @@ auth-type: none
 
 `auth-type: none` is used to disable authentication.
 
-If authentication is enabled, i.e. `auth-type: file` or `auth-type: ldap`, 
+If authentication is enabled, i.e. `auth-type: file` or `auth-type: ldap`,
 the `auth-jwt` sections should be provided:
 
 ```{.yaml}
@@ -343,6 +343,26 @@ is not so important. Anyway it can be customized via `default-data-delim` option
 
 Sometimes catalog need to save file content into temporary file. These
 temporary files are placed in `temp-dir` directory.
+
+
+### Script transformation configuration
+
+The [script transformation](./rest/README.md#script-transformation) calls
+external application or script. The list of trusted applications is configured
+via `post-processing-scripts` configuration section.
+
+```{.yaml}
+post-processing-scripts:
+  false:
+    path: [/bin/false]
+  cat:
+    path: [/bin/cat]
+  my_test1:
+    path: [/usr/bin/jq, -c, "{lat: .lat, lon: .lon}"]
+```
+
+Each item is a script name and a `path` containing full path to the
+application/script and a set of additional command line options.
 
 
 # Debian package

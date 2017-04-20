@@ -44,7 +44,7 @@ consisting of a relational expression which takes the following form:
    When searching raw text data, `CONTAINS` should be used instead of `EQUALS`.
 - `NOT_EQUALS` - The input must be anything other than expression.
    Note that this operator has meaning only for record- and field-based
-   searches. If used with raw text input, an error will be generated. 
+   searches. If used with raw text input, an error will be generated.
 - `CONTAINS` - The input must contain expression,
    and may contain additional leading or trailing data.
 - `NOT_CONTAINS` The input must not contain expression. Note that this
@@ -86,7 +86,7 @@ each search type.
 Note that it is permissible to include valid but extraneous options,
 in which case they will be ignored. For example, if a `DISTANCE` options
 is specified with an `EXACT` primitive, the `DISTANCE` option will
-be ignored and the search will still run. 
+be ignored and the search will still run.
 
 `logical_operator` allows for complex collections of relational expressions. The possible values are:
 
@@ -147,6 +147,10 @@ Once first "Hello" is executed the list of files (from INDEX) is used as
 input data set to do subsequent search with "Apple".
 The key difference: input data set for the second call is not the DATA from the
 first call, but the unique file list extracted from the INDEX file of the first call.
+
+Please note, to use this feature the catalog should be properly created.
+In particular the file names inside catalog should be relative to user's
+home directory. Otherwise no files will be found for the second Ryft call.
 
 This feature is used to do subsequent search on catalogs. In conjunction with
 the [FILTER](./README.md#filter-option) option it is used for GoogleEarth demo.
