@@ -640,6 +640,28 @@ func createFile(mountPoint string, params PostFilesParams, content io.Reader) (s
 	rbase := randomizePath(params.File) // first replace all {{random}} tokens
 	rpath := rbase
 
+	if params.Length < 0 {
+		// save to temp file to determine data length
+		if len(catalog.DefaultTempDirectory) > 0 {
+			_ = os.MkdirAll(catalog.DefaultTempDirectory, 0755)
+		}
+		tmp, err := ioutil.TempFile(catalog.DefaultTempDirectory, filepath.Base(params.File))
+		if err != nil {
+			return rpath, 0, 0, fmt.Errorf("failed to create temp file: %s", err)
+		}
+		defer func() {
+			tmp.Close()
+			os.RemoveAll(tmp.Name())
+		}()
+
+		params.Length, err = io.Copy(tmp, content)
+		if err != nil {
+			return rpath, 0, 0, fmt.Errorf("failed to copy content to temp file: %s", err)
+		}
+		tmp.Seek(0, os.SEEK_SET /*TODO: io.SeekStart*/)
+		content = tmp
+	}
+
 	// create all parent directories
 	pdir := filepath.Join(mountPoint, filepath.Dir(rpath))
 	err := os.MkdirAll(pdir, 0755)
