@@ -86,8 +86,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 		Case:   true,
 		Reduce: true,
 	}
-	b := binding.Default(ctx.Request.Method, ctx.ContentType())
-	if err := b.Bind(ctx.Request, &params); err != nil {
+	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}
@@ -250,8 +249,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	params := CountParams{
 		Case: true,
 	}
-	b := binding.Default(ctx.Request.Method, ctx.ContentType())
-	if err := b.Bind(ctx.Request, &params); err != nil {
+	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}
