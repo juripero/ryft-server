@@ -199,6 +199,9 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	case "multipart/form-data":
 		f, _, err := ctx.Request.FormFile("file")
 		if err != nil {
+			f, _, err = ctx.Request.FormFile("content") // for backward compatibility with the SwaggerUI
+		}
+		if err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()).
 				WithDetails(`no "file" form data provided`))
 		}
