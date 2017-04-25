@@ -376,7 +376,7 @@
           "200": {
             "description": "Map of file/dir/catalog and its status",
             "schema": {
-              "$ref": "#/definitions/FilesResponse"
+              "$ref": "#/definitions/RenameResponse"
             }
           },
           "default": {
@@ -450,7 +450,18 @@
         "summary": "Upload files",
         "description": "Endpoint to upload files",
         "operationId": "postFiles",
+        "consumes": [
+          "application/octet-stream",
+          "multipart/form-data"
+        ],
         "parameters": [
+          {
+            "name": "content",
+            "in": "formData",
+            "type": "file",
+            "description": "file to save",
+            "required": true
+          },
           {
             "name": "file",
             "type": "string",
@@ -795,6 +806,14 @@
           "type": "string"
         },
         "code": {
+          "type": "string"
+        }
+      }
+    },
+    "RenameResponse": {
+      "type": "object",
+      "properties": {
+        "path": {
           "type": "string"
         }
       }
