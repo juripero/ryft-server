@@ -432,7 +432,7 @@
           "200": {
             "description": "List of files and directories for node/cluster",
             "schema": {
-              "$ref": "#/definitions/FilesResponse"
+              "$ref": "#/definitions/GetFilesResponse"
             }
           },
           "default": {
@@ -519,7 +519,7 @@
           "200": {
             "description": "Map of files and directories uploaded",
             "schema": {
-              "$ref": "#/definitions/FilesResponse"
+              "$ref": "#/definitions/PostFilesResponse"
             }
           },
           "default": {
@@ -580,7 +580,7 @@
           "200": {
             "description": "Map of files and directories deleted",
             "schema": {
-              "$ref": "#/definitions/FilesResponse"
+              "$ref": "#/definitions/DeleteFilesResponse"
             }
           },
           "default": {
@@ -817,6 +817,31 @@
           "type": "string"
         }
       }
+    },
+    "PostFilesResponse": {
+      "type": "object",
+      "properties": {
+        "length": {
+          "type": "integer"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "DeleteFilesResponse": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "GetFilesResponse": {
+      "type":"string"
     }
   },
   "securityDefinitions": {
