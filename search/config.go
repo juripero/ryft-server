@@ -86,6 +86,13 @@ func NewConfig(query string, files ...string) *Config {
 	return cfg
 }
 
+// Clone creates a copy of current configuration
+func (cfg *Config) Clone() *Config {
+	newCfg := new(Config)
+	*newCfg = *cfg // TODO: deep copy
+	return newCfg
+}
+
 // AddFile adds one or more files to the search configuration.
 func (cfg *Config) AddFile(files ...string) {
 	cfg.AddFiles(files)

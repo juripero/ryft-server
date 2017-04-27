@@ -43,7 +43,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// prepare requests
 	for _, backend := range engine.Backends {
-		res, err := backend.Search(cfg)
+		res, err := backend.Search(cfg.Clone())
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to start /search backend", TAG)
 			mux.ReportError(fmt.Errorf("failed to start /search backend: %s", err))
