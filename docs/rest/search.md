@@ -534,10 +534,8 @@ For example,
 
 ```{.sh}
 $ ryftrest -q hello -f test/foo/1.txt -w=10 --format=utf8 --accept=csv
-rec,test/foo/1.txt,0,15,0,ryftone-313,"hello world
-hel"
-rec,test/foo/1.txt,2,25,0,ryftone-313,"llo world
-hello worldhell"
+rec,test/foo/1.txt,0,15,0,ryftone-313,"hello worldhel"
+rec,test/foo/1.txt,2,25,0,ryftone-313,"llo worldhello worldhell"
 rec,test/foo/1.txt,13,25,0,ryftone-313,ello worldhello from curl
 rec,test/foo/1.txt,28,25,0,ryftone-313," from curlhello from curl"
 rec,test/foo/1.txt,43,25,0,ryftone-313," from curlhello from curl"
