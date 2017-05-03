@@ -662,7 +662,7 @@ function ryft_ryftone_maintenance_menu
 function ryft_ryft_server_d_maintenance_menu
 {
     local processName=ryft-server-d
-    local configFile=/etc/ryft-rest.conf
+    local configFile=/etc/ryft-server.conf
 
     local MAINTENANCE_MENU_TITLE="$processName Maintenance Menu"
 	
