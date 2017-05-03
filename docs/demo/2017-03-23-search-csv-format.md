@@ -46,10 +46,8 @@ and data in format defined in the `format` parameter.
 
 ```{.sh}
 bash ryftrest -q 'hello' -w 10 -f test/foo/1.txt --format=utf8 --search --no-stats --address localhost:9786 --accept csv
-rec,test/foo/1.txt,0,15,0,ryftone-313,"hello world
-hel"
-rec,test/foo/1.txt,2,25,0,ryftone-313,"llo world
-hello worldhell"
+rec,test/foo/1.txt,0,15,0,ryftone-313,"hello worldhel"
+rec,test/foo/1.txt,2,25,0,ryftone-313,"llo worldhello worldhell"
 rec,test/foo/1.txt,13,25,0,ryftone-313,ello worldhello from curl
 rec,test/foo/1.txt,28,25,0,ryftone-313," from curlhello from curl"
 rec,test/foo/1.txt,43,25,0,ryftone-313," from curlhello from curl"
@@ -90,10 +88,8 @@ end
 #### record + statistics
 ```{.sh}
 bash ryftrest -q hello -w 10 -f test/foo/1.txt --format=utf8 --search --address localhost:9786 --accept csv
-rec,test/foo/1.txt,0,15,0,ryftone-313,"hello world
-hel"
-rec,test/foo/1.txt,2,25,0,ryftone-313,"llo world
-hello worldhell"
+rec,test/foo/1.txt,0,15,0,ryftone-313,"hello worldhel"
+rec,test/foo/1.txt,2,25,0,ryftone-313,"llo worldhello worldhell"
 rec,test/foo/1.txt,13,25,0,ryftone-313,ello worldhello from curl
 rec,test/foo/1.txt,28,25,0,ryftone-313," from curlhello from curl"
 rec,test/foo/1.txt,43,25,0,ryftone-313," from curlhello from curl"
