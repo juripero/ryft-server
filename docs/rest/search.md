@@ -69,9 +69,13 @@ Depending on [search mode](#search-mode-parameter) exact search query format may
 Check corresponding Ryft Open API or [short reference](../search/README.md)
 for more details on search expressions.
 
+#### Simple/Plain Queries
+
 `ryft-server` supports simple plain queries - without any keywords.
 The `query=Batman` will be automatically converted to `query=(RAW_TEXT CONTAINS "Batman")`.
 NOTE: This only works for text search; it is not appropriate for structured search.
+
+#### Complex Queries
 
 `ryft-server` also supports complex queries containing several search expressions of different types.
 For example `(RECORD.id CONTAINS "100") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
