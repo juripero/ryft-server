@@ -14,13 +14,15 @@ EXPOSE 8765
 
 COPY .tmp/ryft-server /ryft-server
 COPY etc/ryft-server.conf /etc/ryft-server.conf
-COPY etc/ryft-users.yaml /etc/ryft-users.yml
+COPY etc/ryft-users.yaml /etc/ryft-users.yaml
 COPY ryftprim /usr/bin/ryftprim
+COPY ryftx /usr/bin/ryftx
 
 RUN groupadd ryftuser && \
     useradd -g ryftuser ryftuser && \
     chmod +x /ryft-server && \
     chmod +x /usr/bin/ryftprim && \
+    chmod +x /usr/bin/ryftx && \
     mkdir -p /ryftone
 
 CMD /ryft-server --config=/etc/ryft-server.conf --address :8765 --debug

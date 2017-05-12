@@ -6,8 +6,11 @@ REGISTRY ?= 172.16.34.3:5000
 
 builder:
 	cd builder && \
-	docker build --no-cache --rm -t=${REGISTRY}/ryft/builder:${VERSION} . && \
+	docker build --no-cache --rm -t=${REGISTRY}/ryft/builder:${VERSION} .
+
+push_builder:
 	docker push ${REGISTRY}/ryft/builder:${VERSION}
+
 
 build:
 	cd builder && \
@@ -21,8 +24,10 @@ app:
 	mkdir -p .tmp && \
 	cp ${SOURCE}/ryft-server/ryft-server .tmp/ryft-server && \
 	docker build -t=${REGISTRY}/ryft/app:${VERSION} . && \
-	docker push ${REGISTRY}/ryft/app:${VERSION} && \
 	rm -rf .tmp
+
+push_app:
+	docker push ${REGISTRY}/ryft/app:${VERSION}
 
 clear:
 	rm -rfv app/.tmp

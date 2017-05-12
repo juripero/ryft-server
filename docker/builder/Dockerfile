@@ -1,5 +1,3 @@
-# Docker file to test ryft-server building.
-# Get's sources from current directory (actually ..)
 FROM golang:1.8.1
 
 RUN apt-get update -y && apt-get install -y \
