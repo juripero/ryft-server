@@ -37,6 +37,8 @@ import (
 const (
 	IN_RAW_TEXT = "RAW_TEXT"
 	IN_RECORD   = "RECORD"
+	IN_XRECORD  = "XRECORD"
+	IN_CRECORD  = "CRECORD"
 
 	OP_CONTAINS     = "CONTAINS"
 	OP_NOT_CONTAINS = "NOT_CONTAINS"
@@ -130,7 +132,9 @@ func (lex Lexeme) IsRecord() bool {
 		return false
 	}
 
-	return strings.EqualFold(lex.literal, IN_RECORD)
+	return strings.EqualFold(lex.literal, IN_RECORD) ||
+		strings.EqualFold(lex.literal, IN_XRECORD) ||
+		strings.EqualFold(lex.literal, IN_CRECORD)
 }
 
 // IsContains checks "CONTAINS" operator.
