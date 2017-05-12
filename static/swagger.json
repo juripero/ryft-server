@@ -376,7 +376,7 @@
           "200": {
             "description": "Map of file/dir/catalog and its status",
             "schema": {
-              "$ref": "#/definitions/FilesResponse"
+              "$ref": "#/definitions/RenameResponse"
             }
           },
           "default": {
@@ -432,7 +432,7 @@
           "200": {
             "description": "List of files and directories for node/cluster",
             "schema": {
-              "$ref": "#/definitions/FilesResponse"
+              "$ref": "#/definitions/GetFilesResponse"
             }
           },
           "default": {
@@ -450,7 +450,18 @@
         "summary": "Upload files",
         "description": "Endpoint to upload files",
         "operationId": "postFiles",
+        "consumes": [
+          "application/octet-stream",
+          "multipart/form-data"
+        ],
         "parameters": [
+          {
+            "name": "content",
+            "in": "formData",
+            "type": "file",
+            "description": "File content to upload",
+            "required": true
+          },
           {
             "name": "file",
             "type": "string",
@@ -508,7 +519,7 @@
           "200": {
             "description": "Map of files and directories uploaded",
             "schema": {
-              "$ref": "#/definitions/FilesResponse"
+              "$ref": "#/definitions/PostFilesResponse"
             }
           },
           "default": {
@@ -569,7 +580,7 @@
           "200": {
             "description": "Map of files and directories deleted",
             "schema": {
-              "$ref": "#/definitions/FilesResponse"
+              "$ref": "#/definitions/DeleteFilesResponse"
             }
           },
           "default": {
@@ -798,6 +809,39 @@
           "type": "string"
         }
       }
+    },
+    "RenameResponse": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "PostFilesResponse": {
+      "type": "object",
+      "properties": {
+        "length": {
+          "type": "integer"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "DeleteFilesResponse": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "GetFilesResponse": {
+      "type":"string"
     }
   },
   "securityDefinitions": {

@@ -69,9 +69,13 @@ Depending on [search mode](#search-mode-parameter) exact search query format may
 Check corresponding Ryft Open API or [short reference](../search/README.md)
 for more details on search expressions.
 
+#### Simple/Plain Queries
+
 `ryft-server` supports simple plain queries - without any keywords.
 The `query=Batman` will be automatically converted to `query=(RAW_TEXT CONTAINS "Batman")`.
 NOTE: This only works for text search; it is not appropriate for structured search.
+
+#### Complex Queries
 
 `ryft-server` also supports complex queries containing several search expressions of different types.
 For example `(RECORD.id CONTAINS "100") AND (RAW_TEXT CONTAINS DATE(MM/DD/YYYY > 04/15/2015))`.
@@ -534,10 +538,8 @@ For example,
 
 ```{.sh}
 $ ryftrest -q hello -f test/foo/1.txt -w=10 --format=utf8 --accept=csv
-rec,test/foo/1.txt,0,15,0,ryftone-313,"hello world
-hel"
-rec,test/foo/1.txt,2,25,0,ryftone-313,"llo world
-hello worldhell"
+rec,test/foo/1.txt,0,15,0,ryftone-313,"hello worldhel"
+rec,test/foo/1.txt,2,25,0,ryftone-313,"llo worldhello worldhell"
 rec,test/foo/1.txt,13,25,0,ryftone-313,ello worldhello from curl
 rec,test/foo/1.txt,28,25,0,ryftone-313," from curlhello from curl"
 rec,test/foo/1.txt,43,25,0,ryftone-313," from curlhello from curl"
