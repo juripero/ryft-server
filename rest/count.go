@@ -148,6 +148,13 @@ func (server *Server) DoCount(ctx *gin.Context) {
 			WithDetails("failed to parse transformations"))
 	}
 
+	// session preparation
+	session, err := NewSession(server.Config.Sessions.Algorithm)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to create session token"))
+	}
+
 	log.WithFields(map[string]interface{}{
 		"config":    cfg,
 		"user":      userName,
@@ -217,6 +224,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					// save request parameters in "extra"
 					res.Stat.Extra["request"] = &params
 				}
+
 				if params.Performance {
 					metrics := map[string]interface{}{
 						"prepare":  searchStartTime.Sub(requestStartTime).String(),
@@ -226,6 +234,24 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					}
 					res.Stat.AddPerfStat("rest-count", metrics)
 				}
+
+				if session != nil { // session
+					// TODO: cluster information
+					session.SetData("local", map[string]interface{}{
+						"data":  cfg.KeepDataAs,
+						"index": cfg.KeepIndexAs,
+						//"view": cfg.KeepViewAs,
+						"delim":   cfg.Delimiter,
+						"width":   cfg.Width,
+						"matches": res.Stat.Matches,
+					})
+					token, err := session.Token(server.Config.Sessions.Secret)
+					if err != nil {
+						panic(err)
+					}
+					res.Stat.Extra["session"] = token
+				}
+
 				xstat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)
 			} else {

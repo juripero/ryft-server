@@ -41,7 +41,7 @@ import (
 	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/getryft/ryft-server/rest/format"
 	"github.com/getryft/ryft-server/search"
-	//"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -53,6 +53,7 @@ type SearchShowParams struct {
 	IndexFile string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	ViewFile  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
+	Session   string `form:"session" json:"session,omitempty" msgpack:"session,omitempty"`
 	Offset    uint64 `form:"offset" json:"offset,omitempty" msgpack:"offset,omitempty"`
 	Count     uint64 `form:"count" json:"count,omitempty" msgpack:"count,omitempty"`
 
@@ -66,6 +67,65 @@ type SearchShowParams struct {
 	// private configuration
 	relativeToHome string
 	updateHostTo   string
+}
+
+// Apply data from session token
+func (p *SearchShowParams) applySession(session *Session) error {
+	localData_ := session.GetData("local")
+	if localData_ == nil {
+		return nil // nothing to apply
+	}
+
+	localData, ok := localData_.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("bad session type")
+	}
+
+	// INDEX
+	if len(p.IndexFile) == 0 {
+		if v, ok := localData["index"]; ok {
+			if vv, err := utils.AsString(v); err != nil {
+				return fmt.Errorf(`failed to get "index" file: %s`, err)
+			} else if len(vv) != 0 {
+				p.IndexFile = vv
+			}
+		}
+	}
+
+	// DATA
+	if len(p.DataFile) == 0 {
+		if v, ok := localData["data"]; ok {
+			if vv, err := utils.AsString(v); err != nil {
+				return fmt.Errorf(`failed to get "data" file: %s`, err)
+			} else if len(vv) != 0 {
+				p.DataFile = vv
+			}
+		}
+	}
+
+	// VIEW
+	if len(p.ViewFile) == 0 {
+		if v, ok := localData["view"]; ok {
+			if vv, err := utils.AsString(v); err != nil {
+				return fmt.Errorf(`failed to get "view" file: %s`, err)
+			} else if len(vv) != 0 {
+				p.ViewFile = vv
+			}
+		}
+	}
+
+	// delimiter
+	if len(p.Delimiter) == 0 {
+		if v, ok := localData["delim"]; ok {
+			if vv, err := utils.AsString(v); err != nil {
+				return fmt.Errorf(`failed to get "delim": %s`, err)
+			} else if len(vv) != 0 {
+				p.Delimiter = vv
+			}
+		}
+	}
+
+	return nil // OK
 }
 
 // Handle /search/show endpoint.
@@ -83,6 +143,20 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}
+
+	if len(params.Session) != 0 {
+		session, err := ParseSession(server.Config.Sessions.Secret, params.Session)
+		if err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse session token"))
+		}
+
+		if err := params.applySession(session); err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to apply session token"))
+		}
+	}
+
 	params.Delimiter = mustParseDelim(params.Delimiter)
 	if format.IsNull(params.Format) {
 		params.DataFile = "" // no DATA for NULL format

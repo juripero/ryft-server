@@ -139,6 +139,12 @@ type ServerConfig struct {
 	SettingsPath string `yaml:"settings-path,omitempty"`
 	HostName     string `yaml:"hostname,omitempty"`
 
+	Sessions struct {
+		Algorithm string `yaml:"signing-algorithm,omitempty"`
+		Secret    string `yaml:"secret,omitempty"`
+		// Lifetime  string `yaml:"lifetime,omitempty"`
+	} `yaml:"sessions,omitempty"`
+
 	// post-processing scripts/actions
 	PostProcScripts map[string]struct {
 		ExecPath []string `yaml:"path"`
@@ -182,6 +188,8 @@ func NewServer() *Server {
 	s.Config.Catalogs.CacheDropTimeout = 10 * time.Second
 	s.Config.Catalogs.CacheDropTimeout_ = NewTimeDuration(&s.Config.Catalogs.CacheDropTimeout)
 	s.Config.SettingsPath = "/var/ryft/server.settings"
+	s.Config.Sessions.Algorithm = "HS256"
+	s.Config.Sessions.Secret = "session-secret-key"
 
 	return s // OK
 }
