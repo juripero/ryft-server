@@ -66,7 +66,7 @@ type SearchParams struct {
 	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
-	Limit       int    `form:"limit" json:"limit,omitempty" msgpack:"limite,omitempty"`
+	Limit       int    `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
@@ -163,8 +163,8 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)
 	cfg.Limit = uint(params.Limit)
-	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	cfg.Performance = params.Performance
+	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse sharing mode"))
