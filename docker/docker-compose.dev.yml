@@ -15,10 +15,12 @@ services:
     environment:
       - GOPATH=/usr
       - GOROOT=/usr/local/go
+    env_file: # because of docker-compose bug
+      - .env
     working_dir: /usr/src/github.com/getryft/ryft-server
-    command: make build && ./ryft-server --config=/etc/ryft-server.conf --address :8765 --debug
+    command: ./ryft-server --config=/etc/ryft-server.conf --address :8765 --debug
 
- consul:
+  consul:
     image: consul:0.8.0
     container_name: "consul"
     hostname: "consul"

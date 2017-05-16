@@ -819,16 +819,25 @@
       }
     },
     "PostFilesResponse": {
-      "type": "object",
-      "properties": {
-        "length": {
-          "type": "integer"
-        },
-        "offset": {
-          "type": "integer"
-        },
-        "path": {
-          "type": "string"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "length": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
         }
       }
     },

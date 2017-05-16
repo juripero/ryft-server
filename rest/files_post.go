@@ -235,6 +235,8 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	}
 
 	result := map[string]interface{}{}
+	results := []map[string]interface{}{}
+
 	log.WithField("params", params).
 		WithField("user", userName).
 		WithField("home", homeDir).
@@ -290,10 +292,6 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 			nodes[i] = node
 		}
-
-		minLen := []int64{}
-		allPath := []string{}
-		allCat := []string{}
 
 		if Ncopies > 1 {
 			// save to temp file to get multiple copies
@@ -366,22 +364,13 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				}
 
 				if node.Error != nil {
-					result[node.Name] = map[string]interface{}{
-						"error": node.Error.Error(),
-					}
+					results = append(results, map[string]interface{}{
+						"error":    node.Error.Error(),
+						"hostname": node.Name,
+					})
 				} else {
-					result[node.Name] = node.Result
-				}
-
-				// combine results
-				if x, err := utils.AsUint64(node.Result["length"]); err == nil {
-					minLen = append(minLen, int64(x))
-				}
-				if x, err := utils.AsString(node.Result["path"]); err == nil {
-					allPath = append(allPath, x)
-				}
-				if x, err := utils.AsString(node.Result["catalog"]); err == nil {
-					allCat = append(allCat, x)
+					node.Result["hostname"] = node.Name
+					results = append(results, node.Result)
 				}
 			}
 		} else {
@@ -402,48 +391,32 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				}
 
 				if node.Error != nil {
-					result[node.Name] = map[string]interface{}{
-						"error": err.Error(),
-					}
+					results = append(results, map[string]interface{}{
+						"error":    err.Error(),
+						"hostname": node.Name,
+					})
 				} else {
-					result[node.Name] = node.Result
-				}
-
-				// combine results
-				if x, err := utils.AsUint64(node.Result["length"]); err == nil {
-					minLen = append(minLen, int64(x))
-				}
-				if x, err := utils.AsString(node.Result["path"]); err == nil {
-					allPath = append(allPath, x)
-				}
-				if x, err := utils.AsString(node.Result["catalog"]); err == nil {
-					allCat = append(allCat, x)
+					node.Result["hostname"] = node.Name
+					results = append(results, node.Result)
 				}
 				break // one node enough
 			}
 		}
-
-		result = map[string]interface{}{
-			"details": result,
-			"length":  findMinLength(minLen),
-		}
-		if x := getUniqueOrEmpty(allPath); len(x) > 0 {
-			result["path"] = x
-		}
-		if x := getUniqueOrEmpty(allCat); len(x) > 0 {
-			result["catalog"] = x
-		}
 	} else {
 		status, result, _ = s.postLocalFiles(mountPoint, params, delim, file)
+		results = append(results, result)
 	}
 
-	ctx.JSON(status, result)
+	ctx.JSON(status, results)
 }
 
 // post local nodes: files, dirs, catalogs
 func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, map[string]interface{}, error) {
 	res := make(map[string]interface{})
 	status := http.StatusOK
+	if hostname, err := os.Hostname(); err == nil {
+		res["hostname"] = hostname
+	}
 
 	if len(params.Catalog) != 0 { // append to catalog
 		catalog, filePath, length, err := updateCatalog(mountPoint, params, delim, file)

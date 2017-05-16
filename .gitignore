@@ -7,5 +7,5 @@
 .idea/
 /docker-compose.yml
 /vendor/*/
-/ryftone
+ryftone/
 .tmp
