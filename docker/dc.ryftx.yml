@@ -1,0 +1,31 @@
+version: '3.1'
+services:
+  app:
+    image: ${REGISTRY}/ryft/builder:${BUILDER_VERSION}
+    depends_on:
+      - consul
+    volumes:
+      - ~/.ssh:/root/.ssh
+      - ../:/usr/src/github.com/getryft/ryft-server
+      - ./ryftone:/ryftone
+      - ./app/run.sh:/run.sh
+      - ./app/ryftx:/usr/bin/ryftx
+      - ./app/etc/ryft-users.yaml:/etc/ryft-users.yaml
+      - ./app/etc/ryft-server.ryftx.conf:/etc/ryft-server.conf
+    ports:
+      - ${APP_PORT}
+    environment:
+      - GOPATH=/usr
+      - GOROOT=/usr/local/go
+    env_file: # because of docker-compose bug
+      - .env
+    working_dir: /usr/src/github.com/getryft/ryft-server
+
+  consul:
+    image: consul:0.8.0
+    container_name: "consul"
+    hostname: "consul"
+    ports:
+      - 8400
+      - 8500
+      - 8600

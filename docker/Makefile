@@ -1,8 +1,10 @@
+include .env
+export $(shell sed 's/=.*//' .env)
+
 SOURCE ?= `cd ../../../ && pwd`
 VERSION ?= latest
-REGISTRY ?= 172.16.34.3:5000
 
-.PHONY: builder build app clear
+.PHONY: builder push_builder build app push_app clear
 
 builder:
 	cd builder && \

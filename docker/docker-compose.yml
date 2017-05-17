@@ -2,15 +2,15 @@ version: '3.1'
 services:
   app:
     image: ${REGISTRY}/ryft/app:${APP_VERSION}
+    depends_on:
+      - consul
     ports:
-      - 8765
+      - ${APP_PORT}
     env_file: # because of docker-compose bug
       - .env
     volumes:
       - ~/.ssh:/root/.ssh
-      - ./ryftone:/ryftone
-      - ./app/etc/ryft-server.conf:/etc/ryft-server.conf
-    command:  /ryft-server --config=/etc/ryft-server.conf --address :8765 --debug
+      - /ryftone:/ryftone
 
   consul:
     image: consul:0.8.0

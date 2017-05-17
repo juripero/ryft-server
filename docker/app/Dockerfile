@@ -1,6 +1,7 @@
 FROM ubuntu:16.10
 
 RUN apt-get update -y && apt-get install -y \
+     ssh-client \
      dpkg \
      tar \
      less \
@@ -13,16 +14,16 @@ RUN apt-get update -y && apt-get install -y \
 EXPOSE 8765
 
 COPY .tmp/ryft-server /ryft-server
-COPY etc/ryft-server.conf /etc/ryft-server.conf
+COPY etc/ryft-server.ryftprim.conf /etc/ryft-server.conf
 COPY etc/ryft-users.yaml /etc/ryft-users.yaml
 COPY ryftprim /usr/bin/ryftprim
-COPY ryftx /usr/bin/ryftx
+COPY run.sh /run.sh
 
 RUN groupadd ryftuser && \
     useradd -g ryftuser ryftuser && \
     chmod +x /ryft-server && \
     chmod +x /usr/bin/ryftprim && \
-    chmod +x /usr/bin/ryftx && \
+    chmod +x /run.sh && \
     mkdir -p /ryftone
 
-CMD /ryft-server --config=/etc/ryft-server.conf --address :8765 --debug
+CMD ['/bin/bash', '/run.sh']

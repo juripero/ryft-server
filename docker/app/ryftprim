@@ -1,4 +1,4 @@
 #!/bin/bash
 
 # pass all command line arguments to remote ryftprim
-ssh -C ${RYFTPRIM_REMOTE_USER}@${RYFTPRIM_REMOTE_HOST} $@
+ssh -C ${RYFTPRIM_REMOTE_USER}@${RYFTPRIM_REMOTE_HOST} -- $@
