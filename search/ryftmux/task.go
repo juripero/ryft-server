@@ -91,8 +91,8 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	} else {
 		recordsLimit = math.MaxUint64
 	}
-	for _, res := range task.results {
-		go func(res *search.Result) {
+	for i, res := range task.results {
+		go func(backend search.Engine, res *search.Result) {
 			defer func() {
 				task.subtasks.Done()
 				resCh <- res
@@ -153,11 +153,17 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 						}
 					}
 
+					if opts := backend.Options(); opts != nil && res.Stat != nil {
+						if url, ok := opts["server-url"]; ok {
+							res.Stat.AddSessionData("location", url)
+						}
+					}
+
 					return // done!
 				}
 			}
 
-		}(res)
+		}(engine.Backends[i], res)
 	}
 
 	// wait for statistics and process cancellation
