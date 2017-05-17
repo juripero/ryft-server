@@ -35,11 +35,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 
 	"github.com/getryft/ryft-server/rest/codec"
+	my_codec "github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 	"github.com/getryft/ryft-server/rest/format"
+	my_format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 
@@ -147,6 +152,7 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 			WithDetails("failed to parse request parameters"))
 	}
 
+	var sessionInfo []interface{}
 	if len(params.Session) != 0 {
 		session, err := ParseSession(server.Config.Sessions.Secret, params.Session)
 		if err != nil {
@@ -154,9 +160,11 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 				WithDetails("failed to parse session token"))
 		}
 
-		if err := params.applySession(session); err != nil {
-			panic(NewError(http.StatusBadRequest, err.Error()).
-				WithDetails("failed to apply session token"))
+		if info, ok := session.GetData("info").([]interface{}); !ok {
+			panic(NewError(http.StatusBadRequest, "invalid data format").
+				WithDetails("failed to parse session token"))
+		} else {
+			sessionInfo = info
 		}
 	}
 
@@ -213,11 +221,15 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 
 	params.relativeToHome = mountPoint
 	params.updateHostTo = server.Config.HostName
-	if params.Local {
+	if params.Local || len(sessionInfo) <= 1 {
 		res, err = doLocalSearchShow(mountPoint, params)
 	} else {
-		panic(fmt.Errorf("CLUSTER MODE IS NOT IMPLEMENTED YET"))
-		_ = authToken
+		nodes, err := server.searchShowGetNodes(sessionInfo, params)
+		if err != nil {
+			panic(NewError(http.StatusInternalServerError, err.Error()).
+				WithDetails("failed to get cluster nodes"))
+		}
+		res, err = doRemoteSearchShowMux(mountPoint, authToken, nodes)
 	}
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
@@ -481,5 +493,397 @@ func doLocalSearchShowNoView(mountPoint string, params SearchShowParams) (*searc
 
 // do local show (view file)
 func doLocalSearchShowView(mountPoint string, params SearchShowParams) (*search.Result, error) {
-	return nil, fmt.Errorf("NOT IMPLEMENTED YET")
+	return doLocalSearchShowView(mountPoint, params)
+	// return nil, fmt.Errorf("NOT IMPLEMENTED YET")
+}
+
+// do remote show via HTTP request
+func doRemoteSearchShowHttp(serverUrl, authToken string, params SearchShowParams) (*search.Result, error) {
+	// server URL should be parsed in engine initialization
+	// so we can omit error checking here
+	u, _ := url.Parse(serverUrl)
+	u.Path += "/search/show"
+
+	// prepare query
+	q := url.Values{}
+	if !format.IsNull(params.Format) {
+		q.Set("format", "raw")
+	} else {
+		q.Set("format", "null")
+	}
+	q.Set("local", fmt.Sprintf("%t", true))
+	q.Set("stream", fmt.Sprintf("%t", true))
+	q.Set("--internal-error-prefix", fmt.Sprintf("%t", true)) // enable error prefixes!
+
+	q.Set("data", params.DataFile)
+	q.Set("index", params.IndexFile)
+	q.Set("view", params.ViewFile)
+	if len(params.Delimiter) != 0 {
+		q.Set("delimiter", params.Delimiter)
+	}
+	q.Set("offset", fmt.Sprintf("%d", params.Offset))
+	q.Set("count", fmt.Sprintf("%d", params.Count))
+	u.RawQuery = q.Encode()
+
+	// prepare request
+	// task.log().WithField("url", u.String()).Infof("[%s]: sending GET", TAG)
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		// task.log().WithError(err).Warnf("[%s]: failed to create request", TAG)
+		return nil, fmt.Errorf("failed to create request: %s", err)
+	}
+
+	// we expect MSGPACK format for streaming
+	req.Header.Set("Accept", my_codec.MIME)
+
+	// authorization
+	if len(authToken) != 0 {
+		req.Header.Set("Authorization", authToken)
+	}
+
+	res := search.NewResult()
+	go func() {
+		// some futher cleanup
+		defer res.Close()
+		defer res.ReportDone()
+
+		doneCh := make(chan struct{})
+		defer close(doneCh)
+
+		cancelCh := make(chan struct{})
+		req.Cancel = cancelCh
+		var cancelled int32 // atomic
+
+		// do HTTP request
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			//task.log().WithError(err).Warnf("[%s]: failed to send request", TAG)
+			res.ReportError(fmt.Errorf("failed to send request: %s", err))
+			return // failed
+		}
+
+		defer resp.Body.Close() // close it later
+
+		// check status code
+		if resp.StatusCode != http.StatusOK {
+			// task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid response status", TAG)
+			res.ReportError(fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status))
+			return // failed (not 200)
+		}
+
+		// read response and report records and/or statistics
+		dec, _ := my_codec.NewStreamDecoder(resp.Body)
+
+		// handle task cancellation
+		go func() {
+			select {
+			case <-res.CancelChan:
+				// task.log().Warnf("[%s]: cancelling by client", TAG)
+				if atomic.CompareAndSwapInt32(&cancelled, 0, 1) {
+					close(cancelCh) // cancel the request, once
+				}
+
+			case <-doneCh:
+				// task.log().Debugf("[%s]: done", TAG)
+				return
+			}
+		}()
+
+		// read stream of tag-object pairs
+		for atomic.LoadInt32(&cancelled) == 0 {
+			tag, err := dec.NextTag()
+			if err != nil {
+				//task.log().WithError(err).Warnf("[%s]: failed to decode next tag", TAG)
+				res.ReportError(fmt.Errorf("failed to decode next tag: %s", err))
+				return // failed
+			}
+
+			switch tag {
+			case my_codec.TAG_EOF:
+				//task.log().WithField("result", res).Infof("[%s]: got end of response", TAG)
+				return // DONE
+
+			case my_codec.TAG_REC:
+				item := my_format.NewRecord()
+				if err := dec.Next(item); err != nil {
+					//task.log().WithError(err).Warnf("[%s]: failed to decode record", TAG)
+					res.ReportError(fmt.Errorf("failed to decode record: %s", err))
+					return // failed
+				} else {
+					rec := my_format.ToRecord(item)
+					// task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG) // FIXME: DEBUG
+					res.ReportRecord(rec)
+					// continue
+				}
+
+			case my_codec.TAG_ERR:
+				var msg string
+				if err := dec.Next(&msg); err != nil {
+					//task.log().WithError(err).Warnf("[%s]: failed to decode error", TAG)
+					res.ReportError(fmt.Errorf("failed to decode error: %s", err))
+					return // failed
+				} else {
+					err := fmt.Errorf("%s", msg)
+					// task.log().WithError(err).Debugf("[%s]: new error received", TAG) // FIXME: DEBUG
+					res.ReportError(err)
+					// continue
+				}
+
+			case my_codec.TAG_STAT:
+				stat := my_format.NewStat()
+				if err := dec.Next(stat); err != nil {
+					//task.log().WithError(err).Warnf("[%s]: failed to decode statistics", TAG)
+					res.ReportError(fmt.Errorf("failed to decode statistics: %s", err))
+					return // failed
+				} else {
+					res.Stat = my_format.ToStat(stat)
+					// task.log().WithField("stat", res.Stat).Debugf("[%s]: statistics received", TAG) // FIXME: DEBUG
+					// continue
+				}
+
+			default:
+				// task.log().WithField("tag", tag).Warnf("[%s]: unknown tag", TAG)
+				res.ReportError(fmt.Errorf("unknown data tag received: %v", tag))
+				return // failed, no sense to continue processing
+			}
+		}
+	}()
+
+	return res, nil // OK for now
+}
+
+type nodeSearchShow struct {
+	isLocal bool
+	nodeUrl string
+	params  SearchShowParams
+}
+
+// get nodes according to incoming info and offset/count
+func (s *Server) searchShowGetNodes(info []interface{}, params SearchShowParams) ([]nodeSearchShow, error) {
+	params.Session = ""
+	res := make([]nodeSearchShow, 0)
+	if len(info) <= 1 {
+		res = append(res, nodeSearchShow{
+			isLocal: true,
+			nodeUrl: "", // not used
+			params:  params,
+		})
+	} else {
+		log.Debugf("requested range [%d..%d)", params.Offset, params.Offset+params.Count)
+		// TODO: case if params.Count = 0 - means from offset till the END
+		var offset uint64
+		for _, node_ := range info {
+			if node, ok := node_.(map[string]interface{}); ok {
+				matches, _ := utils.AsUint64(node["matches"])
+				beg := offset
+				end := beg + matches
+				offset += matches
+
+				log.Debugf("  node: %v", node)
+
+				if params.Offset+params.Count < beg || end <= params.Offset {
+					continue // out of range
+				}
+
+				nss := nodeSearchShow{
+					params: params,
+				}
+				if location, err := utils.AsString(node["location"]); err != nil {
+					return nil, fmt.Errorf("failed to get location: %s", err)
+				} else if len(location) != 0 {
+					u, err := url.Parse(location)
+					if err != nil {
+						return nil, fmt.Errorf("failed to parse location: %s", err)
+					}
+					if s.isLocalServiceUrl(u) {
+						nss.isLocal = true
+						nss.nodeUrl = ""
+					} else {
+						nss.isLocal = false
+						nss.nodeUrl = location
+					}
+				} else {
+					nss.isLocal = true
+					nss.nodeUrl = ""
+				}
+
+				nss.params.DataFile, _ = utils.AsString(node["data"])
+				nss.params.IndexFile, _ = utils.AsString(node["index"])
+				nss.params.ViewFile, _ = utils.AsString(node["view"])
+				nss.params.Delimiter, _ = utils.AsString(node["delim"])
+				if beg < params.Offset {
+					nss.params.Offset = params.Offset - beg
+				} else {
+					nss.params.Offset = 0
+				}
+				if end < params.Offset+params.Count {
+					nss.params.Count = matches - nss.params.Offset
+				} else {
+					nss.params.Count = matches - (end - (params.Offset + params.Count)) - nss.params.Offset
+				}
+
+				log.Debugf("%s mapped range [%d/%d]", nss.nodeUrl, nss.params.Offset, nss.params.Count)
+
+				res = append(res, nss)
+			} else {
+				return nil, fmt.Errorf("bad info data format: %T", node_)
+			}
+		}
+	}
+
+	return res, nil // OK
+}
+
+// process and wait all
+func doRemoteSearchShowMux(mountPoint string, authToken string, nodes []nodeSearchShow) (*search.Result, error) {
+	mux := search.NewResult()
+
+	var subtasks sync.WaitGroup
+	results := make([]*search.Result, 0, len(nodes))
+
+	// prepare requests
+	for _, node := range nodes {
+		var res *search.Result
+		var err error
+		if node.isLocal {
+			res, err = doLocalSearchShow(mountPoint, node.params)
+		} else {
+			res, err = doRemoteSearchShowHttp(node.nodeUrl, authToken, node.params)
+		}
+		if err != nil {
+			//task.log().WithError(err).Warnf("[%s]: failed to start /search backend", TAG)
+			mux.ReportError(fmt.Errorf("failed to start /search backend: %s", err))
+			continue
+		}
+
+		subtasks.Add(1)
+		results = append(results, res)
+	}
+
+	go func() {
+		// some futher cleanup
+		defer mux.Close()
+		defer mux.ReportDone()
+
+		// communication channel to report completed results
+		resCh := make(chan *search.Result, len(results))
+
+		// start multiplexing results and errors
+		//task.log().Debugf("[%s]: start subtask processing...", TAG)
+		//var recordsReported uint64 // for all subtasks, atomic
+		for _, res := range results {
+			go func(res *search.Result) {
+				defer func() {
+					subtasks.Done()
+					resCh <- res
+				}()
+
+				// drain subtask's records and errors
+				for {
+					select {
+					case err, ok := <-res.ErrorChan:
+						if ok && err != nil {
+							// TODO: mark error with subtask's tag?
+							// task.log().WithError(err).Debugf("[%s]: new error received", TAG) // FIXME: DEBUG
+							mux.ReportError(err)
+						}
+
+					case rec, ok := <-res.RecordChan:
+						if ok && rec != nil {
+							if true { //atomic.AddUint64(&recordsReported, 1) <= recordsLimit {
+								// task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG) // FIXME: DEBUG
+								//rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+								mux.ReportRecord(rec)
+								/*} else {
+								task.log().WithField("limit", recordsLimit).Infof("[%s]: stopped by limit", TAG)
+								errors, records := res.Cancel()
+								if errors > 0 || records > 0 {
+									task.log().WithFields(map[string]interface{}{
+										"errors":  errors,
+										"records": records,
+									}).Debugf("[%s]: some errors/records are ignored", TAG)
+								}
+								return // done!*/
+							}
+						}
+
+					case <-res.DoneChan:
+						// drain the whole errors channel
+						for err := range res.ErrorChan {
+							// task.log().WithError(err).Debugf("[%s]: *** new error received", TAG) // FIXME: DEBUG
+							mux.ReportError(err)
+						}
+
+						// drain the whole records channel
+						for rec := range res.RecordChan {
+							if true { // atomic.AddUint64(&recordsReported, 1) <= recordsLimit {
+								// task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG) // FIXME: DEBUG
+								// rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
+								mux.ReportRecord(rec)
+								/*} else {
+								task.log().WithField("limit", recordsLimit).Infof("[%s]: *** stopped by limit", TAG)
+								errors, records := res.Cancel()
+								if errors > 0 || records > 0 {
+									task.log().WithFields(map[string]interface{}{
+										"errors":  errors,
+										"records": records,
+									}).Debugf("[%s]: *** some errors/records are ignored", TAG)
+								}
+								return // done!*/
+							}
+						}
+
+						return // done!
+					}
+				}
+
+			}(res)
+		}
+
+		// wait for statistics and process cancellation
+		finished := make(map[*search.Result]bool)
+	WaitLoop:
+		for _ = range results {
+			select {
+			case res, ok := <-resCh:
+				if ok && res != nil {
+					// once subtask is finished combine statistics
+					//					task.log().WithField("result", res).
+					//						Infof("[%s]: subtask is finished", TAG)
+					if res.Stat != nil {
+						if mux.Stat == nil {
+							// create multiplexed statistics
+							mux.Stat = search.NewStat("")
+						}
+						mux.Stat.Merge(res.Stat)
+					}
+					finished[res] = true
+				}
+				continue WaitLoop
+
+			case <-mux.CancelChan:
+				// cancel all unfinished tasks
+				// task.log().Warnf("[%s]: cancelling by client", TAG)
+				for _, r := range results {
+					if !finished[r] {
+						errors, records := r.Cancel()
+						if errors > 0 || records > 0 {
+							log.WithFields(map[string]interface{}{
+								"errors":  errors,
+								"records": records,
+							}).Debugf("[%s]: subtask is cancelled, some errors/records are ignored", CORE)
+						}
+					}
+				}
+				break WaitLoop
+			}
+		}
+
+		// wait all goroutines
+		log.Debugf("[%s]: waiting all subtasks...", CORE)
+		subtasks.Wait()
+		log.Debugf("[%s]: done", CORE)
+	}()
+
+	return mux, nil // OK for now
 }

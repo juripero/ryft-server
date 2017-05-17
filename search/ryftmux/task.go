@@ -79,8 +79,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	defer mux.ReportDone()
 
 	// communication channel to report completed results
-	resCh := make(chan *search.Result,
-		len(task.results))
+	resCh := make(chan *search.Result, len(task.results))
 
 	// start multiplexing results and errors
 	task.log().Debugf("[%s]: start subtask processing...", TAG)
