@@ -72,6 +72,10 @@ type CountParams struct {
 	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
 
 	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
+
+	// internal parameters
+	//InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
+	InternalNoSessionId bool `form:"--internal-no-session-id"`
 }
 
 // Handle /count endpoint.

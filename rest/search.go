@@ -72,16 +72,19 @@ type SearchParams struct {
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
 
-	Format      string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
-	Fields      string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
-	Stats       bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
-	Stream      bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
-	ErrorPrefix bool   `form:"ep" json:"ep,omitempty" msgpack:"ep,omitempty"` // include host prefixes for error messages
+	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
+	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
+	Stats  bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
+	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 
 	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
 	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
 
 	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
+
+	// internal parameters
+	InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
+	InternalNoSessionId bool `form:"--internal-no-session-id"`
 }
 
 // Handle /search endpoint.
@@ -214,7 +217,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 
 	// error prefix
 	var errorPrefix string
-	if params.ErrorPrefix {
+	if params.InternalErrorPrefix {
 		errorPrefix = server.Config.HostName
 	}
 

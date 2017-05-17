@@ -57,12 +57,15 @@ type SearchShowParams struct {
 	Offset    uint64 `form:"offset" json:"offset,omitempty" msgpack:"offset,omitempty"`
 	Count     uint64 `form:"count" json:"count,omitempty" msgpack:"count,omitempty"`
 
-	Format      string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
-	Fields      string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
-	Stream      bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
-	ErrorPrefix bool   `form:"ep" json:"ep,omitempty" msgpack:"ep,omitempty"` // include host prefixes for error messages
+	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
+	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
+	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 
 	Local bool `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+
+	// internal parameters
+	InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
+	//InternalNoSessionId bool `form:"--internal-no-session-id"`
 
 	// private configuration
 	relativeToHome string

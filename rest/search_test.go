@@ -81,7 +81,7 @@ func TestSearchUsual(t *testing.T) {
 	if all {
 		fs.server.Config.BackendOptions["search-report-records"] = 0
 		fs.server.Config.BackendOptions["search-report-errors"] = 1
-		check("/search?query=hello&file=*.txt&surrounding=0&ep=true", "application/octet-stream", // should be changed to application/json
+		check("/search?query=hello&file=*.txt&surrounding=0&--internal-error-prefix=true", "application/octet-stream", // should be changed to application/json
 			0, http.StatusOK, `"results":[]`, `"errors":["[node-1]: error-1"]`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
@@ -91,7 +91,7 @@ func TestSearchUsual(t *testing.T) {
 		fs.server.Config.BackendOptions["search-report-records"] = 0
 		fs.server.Config.BackendOptions["search-report-errors"] = 1
 		fs.server.Config.BackendOptions["search-no-stat"] = true
-		check("/search?query=hello&file=*.txt&surrounding=0&ep=true", "",
+		check("/search?query=hello&file=*.txt&surrounding=0&--internal-error-prefix=true", "",
 			0, http.StatusInternalServerError, `[node-1]: error-1`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
