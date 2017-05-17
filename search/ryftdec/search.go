@@ -206,6 +206,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		keepDataAs := cfg.KeepDataAs
 		keepIndexAs := cfg.KeepIndexAs
+		// keepViewAs := cfg.KeepViewAs
 		delimiter := cfg.Delimiter
 
 		searchStart := time.Now()
@@ -302,6 +303,7 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 	engine.updateConfig(cfg, query.Simple)
 	cfg.KeepDataAs = dat1
 	cfg.KeepIndexAs = idx1
+	cfg.KeepViewAs = ""
 	cfg.ReportIndex = false
 	cfg.ReportData = false
 

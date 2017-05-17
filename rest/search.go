@@ -65,6 +65,7 @@ type SearchParams struct {
 
 	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
+	KeepViewAs  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 	Limit       int    `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
@@ -159,6 +160,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.KeepViewAs = params.KeepViewAs
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)

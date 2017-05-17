@@ -62,6 +62,7 @@ type CountParams struct {
 
 	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
+	KeepViewAs  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 
 	// post-process transformations
@@ -130,6 +131,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.KeepViewAs = params.KeepViewAs
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
@@ -319,6 +321,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.KeepViewAs = params.KeepViewAs
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
