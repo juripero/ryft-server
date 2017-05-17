@@ -55,6 +55,7 @@ type Engine struct {
 	IndexHost string // optional host in cluster mode
 
 	httpClient *http.Client
+	options    map[string]interface{}
 }
 
 // NewEngine creates new RyftHTTP search engine.

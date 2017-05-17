@@ -68,6 +68,8 @@ type Engine struct {
 	FilesReportFiles []string
 	FilesReportDirs  []string
 	FilesPathSuffix  string
+
+	options map[string]interface{}
 }
 
 // NewEngine creates new fake RyftMUX search engine.

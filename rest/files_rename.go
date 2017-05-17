@@ -369,13 +369,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 		nodes := make([]*Node, len(services))
 		for i, service := range services {
 			node := new(Node)
-			scheme := "http"
-			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
-			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-			}
-
+			node.Address = getServiceUrl(service)
 			node.IsLocal = server.isLocalService(service)
 			node.Params = RenameFileParams{
 				File:    params.File,

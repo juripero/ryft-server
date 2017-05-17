@@ -41,16 +41,21 @@ import (
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"instance-name": engine.Instance,
-		"ryftone-mount": engine.MountPoint,
-		"home-dir":      engine.HomeDir,
-		"host-name":     engine.HostName,
+	opts := make(map[string]interface{})
+	for k, v := range engine.options {
+		opts[k] = v
 	}
+	opts["instance-name"] = engine.Instance
+	opts["ryftone-mount"] = engine.MountPoint
+	opts["home-dir"] = engine.HomeDir
+	opts["host-name"] = engine.HostName
+	return opts
 }
 
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
+	engine.options = opts // base
+
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)

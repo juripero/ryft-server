@@ -234,6 +234,16 @@ func (s *Server) isLocalService(service *consul.CatalogService) bool {
 	return false
 }
 
+// get service URL
+func getServiceUrl(service *consul.CatalogService) string {
+	scheme := "http"
+	if port := service.ServicePort; port == 0 { // TODO: review the URL building!
+		return fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+	} else {
+		return fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+	}
+}
+
 // get partition info from the KV storage
 // return map: mask -> list of tags
 func getPartitionInfo(client *consul.Client, userTag string) (map[string][]string, error) {

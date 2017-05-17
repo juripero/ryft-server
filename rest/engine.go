@@ -47,7 +47,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, home
 		return s.getClusterSearchEngine(files, authToken, homeDir, userTag)
 	}
 
-	return s.getLocalSearchEngine(homeDir)
+	return s.getLocalSearchEngine(homeDir, "", "")
 }
 
 // get cluster's search engine
@@ -100,7 +100,8 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		// use native search engine for local services!
 		// (no sense to do extra HTTP call)
 		if s.isLocalService(service) {
-			engine, err := s.getLocalSearchEngine(homeDir)
+			engine, err := s.getLocalSearchEngine(homeDir,
+				service.Node, getServiceUrl(service))
 			if err != nil {
 				return nil, err
 			}
@@ -111,16 +112,11 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		}
 
 		// remote node: use RyftHTTP backend
-		port := service.ServicePort
-		scheme := "http"
-		var url string
-		if port == 0 { // TODO: review the URL building!
-			url = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
-		} else {
-			url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-		}
-
+		url := getServiceUrl(service)
 		opts := map[string]interface{}{
+			"--cluster-node-name": service.Node,
+			"--cluster-node-addr": url,
+
 			"server-url": url,
 			"auth-token": authToken,
 			"local-only": true,
@@ -156,12 +152,19 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 
 	// no services from consule, just use local search as a fallback
 	log.Debugf("use local search as fallback")
-	return s.getLocalSearchEngine(homeDir)
+	return s.getLocalSearchEngine(homeDir, "", "")
 }
 
 // get local search engine
-func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
+func (s *Server) getLocalSearchEngine(homeDir string, nodeName, nodeAddr string) (search.Engine, error) {
 	opts := s.getBackendOptions()
+
+	if len(nodeName) != 0 {
+		opts["--cluster-node-name"] = nodeName
+	}
+	if len(nodeAddr) != 0 {
+		opts["--cluster-node-addr"] = nodeAddr
+	}
 
 	// some auto-options
 	switch s.Config.SearchBackend {
@@ -206,7 +209,7 @@ func (s *Server) getBackendOptions() map[string]interface{} {
 
 // get mount point path from local search engine
 func (s *Server) getMountPoint(homeDir string) (string, error) {
-	engine, err := s.getLocalSearchEngine(homeDir)
+	engine, err := s.getLocalSearchEngine(homeDir, "", "")
 	if err != nil {
 		return "", err
 	}

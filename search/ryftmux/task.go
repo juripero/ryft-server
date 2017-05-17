@@ -153,9 +153,13 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 						}
 					}
 
+					// set some session specific data
 					if opts := backend.Options(); opts != nil && res.Stat != nil {
-						if url, ok := opts["server-url"]; ok {
+						if url, ok := opts["--cluster-node-addr"]; ok {
 							res.Stat.AddSessionData("location", url)
+						}
+						if node, ok := opts["--cluster-node-name"]; ok {
+							res.Stat.AddSessionData("node", node)
 						}
 					}
 

@@ -50,6 +50,8 @@ type Engine struct {
 	Backends []search.Engine
 
 	IndexHost string // optional host in cluster mode
+
+	options map[string]interface{}
 }
 
 // NewEngine creates new RyftMUX search engine.
@@ -67,9 +69,12 @@ func (engine *Engine) String() string {
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
+	opts := make(map[string]interface{})
+	for k, v := range engine.options {
+		opts[k] = v
 	}
+	opts["index-host"] = engine.IndexHost
+	return opts
 }
 
 // SetLogLevelString changes global module log level.
