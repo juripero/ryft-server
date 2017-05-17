@@ -124,6 +124,9 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	if len(cfg.KeepIndexAs) != 0 {
 		q.Set("index", cfg.KeepIndexAs)
 	}
+	if len(cfg.Delimiter) != 0 {
+		q.Set("delimiter", cfg.Delimiter)
+	}
 	if cfg.Limit > 0 {
 		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
 	}
