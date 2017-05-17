@@ -314,6 +314,14 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 			res.Stat.AddPerfStat("ryftprim", metrics)
 		}
+		if res.Stat != nil {
+			res.Stat.AddSessionData("index", task.config.KeepIndexAs)
+			res.Stat.AddSessionData("data", task.config.KeepDataAs)
+			res.Stat.AddSessionData("view", task.config.KeepViewAs)
+			res.Stat.AddSessionData("delim", task.config.Delimiter)
+			res.Stat.AddSessionData("width", task.config.Width)
+			res.Stat.AddSessionData("matches", res.Stat.Matches)
+		}
 		res.ReportDone()
 		res.Close()
 	}()

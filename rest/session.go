@@ -83,3 +83,8 @@ func (s *Session) SetData(name string, val interface{}) {
 func (s *Session) GetData(name string) interface{} {
 	return s.token.Claims[name]
 }
+
+// AllData
+func (s *Session) AllData() map[string]interface{} {
+	return s.token.Claims
+}

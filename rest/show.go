@@ -234,7 +234,7 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 
 	// error prefix
 	var errorPrefix string
-	if params.ErrorPrefix {
+	if params.InternalErrorPrefix {
 		errorPrefix = server.Config.HostName
 	}
 

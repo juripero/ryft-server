@@ -306,20 +306,13 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 					res.Stat.AddPerfStat("rest-search", metrics)
 				}
 
-				if session != nil {
-					// TODO: cluster information
-					session.SetData("local", map[string]interface{}{
-						"data":  cfg.KeepDataAs,
-						"index": cfg.KeepIndexAs,
-						//"view": cfg.KeepViewAs,
-						"delim":   cfg.Delimiter,
-						"width":   cfg.Width,
-						"matches": res.Stat.Matches,
-					})
+				if session != nil && !params.InternalNoSessionId {
+					updateSession(session, res.Stat)
 					token, err := session.Token(server.Config.Sessions.Secret)
 					if err != nil {
 						panic(err)
 					}
+					log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
 					res.Stat.Extra["session"] = token
 				}
 
@@ -448,4 +441,30 @@ func parseNameAndArgs(s string) (string, []string, error) {
 	}
 
 	return "", nil, fmt.Errorf("no script name found")
+}
+
+// update Session token based on provided session data
+func updateSession(session *Session, stat *search.Stat) {
+	data := []interface{}{}
+
+	// get data from details
+	for _, dstat := range stat.Details {
+		if d := dstat.GetSessionData(); d != nil {
+			// see ryftmux search engine for "--internal-cluster-mode" flag
+			if flag, ok := dstat.Extra["--internal-cluster-mode"]; ok {
+				delete(dstat.Extra, "--internal-cluster-mode") // clean-up
+				if v, ok := flag.(bool); ok && v {
+					data = append(data, d)
+				}
+			}
+		}
+	}
+
+	// get main data
+	if d := stat.GetSessionData(); d != nil {
+		data = append(data, d)
+	}
+
+	session.SetData("info", data)
+	stat.ClearSessionData(true)
 }

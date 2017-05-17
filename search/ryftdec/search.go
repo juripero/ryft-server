@@ -269,6 +269,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 			mux.Stat.AddPerfStat("ryftdec", metrics)
 		}
+
+		if mux.Stat != nil {
+			mux.Stat.AddSessionData("index", task.config.KeepIndexAs)
+			mux.Stat.AddSessionData("data", task.config.KeepDataAs)
+			mux.Stat.AddSessionData("view", task.config.KeepViewAs)
+			mux.Stat.AddSessionData("delim", task.config.Delimiter)
+			mux.Stat.AddSessionData("width", task.config.Width)
+			mux.Stat.AddSessionData("matches", mux.Stat.Matches)
+		}
 	}()
 
 	return mux, nil // OK for now

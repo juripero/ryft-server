@@ -175,6 +175,7 @@ WaitLoop:
 						// create multiplexed statistics
 						mux.Stat = search.NewStat(engine.IndexHost)
 					}
+					res.Stat.Extra["--internal-cluster-mode"] = true // ! mark for sessions
 					mux.Stat.Merge(res.Stat)
 				}
 				finished[res] = true

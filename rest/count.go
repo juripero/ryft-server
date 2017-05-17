@@ -241,20 +241,13 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					res.Stat.AddPerfStat("rest-count", metrics)
 				}
 
-				if session != nil { // session
-					// TODO: cluster information
-					session.SetData("local", map[string]interface{}{
-						"data":  cfg.KeepDataAs,
-						"index": cfg.KeepIndexAs,
-						//"view": cfg.KeepViewAs,
-						"delim":   cfg.Delimiter,
-						"width":   cfg.Width,
-						"matches": res.Stat.Matches,
-					})
+				if session != nil && !params.InternalNoSessionId { // session
+					updateSession(session, res.Stat)
 					token, err := session.Token(server.Config.Sessions.Secret)
 					if err != nil {
 						panic(err)
 					}
+					log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
 					res.Stat.Extra["session"] = token
 				}
 
