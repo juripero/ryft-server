@@ -133,9 +133,9 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.KeepDataAs = params.KeepDataAs
-	cfg.KeepIndexAs = params.KeepIndexAs
-	cfg.KeepViewAs = params.KeepViewAs
+	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
+	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
+	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
