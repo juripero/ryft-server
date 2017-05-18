@@ -116,7 +116,6 @@ func (mw *Middleware) Authentication() gin.HandlerFunc {
 		h := c.Request.Header.Get("Authorization")
 
 		username, password, ok, err := parseBasicAuth(h)
-
 		if ok && err == nil { // basic authentication
 			user := mw.provider.Verify(username, password)
 			if user == nil {

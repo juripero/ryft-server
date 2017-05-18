@@ -414,9 +414,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, map[string]interface{}, error) {
 	res := make(map[string]interface{})
 	status := http.StatusOK
-	if hostname, err := os.Hostname(); err == nil {
-		res["hostname"] = hostname
-	}
+	res["hostname"] = s.Config.HostName
 
 	if len(params.Catalog) != 0 { // append to catalog
 		catalog, filePath, length, err := updateCatalog(mountPoint, params, delim, file)

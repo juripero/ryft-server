@@ -278,7 +278,6 @@ func main() {
 	if authProvider != nil {
 		mw := auth.NewMiddleware(authProvider, "")
 		secret, err := auth.ParseSecret(server.Config.AuthJwt.Secret)
-
 		if err != nil {
 			log.WithError(err).Fatal("Failed to parse JWT secret")
 		}

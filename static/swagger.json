@@ -811,10 +811,16 @@
       }
     },
     "RenameResponse": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "type": "string"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          }
         }
       }
     },
@@ -842,10 +848,16 @@
       }
     },
     "DeleteFilesResponse": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "type": "string"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          }
         }
       }
     },

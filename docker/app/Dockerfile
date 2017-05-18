@@ -16,7 +16,7 @@ EXPOSE 8765
 COPY .tmp/ryft-server /ryft-server
 COPY etc/ryft-server.ryftprim.conf /etc/ryft-server.conf
 COPY etc/ryft-users.yaml /etc/ryft-users.yaml
-COPY ryftprim /usr/bin/ryftprim
+COPY ryftprim.ssh /usr/bin/ryftprim
 COPY run.sh /run.sh
 
 RUN groupadd ryftuser && \
