@@ -35,6 +35,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -67,6 +68,7 @@ type SearchParams struct {
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	KeepViewAs  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
+	Lifetime    string `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
 	Limit       int    `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	// post-process transformations
@@ -165,6 +167,12 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
+	if len(params.Lifetime) > 0 {
+		if cfg.Lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse lifetime"))
+		}
+	}
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)
 	cfg.Limit = uint(params.Limit)
@@ -294,6 +302,11 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			if params.Stats && res.Stat != nil {
 				if server.Config.ExtraRequest {
 					res.Stat.Extra["request"] = &params
+				}
+
+				if cfg.Lifetime != 0 {
+					// delete output INDEX&DATA&VIEW files later
+					server.cleanupSession(homeDir, cfg)
 				}
 
 				if params.Performance {
@@ -467,4 +480,26 @@ func updateSession(session *Session, stat *search.Stat) {
 
 	session.SetData("info", data)
 	stat.ClearSessionData(true)
+}
+
+// mark output files to delete later
+func (server *Server) cleanupSession(homeDir string, cfg *search.Config) {
+	mountPoint, _ := server.getMountPoint(homeDir)
+	now := time.Now()
+
+	if len(cfg.KeepIndexAs) != 0 {
+		server.addJob("delete-file",
+			filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
+			now.Add(cfg.Lifetime))
+	}
+	if len(cfg.KeepDataAs) != 0 {
+		server.addJob("delete-file",
+			filepath.Join(mountPoint, homeDir, cfg.KeepDataAs),
+			now.Add(cfg.Lifetime))
+	}
+	if len(cfg.KeepViewAs) != 0 {
+		server.addJob("delete-file",
+			filepath.Join(mountPoint, homeDir, cfg.KeepViewAs),
+			now.Add(cfg.Lifetime))
+	}
 }

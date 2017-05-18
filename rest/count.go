@@ -64,6 +64,7 @@ type CountParams struct {
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	KeepViewAs  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
+	Lifetime    string `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
@@ -137,6 +138,12 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
+	if len(params.Lifetime) > 0 {
+		if cfg.Lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse lifetime"))
+		}
+	}
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
 	// cfg.Limit = 0
@@ -229,6 +236,11 @@ func (server *Server) DoCount(ctx *gin.Context) {
 				if server.Config.ExtraRequest {
 					// save request parameters in "extra"
 					res.Stat.Extra["request"] = &params
+				}
+
+				if cfg.Lifetime != 0 {
+					// delete output INDEX&DATA&VIEW files later
+					server.cleanupSession(homeDir, cfg)
 				}
 
 				if params.Performance {

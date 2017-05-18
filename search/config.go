@@ -33,6 +33,7 @@ package search
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -57,6 +58,7 @@ type Config struct {
 	KeepIndexAs string
 	KeepViewAs  string
 	Delimiter   string
+	Lifetime    time.Duration
 
 	// post-processing transformations
 	Transforms []Transform

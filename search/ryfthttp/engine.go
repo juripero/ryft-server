@@ -133,6 +133,9 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	if len(cfg.Delimiter) != 0 {
 		q.Set("delimiter", cfg.Delimiter)
 	}
+	if cfg.Lifetime != 0 {
+		q.Set("lifetime", cfg.Lifetime.String())
+	}
 	if cfg.Limit > 0 {
 		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
 	}
