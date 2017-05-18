@@ -77,65 +77,6 @@ type SearchShowParams struct {
 	updateHostTo   string
 }
 
-// Apply data from session token
-func (p *SearchShowParams) applySession(session *Session) error {
-	localData_ := session.GetData("local")
-	if localData_ == nil {
-		return nil // nothing to apply
-	}
-
-	localData, ok := localData_.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("bad session type")
-	}
-
-	// INDEX
-	if len(p.IndexFile) == 0 {
-		if v, ok := localData["index"]; ok {
-			if vv, err := utils.AsString(v); err != nil {
-				return fmt.Errorf(`failed to get "index" file: %s`, err)
-			} else if len(vv) != 0 {
-				p.IndexFile = vv
-			}
-		}
-	}
-
-	// DATA
-	if len(p.DataFile) == 0 {
-		if v, ok := localData["data"]; ok {
-			if vv, err := utils.AsString(v); err != nil {
-				return fmt.Errorf(`failed to get "data" file: %s`, err)
-			} else if len(vv) != 0 {
-				p.DataFile = vv
-			}
-		}
-	}
-
-	// VIEW
-	if len(p.ViewFile) == 0 {
-		if v, ok := localData["view"]; ok {
-			if vv, err := utils.AsString(v); err != nil {
-				return fmt.Errorf(`failed to get "view" file: %s`, err)
-			} else if len(vv) != 0 {
-				p.ViewFile = vv
-			}
-		}
-	}
-
-	// delimiter
-	if len(p.Delimiter) == 0 {
-		if v, ok := localData["delim"]; ok {
-			if vv, err := utils.AsString(v); err != nil {
-				return fmt.Errorf(`failed to get "delim": %s`, err)
-			} else if len(vv) != 0 {
-				p.Delimiter = vv
-			}
-		}
-	}
-
-	return nil // OK
-}
-
 // Handle /search/show endpoint.
 func (server *Server) DoSearchShow(ctx *gin.Context) {
 	// recover from panics if any
@@ -222,7 +163,16 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	params.relativeToHome = mountPoint
 	params.updateHostTo = server.Config.HostName
 	if params.Local || len(sessionInfo) <= 1 {
-		res, err = doLocalSearchShow(mountPoint, params)
+		nodes, err := server.searchShowGetNodes(sessionInfo, params)
+		if err != nil {
+			panic(NewError(http.StatusInternalServerError, err.Error()).
+				WithDetails("failed to get cluster nodes"))
+		}
+		for _, node := range nodes {
+			if node.isLocal {
+				res, err = doLocalSearchShow(mountPoint, node.params)
+			}
+		}
 	} else {
 		nodes, err := server.searchShowGetNodes(sessionInfo, params)
 		if err != nil {
@@ -233,6 +183,10 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	}
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get search results"))
+	}
+	if res == nil {
+		panic(NewError(http.StatusInternalServerError, "no results available").
 			WithDetails("failed to get search results"))
 	}
 
@@ -661,13 +615,33 @@ type nodeSearchShow struct {
 // get nodes according to incoming info and offset/count
 func (s *Server) searchShowGetNodes(info []interface{}, params SearchShowParams) ([]nodeSearchShow, error) {
 	params.Session = ""
-	res := make([]nodeSearchShow, 0)
+	res := make([]nodeSearchShow, 0, len(info))
 	if len(info) <= 1 {
-		res = append(res, nodeSearchShow{
+		nss := nodeSearchShow{
 			isLocal: true,
 			nodeUrl: "", // not used
 			params:  params,
-		})
+		}
+
+		if len(info) != 0 {
+			node_ := info[0]
+			if node, ok := node_.(map[string]interface{}); ok {
+				if len(nss.params.DataFile) == 0 {
+					nss.params.DataFile, _ = utils.AsString(node["data"])
+				}
+				if len(nss.params.IndexFile) == 0 {
+					nss.params.IndexFile, _ = utils.AsString(node["index"])
+				}
+				if len(nss.params.ViewFile) == 0 {
+					nss.params.ViewFile, _ = utils.AsString(node["view"])
+				}
+				if len(nss.params.Delimiter) == 0 {
+					nss.params.Delimiter, _ = utils.AsString(node["delim"])
+				}
+			}
+		}
+
+		res = append(res, nss)
 	} else {
 		log.Debugf("requested range [%d..%d)", params.Offset, params.Offset+params.Count)
 		// TODO: case if params.Count = 0 - means from offset till the END
