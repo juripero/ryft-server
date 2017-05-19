@@ -99,14 +99,21 @@
             "type": "string",
             "x-go-name": "Data",
             "name": "data",
-            "description": "Name of data file to keep. WARNING: file will be overriden!"
+            "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
             "type": "string",
             "name": "index",
             "x-go-name": "Index",
-            "description": "Name of index file to keep. WARNING: file will be overriden!"
+            "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
@@ -114,6 +121,13 @@
             "name": "delimiter",
             "x-go-name": "Delimiter",
             "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "x-go-name": "Lifetime",
+            "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
           },
           {
             "in": "query",
@@ -193,7 +207,7 @@
       "get": {
         "description": "Endpoint for the count. Does the search but returns just statistics.",
         "tags": [
-          "count"
+          "search"
         ],
         "summary": "Count the search matches",
         "operationId": "count",
@@ -263,14 +277,21 @@
             "type": "string",
             "x-go-name": "Data",
             "name": "data",
-            "description": "Name of data file to keep. WARNING: file will be overriden!"
+            "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
             "type": "string",
             "name": "index",
             "x-go-name": "Index",
-            "description": "Name of index file to keep. WARNING: file will be overriden!"
+            "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
@@ -278,6 +299,13 @@
             "name": "delimiter",
             "x-go-name": "Delimiter",
             "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "x-go-name": "Lifetime",
+            "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
           },
           {
             "in": "query",
@@ -328,10 +356,120 @@
         }
       }
     },
+    "/search/show": {
+      "get": {
+        "description": "Endpoint to access search results. Reads already existing search results.",
+        "tags": [
+          "search"
+        ],
+        "produces": [
+          "application/json",
+          "text/csv"
+        ],
+        "summary": "Read search results",
+        "operationId": "searchShow",
+        "parameters": [
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint",
+            "name": "offset",
+            "x-go-name": "Offset",
+            "description": "Offset of first record to report."
+          },
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint",
+            "name": "count",
+            "x-go-name": "Count",
+            "description": "Total number of records to report."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "format",
+            "x-go-name": "Format",
+            "description": "Input data format. Parameter is used with structured or RAW text search.",
+            "enum": ["raw", "xml", "json", "utf8", "null"]
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "fields",
+            "x-go-name": "Fields",
+            "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Session",
+            "name": "session",
+            "description": "Session token to access search results."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Data",
+            "name": "data",
+            "description": "Name of DATA file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "index",
+            "x-go-name": "Index",
+            "description": "Name of INDEX file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "x-go-name": "Delimiter",
+            "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "x-go-name": "Local",
+            "description": "Perform search only on this cluster member. Default 'false'."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "performance",
+            "x-go-name": "Performance",
+            "description": "Include performance metrics in response. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "schema": {
+              "$ref": "#/definitions/SearchResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/rename": {
       "put": {
         "tags": [
-          "rename"
+          "files"
         ],
         "summary": "Change file/directory/catalog name or file name in catalog",
         "description": "Endpoint for the file renaming",
@@ -499,7 +637,7 @@
             "in": "query",
             "type": "string",
             "name": "lifetime",
-            "description": "The file or catalog lifetime, for example '2h'."
+            "description": "The file or catalog lifetime, for example \"2h\"."
           },
           {
             "in": "query",
@@ -656,7 +794,7 @@
     "/token/refresh": {
       "get": {
         "tags": [
-          "token_refresh"
+          "login"
         ],
         "summary": "Refresh authentication",
         "description": "Endpoint to refresh existing authentication token",

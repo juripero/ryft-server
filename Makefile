@@ -3,7 +3,7 @@ ASSETS = bindata.go
 BINARIES = ryft-server
 HINT=ryft-server
 
-all: $(ASSETS) build
+all: $(ASSETS) build version
 
 ifeq (${VERSION},)
   VERSION=$(shell git describe --tags)

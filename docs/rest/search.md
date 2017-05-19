@@ -36,9 +36,11 @@ The list of supported query parameters are the following (check detailed descrip
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
-| `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
-| `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
+| `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
+| `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
+| `view`        | string  | [The name of VIEW file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `lifetime`    | string  | [The output files lifetime](#search-lifetime-parameter). |
 | `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
@@ -274,6 +276,29 @@ Using the second parameter `index=index.txt` keeps the search index file under `
 NOTE: According to Ryft API documentation, an index file should always have `.txt` extension!
 
 **WARNING:** Provided data or index files will be overriden!
+
+In some cases the output Ryft results can be additionally indexed to the
+so called VIEW file - a binary index cache. This VIEW file allows quick
+search result access at random position. The `view=view.bin` paramter
+will save this VIEW file into `/ryftone/view.bin` file.
+
+All filenames can contain special `{{random}}` keyword to put piece of unique
+data into filename. For example `data=my-data-{{random}}.txt`.
+
+
+### Search `lifetime` parameter
+
+By default all output files should be deleted manually. But it's possible to
+specify output files lifetime with `lifetime=` parameter.
+
+For example, if `lifetime=1h` is provided then output DATA and INDEX files
+will be avialable during one hour and then will be automatically deleted by
+the REST service.
+
+The following suffixes are supported:
+- `h` for hours, for example `lifetime=2h`
+- `m` for minutes, for example `lifetime=20m`
+- `s` for seconds, for example `lifetime=200s`
 
 
 ### Search `delimiter` parameter
@@ -583,9 +608,11 @@ The list of supported query parameters are the following:
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
-| `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
-| `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
+| `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
+| `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
+| `view`        | string  | [The name of VIEW file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `lifetime`    | string  | [The output files lifetime](#search-lifetime-parameter). |
 | `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
