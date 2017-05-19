@@ -328,6 +328,116 @@
         }
       }
     },
+    "/search/show": {
+      "get": {
+        "description": "Endpoint to access search results. Reads already existing search results.",
+        "tags": [
+          "search"
+        ],
+        "produces": [
+          "application/json",
+          "text/csv"
+        ],
+        "summary": "Read search results",
+        "operationId": "searchShow",
+        "parameters": [
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint",
+            "name": "offset",
+            "x-go-name": "Offset",
+            "description": "Offset of first record to report."
+          },
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint",
+            "name": "count",
+            "x-go-name": "Count",
+            "description": "Total number of records to report."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "format",
+            "x-go-name": "Format",
+            "description": "Input data format. Parameter is used with structured or RAW text search.",
+            "enum": ["raw", "xml", "json", "utf8", "null"]
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "fields",
+            "x-go-name": "Fields",
+            "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Session",
+            "name": "session",
+            "description": "Session token to access search results."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Data",
+            "name": "data",
+            "description": "Name of DATA file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "index",
+            "x-go-name": "Index",
+            "description": "Name of INDEX file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "x-go-name": "Delimiter",
+            "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "x-go-name": "Local",
+            "description": "Perform search only on this cluster member. Default 'false'."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "performance",
+            "x-go-name": "Performance",
+            "description": "Include performance metrics in response. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "schema": {
+              "$ref": "#/definitions/SearchResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/rename": {
       "put": {
         "tags": [
@@ -837,20 +947,28 @@
       "items": {
         "type": "object",
         "properties": {
-          "length": {
-            "type": "integer"
-          },
-          "offset": {
-            "type": "integer"
-          },
-          "path": {
-            "type": "string"
-          },
           "hostname": {
             "type": "string"
           },
           "error": {
             "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "length": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "path": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              }
+            }
           }
         }
       }

@@ -124,7 +124,6 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 	// based of these tags determine the list of nodes having such file|dir|catalog.
 	// for each node (with non empty list) call DELETE /files passing
 	// list of files whose tags are matched.
-	result := make(map[string]interface{})
 	results := []map[string]interface{}{}
 
 	if !params.Local && !server.Config.LocalOnly && !params.isEmpty() {
@@ -201,11 +200,11 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 		// wait and report all results
 		wg.Wait()
 		for _, node := range nodes {
-			result["hostname"] = node.Name
-
 			if node.Params.isEmpty() {
 				continue // nothing to do
 			}
+			result := make(map[string]interface{})
+			result["hostname"] = node.Name
 			if node.Error != nil {
 				result["error"] = node.Error.Error()
 			} else {
@@ -213,15 +212,14 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 			}
 			results = append(results, result)
 		}
-
 	} else {
+		result := make(map[string]interface{})
 		result["hostname"] = server.Config.HostName
 		if details := server.deleteLocalFiles(mountPoint, params); len(details) > 0 {
 			result["details"] = details
 		}
 		results = append(results, result)
 	}
-
 	ctx.JSON(http.StatusOK, results)
 }
 

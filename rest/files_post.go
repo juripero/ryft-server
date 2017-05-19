@@ -234,7 +234,6 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		}
 	}
 
-	result := map[string]interface{}{}
 	results := []map[string]interface{}{}
 
 	log.WithField("params", params).
@@ -365,12 +364,14 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 				if node.Error != nil {
 					results = append(results, map[string]interface{}{
-						"error":    node.Error.Error(),
 						"hostname": node.Name,
+						"error":    node.Error.Error(),
 					})
 				} else {
-					node.Result["hostname"] = node.Name
-					results = append(results, node.Result)
+					results = append(results, map[string]interface{}{
+						"hostname": node.Name,
+						"details":  node.Result,
+					})
 				}
 			}
 		} else {
@@ -378,10 +379,12 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				if node.Params.isEmpty() {
 					continue // nothing to do
 				}
-
+				result := map[string]interface{}{}
+				result["hostname"] = node.Name
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("*copying on local node")
-					_, node.Result, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, file)
+					// hide error response because result already contains that
+					_, node.Result, _ = s.postLocalFiles(mountPoint, node.Params, delim, file)
 				} else {
 					log.WithField("what", node.Params).
 						WithField("node", node.Name).
@@ -391,20 +394,21 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				}
 
 				if node.Error != nil {
-					results = append(results, map[string]interface{}{
-						"error":    err.Error(),
-						"hostname": node.Name,
-					})
+					result["error"] = err.Error()
 				} else {
-					node.Result["hostname"] = node.Name
-					results = append(results, node.Result)
+					result["details"] = node.Result
 				}
+				results = append(results, result)
 				break // one node enough
 			}
 		}
 	} else {
+		result := map[string]interface{}{}
 		status, result, _ = s.postLocalFiles(mountPoint, params, delim, file)
-		results = append(results, result)
+		results = append(results, map[string]interface{}{
+			"hostname": s.Config.HostName,
+			"details":  result,
+		})
 	}
 
 	ctx.JSON(status, results)
@@ -414,8 +418,6 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, map[string]interface{}, error) {
 	res := make(map[string]interface{})
 	status := http.StatusOK
-	res["hostname"] = s.Config.HostName
-
 	if len(params.Catalog) != 0 { // append to catalog
 		catalog, filePath, length, err := updateCatalog(mountPoint, params, delim, file)
 
@@ -433,11 +435,9 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			res["file"] = filePath
 			res["length"] = length // not total, just this part
 		}
-
 		return status, res, err
 	} else { // standalone file
 		path, offset, length, err := createFile(mountPoint, params, file)
-
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
 			res["error"] = err.Error()
@@ -453,7 +453,6 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			res["length"] = length
 			res["offset"] = offset
 		}
-
 		return status, res, err
 	}
 }
