@@ -32,6 +32,8 @@ func TestDeleteDirs(t *testing.T) {
 		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
 	}()
 
+	hostname := fs.server.Config.HostName
+
 	os.MkdirAll(filepath.Join(fs.homeDir(), "foo/empty-dir"), 0755)
 	os.MkdirAll(filepath.Join(fs.homeDir(), "foo/dir"), 0755)
 
@@ -48,15 +50,15 @@ func TestDeleteDirs(t *testing.T) {
 
 	// OK to delete non-existing directories
 	check([]string{"non_existing_dir", "non_existing_dir2"}, http.StatusOK,
-		`{}`)
+		`[{"hostname":"`+hostname+`"}]`)
 
 	// OK to delete empty directory
 	check([]string{"foo/empty-dir"}, http.StatusOK,
-		`{"foo/empty-dir":"OK"}`)
+		`[{"details": {"foo/empty-dir":"OK"}, "hostname":"`+hostname+`"}]`)
 
 	// OK to delete non-empty directory
 	check([]string{"foo"}, http.StatusOK,
-		`{"foo":"OK"}`)
+		`[{"details": {"foo":"OK"}, "hostname":"`+hostname+`"}]`)
 }
 
 // DELETE files
@@ -67,6 +69,8 @@ func TestDeleteFiles(t *testing.T) {
 
 	fs := newFake()
 	defer fs.cleanup()
+
+	hostname := fs.server.Config.HostName
 
 	go func() {
 		err := fs.worker.ListenAndServe()
@@ -98,15 +102,15 @@ func TestDeleteFiles(t *testing.T) {
 
 	// OK to delete non-existing files
 	check([]string{"/non_existing_file", "/non_existing_file2"}, http.StatusOK,
-		`{}`)
+		`[{"hostname":"`+hostname+`"}]`)
 
 	// OK to delete specific files
 	check([]string{"/foo/dir/file0.txt", "/foo/dir/file1.txt"}, http.StatusOK,
-		`{"foo/dir/file0.txt":"OK", "foo/dir/file1.txt":"OK"}`)
+		`[{"details": {"foo/dir/file0.txt":"OK", "foo/dir/file1.txt":"OK"}, "hostname": "`+hostname+`"}]`)
 
 	// OK to delete by mask
 	check([]string{"/foo/dir/*.txt"}, http.StatusOK,
-		`{"foo/dir/file2.txt":"OK", "foo/dir/file3.txt":"OK", "foo/dir/file4.txt":"OK"}`)
+		`[{"details": {"foo/dir/file2.txt":"OK", "foo/dir/file3.txt":"OK", "foo/dir/file4.txt":"OK"}, "hostname": "`+hostname+`"}]`)
 }
 
 // DELETE catalogs

@@ -815,11 +815,19 @@
       "items": {
         "type": "object",
         "properties": {
-          "path": {
-            "type": "string"
-          },
           "hostname": {
             "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            }
           }
         }
       }
@@ -852,11 +860,19 @@
       "items": {
         "type": "object",
         "properties": {
-          "path": {
-            "type": "string"
-          },
           "hostname": {
             "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            }
           }
         }
       }

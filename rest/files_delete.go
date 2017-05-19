@@ -124,8 +124,9 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 	// based of these tags determine the list of nodes having such file|dir|catalog.
 	// for each node (with non empty list) call DELETE /files passing
 	// list of files whose tags are matched.
-
 	result := make(map[string]interface{})
+	results := []map[string]interface{}{}
+
 	if !params.Local && !server.Config.LocalOnly && !params.isEmpty() {
 		services, tags, err := server.getConsulInfoForFiles(userTag, params.Files)
 		if err != nil || len(tags) != len(params.Files) {
@@ -139,7 +140,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 			Address string
 			Params  DeleteFilesParams
 
-			Result interface{}
+			Result map[string]interface{}
 			Error  error
 		}
 
@@ -200,30 +201,33 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 		// wait and report all results
 		wg.Wait()
 		for _, node := range nodes {
+			result["hostname"] = node.Name
+
 			if node.Params.isEmpty() {
 				continue // nothing to do
 			}
-
 			if node.Error != nil {
-				result[node.Name] = map[string]interface{}{
-					"error": node.Error.Error(),
-				}
+				result["error"] = node.Error.Error()
 			} else {
-				result[node.Name] = node.Result
+				result["details"] = node.Result
 			}
+			results = append(results, result)
 		}
 
 	} else {
-		result = server.deleteLocalFiles(mountPoint, params)
+		result["hostname"] = server.Config.HostName
+		if details := server.deleteLocalFiles(mountPoint, params); len(details) > 0 {
+			result["details"] = details
+		}
+		results = append(results, result)
 	}
 
-	ctx.JSON(http.StatusOK, result)
+	ctx.JSON(http.StatusOK, results)
 }
 
 // delete local nodes: files, dirs, catalogs
 func (s *Server) deleteLocalFiles(mountPoint string, params DeleteFilesParams) map[string]interface{} {
 	res := make(map[string]interface{})
-
 	updateResult := func(name string, err error) {
 		// in case of duplicate input
 		// last result will be reported
