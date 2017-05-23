@@ -206,7 +206,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		keepDataAs := cfg.KeepDataAs
 		keepIndexAs := cfg.KeepIndexAs
-		// keepViewAs := cfg.KeepViewAs
+		keepViewAs := cfg.KeepViewAs
 		delimiter := cfg.Delimiter
 
 		searchStart := time.Now()
@@ -240,7 +240,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		drainStart := time.Now()
 		err = task.result.DrainFinalResults(task, mux,
-			keepDataAs, keepIndexAs, delimiter,
+			keepDataAs, keepIndexAs, delimiter, keepViewAs,
 			filepath.Join(opts.MountPoint, opts.HomeDir),
 			res.Output, findLastFilter(task.rootQuery))
 		if err != nil {

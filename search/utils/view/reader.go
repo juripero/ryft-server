@@ -84,12 +84,17 @@ func Open(path string) (*Reader, error) {
 	return r, nil
 }
 
+// Count returns number of items
+func (r *Reader) Count() uint64 {
+	return r.itemCount
+}
+
 // Get gets record by index from the VIEW file.
 func (r *Reader) Get(pos int64) (indexBeg, indexEnd int64, dataBeg, dataEnd int64, err error) {
 	if pos < 0 || pos >= int64(r.itemCount) {
 		return -1, -1, -1, -1, fmt.Errorf("VIEW out of range: %d of %d", pos, r.itemCount)
 	}
-	//fmt.Printf("get #%d: ", pos)
+	//fmt.Printf("VIEW/reader: get #%d (rpos:%d): ", pos, r.rpos)
 
 	// find item location
 	fpos := headerSize + pos*itemSize
@@ -100,6 +105,7 @@ func (r *Reader) Get(pos int64) (indexBeg, indexEnd int64, dataBeg, dataEnd int6
 			if _, err := r.buf.Discard(int(n)); err != nil {
 				return -1, -1, -1, -1, fmt.Errorf("failed to seek VIEW file: %s", err)
 			}
+			r.rpos += n
 		}
 	} else {
 		// base case. read before buffer or too far after...

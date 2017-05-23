@@ -44,6 +44,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/getryft/ryft-server/search/utils/query"
+	"github.com/getryft/ryft-server/search/utils/view"
 )
 
 var (
@@ -141,7 +142,7 @@ type PostProcessing interface {
 	AddCatalog(base *catalog.Catalog) error
 
 	DrainFinalResults(task *Task, mux *search.Result,
-		keepDataAs, keepIndexAs, delimiter string,
+		keepDataAs, keepIndexAs, delimiter, keepViewAs string,
 		mountPointAndHomeDir string,
 		ryftCalls []RyftCall,
 		filter string) error
@@ -559,7 +560,7 @@ func (p memItems) Less(i, j int) bool {
 
 // DrainFinalResults drain final results
 func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result,
-	keepDataAs, keepIndexAs, delimiter string, home string,
+	keepDataAs, keepIndexAs, delimiter, keepViewAs string, home string,
 	ryftCalls []RyftCall, filter string) error {
 
 	start := time.Now()
@@ -701,6 +702,21 @@ BuildItems:
 		}()
 	}
 
+	// output VIEW file
+	var viewFile *view.Writer
+	var indexPos, dataPos int64
+	if len(keepViewAs) > 0 {
+		f, err := view.Create(filepath.Join(home, keepViewAs))
+		if err != nil {
+			return fmt.Errorf("failed to create VIEW file: %s", err)
+		}
+		viewFile = f
+		defer func() {
+			viewFile.Update(indexPos, dataPos)
+			viewFile.Close()
+		}()
+	}
+
 	// cached input DATA files
 	type CachedFile struct {
 		f   *os.File
@@ -811,6 +827,8 @@ ItemsLoop:
 		}
 
 		// output DATA file
+		dataBeg := dataPos
+		dataEnd := dataPos + int64(len(recRawData))
 		if datFile != nil {
 			start := time.Now()
 			n, err := datFile.Write(recRawData)
@@ -832,8 +850,11 @@ ItemsLoop:
 			}
 			datFileTime += time.Since(start)
 		}
+		dataPos += int64(len(recRawData) + len(delimiter))
 
 		// output INDEX file
+		indexBeg := indexPos
+		indexEnd := indexBeg
 		if idxFile != nil {
 			start := time.Now()
 			indexStr := fmt.Sprintf("%s,%d,%d,%d\n", item.Index.File, item.Index.Offset, item.Index.Length, item.Index.Fuzziness)
@@ -842,7 +863,18 @@ ItemsLoop:
 				mux.ReportError(fmt.Errorf("failed to write INDEX: %s", err))
 				// file is corrupted, any sense to continue?
 			}
+			indexEnd += int64(len(indexStr))
+			indexPos += int64(len(indexStr))
 			idxFileTime += time.Since(start)
+		}
+
+		// output VIEW file
+		if viewFile != nil {
+			err := viewFile.Put(indexBeg, indexEnd, dataBeg, dataEnd)
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to write VIEW: %s", err))
+				// any sense to continue?
+			}
 		}
 
 		if reportRecords {

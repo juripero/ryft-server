@@ -191,6 +191,11 @@ func (engine *Engine) prepare(task *Task) error {
 		args = append(args, "-od", engine.relativeToMountPoint(task.DataFileName))
 	}
 
+	// VIEW output file
+	if len(cfg.KeepViewAs) != 0 {
+		task.ViewFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)
+	}
+
 	// assign command line
 	task.toolArgs = args
 	return nil // OK
@@ -414,6 +419,16 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 
 		task.log().Debugf("[%s]: done reading", TAG)
+	} else {
+		// it's /count, check if we have to create VIEW file
+		if len(task.ViewFileName) != 0 {
+			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter); err != nil {
+				task.log().WithError(err).WithField("path", task.ViewFileName).
+					Warnf("[%s]: failed to create VIEW file", TAG)
+				res.ReportError(fmt.Errorf("failed to create VIEW file: %s", err))
+			}
+			// TODO: report in performance metric
+		}
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing

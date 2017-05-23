@@ -47,6 +47,7 @@ import (
 	my_format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/view"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -162,8 +163,10 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 
 	params.relativeToHome = mountPoint
 	params.updateHostTo = server.Config.HostName
+
 	if params.Local || len(sessionInfo) <= 1 {
-		nodes, err := server.searchShowGetNodes(sessionInfo, params)
+		var nodes []nodeSearchShow
+		nodes, err = server.searchShowGetNodes(sessionInfo, params)
 		if err != nil {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
 				WithDetails("failed to get cluster nodes"))
@@ -171,10 +174,12 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 		for _, node := range nodes {
 			if node.isLocal {
 				res, err = doLocalSearchShow(mountPoint, node.params)
+				break
 			}
 		}
 	} else {
-		nodes, err := server.searchShowGetNodes(sessionInfo, params)
+		var nodes []nodeSearchShow
+		nodes, err = server.searchShowGetNodes(sessionInfo, params)
 		if err != nil {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
 				WithDetails("failed to get cluster nodes"))
@@ -447,8 +452,223 @@ func doLocalSearchShowNoView(mountPoint string, params SearchShowParams) (*searc
 
 // do local show (view file)
 func doLocalSearchShowView(mountPoint string, params SearchShowParams) (*search.Result, error) {
-	return doLocalSearchShowView(mountPoint, params)
-	// return nil, fmt.Errorf("NOT IMPLEMENTED YET")
+	var idxFd, datFd *os.File
+	var idxRd, datRd *bufio.Reader
+	var indexPos int64 // INDEX read position
+	var dataPos int64  // DATA read position
+
+	// INDEX file reader
+	if idxRd == nil {
+		// try to open INDEX file
+		f, err := os.Open(filepath.Join(mountPoint, params.IndexFile))
+		if err != nil {
+			return nil, fmt.Errorf("failed to open INDEX file: %s", err)
+		}
+
+		idxFd, idxRd = f, bufio.NewReaderSize(f, 256*1024)
+		// log.Debugf("[%s/show]: open INDEX at: %s", CORE, f.Name())
+	}
+
+	// DATA file reader
+	if datRd == nil && len(params.DataFile) != 0 {
+		// try to open DATA file
+		f, err := os.Open(filepath.Join(mountPoint, params.DataFile))
+		if err != nil {
+			return nil, fmt.Errorf("failed to open DATA file: %s", err)
+		}
+
+		datFd, datRd = f, bufio.NewReaderSize(f, 256*1024)
+		// log.Debugf("[%s/show]: open DATA at: %s", CORE, f.Name())
+	}
+
+	// VIEW file reader
+	var viewRd *view.Reader
+	if viewRd == nil && len(params.ViewFile) != 0 {
+		f, err := view.Open(filepath.Join(mountPoint, params.ViewFile))
+		if err != nil {
+			return nil, fmt.Errorf("failed to open VIEW file: %s", err)
+		}
+
+		viewRd = f
+	}
+
+	res := search.NewResult()
+	go func() {
+		defer res.Close()
+		defer res.ReportDone()
+
+		// close at the end
+		if idxFd != nil {
+			defer idxFd.Close()
+		}
+		if datFd != nil {
+			defer datFd.Close()
+		}
+		if viewRd != nil {
+			defer viewRd.Close()
+		}
+
+		// buffer to check delimiter
+		delim := make([]byte, len(params.Delimiter))
+
+		// adjust count: if zero - get rest of records
+		if n := viewRd.Count(); true {
+			if params.Count == 0 {
+				params.Count = n
+			}
+
+			// limit count to available number of items
+			if params.Offset+params.Count > n {
+				params.Count = n - params.Offset
+			}
+		}
+
+		var i uint64
+		for i = 0; i < params.Count && !res.IsCancelled(); i++ {
+			indexBeg, indexEnd, dataBeg, dataEnd, err := viewRd.Get(int64(i + params.Offset))
+			if err != nil {
+				res.ReportError(fmt.Errorf("failed to read VIEW: %s", err))
+				return // FAILED
+			}
+
+			// read INDEX line
+			if n := int(indexBeg - indexPos); n >= 0 && n < idxRd.Buffered() {
+				if n != 0 {
+					// we are within one buffer range, so just discard
+					//fmt.Printf("discarding %d bytes", n)
+					if _, err := idxRd.Discard(n); err != nil {
+						res.ReportError(fmt.Errorf("failed to seek INDEX file: %s", err))
+						return // FAILED
+					}
+				}
+			} else {
+				// base case. read before buffer or too far after...
+				//fmt.Printf("seek to %d bytes (rpos: %d)", fpos, r.rpos)
+				if _, err := idxFd.Seek(indexBeg, io.SeekStart); err != nil {
+					res.ReportError(fmt.Errorf("failed to seek INDEX file: %s", err))
+					return // FAILED
+				}
+
+				// have to reset buffer
+				idxRd.Reset(idxFd)
+				indexPos = indexBeg
+			}
+
+			line := make([]byte, int(indexEnd-indexBeg))
+			_, err = io.ReadFull(idxRd, line)
+			if err != nil {
+				if err == io.EOF && 0 == len(line) {
+					return // DONE
+				} else {
+					res.ReportError(fmt.Errorf("failed to read INDEX(view): %s", err))
+					return // FAILED
+				}
+			}
+			indexPos += int64(len(line))
+
+			// parse index
+			index, err := search.ParseIndex(line)
+			if err != nil {
+				res.ReportError(fmt.Errorf("failed to parse INDEX: %s", err))
+				return // FAILED
+			}
+
+			//log.Debugf("[%s/show]: read INDEX: %s", CORE, index)
+
+			var data []byte
+			if datRd != nil {
+				if index.Length != uint64(dataEnd-dataBeg) {
+					res.ReportError(fmt.Errorf("INDEX and VIEW mismatch: %d != %d (expected)", dataEnd-dataBeg, index.Length))
+					return // FAILED
+				}
+
+				if n := int(dataBeg - dataPos); n >= 0 && n < datRd.Buffered() {
+					if n != 0 {
+						// we are within one buffer range, so just discard
+						//fmt.Printf("DATA: discarding %d bytes", n)
+						if _, err := datRd.Discard(n); err != nil {
+							res.ReportError(fmt.Errorf("failed to seek DATA file: %s", err))
+							return // FAILED
+						}
+					}
+				} else {
+					// base case. read before buffer or too far after...
+					//fmt.Printf("seek to %d bytes (rpos: %d)", fpos, r.rpos)
+					if _, err := datFd.Seek(dataBeg, io.SeekStart); err != nil {
+						res.ReportError(fmt.Errorf("failed to seek DATA file: %s", err))
+						return // FAILED
+					}
+
+					// have to reset buffer
+					datRd.Reset(datFd)
+					dataPos = dataBeg
+				}
+
+				data = make([]byte, int(index.Length))
+				m, err := io.ReadFull(datRd, data)
+				if err != nil {
+					res.ReportError(fmt.Errorf("failed to read DATA: %s", err))
+					return // FAILED
+				} else if m != len(data) {
+					res.ReportError(fmt.Errorf("not all DATA read: %d of %d", m, len(data)))
+					return // FAILED
+				}
+				dataPos += int64(index.Length)
+
+				// log.Debugf("[%s/show]: DATA: %s of %d bytes", CORE, data, index.Length)
+
+				// read and check delimiter
+				if len(params.Delimiter) > 0 {
+					// or just ... datRd.Discard(len(rr.Delimiter))
+
+					// try to read delimiter
+					m, err := io.ReadFull(datRd, delim)
+					if err != nil {
+						res.ReportError(fmt.Errorf("failed to read DATA delimiter: %s", err))
+						return // FAILED
+					} else if m != len(delim) {
+						res.ReportError(fmt.Errorf("not all DATA delimiter read: %d of %d", m, len(delim)))
+						return // FAILED
+					}
+
+					// log.Debugf("[%s/show]: DATA delim: %x of %d bytes", CORE, delim, m)
+
+					// check delimiter expected
+					if string(delim) != params.Delimiter {
+						res.ReportError(fmt.Errorf("%q unexpected delimiter found at %d", string(delim), dataPos))
+						return // FAILED
+					}
+
+					dataPos += int64(len(delim))
+				}
+			} // dataRd
+
+			// trim mount point from file name!
+			if len(params.relativeToHome) != 0 {
+				if rel, err := filepath.Rel(params.relativeToHome, index.File); err == nil {
+					index.File = rel
+				} else {
+					// keep the absolute filepath as fallback
+					// log.WithError(err).Debugf("[%s/show]: failed to get relative path", TAG)
+				}
+			}
+
+			// update host for cluster mode!
+			index.UpdateHost(params.updateHostTo)
+
+			// report new record
+			rec := search.NewRecord(index, data)
+			// log.WithField("rec", rec).Debugf("[%s/show]: new record", TAG) // FIXME: DEBUG
+
+			res.ReportRecord(rec)
+			if params.Count > 0 && res.RecordsReported() >= params.Count {
+				// log.WithField("limit", params.Count).Debugf("[%s/show]: stopped by limit", TAG)
+				return // DONE
+			}
+		}
+	}()
+
+	return res, nil // OK for now
 }
 
 // do remote show via HTTP request
