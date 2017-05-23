@@ -1,10 +1,13 @@
-There are two REST API endpoints related to search:
+There are a few REST API endpoints related to search:
 
 - [/search](#search)
 - [/count](#count)
+- [/search/show](#show)
 
 First one reports the data found. The seconds one reports
 just search statistics, no any data.
+
+The `search/show` endpoint is used to access already existing results.
 
 
 # Search
@@ -641,3 +644,45 @@ will report the following output:
   "fabricDataRate": 9.55421
 }
 ```
+
+
+# Show
+
+The GET `/search/show` endpoint is used to access already existing search results.
+The search results should be prepared first with `/count` or `/search&limit=` methods.
+
+See corresponding [demo](../demo/2017-05-18-search-show.md) page.
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](../auth.md) for more details.
+
+There are a few [content types](#search-accept-header) that server can produce:
+- `Accept: application/json` which is used by default
+- `Accept: text/csv`
+- `Accept: application/msgpack` which is used internally in cluster mode
+
+
+## Show query parameters
+
+The list of supported query parameters are almost the same as for `/search` method:
+
+| Parameter     | Type    | Description |
+| ------------- | ------- | ----------- |
+| `format`      | string  | [The structured search format](#search-format-parameter). |
+| `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
+| `data`        | string  | [The name of DATA file to read](#show-data-and-index-parameters). |
+| `index`       | string  | [The name of INDEX file to read](#show-data-and-index-parameters). |
+| `view`        | string  | [The name of VIEW file to read](#show-data-and-index-parameters). |
+| `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `session`     | string  | [The session token](#show-session-parameter). |
+| `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
+
+
+### Show `data` and `index` parameters
+
+TBD
+
+
+### Show `session` parameter
+
+TBD
