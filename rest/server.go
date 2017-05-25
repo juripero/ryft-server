@@ -143,6 +143,11 @@ type ServerConfig struct {
 	PostProcScripts map[string]struct {
 		ExecPath []string `yaml:"path"`
 	} `yaml:"post-processing-scripts,omitempty"`
+
+	// docker images for /run
+	DockerImages map[string]struct {
+		ExecArgs []string `yaml:"exec"`
+	} `yaml:"docker-images,omitempty"`
 }
 
 // Server instance

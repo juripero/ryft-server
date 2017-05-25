@@ -279,6 +279,7 @@ func main() {
 	private.GET("/search", server.DoSearch)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
+	private.GET("/run", server.DoRun)
 
 	// need to provide both URLs to disable redirecting
 	private.GET("/files", server.DoGetFiles)
