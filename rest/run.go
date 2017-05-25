@@ -73,15 +73,8 @@ func (server *Server) DoRun(ctx *gin.Context) {
 			WithDetails("failed to get ryftone mount point"))
 	}
 
-	// executable command
-	args := append([]string{params.Command}, params.Args...)
-	if len(args) == 0 {
-		panic(NewError(http.StatusBadRequest,
-			"no any command or argument provided"))
-	}
-
-	// find docker image
-	var imageExec []string
+	// build executable command
+	var args []string
 	if image, ok := server.Config.DockerImages[params.Image]; !ok {
 		panic(NewError(http.StatusBadRequest,
 			fmt.Sprintf("image %q not found", params.Image)))
@@ -101,21 +94,49 @@ func (server *Server) DoRun(ctx *gin.Context) {
 				return "" // not found
 			})
 
-			imageExec = append(imageExec, arg)
+			args = append(args, arg)
 		}
 	}
 
-	// full command list
-	imageExec = append(imageExec, args...)
+	// add +x permission
+	if true {
+		var cmd string
+		if len(params.Command) != 0 {
+			cmd = params.Command
+		} else if len(params.Args) != 0 {
+			cmd = params.Args[0]
+		}
+
+		if len(cmd) != 0 {
+			path := filepath.Join(mountPoint, homeDir, cmd)
+			if info, err := os.Stat(path); err == nil {
+				err := os.Chmod(path, info.Mode()|0111) // +x
+				if err != nil {
+					panic(NewError(http.StatusInternalServerError, err.Error()).
+						WithDetails("failed to add +x permission"))
+				}
+				log.WithField("path", path).Debugf("[%s]: added +x permission ()", CORE)
+			}
+		}
+	}
+
+	if len(params.Command) != 0 {
+		args = append(args, params.Command)
+	}
+	args = append(args, params.Args...)
+	if len(args) == 0 || len(args[0]) == 0 {
+		panic(NewError(http.StatusBadRequest,
+			"no any command or argument provided"))
+	}
 
 	log.WithFields(map[string]interface{}{
-		"args": imageExec,
+		"args": args,
 		"user": userName,
 		"home": homeDir,
 	}).Infof("[%s]: start GET /run", CORE)
 
 	// run docker image
-	cmd := exec.Command(imageExec[0], imageExec[1:]...)
+	cmd := exec.Command(args[0], args[1:]...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
