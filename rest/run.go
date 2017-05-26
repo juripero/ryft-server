@@ -75,26 +75,29 @@ func (server *Server) DoRun(ctx *gin.Context) {
 
 	// build executable command
 	var args []string
-	if image, ok := server.Config.DockerImages[params.Image]; !ok {
+	if image, ok := server.Config.Docker.Images[params.Image]; !ok {
 		panic(NewError(http.StatusBadRequest,
 			fmt.Sprintf("image %q not found", params.Image)))
 	} else {
+		expand := func(name string) string {
+			switch name {
+			case "RYFTUSER":
+				return userName
+			case "RYFTHOME":
+				return filepath.Join(mountPoint, homeDir)
+			case "RYFTONE":
+				return mountPoint
+			}
+
+			return os.Getenv(name) // system fallback
+		}
+
 		// copy and expand arguments
-		for _, arg := range image.ExecArgs {
-			arg = os.Expand(arg, func(name string) string {
-				switch name {
-				case "USER":
-					return userName
-				case "HOME":
-					return filepath.Join(mountPoint, homeDir)
-				case "RYFTONE":
-					return mountPoint
-				}
-
-				return "" // not found
-			})
-
-			args = append(args, arg)
+		for _, arg := range server.Config.Docker.RunCmd {
+			args = append(args, os.Expand(arg, expand))
+		}
+		for _, arg := range image {
+			args = append(args, os.Expand(arg, expand))
 		}
 	}
 
