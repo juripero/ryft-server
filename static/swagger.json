@@ -328,6 +328,54 @@
         }
       }
     },
+    "/run": {
+      "get": {
+        "tags": [
+          "run"
+        ],
+        "summary": "Run custom command on server side",
+        "description": "Endpoint to run custom command",
+        "operationId": "run",
+        "parameters": [
+          {
+            "name": "image",
+            "type": "string",
+            "description": "The Docker image to run command in.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "command",
+            "type": "string",
+            "description": "Command to run.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "name": "arg",
+            "description": "Set of arguments.",
+            "collectionFormat": "multi",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "STDOUT and STDERR combined output of the command"
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/rename": {
       "put": {
         "tags": [
