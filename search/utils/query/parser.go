@@ -44,6 +44,9 @@ type Parser struct {
 	scanner  *Scanner
 	baseOpts Options
 	lexBuf   []Lexeme // last read lexem
+
+	replaceXML bool // replace RECORD with XRECORD
+	replaceCSV bool // replace RECORD with CRECORD
 }
 
 // NewParser returns a new instance of Parser.
@@ -68,8 +71,25 @@ func ParseQuery(query string) (res Query, err error) {
 
 // ParseQueryOpt parses a query from input string using non-default base options.
 func ParseQueryOpt(query string, opts Options) (res Query, err error) {
+	return parseQueryOpt(query, opts, false, false)
+}
+
+// ParseQueryOptXML parses a query from input string and replaces RECORD with XRECORD.
+func ParseQueryOptXML(query string, opts Options) (res Query, err error) {
+	return parseQueryOpt(query, opts, true, false)
+}
+
+// ParseQueryOptCSV parses a query from input string and replaces RECORD with CRECORD.
+func ParseQueryOptCSV(query string, opts Options) (res Query, err error) {
+	return parseQueryOpt(query, opts, false, true)
+}
+
+// parseQueryOpt parses a query from input string using non-default base options.
+func parseQueryOpt(query string, opts Options, convertToXML bool, convertToCSV bool) (res Query, err error) {
 	p := NewParserString(query)
 	p.SetBaseOptions(opts)
+	p.replaceXML = convertToXML
+	p.replaceCSV = convertToCSV
 	res, err = p.ParseQuery()
 	if err == nil && !p.EOF() {
 		// check all data parsed, no more queries expected
@@ -371,6 +391,16 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		// no surrounding width should be used
 		// for structured search!
 		res.Options.Width = 0
+
+		// RECORD => XRECORD (for XML data)
+		if p.replaceXML && strings.HasPrefix(input, IN_RECORD) {
+			input = strings.Replace(input, IN_RECORD, IN_XRECORD, 1)
+		}
+
+		// RECORD => CRECORD (for CSV data)
+		if p.replaceCSV && strings.HasPrefix(input, IN_RECORD) {
+			input = strings.Replace(input, IN_RECORD, IN_CRECORD, 1)
+		}
 	}
 
 	res.ExprOld = fmt.Sprintf("(%s %s %s)", input,
