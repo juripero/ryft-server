@@ -172,7 +172,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	}
 
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	mountPoint, err := s.getMountPoint(homeDir)
+	mountPoint, err := s.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))

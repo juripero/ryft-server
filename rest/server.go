@@ -143,6 +143,8 @@ type ServerConfig struct {
 	PostProcScripts map[string]struct {
 		ExecPath []string `yaml:"path"`
 	} `yaml:"post-processing-scripts,omitempty"`
+
+	DefaultUserConfig map[string]interface{} `yaml:"default-user-config"`
 }
 
 // Server instance
