@@ -84,7 +84,13 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 	}
 
 	// auto-detect directory/catalog/file
-	mountPoint, _ := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint(homeDir)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get mount point"))
+	}
+	mountPoint = filepath.Join(mountPoint, homeDir)
+
 	var path, relPath string
 	if len(params.Catalog) != 0 {
 		relPath = strings.Join([]string{params.Dir, params.Catalog}, string(filepath.Separator))
