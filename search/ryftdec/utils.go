@@ -31,9 +31,14 @@
 package ryftdec
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"unicode"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/query"
@@ -231,4 +236,84 @@ func findLastFilter(q query.Query) string {
 	}
 
 	return "" // not found
+}
+
+// detect XML or CSV file format, by extension or by file content
+func (engine *Engine) detectFileFormat(path string) (string, error) {
+	// first check XML patterns
+	for _, pattern := range engine.xmlPatterns {
+		if yes, err := filepath.Match(pattern, path); err != nil {
+			return "", err
+		} else if yes {
+			return "XML", nil
+		}
+	}
+
+	// second check CSV patterns
+	for _, pattern := range engine.csvPatterns {
+		if yes, err := filepath.Match(pattern, path); err != nil {
+			return "", err
+		} else if yes {
+			return "CSV", nil
+		}
+	}
+
+	// none of XML or CSV file patter matched
+	// let's check file content
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	// check for XML content first
+	if true {
+		_, err = f.Seek(0, io.SeekStart)
+		if err != nil {
+			return "", err
+		}
+		br := bufio.NewReaderSize(f, 4*1024)
+
+		// skip spaces
+		for {
+			r, _, err := br.ReadRune()
+			if err != nil {
+				return "", err
+			}
+			if !unicode.IsSpace(r) {
+				br.UnreadRune()
+				break
+			}
+		}
+
+		// check XML pattern, see http.DetectContentType() function
+		XML := []byte("<?xml")
+		data := make([]byte, len(XML))
+		n, err := io.ReadFull(br, data)
+		if err != nil {
+			return "", err
+		} else if n != len(XML) {
+			return "", fmt.Errorf("less data read (%d of %d)", n, 5)
+		}
+
+		if bytes.Equal(data, XML) {
+			return "XML", nil
+		}
+	}
+
+	// check for CSV content then
+	if true {
+		_, err = f.Seek(0, io.SeekStart)
+		if err != nil {
+			return "", err
+		}
+		br := bufio.NewReaderSize(f, 4*1024)
+		r := csv.NewReader(br)
+		_, err := r.Read()
+		if err == nil {
+			return "CSV", nil
+		}
+	}
+
+	return "", fmt.Errorf("unknown file format")
 }

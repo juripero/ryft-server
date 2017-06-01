@@ -53,6 +53,10 @@ type Engine struct {
 	Backend   search.Engine
 	optimizer *query.Optimizer
 
+	autoRecord  bool     // RECORD to XRECORD or CRECORD replacement
+	xmlPatterns []string // XML patterns
+	csvPatterns []string // CSV patterns
+
 	KeepResultFiles bool // false by default
 	CompatMode      bool // false by default
 }
@@ -165,6 +169,42 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 			}
 		}
 		engine.optimizer.ExceptModes = modes
+	}
+
+	// user configuration
+	if userCfg_, ok := opts["user-config"]; ok {
+		if userCfg, ok := userCfg_.(map[string]interface{}); ok {
+			if recOpts_, ok := userCfg["record-queries"]; ok {
+				if recOpts, ok := recOpts_.(map[string]interface{}); ok {
+					// parse "enabled" flag
+					if v, ok := recOpts["enabled"]; ok {
+						vv, err := utils.AsBool(v)
+						if err != nil {
+							return fmt.Errorf(`failed to parse "user-config.record-queries.enabled" option: %s`, err)
+						}
+						engine.autoRecord = vv
+					}
+
+					// parse XML patterns
+					if v, ok := recOpts["xml"]; ok {
+						if vv, ok := v.([]string); ok {
+							engine.xmlPatterns = vv
+						} else {
+							return fmt.Errorf(`failed to parse "user-config.record-queries.xml" option: %s`, "not a []string")
+						}
+					}
+
+					// parse CSV patterns
+					if v, ok := recOpts["csv"]; ok {
+						if vv, ok := v.([]string); ok {
+							engine.xmlPatterns = vv
+						} else {
+							return fmt.Errorf(`failed to parse "user-config.record-queries.csv" option: %s`, "not a []string")
+						}
+					}
+				}
+			}
+		}
 	}
 
 	return nil
