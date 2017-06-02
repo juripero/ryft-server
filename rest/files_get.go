@@ -84,7 +84,7 @@ func (server *Server) DoGetFiles(ctx *gin.Context) {
 	}
 
 	// auto-detect directory/catalog/file
-	mountPoint, err := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))

@@ -37,14 +37,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
 	_ "github.com/getryft/ryft-server/search/ryfthttp"
 	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils"
+	"gopkg.in/yaml.v2"
 )
 
 // get search backend with options
@@ -235,9 +234,17 @@ func (s *Server) getUserConfig(homeDir string) (map[string]interface{}, error) {
 
 	// try to read as YAML
 	if data, err := ioutil.ReadFile(filepath.Join(mountPoint, homeDir, ".ryft-user.yaml")); err == nil {
-		if err := yaml.Unmarshal(data, &userCfg); err != nil {
+		// workaround on YAML decoder: it unmarshals to map[interface{}]interface{}
+		// but we need map[string]interface{}
+		var tmp struct {
+			Queries map[string]interface{} `yaml:"record-queries"`
+		}
+		if err := yaml.Unmarshal(data, &tmp); err != nil {
 			return userCfg, fmt.Errorf("failed to parse YAML user config: %s", err)
 		}
+
+		userCfg["record-queries"] = tmp.Queries
+		// TODO: more user options here
 
 		return userCfg, nil // YAML config!
 	} else if !os.IsNotExist(err) {
