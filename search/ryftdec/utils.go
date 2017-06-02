@@ -38,6 +38,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"unicode"
 
 	"github.com/getryft/ryft-server/search"
@@ -238,22 +239,40 @@ func findLastFilter(q query.Query) string {
 	return "" // not found
 }
 
+// check the path is matched to pattern
+func patternMatch(pattern, path string) (bool, error) {
+	plist := strings.Split(pattern, string(filepath.Separator))
+	list := strings.Split(path, string(filepath.Separator))
+	n := len(plist)
+
+	if m := len(list); n < m {
+		// match the last n components
+		path = filepath.Join(list[m-n:]...)
+	}
+
+	return filepath.Match(pattern, path)
+}
+
 // detect XML or CSV file format, by extension or by file content
 func (engine *Engine) detectFileFormat(path string) (string, error) {
+	// log.WithField("file", path).Debugf("checking the file format")
+
 	// first check XML patterns
 	for _, pattern := range engine.xmlPatterns {
-		if yes, err := filepath.Match(pattern, path); err != nil {
+		if yes, err := patternMatch(pattern, path); err != nil {
 			return "", err
 		} else if yes {
+			// log.WithField("pattern", pattern).Debugf("XML pattern matched")
 			return "XML", nil
 		}
 	}
 
 	// second check CSV patterns
 	for _, pattern := range engine.csvPatterns {
-		if yes, err := filepath.Match(pattern, path); err != nil {
+		if yes, err := patternMatch(pattern, path); err != nil {
 			return "", err
 		} else if yes {
+			// log.WithField("pattern", pattern).Debugf("CSV pattern matched")
 			return "CSV", nil
 		}
 	}
@@ -268,6 +287,8 @@ func (engine *Engine) detectFileFormat(path string) (string, error) {
 
 	// check for XML content first
 	if true {
+		// log.Debugf("XML content searching...")
+
 		_, err = f.Seek(0, io.SeekStart)
 		if err != nil {
 			return "", err
@@ -303,17 +324,25 @@ func (engine *Engine) detectFileFormat(path string) (string, error) {
 
 	// check for CSV content then
 	if true {
+		// log.Debugf("CSV content searching...")
+
 		_, err = f.Seek(0, io.SeekStart)
 		if err != nil {
 			return "", err
 		}
 		br := bufio.NewReaderSize(f, 4*1024)
 		r := csv.NewReader(br)
-		_, err := r.Read()
-		if err == nil {
-			return "CSV", nil
+
+		// try to read at least two lines on data
+		rec1, err := r.Read() // first line
+		if err == nil && len(rec1) > 1 {
+			_, err = r.Read() // second line
+			if err == nil {
+				return "CSV", nil
+			}
 		}
 	}
 
+	// log.Debugf("unknown file format")
 	return "", fmt.Errorf("unknown file format")
 }
