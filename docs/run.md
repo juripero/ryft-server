@@ -365,6 +365,12 @@ Each item is a script name and a `path` containing full path to the
 application/script and a set of additional command line options.
 
 
+### Ryft user configuration
+
+
+#### Record queries configuration
+
+
 # Debian package
 
 Having Debian package `ryft-server-$version.deb` it's possible to install it to any compatible machine:

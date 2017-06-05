@@ -26,12 +26,18 @@ consisting of a relational expression which takes the following form:
 `input_specifier` specifies how the input data is arranged. The possible values are:
 
 - `RAW_TEXT` - The input is a sequence of raw bytes with no implicit formatting or grouping.
-- `RECORD` - The input is a series of records. Search all records.
+- `RECORD` - The input is a series of records. Search all fields.
 - `RECORD.<field_name>` - The input is a series of records.
    Search only the field called `<field_name>` in each record.
    Note: for JSON input records, multiple field names can be specified
    with `'.'` separators between them to specify a field hierarchy,
    or with `'[]'` separators to specify array hierarchy.
+- `XRECORD` - The input is a series of XML records. Search all fields.
+- `XRECORD.<field_name>` - The input is a series of XML records.
+   Search only the field called `<field_name>` in each record.
+- `CRECORD` - The input is a series of CSV records. Search all fields.
+- `CRECORD.<field_name>` - The input is a series of CSV records.
+   Search only the field called `<field_name>` in each record.
 
 
 `relational_operator` specifies how the input relates to the expression. The possible values are:
