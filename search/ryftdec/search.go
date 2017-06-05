@@ -237,6 +237,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			return nil, fmt.Errorf("failed to decompose CSV query: %s", err)
 		}
 		task.rootQuery = engine.Optimize(q)
+	} else if strings.EqualFold(autoFormat, "JSON") {
+		// do nothing for now, just keep RECORD as is
 	}
 
 	task.log().WithFields(map[string]interface{}{

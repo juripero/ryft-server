@@ -257,27 +257,26 @@ func patternMatch(pattern, path string) (bool, error) {
 func (engine *Engine) detectFileFormat(path string) (string, error) {
 	// log.WithField("file", path).Debugf("checking the file format")
 
-	// first check XML patterns
-	for _, pattern := range engine.xmlPatterns {
-		if yes, err := patternMatch(pattern, path); err != nil {
-			return "", err
-		} else if yes {
-			// log.WithField("pattern", pattern).Debugf("XML pattern matched")
-			return "XML", nil
+	allPatterns := map[string][]string{
+		"":     engine.skipPatterns,
+		"JSON": engine.jsonPatterns,
+		"XML":  engine.xmlPatterns,
+		"CSV":  engine.csvPatterns,
+	}
+
+	// check all patterns
+	for format, patterns := range allPatterns {
+		for _, pattern := range patterns {
+			if yes, err := patternMatch(pattern, path); err != nil {
+				return "", err
+			} else if yes {
+				// log.WithField("pattern", pattern).Debugf("%s pattern matched", format)
+				return format, nil // pattern matched!
+			}
 		}
 	}
 
-	// second check CSV patterns
-	for _, pattern := range engine.csvPatterns {
-		if yes, err := patternMatch(pattern, path); err != nil {
-			return "", err
-		} else if yes {
-			// log.WithField("pattern", pattern).Debugf("CSV pattern matched")
-			return "CSV", nil
-		}
-	}
-
-	// none of XML or CSV file patter matched
+	// none of JSON, XML or CSV file patter matched
 	// let's check file content
 	f, err := os.Open(path)
 	if err != nil {

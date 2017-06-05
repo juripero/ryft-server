@@ -124,8 +124,10 @@ func TestFileFormat(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	engine := Engine{
-		xmlPatterns: []string{"*.xml", "foo/*.myxml"},
-		csvPatterns: []string{"*.csv", "foo/*.mycsv"},
+		skipPatterns: []string{"*.txt"},
+		jsonPatterns: []string{"*.json"},
+		xmlPatterns:  []string{"*.xml", "foo/*.myxml"},
+		csvPatterns:  []string{"*.csv", "foo/*.mycsv"},
 	}
 
 	check := func(path string, expected string) {
@@ -179,4 +181,7 @@ func TestFileFormat(t *testing.T) {
 
 	bad("/tmp/ryft/test/foo/1.bin", "no such file or directory")
 	bad("/tmp/ryft/test/1.bin", "unknown file format")
+
+	check("/tmp/ryft/test/1.txt", "")      // skip
+	check("/tmp/ryft/test/1.json", "JSON") // by extension
 }

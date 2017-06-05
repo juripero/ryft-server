@@ -53,9 +53,11 @@ type Engine struct {
 	Backend   search.Engine
 	optimizer *query.Optimizer
 
-	autoRecord  bool     // RECORD to XRECORD or CRECORD replacement
-	xmlPatterns []string // XML patterns
-	csvPatterns []string // CSV patterns
+	autoRecord   bool     // RECORD to XRECORD or CRECORD replacement
+	skipPatterns []string // skip/ignore patterns
+	jsonPatterns []string // JSON patterns
+	xmlPatterns  []string // XML patterns
+	csvPatterns  []string // CSV patterns
 
 	KeepResultFiles bool // false by default
 	CompatMode      bool // false by default
@@ -185,6 +187,24 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 						engine.autoRecord = vv
 					}
 
+					// parse SKIP patterns
+					if v, ok := recOpts["skip"]; ok {
+						if vv, ok := v.([]string); ok {
+							engine.skipPatterns = vv
+						} else {
+							return fmt.Errorf(`failed to parse "user-config.record-queries.skip" option: %s`, "not a []string")
+						}
+					}
+
+					// parse JSON patterns
+					if v, ok := recOpts["json"]; ok {
+						if vv, ok := v.([]string); ok {
+							engine.jsonPatterns = vv
+						} else {
+							return fmt.Errorf(`failed to parse "user-config.record-queries.json" option: %s`, "not a []string")
+						}
+					}
+
 					// parse XML patterns
 					if v, ok := recOpts["xml"]; ok {
 						if vv, ok := v.([]string); ok {
@@ -197,7 +217,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 					// parse CSV patterns
 					if v, ok := recOpts["csv"]; ok {
 						if vv, ok := v.([]string); ok {
-							engine.xmlPatterns = vv
+							engine.csvPatterns = vv
 						} else {
 							return fmt.Errorf(`failed to parse "user-config.record-queries.csv" option: %s`, "not a []string")
 						}
