@@ -175,52 +175,17 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// user configuration
 	if userCfg_, ok := opts["user-config"]; ok {
-		if userCfg, ok := userCfg_.(map[string]interface{}); ok {
+		if userCfg, err := asStringMap(userCfg_); err != nil {
+			return fmt.Errorf(`failed to get "user-config": %s`, err)
+		} else {
+			// record-queries options
 			if recOpts_, ok := userCfg["record-queries"]; ok {
-				if recOpts, ok := recOpts_.(map[string]interface{}); ok {
-					// parse "enabled" flag
-					if v, ok := recOpts["enabled"]; ok {
-						vv, err := utils.AsBool(v)
-						if err != nil {
-							return fmt.Errorf(`failed to parse "user-config.record-queries.enabled" option: %s`, err)
-						}
-						engine.autoRecord = vv
-					}
-
-					// parse SKIP patterns
-					if v, ok := recOpts["skip"]; ok {
-						if vv, ok := v.([]string); ok {
-							engine.skipPatterns = vv
-						} else {
-							return fmt.Errorf(`failed to parse "user-config.record-queries.skip" option: %s`, "not a []string")
-						}
-					}
-
-					// parse JSON patterns
-					if v, ok := recOpts["json"]; ok {
-						if vv, ok := v.([]string); ok {
-							engine.jsonPatterns = vv
-						} else {
-							return fmt.Errorf(`failed to parse "user-config.record-queries.json" option: %s`, "not a []string")
-						}
-					}
-
-					// parse XML patterns
-					if v, ok := recOpts["xml"]; ok {
-						if vv, ok := v.([]string); ok {
-							engine.xmlPatterns = vv
-						} else {
-							return fmt.Errorf(`failed to parse "user-config.record-queries.xml" option: %s`, "not a []string")
-						}
-					}
-
-					// parse CSV patterns
-					if v, ok := recOpts["csv"]; ok {
-						if vv, ok := v.([]string); ok {
-							engine.csvPatterns = vv
-						} else {
-							return fmt.Errorf(`failed to parse "user-config.record-queries.csv" option: %s`, "not a []string")
-						}
+				if recOpts, err := asStringMap(recOpts_); err != nil {
+					return fmt.Errorf(`failed to get "record-queries": %s`, err)
+				} else {
+					// parse record-queries options
+					if err := engine.updateRecordOptions(recOpts); err != nil {
+						return err
 					}
 				}
 			}
@@ -228,6 +193,104 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	}
 
 	return nil
+}
+
+// update "record-queries" options
+func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
+	// parse "enabled" flag
+	if v, ok := opts["enabled"]; ok {
+		vv, err := utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "user-config.record-queries.enabled" option: %s`, err)
+		}
+		engine.autoRecord = vv
+	}
+
+	// parse SKIP patterns
+	if v, ok := opts["skip"]; ok {
+		if vv, err := asStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "user-config.record-queries.skip" option: %s`, err)
+		} else {
+			engine.skipPatterns = vv
+		}
+	}
+
+	// parse JSON patterns
+	if v, ok := opts["json"]; ok {
+		if vv, err := asStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "user-config.record-queries.json" option: %s`, err)
+		} else {
+			engine.jsonPatterns = vv
+		}
+	}
+
+	// parse XML patterns
+	if v, ok := opts["xml"]; ok {
+		if vv, err := asStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "user-config.record-queries.xml" option: %s`, err)
+		} else {
+			engine.xmlPatterns = vv
+		}
+	}
+
+	// parse CSV patterns
+	if v, ok := opts["csv"]; ok {
+		if vv, err := asStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "user-config.record-queries.csv" option: %s`, err)
+		} else {
+			engine.csvPatterns = vv
+		}
+	}
+
+	return nil // OK
+}
+
+// get value as string slice
+func asStringSlice(v interface{}) ([]string, error) {
+	switch vv := v.(type) {
+	case nil:
+		return nil, nil // empty
+
+	case []string:
+		return vv, nil // OK
+
+	case []interface{}:
+		res := make([]string, 0, len(vv))
+		for _, s := range vv {
+			if ss, err := utils.AsString(s); err != nil {
+				return nil, fmt.Errorf("not a string: %s", err)
+			} else {
+				res = append(res, ss)
+			}
+		}
+		return res, nil // OK
+	}
+
+	return nil, fmt.Errorf("not a []string (but %T)", v)
+}
+
+// get value as map[string]interface{}
+func asStringMap(v interface{}) (map[string]interface{}, error) {
+	switch vv := v.(type) {
+	case nil:
+		return nil, nil // empty
+
+	case map[string]interface{}:
+		return vv, nil // OK
+
+	case map[interface{}]interface{}:
+		res := make(map[string]interface{}, len(vv))
+		for k, v := range vv {
+			if kk, err := utils.AsString(k); err != nil {
+				return nil, fmt.Errorf("bad key: %s", err)
+			} else {
+				res[kk] = v
+			}
+		}
+		return res, nil // OK
+	}
+
+	return nil, fmt.Errorf("not a map[string]interface{} (but %T)", v)
 }
 
 // Files starts synchronous "/files" operation.
