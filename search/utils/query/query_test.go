@@ -7,6 +7,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Convert to JSON
+func TestQueryToJSON(t *testing.T) {
+	// check function
+	check := func(hasRec bool, query string, expected string) {
+		q, err := ParseQueryOptJSON(query, DefaultOptions())
+		if assert.NoError(t, err) {
+			assert.EqualValues(t, expected, fmt.Sprintf("%+v", q))
+			_ = hasRec // assert.EqualValues(t, hasRec, q.HasStructured())
+		}
+	}
+
+	check(false, `RAW_TEXT CONTAINS "hello"`, `(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(true, `JRECORD CONTAINS "hello"`, `(JRECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, `XRECORD CONTAINS "hello"`, `(XRECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, `CRECORD CONTAINS "hello"`, `(CRECORD CONTAINS EXACT("hello"))[es]`)
+
+	check(true, `RECORD CONTAINS "hello"`, `(JRECORD CONTAINS EXACT("hello"))[es]`)
+	check(true, `RECORD.body CONTAINS "hello"`, `(JRECORD.body CONTAINS EXACT("hello"))[es]`)
+	check(true, `RECORD.[] CONTAINS "hello"`, `(JRECORD.[] CONTAINS EXACT("hello"))[es]`)
+
+	check(true, `RECORD.[] CONTAINS "hello" AND RAW_TEXT CONTAINS "world"`,
+		`AND{(JRECORD.[] CONTAINS EXACT("hello"))[es], (RAW_TEXT CONTAINS EXACT("world"))[es]}`)
+	check(true, `RAW_TEXT CONTAINS "world" OR RECORD.[] CONTAINS "hello"`,
+		`OR{(RAW_TEXT CONTAINS EXACT("world"))[es], (JRECORD.[] CONTAINS EXACT("hello"))[es]}`)
+}
+
 // Convert to XML
 func TestQueryToXML(t *testing.T) {
 	// check function
@@ -19,6 +45,7 @@ func TestQueryToXML(t *testing.T) {
 	}
 
 	check(false, `RAW_TEXT CONTAINS "hello"`, `(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(true, `JRECORD CONTAINS "hello"`, `(JRECORD CONTAINS EXACT("hello"))[es]`)
 	check(true, `XRECORD CONTAINS "hello"`, `(XRECORD CONTAINS EXACT("hello"))[es]`)
 	check(true, `CRECORD CONTAINS "hello"`, `(CRECORD CONTAINS EXACT("hello"))[es]`)
 
@@ -44,6 +71,7 @@ func TestQueryToCSV(t *testing.T) {
 	}
 
 	check(false, `RAW_TEXT CONTAINS "hello"`, `(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
+	check(true, `JRECORD CONTAINS "hello"`, `(JRECORD CONTAINS EXACT("hello"))[es]`)
 	check(true, `XRECORD CONTAINS "hello"`, `(XRECORD CONTAINS EXACT("hello"))[es]`)
 	check(true, `CRECORD CONTAINS "hello"`, `(CRECORD CONTAINS EXACT("hello"))[es]`)
 

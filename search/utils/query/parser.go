@@ -45,8 +45,9 @@ type Parser struct {
 	baseOpts Options
 	lexBuf   []Lexeme // last read lexem
 
-	replaceXML bool // replace RECORD with XRECORD
-	replaceCSV bool // replace RECORD with CRECORD
+	replaceJSON bool // replace RECORD with JRECORD
+	replaceXML  bool // replace RECORD with XRECORD
+	replaceCSV  bool // replace RECORD with CRECORD
 }
 
 // NewParser returns a new instance of Parser.
@@ -71,23 +72,29 @@ func ParseQuery(query string) (res Query, err error) {
 
 // ParseQueryOpt parses a query from input string using non-default base options.
 func ParseQueryOpt(query string, opts Options) (res Query, err error) {
-	return parseQueryOpt(query, opts, false, false)
+	return parseQueryOpt(query, opts, false /*JSON*/, false /*XML*/, false /*CSV*/)
+}
+
+// ParseQueryOptJSON parses a query from input string and replaces RECORD with JRECORD.
+func ParseQueryOptJSON(query string, opts Options) (res Query, err error) {
+	return parseQueryOpt(query, opts, true /*JSON*/, false /*XML*/, false /*CSV*/)
 }
 
 // ParseQueryOptXML parses a query from input string and replaces RECORD with XRECORD.
 func ParseQueryOptXML(query string, opts Options) (res Query, err error) {
-	return parseQueryOpt(query, opts, true, false)
+	return parseQueryOpt(query, opts, false /*JSON*/, true /*XML*/, false /*CSV*/)
 }
 
 // ParseQueryOptCSV parses a query from input string and replaces RECORD with CRECORD.
 func ParseQueryOptCSV(query string, opts Options) (res Query, err error) {
-	return parseQueryOpt(query, opts, false, true)
+	return parseQueryOpt(query, opts, false /*JSON*/, false /*XML*/, true /*CSV*/)
 }
 
 // parseQueryOpt parses a query from input string using non-default base options.
-func parseQueryOpt(query string, opts Options, convertToXML bool, convertToCSV bool) (res Query, err error) {
+func parseQueryOpt(query string, opts Options, convertToJSON bool, convertToXML bool, convertToCSV bool) (res Query, err error) {
 	p := NewParserString(query)
 	p.SetBaseOptions(opts)
+	p.replaceJSON = convertToJSON
 	p.replaceXML = convertToXML
 	p.replaceCSV = convertToCSV
 	res, err = p.ParseQuery()
@@ -391,6 +398,11 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		// no surrounding width should be used
 		// for structured search!
 		res.Options.Width = 0
+
+		// RECORD => JRECORD (for JSON data)
+		if p.replaceJSON && strings.HasPrefix(input, IN_RECORD) {
+			input = strings.Replace(input, IN_RECORD, IN_JRECORD, 1)
+		}
 
 		// RECORD => XRECORD (for XML data)
 		if p.replaceXML && strings.HasPrefix(input, IN_RECORD) {

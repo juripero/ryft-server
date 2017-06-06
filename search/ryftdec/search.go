@@ -238,7 +238,14 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		}
 		task.rootQuery = engine.Optimize(q)
 	} else if strings.EqualFold(autoFormat, "JSON") {
-		// do nothing for now, just keep RECORD as is
+		task.log().Debugf("[%s]: converting query to JSON-based JRECORD", TAG)
+		q, err = query.ParseQueryOptJSON(cfg.Query, ConfigToOptions(cfg))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decompose JSON query: %s", err)
+		}
+		task.rootQuery = engine.Optimize(q)
+	} else {
+		// keep "as is"
 	}
 
 	task.log().WithFields(map[string]interface{}{

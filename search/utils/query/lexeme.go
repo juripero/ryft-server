@@ -37,6 +37,7 @@ import (
 const (
 	IN_RAW_TEXT = "RAW_TEXT"
 	IN_RECORD   = "RECORD"
+	IN_JRECORD  = "JRECORD"
 	IN_XRECORD  = "XRECORD"
 	IN_CRECORD  = "CRECORD"
 
@@ -133,6 +134,7 @@ func (lex Lexeme) IsRecord() bool {
 	}
 
 	return strings.EqualFold(lex.literal, IN_RECORD) ||
+		strings.EqualFold(lex.literal, IN_JRECORD) ||
 		strings.EqualFold(lex.literal, IN_XRECORD) ||
 		strings.EqualFold(lex.literal, IN_CRECORD)
 }
