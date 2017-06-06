@@ -135,12 +135,16 @@ func (engine *Engine) prepare(task *Task) error {
 		}
 
 		if !skip {
-			args = append(args, "-f", engine.relativeToMountPoint(path))
+			args = append(args, "-f", engine.getFilePath(path))
 		}
 	}
 
-	// data separator (should be hex-escaped)
-	args = append(args, "-e", utils.HexEscape([]byte(cfg.Delimiter)))
+	if len(cfg.Delimiter) != 0 {
+		// data separator (should be hex-escaped)
+		args = append(args, "-e", utils.HexEscape([]byte(cfg.Delimiter)))
+	} else {
+		args = append(args, "-en") // NULL delimiter
+	}
 
 	// enable verbose mode to grab statistics
 	args = append(args, "-v")
@@ -174,7 +178,7 @@ func (engine *Engine) prepare(task *Task) error {
 				Warnf("[%s]: index filename was updated to have TXT extension", TAG)
 		}
 
-		args = append(args, "-oi", engine.relativeToMountPoint(task.IndexFileName))
+		args = append(args, "-oi", engine.getFilePath(task.IndexFileName))
 	}
 
 	// DATA output file
@@ -188,7 +192,7 @@ func (engine *Engine) prepare(task *Task) error {
 				engine.Instance, fmt.Sprintf(".dat-%s.bin", task.Identifier))
 		}
 
-		args = append(args, "-od", engine.relativeToMountPoint(task.DataFileName))
+		args = append(args, "-od", engine.getFilePath(task.DataFileName))
 	}
 
 	// assign command line
@@ -432,4 +436,13 @@ func (engine *Engine) relativeToMountPoint(path string) string {
 	}
 
 	return rel
+}
+
+// get a file path (relative or absolute)
+func (engine *Engine) getFilePath(path string) string {
+	if engine.UseAbsPath {
+		return path
+	}
+
+	return engine.relativeToMountPoint(path)
 }
