@@ -115,9 +115,9 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		scheme := "http"
 		var url string
 		if port == 0 { // TODO: review the URL building!
-			url = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+			url = fmt.Sprintf("%s://%s:8765", scheme, service.ServiceAddress)
 		} else {
-			url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+			url = fmt.Sprintf("%s://%s:%d", scheme, service.ServiceAddress, port)
 		}
 
 		opts := map[string]interface{}{

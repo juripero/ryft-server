@@ -150,13 +150,13 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 			node := new(Node)
 			scheme := "http"
 			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.ServiceAddress)
 			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.ServiceAddress, port)
 				// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
 			}
 			node.IsLocal = server.isLocalService(service)
-			node.Name = service.Node
+			node.Name = service.ServiceID
 			node.Params.Local = true
 
 			// check tags (no tags - all nodes)
@@ -204,7 +204,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 				continue // nothing to do
 			}
 			result := make(map[string]interface{})
-			result["hostname"] = node.Name
+			result["host"] = node.Name
 			if node.Error != nil {
 				result["error"] = node.Error.Error()
 			} else {
@@ -214,7 +214,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 		}
 	} else {
 		result := make(map[string]interface{})
-		result["hostname"] = server.Config.HostName
+		result["host"] = server.Config.HostName
 		if details := server.deleteLocalFiles(mountPoint, params); len(details) > 0 {
 			result["details"] = details
 		}
@@ -289,13 +289,14 @@ func (s *Server) deleteRemoteFiles(address string, authToken string, params Dele
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	res := make(map[string]interface{})
+	results := []map[string]interface{}{}
+	result := make(map[string]interface{})
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&res); err != nil {
+	if err := dec.Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
-
-	return res, nil // OK
+	result = results[0]
+	return result, nil // OK
 }
 
 // remove directories or/and files

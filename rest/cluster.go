@@ -64,10 +64,17 @@ func (server *Server) DoClusterMembers(ctx *gin.Context) {
 			"tags": s.ServiceTags,
 			"address": func() string {
 				if s.ServicePort != 0 {
+					return fmt.Sprintf("%s:%d", s.Address, s.ServicePort)
+				}
+				return s.Address
+			}(),
+			"serviceAddress": func() string {
+				if s.ServicePort != 0 {
 					return fmt.Sprintf("%s:%d", s.ServiceAddress, s.ServicePort)
 				}
 				return s.ServiceAddress
 			}(),
+			"serviceName": s.ServiceName,
 		}
 	}
 
@@ -224,7 +231,7 @@ func (s *Server) isLocalService(service *consul.CatalogService) bool {
 	}
 
 	// check each interface without mask
-	saddr := service.Address + "/"
+	saddr := service.ServiceAddress + "/"
 	for _, addr := range addrs {
 		if strings.HasPrefix(addr.String(), saddr) {
 			return true

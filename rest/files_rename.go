@@ -371,9 +371,9 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			node := new(Node)
 			scheme := "http"
 			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.ServiceAddress)
 			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.ServiceAddress, port)
 			}
 
 			node.IsLocal = server.isLocalService(service)
@@ -422,7 +422,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 				continue // nothing to do
 			}
 			result := make(map[string]interface{})
-			result["hostname"] = node.Name
+			result["host"] = node.Name
 			if node.Error != nil {
 				result["error"] = node.Error.Error()
 			} else {
@@ -436,7 +436,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			panic(NewError(http.StatusBadRequest, err.Error()))
 		}
 		result := make(map[string]interface{})
-		result["hostname"] = server.Config.HostName
+		result["host"] = server.Config.HostName
 		if details := server.RenameLocalFile(fileRename); len(details) > 0 {
 			result["details"] = details
 		}
@@ -498,11 +498,12 @@ func (server *Server) RenameRemoteFile(address string, authToken string, params 
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	res := make(map[string]interface{})
+	results := []map[string]interface{}{}
+	result := make(map[string]interface{})
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&res); err != nil {
+	if err := dec.Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
-
-	return res, nil // OK
+	result = results[0]
+	return result, nil // OK
 }

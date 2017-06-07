@@ -52,6 +52,21 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
+type FilesDetails struct {
+	Catalog string `json:"catalog,omitempty"`
+	File    string `json:"file,omitempty"`
+	Error   error  `json:"error,omitempty"`
+	Offset  int64  `json:"offset"`
+	Length  int64  `json:"length"`
+	Path    string `json:"path,omitempty"`
+}
+
+type FilesNodeResult struct {
+	Details FilesDetails `json:"details,omitempty"`
+	Error   error        `json:"error,omitempty"`
+	Host    string       `json:"host"`
+}
+
 // PostFilesParams query parameters for POST /files
 type PostFilesParams struct {
 	Catalog   string `form:"catalog" json:"catalog"`     // catalog to save to
@@ -234,7 +249,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		}
 	}
 
-	results := []map[string]interface{}{}
+	results := []*FilesNodeResult{}
 
 	log.WithField("params", params).
 		WithField("user", userName).
@@ -262,8 +277,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 			Params PostFilesParams
 			data   io.Reader
-
-			Result map[string]interface{}
+			Result FilesNodeResult
 			Error  error
 		}
 
@@ -274,9 +288,9 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			node := new(Node)
 			scheme := "http"
 			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
+				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.ServiceAddress)
 			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
+				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.ServiceAddress, port)
 				// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
 			}
 			node.IsLocal = s.isLocalService(service)
@@ -288,7 +302,6 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				node.Params.Local = true
 				Ncopies += 1
 			}
-
 			nodes[i] = node
 		}
 
@@ -338,19 +351,22 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				if node.Params.isEmpty() {
 					continue // nothing to do
 				}
-
 				wg.Add(1)
 				go func(node *Node) {
 					defer wg.Done()
 					if node.IsLocal {
 						log.WithField("what", node.Params).Debugf("copying on local node")
-						_, node.Result, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, node.data)
+						details := &FilesDetails{}
+						_, details, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, node.data)
+						node.Result = FilesNodeResult{Details: *details}
 					} else {
 						log.WithField("what", node.Params).
 							WithField("node", node.Name).
 							WithField("addr", node.Address).
 							Debugf("copying on remote node")
-						node.Result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, node.data)
+						result, err := s.postRemoteFiles(node.Address, authToken, node.Params, delim, node.data)
+						node.Error = err
+						node.Result = *result
 					}
 				}(node)
 			}
@@ -363,15 +379,12 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				}
 
 				if node.Error != nil {
-					results = append(results, map[string]interface{}{
-						"hostname": node.Name,
-						"error":    node.Error.Error(),
+					results = append(results, &FilesNodeResult{
+						Host:  node.Name,
+						Error: node.Error,
 					})
 				} else {
-					results = append(results, map[string]interface{}{
-						"hostname": node.Name,
-						"details":  node.Result,
-					})
+					results = append(results, &node.Result)
 				}
 			}
 		} else {
@@ -379,35 +392,35 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				if node.Params.isEmpty() {
 					continue // nothing to do
 				}
-				result := map[string]interface{}{}
-				result["hostname"] = node.Name
+				result := &FilesNodeResult{}
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("*copying on local node")
 					// hide error response because result already contains that
-					_, node.Result, _ = s.postLocalFiles(mountPoint, node.Params, delim, file)
+					details := &FilesDetails{}
+					_, details, _ = s.postLocalFiles(mountPoint, node.Params, delim, file)
+					result.Details = *details
+					result.Host = node.Name
 				} else {
 					log.WithField("what", node.Params).
 						WithField("node", node.Name).
 						WithField("addr", node.Address).
 						Debugf("*copying on remote node")
-					node.Result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, file)
-				}
+					result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, file)
 
-				if node.Error != nil {
-					result["error"] = err.Error()
-				} else {
-					result["details"] = node.Result
+					if node.Error != nil {
+						result.Error = node.Error
+					}
 				}
 				results = append(results, result)
 				break // one node enough
 			}
 		}
 	} else {
-		result := map[string]interface{}{}
-		status, result, _ = s.postLocalFiles(mountPoint, params, delim, file)
-		results = append(results, map[string]interface{}{
-			"hostname": s.Config.HostName,
-			"details":  result,
+		details := &FilesDetails{}
+		status, details, _ = s.postLocalFiles(mountPoint, params, delim, file)
+		results = append(results, &FilesNodeResult{
+			Host:    s.Config.HostName,
+			Details: *details,
 		})
 	}
 
@@ -415,50 +428,52 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 }
 
 // post local nodes: files, dirs, catalogs
-func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, map[string]interface{}, error) {
-	res := make(map[string]interface{})
+func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, *FilesDetails, error) {
+	// res := make(map[string]interface{})
+	res := &FilesDetails{}
 	status := http.StatusOK
+
 	if len(params.Catalog) != 0 { // append to catalog
 		catalog, filePath, length, err := updateCatalog(mountPoint, params, delim, file)
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
-			res["error"] = err.Error()
-			res["length"] = length
+			res.Error = err
+			res.Length = int64(length)
 		} else {
 			if params.lifetime > 0 {
 				s.addJob("delete-catalog",
 					filepath.Join(mountPoint, catalog),
 					time.Now().Add(params.lifetime))
 			}
-			res["catalog"] = catalog
-			res["file"] = filePath
-			res["length"] = length // not total, just this part
+			res.Catalog = catalog
+			res.File = filePath
+			res.Length = int64(length) // not total, just this part
 		}
 		return status, res, err
 	} else { // standalone file
 		path, offset, length, err := createFile(mountPoint, params, file)
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
-			res["error"] = err.Error()
-			res["length"] = length
-			res["offset"] = offset
+			res.Error = err
+			res.Length = length
+			res.Offset = offset
 		} else {
 			if params.lifetime > 0 {
 				s.addJob("delete-file",
 					filepath.Join(mountPoint, path),
 					time.Now().Add(params.lifetime))
 			}
-			res["path"] = path
-			res["length"] = length
-			res["offset"] = offset
+			res.Path = path
+			res.Length = length
+			res.Offset = offset
 		}
 		return status, res, err
 	}
 }
 
 // post remote nodes: files
-func (s *Server) postRemoteFiles(address string, authToken string, params PostFilesParams, delim *string, file io.Reader) (map[string]interface{}, error) {
+func (s *Server) postRemoteFiles(address string, authToken string, params PostFilesParams, delim *string, file io.Reader) (*FilesNodeResult, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {
@@ -516,13 +531,13 @@ func (s *Server) postRemoteFiles(address string, authToken string, params PostFi
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	res := make(map[string]interface{})
+	results := []*FilesNodeResult{}
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&res); err != nil {
+	if err := dec.Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
-
-	return res, nil // OK
+	result := results[0]
+	return result, nil // OK
 }
 
 // file lock system
