@@ -367,8 +367,58 @@ application/script and a set of additional command line options.
 
 ### Ryft user configuration
 
+Some parameters of ryft-server might be customized via Ryft user configuration file.
+Every user can change some part of ryft-server behaviour uploading special `YAML`
+or `JSON` configuration file:
+
+```{.sh}
+curl -s "http://ryft-host:8765/files?file=.ryft-user.yaml&offset=0" \
+     -H 'Content-Type: application/octet-stream' --data \
+'record-queries:
+  enabled: true
+  skip: ["*.txt", "*.dat"]
+  json: ["*.json"]
+  xml: ["*.xml"]
+  csv: ["*.csv"]
+'
+```
+
+By default the `default-user-config` section from main configuration file used.
+But if the `/ryftone/${RYFTUSER}/.ryft-user.yaml` or `/ryftone/${RYFTUSER}/.ryft-user.json`
+file is present, then it will be used instead of `default-user-config` secion.
+
+Please note, if you change parameters in main configuration file and nothing is happened
+then probably there is Ryft user configuration file which overrides all parameters
+from `default-user-config`.
+
+The following parameters can be customized:
+- [automatic `RECORD` replacement](#record-queries-configuration)
+
 
 #### Record queries configuration
+
+The `record-queries` subsection contains all the parameters related to
+automatic `RECORD` [replacement](./search/README.md#automatic-record-replacement).
+
+```{.yaml}
+record-queries:
+  enabled: true
+  skip: ["*.txt", "*.dat"]
+  json: ["*.json"]
+  xml: ["*.xml"]
+  csv: ["*.csv"]
+```
+
+This feature can be disabled by `enabled: false` option.
+
+The following lists of file patterns customize extension-based file type detection:
+- `skip` ignore these extensions. The `RECORD` will be kept as is.
+- `json` extensions for `JSON` data. The `RECORD` will be replaced with `JRECORD`.
+- `xml` extensions for `XML` data. The `RECORD` will be replaced with `XRECORD`.
+- `csv` extensions for `CSV` data. The `RECORD` will be replaced with `CRECORD`.
+
+Note, the file pattern may include directory filter, the `json: ["foo/*.json"]`
+matches all JSON files in `foo` directory.
 
 
 # Debian package
