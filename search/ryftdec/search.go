@@ -231,7 +231,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// automatic RECORD to XRECORD or CRECORD...
 	if strings.EqualFold(autoFormat, "XML") {
-		task.log().Debugf("[%s]: converting query to XML-based XRECORD", TAG)
+		task.log().WithField("root", rootRecord).Debugf("[%s]: converting query to XML-based XRECORD", TAG)
 		var newRecord string
 		if rootRecord != "" {
 			newRecord = fmt.Sprintf("%s.%s", query.IN_XRECORD, rootRecord)
