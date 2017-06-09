@@ -45,9 +45,10 @@ import (
 // checks if input fileset contains any catalog
 // also populates the Post-Processing engine
 // return: numOfCatalogs, expandedFileList, error
-func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home string, width int, filter string, autoRecord bool) (int, []string, string, error) {
+func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home string, width int, filter string, autoRecord bool) (int, []string, string, string, error) {
 	newFiles := make([]string, 0, len(files))
 	autoFormat := ""
+	rootRecord := ""
 	NoCatalogs := 0
 
 	// check it dynamically: catalog or regular file
@@ -55,13 +56,13 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 		// relative -> absolute (mount point + home + ...)
 		matches, err := filepath.Glob(filepath.Join(home, mask))
 		if err != nil {
-			return 0, nil, "", fmt.Errorf("failed to glob file mask %s: %s", mask, err)
+			return 0, nil, "", "", fmt.Errorf("failed to glob file mask %s: %s", mask, err)
 		}
 
 		// iterate all matches
 		for _, filePath := range matches {
 			if info, err := os.Stat(filePath); err != nil {
-				return 0, nil, "", fmt.Errorf("failed to stat file: %s", err)
+				return 0, nil, "", "", fmt.Errorf("failed to stat file: %s", err)
 			} else if info.IsDir() {
 				log.WithField("path", filePath).Warnf("[%s]: is a directory, skipped", TAG)
 				// TODO: get all files in directory???
@@ -83,20 +84,23 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 					newFiles = append(newFiles, relativeToHome(home, filePath))
 
 					if autoRecord {
-						format, err := engine.detectFileFormat(filePath)
+						format, root, err := engine.detectFileFormat(filePath)
 						if err != nil {
-							return 0, nil, "", fmt.Errorf("failed to detect %q file format: %s", filePath, err)
+							return 0, nil, "", "", fmt.Errorf("failed to detect %q file format: %s", filePath, err)
 						}
 						if len(autoFormat) == 0 {
 							autoFormat = format
+							rootRecord = root
 						} else if autoFormat != format {
-							return 0, nil, "", fmt.Errorf("many file formats matched: %q and %q", autoFormat, format)
+							return 0, nil, "", "", fmt.Errorf("many file formats matched: %q and %q", autoFormat, format)
+						} else if rootRecord != root {
+							return 0, nil, "", "", fmt.Errorf("many root records found: %q and %q", rootRecord, root)
 						}
 					}
 
 					continue // go to next match
 				}
-				return 0, nil, "", fmt.Errorf("failed to open catalog: %s", err)
+				return 0, nil, "", "", fmt.Errorf("failed to open catalog: %s", err)
 			}
 			defer cat.Close()
 
@@ -106,21 +110,24 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 
 			// data files (absolute path)
 			if dataFiles, err := cat.GetDataFiles(filter, width < 0); err != nil {
-				return 0, nil, "", fmt.Errorf("failed to get catalog files: %s", err)
+				return 0, nil, "", "", fmt.Errorf("failed to get catalog files: %s", err)
 			} else {
 				// relative to home
 				for _, filePath := range dataFiles {
 					newFiles = append(newFiles, relativeToHome(home, filePath))
 
 					if autoRecord {
-						format, err := engine.detectFileFormat(filePath)
+						format, root, err := engine.detectFileFormat(filePath)
 						if err != nil {
-							return 0, nil, "", fmt.Errorf("failed to detect %q file format: %s", filePath, err)
+							return 0, nil, "", "", fmt.Errorf("failed to detect %q file format: %s", filePath, err)
 						}
 						if len(autoFormat) == 0 {
 							autoFormat = format
+							rootRecord = root
 						} else if autoFormat != format {
-							return 0, nil, "", fmt.Errorf("many file formats matched: %q and %q", autoFormat, format)
+							return 0, nil, "", "", fmt.Errorf("many file formats matched: %q and %q", autoFormat, format)
+						} else if rootRecord != root {
+							return 0, nil, "", "", fmt.Errorf("many root records found: %q and %q", rootRecord, root)
 						}
 					}
 				}
@@ -134,7 +141,7 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 		new_files = files // use source files "as is"
 	}*/
 
-	return NoCatalogs, newFiles, autoFormat, nil // OK
+	return NoCatalogs, newFiles, autoFormat, rootRecord, nil // OK
 }
 
 // check if task contains complex query and need intermediate results
@@ -211,8 +218,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// check input data-set for catalogs
 	var hasCatalogs int
-	var autoFormat string
-	hasCatalogs, cfg.Files, autoFormat, err = engine.checksForCatalog(task.result, cfg.Files,
+	var autoFormat, rootRecord string
+	hasCatalogs, cfg.Files, autoFormat, rootRecord, err = engine.checksForCatalog(task.result, cfg.Files,
 		home, cfg.Width, findFirstFilter(task.rootQuery), autoRecord)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
@@ -225,23 +232,29 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	// automatic RECORD to XRECORD or CRECORD...
 	if strings.EqualFold(autoFormat, "XML") {
 		task.log().Debugf("[%s]: converting query to XML-based XRECORD", TAG)
-		q, err = query.ParseQueryOptXML(cfg.Query, ConfigToOptions(cfg))
+		var newRecord string
+		if rootRecord != "" {
+			newRecord = fmt.Sprintf("%s.%s", query.IN_XRECORD, rootRecord)
+		} else {
+			newRecord = query.IN_XRECORD
+		}
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), newRecord)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose XML query: %s", err)
 		}
 		task.rootQuery = engine.Optimize(q)
-	} else if strings.EqualFold(autoFormat, "CSV") {
-		task.log().Debugf("[%s]: converting query to CSV-based CRECORD", TAG)
-		q, err = query.ParseQueryOptCSV(cfg.Query, ConfigToOptions(cfg))
-		if err != nil {
-			return nil, fmt.Errorf("failed to decompose CSV query: %s", err)
-		}
-		task.rootQuery = engine.Optimize(q)
 	} else if strings.EqualFold(autoFormat, "JSON") {
 		task.log().Debugf("[%s]: converting query to JSON-based JRECORD", TAG)
-		q, err = query.ParseQueryOptJSON(cfg.Query, ConfigToOptions(cfg))
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_JRECORD)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose JSON query: %s", err)
+		}
+		task.rootQuery = engine.Optimize(q)
+	} else if strings.EqualFold(autoFormat, "CSV") {
+		task.log().Debugf("[%s]: converting query to CSV-based CRECORD", TAG)
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_CRECORD)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decompose CSV query: %s", err)
 		}
 		task.rootQuery = engine.Optimize(q)
 	} else {
@@ -497,7 +510,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 
 			// check for catalogs recusively
 			task.log().WithField("files", files).Debugf("[%s/%d]: new input file list", TAG, task.subtaskId)
-			_, tempCfg.Files, _, err = engine.checksForCatalog(task.result, files,
+			_, tempCfg.Files, _, _, err = engine.checksForCatalog(task.result, files,
 				opts.atHome(""), tempCfg.Width, findFirstFilter(q2), false) // TODO: check width and filter
 			if err != nil {
 				task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)

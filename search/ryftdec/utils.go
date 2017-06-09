@@ -32,14 +32,13 @@ package ryftdec
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/csv"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/query"
@@ -253,9 +252,79 @@ func patternMatch(pattern, path string) (bool, error) {
 	return filepath.Match(pattern, path)
 }
 
+// detect XML file
+func detectXmlFile(f io.Reader) (string, error) {
+	// log.Debugf("XML content searching...")
+	dec := xml.NewDecoder(bufio.NewReaderSize(f, 4*1024))
+
+	// find <?xml>
+	findStart := func() error {
+		for {
+			t, err := dec.Token()
+			if err != nil {
+				return err // not a XML
+			}
+
+			switch v := t.(type) {
+			case xml.CharData, xml.Comment:
+				// do nothing... wait
+				break
+
+			case xml.StartElement, xml.EndElement, xml.Directive:
+				return fmt.Errorf("bad XML format: no <?xml")
+
+			case xml.ProcInst:
+				if v.Target != "xml" {
+					return fmt.Errorf("bad XML: %q found", v.Target)
+				}
+				return nil // OK
+			}
+		}
+	}
+
+	// root element
+	findRoot := func() (string, error) {
+		for {
+			t, err := dec.Token()
+			if err != nil {
+				return "", err // not a XML
+			}
+
+			switch v := t.(type) {
+			case xml.CharData, xml.Comment, xml.Directive:
+				// do nothing... wait
+				break
+
+			case xml.EndElement, xml.ProcInst:
+				return "", fmt.Errorf("bad XML format: no record start")
+
+			case xml.StartElement:
+				return v.Name.Local, nil // OK
+			}
+		}
+	}
+
+	// find <?xml ... >
+	if err := findStart(); err != nil {
+		return "", err // no <?xml found
+	}
+
+	// find root element
+	if _, err := findRoot(); err != nil {
+		return "", err
+	}
+
+	// find first element
+	if rec, err := findRoot(); err != nil {
+		return "", err
+	} else {
+		return rec, nil // OK
+	}
+}
+
 // detect XML or CSV file format, by extension or by file content
-func (engine *Engine) detectFileFormat(path string) (string, error) {
-	// log.WithField("file", path).Debugf("checking the file format")
+func (engine *Engine) detectFileFormat(path string) (string, string, error) {
+	log.WithField("file", path).Debugf("checking the file format")
 
 	allPatterns := map[string][]string{
 		"":     engine.skipPatterns,
@@ -268,10 +337,27 @@ func (engine *Engine) detectFileFormat(path string) (string, error) {
 	for format, patterns := range allPatterns {
 		for _, pattern := range patterns {
 			if yes, err := patternMatch(pattern, path); err != nil {
-				return "", err
+				return "", "", err
 			} else if yes {
 				// log.WithField("pattern", pattern).Debugf("%s pattern matched", format)
-				return format, nil // pattern matched!
+				if format == "XML" {
+					// let's check XML file content
+					f, err := os.Open(path)
+					if err != nil {
+						return "", "", err
+					}
+
+					defer f.Close()
+
+					if root, err := detectXmlFile(f); err == nil {
+						return format, root, nil
+						//} else {
+						//log.WithError(err).Warnf("failed to detect XML")
+					}
+
+					// no root record, continue?
+				}
+				return format, "", nil // pattern matched!
 			}
 		}
 	}
@@ -280,7 +366,7 @@ func (engine *Engine) detectFileFormat(path string) (string, error) {
 	// let's check file content
 	f, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer f.Close()
 
@@ -290,35 +376,19 @@ func (engine *Engine) detectFileFormat(path string) (string, error) {
 
 		_, err = f.Seek(0, io.SeekStart)
 		if err != nil {
-			return "", err
-		}
-		br := bufio.NewReaderSize(f, 4*1024)
-
-		// skip spaces
-		for {
-			r, _, err := br.ReadRune()
-			if err != nil {
-				return "", err
-			}
-			if !unicode.IsSpace(r) {
-				br.UnreadRune()
-				break
-			}
+			return "", "", err
 		}
 
-		// check XML pattern, see http.DetectContentType() function
-		XML := []byte("<?xml")
-		data := make([]byte, len(XML))
-		n, err := io.ReadFull(br, data)
-		if err != nil {
-			return "", err
-		} else if n != len(XML) {
-			return "", fmt.Errorf("less data read (%d of %d)", n, 5)
+		if root, err := detectXmlFile(f); err == nil {
+			return "XML", root, nil // XML
+			//} else {
+			//log.WithError(err).Warnf("failed to detect XML")
 		}
+	}
 
-		if bytes.Equal(data, XML) {
-			return "XML", nil
-		}
+	// check for JSON
+	if false {
+		// log.Debugf("JSON content searching...")
 	}
 
 	// check for CSV content then
@@ -327,7 +397,7 @@ func (engine *Engine) detectFileFormat(path string) (string, error) {
 
 		_, err = f.Seek(0, io.SeekStart)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		br := bufio.NewReaderSize(f, 4*1024)
 		r := csv.NewReader(br)
@@ -337,11 +407,11 @@ func (engine *Engine) detectFileFormat(path string) (string, error) {
 		if err == nil && len(rec1) > 1 {
 			_, err = r.Read() // second line
 			if err == nil {
-				return "CSV", nil
+				return "CSV", "", nil
 			}
 		}
 	}
 
 	// log.Debugf("unknown file format")
-	return "", fmt.Errorf("unknown file format")
+	return "", "", fmt.Errorf("unknown file format")
 }

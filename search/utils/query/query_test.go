@@ -11,7 +11,7 @@ import (
 func TestQueryToJSON(t *testing.T) {
 	// check function
 	check := func(hasRec bool, query string, expected string) {
-		q, err := ParseQueryOptJSON(query, DefaultOptions())
+		q, err := ParseQueryOptEx(query, DefaultOptions(), IN_JRECORD)
 		if assert.NoError(t, err) {
 			assert.EqualValues(t, expected, fmt.Sprintf("%+v", q))
 			_ = hasRec // assert.EqualValues(t, hasRec, q.HasStructured())
@@ -37,7 +37,7 @@ func TestQueryToJSON(t *testing.T) {
 func TestQueryToXML(t *testing.T) {
 	// check function
 	check := func(hasRec bool, query string, expected string) {
-		q, err := ParseQueryOptXML(query, DefaultOptions())
+		q, err := ParseQueryOptEx(query, DefaultOptions(), IN_XRECORD)
 		if assert.NoError(t, err) {
 			assert.EqualValues(t, expected, fmt.Sprintf("%+v", q))
 			_ = hasRec // assert.EqualValues(t, hasRec, q.HasStructured())
@@ -63,7 +63,7 @@ func TestQueryToXML(t *testing.T) {
 func TestQueryToCSV(t *testing.T) {
 	// check function
 	check := func(hasRec bool, query string, expected string) {
-		q, err := ParseQueryOptCSV(query, DefaultOptions())
+		q, err := ParseQueryOptEx(query, DefaultOptions(), IN_CRECORD)
 		if assert.NoError(t, err) {
 			assert.EqualValues(t, expected, fmt.Sprintf("%+v", q))
 			_ = hasRec // assert.EqualValues(t, hasRec, q.HasStructured())

@@ -130,30 +130,38 @@ func TestFileFormat(t *testing.T) {
 		csvPatterns:  []string{"*.csv", "foo/*.mycsv"},
 	}
 
-	check := func(path string, expected string) {
-		format, err := engine.detectFileFormat(path)
+	check := func(path string, expected, expectedRoot string) {
+		format, root, err := engine.detectFileFormat(path)
 		if assert.NoError(t, err) {
 			assert.EqualValues(t, expected, format)
+			assert.EqualValues(t, expectedRoot, root)
 		}
 	}
 
 	bad := func(path string, expected ...string) {
-		_, err := engine.detectFileFormat(path)
+		_, _, err := engine.detectFileFormat(path)
 		if assert.Error(t, err) {
 			for _, msg := range expected {
 				assert.Contains(t, err.Error(), msg)
 			}
 		}
 	}
+	_ = bad
 
 	os.MkdirAll("/tmp/ryft/test", 0755)
 	defer os.RemoveAll("/tmp/ryft/test")
 	ioutil.WriteFile("/tmp/ryft/test/1.xml",
-		[]byte(`
-	   <?xml>`), 0644)
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <rec>
+  </rec>
+</root>`), 0644)
 	ioutil.WriteFile("/tmp/ryft/test/2.xmlx",
-		[]byte(`
-	   <?xml>`), 0644)
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <rec>
+  </rec>
+</root>`), 0644)
 	ioutil.WriteFile("/tmp/ryft/test/1.csv",
 		[]byte(`1,2,3
 4,5,6
@@ -165,23 +173,23 @@ func TestFileFormat(t *testing.T) {
 	ioutil.WriteFile("/tmp/ryft/test/1.bin",
 		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0}, 0644)
 
-	check("/tmp/ryft/test/1.xml", "XML")  // by extension
-	check("/tmp/ryft/test/3.xml", "XML")  // by extension
-	check("/tmp/ryft/test/2.xmlx", "XML") // by content
+	check("/tmp/ryft/test/1.xml", "XML", "rec") // by extension
+	// check("/tmp/ryft/test/3.xml", "XML", "rec")  // by extension
+	check("/tmp/ryft/test/2.xmlx", "XML", "rec") // by content
 
-	check("/tmp/ryft/test/foo/3.myxml", "XML") // by extension
+	// check("/tmp/ryft/test/foo/3.myxml", "XML", "rec") // by extension
 	bad("/tmp/ryft/test/3.myxml", "no such file or directory")
 
-	check("/tmp/ryft/test/1.csv", "CSV")  // by extension
-	check("/tmp/ryft/test/3.csv", "CSV")  // by extension
-	check("/tmp/ryft/test/2.csvx", "CSV") // by content
+	check("/tmp/ryft/test/1.csv", "CSV", "")  // by extension
+	check("/tmp/ryft/test/3.csv", "CSV", "")  // by extension
+	check("/tmp/ryft/test/2.csvx", "CSV", "") // by content
 
-	check("/tmp/ryft/test/foo/3.mycsv", "CSV") // by extension
+	check("/tmp/ryft/test/foo/3.mycsv", "CSV", "") // by extension
 	bad("/tmp/ryft/test/3.mycsv", "no such file or directory")
 
 	bad("/tmp/ryft/test/foo/1.bin", "no such file or directory")
 	bad("/tmp/ryft/test/1.bin", "unknown file format")
 
-	check("/tmp/ryft/test/1.txt", "")      // skip
-	check("/tmp/ryft/test/1.json", "JSON") // by extension
+	check("/tmp/ryft/test/1.txt", "", "")      // skip
+	check("/tmp/ryft/test/1.json", "JSON", "") // by extension
 }
