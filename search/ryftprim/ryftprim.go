@@ -248,12 +248,30 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
 func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+			if err, ok := r.(error); ok {
+				res.ReportError(err)
+			}
+		}
+	}()
+
 	defer task.log().WithField("result", res).Debugf("[%s]: end TASK", TAG)
 	task.log().Debugf("[%s]: start TASK...", TAG)
 
 	// wait tool for process done
 	doneCh := make(chan error, 1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+				if err, ok := r.(error); ok {
+					res.ReportError(err)
+				}
+			}
+		}()
+
 		task.log().Debugf("[%s]: waiting for tool finished...", TAG)
 		defer close(doneCh) // close channel once process is finished
 		doneCh <- task.toolCmd.Wait()
@@ -388,6 +406,15 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		// at the same time monitor the res.Cancel event!
 		doneCh := make(chan struct{})
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+					if err, ok := r.(error); ok {
+						res.ReportError(err)
+					}
+				}
+			}()
+
 			task.waitProcessingDone()
 			close(doneCh)
 		}()

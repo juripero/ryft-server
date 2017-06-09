@@ -151,6 +151,7 @@ func (fs *fakeServer) homeDir() string {
 // cleanup - delete whole home directory
 func (fs *fakeServer) cleanup() {
 	os.RemoveAll(fs.homeDir())
+	fs.server.Close()
 }
 
 // do a request
@@ -235,5 +236,7 @@ func (fs *fakeServer) PUT(url, accept string, contentType, data string, cancelIn
 // create engine
 func TestServerCreate(t *testing.T) {
 	server := NewServer() // valid (usual case)
-	assert.NotNil(t, server)
+	if assert.NotNil(t, server) {
+		defer server.Close()
+	}
 }

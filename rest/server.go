@@ -165,6 +165,8 @@ type Server struct {
 	settings    *ServerSettings
 	gotJobsChan chan int // signal new jobs added
 	// newJobsCount int32    // atomic
+
+	closeCh chan struct{} // close all
 }
 
 // NewServer creates new server instance
@@ -185,7 +187,13 @@ func NewServer() *Server {
 	s.Config.Catalogs.CacheDropTimeout_ = NewTimeDuration(&s.Config.Catalogs.CacheDropTimeout)
 	s.Config.SettingsPath = "/var/ryft/server.settings"
 
+	s.closeCh = make(chan struct{})
 	return s // OK
+}
+
+// Close() closes the server
+func (s *Server) Close() {
+	close(s.closeCh)
 }
 
 // ParseConfig parses server configuration from YML file

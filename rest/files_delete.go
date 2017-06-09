@@ -184,6 +184,15 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 			wg.Add(1)
 			go func(node *Node) {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						log.WithField("error", r).Errorf("[%s]: delete file failed", CORE)
+						if err, ok := r.(error); ok {
+							node.Error = err
+						}
+					}
+				}()
+
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("deleting on local node")
 					node.Result, node.Error = server.deleteLocalFiles(mountPoint, node.Params), nil

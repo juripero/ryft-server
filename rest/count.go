@@ -194,7 +194,8 @@ func (server *Server) DoCount(ctx *gin.Context) {
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
 				// log.WithField("error", err).Debugf("[%s]: error received", CORE) // FIXME: DEBUG
-				panic(err) // TODO: check this? no other ways to report errors
+				panic(NewError(http.StatusInternalServerError, err.Error()).
+					WithDetails("failed to do search"))
 			}
 
 		case <-res.DoneChan:
@@ -207,7 +208,8 @@ func (server *Server) DoCount(ctx *gin.Context) {
 			// ... and errors
 			for err := range res.ErrorChan {
 				// log.WithField("error", err).Debugf("[%s]: error received", CORE) // FIXME: DEBUG
-				panic(err) // TODO: check this? no other ways to report errors
+				panic(NewError(http.StatusInternalServerError, err.Error()).
+					WithDetails("failed to do search"))
 			}
 
 			transferStopTime := time.Now() // performance metric

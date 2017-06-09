@@ -286,9 +286,18 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	mux := search.NewResult()
 	go func() {
 		// some futher cleanup
-		defer mux.Close()
-		defer mux.ReportDone()
-		defer task.result.Drop(engine.KeepResultFiles)
+		defer func() {
+			if r := recover(); r != nil {
+				task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+				if err, ok := r.(error); ok {
+					mux.ReportError(err)
+				}
+			}
+
+			task.result.Drop(engine.KeepResultFiles)
+			mux.ReportDone()
+			mux.Close()
+		}()
 
 		keepDataAs := cfg.KeepDataAs
 		keepIndexAs := cfg.KeepIndexAs

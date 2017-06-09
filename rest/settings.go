@@ -340,8 +340,13 @@ WHERE datetime(whenToRun) <= datetime(?);`, now.UTC().Format(jobTimeFormat))
 	ch := make(chan SettingsJobItem, 1024)
 
 	go func() {
-		defer close(ch)
-		defer rows.Close()
+		defer func() {
+			if r := recover(); r != nil {
+				log.WithField("error", r).Errorf("[%s]: get jobs failed", CORE)
+			}
+			rows.Close()
+			close(ch)
+		}()
 
 		for rows.Next() {
 			var item SettingsJobItem
