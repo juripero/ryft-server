@@ -143,7 +143,7 @@ func needExtension(q query.Query) bool {
 		(strings.EqualFold(q.Operator, "AND") ||
 			strings.EqualFold(q.Operator, "OR") ||
 			strings.EqualFold(q.Operator, "XOR")) {
-		return true
+		return q.IsStructured()
 	}
 
 	return false
