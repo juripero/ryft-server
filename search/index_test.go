@@ -103,38 +103,47 @@ func TestIndexFile(t *testing.T) {
 {3.txt#22 [150..161)}`, f.String())
 
 	f.Width = 0
-	tmp, shift := f.Unwind(NewIndex("0.dat", 1000, 5).SetFuzziness(1))
+	tmp, shift, err := f.Unwind(NewIndex("0.dat", 1000, 5).SetFuzziness(1))
 	assert.EqualValues(t, `{0.dat#1000, len:5, d:1}`, tmp.String())
 	assert.EqualValues(t, 0, shift)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "no base found")
+	}
 
 	f.Width = 1
-	tmp, shift = f.Unwind(NewIndex("0.dat", 0, 5).UpdateHost("ryft.com"))
+	tmp, shift, err = f.Unwind(NewIndex("0.dat", 0, 5).UpdateHost("ryft.com"))
 	assert.EqualValues(t, `{1.txt#0, len:5, d:0}`, tmp.String())
 	assert.EqualValues(t, "ryft.com", tmp.Host)
 	assert.EqualValues(t, 0, shift)
+	assert.NoError(t, err)
 
 	f.Width = -1
-	tmp, shift = f.Unwind(NewIndex("0.dat", 14, 11))
+	tmp, shift, err = f.Unwind(NewIndex("0.dat", 14, 11))
 	assert.EqualValues(t, `{1.txt#11, len:11, d:0}`, tmp.String())
 	assert.EqualValues(t, 0, shift)
+	assert.NoError(t, err)
 
 	f.Width = 0
-	tmp, shift = f.Unwind(NewIndex("0.dat", 15, 5))
+	tmp, shift, err = f.Unwind(NewIndex("0.dat", 15, 5))
 	assert.EqualValues(t, `{1.txt#12, len:5, d:0}`, tmp.String())
 	assert.EqualValues(t, 0, shift)
+	assert.NoError(t, err)
 
 	f.Width = 0
-	tmp, shift = f.Unwind(NewIndex("0.dat", 15, 15))
+	tmp, shift, err = f.Unwind(NewIndex("0.dat", 15, 15))
 	assert.EqualValues(t, `{1.txt#12, len:10, d:0}`, tmp.String())
 	assert.EqualValues(t, 0, shift)
+	assert.NoError(t, err)
 
 	f.Width = 5
-	tmp, shift = f.Unwind(NewIndex("0.dat", 10, 10))
+	tmp, shift, err = f.Unwind(NewIndex("0.dat", 10, 10))
 	assert.EqualValues(t, `{1.txt#11, len:6, d:0}`, tmp.String())
 	assert.EqualValues(t, 4, shift)
+	assert.NoError(t, err)
 
 	f.Width = 5
-	tmp, shift = f.Unwind(NewIndex("0.dat", 10, 25))
+	tmp, shift, err = f.Unwind(NewIndex("0.dat", 10, 25))
 	assert.EqualValues(t, `{1.txt#11, len:11, d:0}`, tmp.String())
 	assert.EqualValues(t, 4, shift)
+	assert.NoError(t, err)
 }
