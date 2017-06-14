@@ -35,6 +35,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -65,22 +66,27 @@ type SearchParams struct {
 
 	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
+	KeepViewAs  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
-	Limit       int    `form:"limit" json:"limit,omitempty" msgpack:"limite,omitempty"`
+	Lifetime    string `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
+	Limit       int    `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
 
-	Format      string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
-	Fields      string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
-	Stats       bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
-	Stream      bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
-	ErrorPrefix bool   `form:"ep" json:"ep,omitempty" msgpack:"ep,omitempty"` // include host prefixes for error messages
+	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
+	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
+	Stats  bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
+	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 
 	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
 	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
 
 	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
+
+	// internal parameters
+	InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
+	InternalNoSessionId bool `form:"--internal-no-session-id"`
 }
 
 // Handle /search endpoint.
@@ -157,14 +163,21 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.KeepDataAs = params.KeepDataAs
-	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
+	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
+	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
+	if len(params.Lifetime) > 0 {
+		if cfg.Lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse lifetime"))
+		}
+	}
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)
 	cfg.Limit = uint(params.Limit)
-	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	cfg.Performance = params.Performance
+	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse sharing mode"))
@@ -175,6 +188,13 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse transformations"))
+	}
+
+	// session preparation
+	session, err := NewSession(server.Config.Sessions.Algorithm)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to create session token"))
 	}
 
 	log.WithFields(map[string]interface{}{
@@ -205,7 +225,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 
 	// error prefix
 	var errorPrefix string
-	if params.ErrorPrefix {
+	if params.InternalErrorPrefix {
 		errorPrefix = server.Config.HostName
 	}
 
@@ -283,6 +303,12 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 				if server.Config.ExtraRequest {
 					res.Stat.Extra["request"] = &params
 				}
+
+				if cfg.Lifetime != 0 {
+					// delete output INDEX&DATA&VIEW files later
+					server.cleanupSession(homeDir, cfg)
+				}
+
 				if params.Performance {
 					metrics := map[string]interface{}{
 						"prepare":  searchStartTime.Sub(requestStartTime).String(),
@@ -292,6 +318,17 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 					}
 					res.Stat.AddPerfStat("rest-search", metrics)
 				}
+
+				if session != nil && !params.InternalNoSessionId {
+					updateSession(session, res.Stat)
+					token, err := session.Token(server.Config.Sessions.secret)
+					if err != nil {
+						panic(err)
+					}
+					log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
+					res.Stat.Extra["session"] = token
+				}
+
 				xstat := tcode.FromStat(res.Stat)
 				err := enc.EncodeStat(xstat)
 				if err != nil {
@@ -417,4 +454,52 @@ func parseNameAndArgs(s string) (string, []string, error) {
 	}
 
 	return "", nil, fmt.Errorf("no script name found")
+}
+
+// update Session token based on provided session data
+func updateSession(session *Session, stat *search.Stat) {
+	data := []interface{}{}
+
+	// get data from details
+	for _, dstat := range stat.Details {
+		if d := dstat.GetSessionData(); d != nil {
+			// see ryftmux search engine for "--internal-cluster-mode" flag
+			if flag, ok := dstat.Extra["--internal-cluster-mode"]; ok {
+				delete(dstat.Extra, "--internal-cluster-mode") // clean-up
+				if v, ok := flag.(bool); ok && v {
+					data = append(data, d)
+				}
+			}
+		}
+	}
+
+	// get main data
+	if d := stat.GetSessionData(); d != nil {
+		data = append(data, d)
+	}
+
+	session.SetData("info", data)
+	stat.ClearSessionData(true)
+}
+
+// mark output files to delete later
+func (server *Server) cleanupSession(homeDir string, cfg *search.Config) {
+	mountPoint, _ := server.getMountPoint(homeDir)
+	now := time.Now()
+
+	if len(cfg.KeepIndexAs) != 0 {
+		server.addJob("delete-file",
+			filepath.Join(mountPoint, homeDir, cfg.KeepIndexAs),
+			now.Add(cfg.Lifetime))
+	}
+	if len(cfg.KeepDataAs) != 0 {
+		server.addJob("delete-file",
+			filepath.Join(mountPoint, homeDir, cfg.KeepDataAs),
+			now.Add(cfg.Lifetime))
+	}
+	if len(cfg.KeepViewAs) != 0 {
+		server.addJob("delete-file",
+			filepath.Join(mountPoint, homeDir, cfg.KeepViewAs),
+			now.Add(cfg.Lifetime))
+	}
 }

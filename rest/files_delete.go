@@ -148,14 +148,9 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 
 		for i, service := range services {
 			node := new(Node)
-			scheme := "http"
-			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
-			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-				// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
-			}
+			node.Address = getServiceUrl(service)
 			node.IsLocal = server.isLocalService(service)
+			// node.Name = fmt.Sprintf("%s-%d", service.Node, service.Port)
 			node.Name = service.Node
 			node.Params.Local = true
 

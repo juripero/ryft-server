@@ -277,6 +277,7 @@ func main() {
 
 	// main API endpoints
 	private.GET("/search", server.DoSearch)
+	private.GET("/search/show", server.DoSearchShow)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
 

@@ -67,6 +67,8 @@ type Engine struct {
 	ReadFilePollLimit   int
 
 	IndexHost string // optional host (cluster mode)
+
+	options map[string]interface{}
 }
 
 // NewEngine creates new RyftPrim search engine.

@@ -44,6 +44,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/getryft/ryft-server/search/utils/query"
+	"github.com/getryft/ryft-server/search/utils/view"
 )
 
 var (
@@ -141,10 +142,10 @@ type PostProcessing interface {
 	AddCatalog(base *catalog.Catalog) error
 
 	DrainFinalResults(task *Task, mux *search.Result,
-		keepDataAs, keepIndexAs, delimiter string,
+		keepDataAs, keepIndexAs, delimiter, keepViewAs string,
 		mountPointAndHomeDir string,
 		ryftCalls []RyftCall,
-		filter string) error
+		filter string) (uint64, error)
 	GetUniqueFiles(task *Task, mux *search.Result,
 		mountPointAndHomeDir string,
 		filter string) ([]string, error)
@@ -559,8 +560,8 @@ func (p memItems) Less(i, j int) bool {
 
 // DrainFinalResults drain final results
 func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Result,
-	keepDataAs, keepIndexAs, delimiter string, home string,
-	ryftCalls []RyftCall, filter string) error {
+	keepDataAs, keepIndexAs, delimiter, keepViewAs string, home string,
+	ryftCalls []RyftCall, filter string) (uint64, error) {
 
 	start := time.Now()
 	defer func() {
@@ -582,7 +583,7 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 		var err error
 		ff, err = regexp.Compile(filter)
 		if err != nil {
-			return fmt.Errorf("failed to compile filter's regexp: %s", err)
+			return 0, fmt.Errorf("failed to compile filter's regexp: %s", err)
 		}
 	}
 
@@ -678,7 +679,7 @@ BuildItems:
 	if len(keepDataAs) > 0 {
 		f, err := os.Create(filepath.Join(home, keepDataAs))
 		if err != nil {
-			return fmt.Errorf("failed to create DATA file: %s", err)
+			return 0, fmt.Errorf("failed to create DATA file: %s", err)
 		}
 		datFile = bufio.NewWriterSize(f, 256*1024)
 		defer func() {
@@ -692,12 +693,27 @@ BuildItems:
 	if len(keepIndexAs) > 0 {
 		f, err := os.Create(filepath.Join(home, keepIndexAs))
 		if err != nil {
-			return fmt.Errorf("failed to create INDEX file: %s", err)
+			return 0, fmt.Errorf("failed to create INDEX file: %s", err)
 		}
 		idxFile = bufio.NewWriterSize(f, 256*1024)
 		defer func() {
 			idxFile.Flush()
 			f.Close()
+		}()
+	}
+
+	// output VIEW file
+	var viewFile *view.Writer
+	var indexPos, dataPos int64
+	if len(keepViewAs) > 0 {
+		f, err := view.Create(filepath.Join(home, keepViewAs))
+		if err != nil {
+			return 0, fmt.Errorf("failed to create VIEW file: %s", err)
+		}
+		viewFile = f
+		defer func() {
+			viewFile.Update(indexPos, dataPos)
+			viewFile.Close()
 		}()
 	}
 
@@ -715,6 +731,7 @@ BuildItems:
 
 	// handle all index items
 	const reportRecords = true
+	var matches uint64
 ItemsLoop:
 	for _, item := range items {
 		cf := files[item.dataFile]
@@ -811,6 +828,8 @@ ItemsLoop:
 		}
 
 		// output DATA file
+		dataBeg := dataPos
+		dataEnd := dataPos + int64(len(recRawData))
 		if datFile != nil {
 			start := time.Now()
 			n, err := datFile.Write(recRawData)
@@ -832,8 +851,11 @@ ItemsLoop:
 			}
 			datFileTime += time.Since(start)
 		}
+		dataPos += int64(len(recRawData) + len(delimiter))
 
 		// output INDEX file
+		indexBeg := indexPos
+		indexEnd := indexBeg
 		if idxFile != nil {
 			start := time.Now()
 			indexStr := fmt.Sprintf("%s,%d,%d,%d\n", item.Index.File, item.Index.Offset, item.Index.Length, item.Index.Fuzziness)
@@ -842,7 +864,18 @@ ItemsLoop:
 				mux.ReportError(fmt.Errorf("failed to write INDEX: %s", err))
 				// file is corrupted, any sense to continue?
 			}
+			indexEnd += int64(len(indexStr))
+			indexPos += int64(len(indexStr))
 			idxFileTime += time.Since(start)
+		}
+
+		// output VIEW file
+		if viewFile != nil {
+			err := viewFile.Put(indexBeg, indexEnd, dataBeg, dataEnd)
+			if err != nil {
+				mux.ReportError(fmt.Errorf("failed to write VIEW: %s", err))
+				// any sense to continue?
+			}
 		}
 
 		if reportRecords {
@@ -852,6 +885,7 @@ ItemsLoop:
 			idx.DataPos = 0 // hide data position
 			mux.ReportRecord(rec)
 		}
+		matches++
 	}
 
 	task.procPerfStat = map[string]interface{}{
@@ -862,7 +896,7 @@ ItemsLoop:
 		"transform":   transformTime.String(),
 	}
 
-	return nil // OK
+	return matches, nil // OK
 }
 
 // GetUniqueFiles gets the unique list of files from unwinded indexes

@@ -206,6 +206,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 		keepDataAs := cfg.KeepDataAs
 		keepIndexAs := cfg.KeepIndexAs
+		keepViewAs := cfg.KeepViewAs
 		delimiter := cfg.Delimiter
 
 		searchStart := time.Now()
@@ -238,8 +239,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		}
 
 		drainStart := time.Now()
-		err = task.result.DrainFinalResults(task, mux,
-			keepDataAs, keepIndexAs, delimiter,
+		matches, err := task.result.DrainFinalResults(task, mux,
+			keepDataAs, keepIndexAs, delimiter, keepViewAs,
 			filepath.Join(opts.MountPoint, opts.HomeDir),
 			res.Output, findLastFilter(task.rootQuery))
 		if err != nil {
@@ -267,6 +268,16 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			}
 
 			mux.Stat.AddPerfStat("ryftdec", metrics)
+		}
+
+		if mux.Stat != nil {
+			mux.Stat.AddSessionData("index", task.config.KeepIndexAs)
+			mux.Stat.AddSessionData("data", task.config.KeepDataAs)
+			mux.Stat.AddSessionData("view", task.config.KeepViewAs)
+			mux.Stat.AddSessionData("delim", task.config.Delimiter)
+			mux.Stat.AddSessionData("width", task.config.Width)
+			mux.Stat.AddSessionData("matches", matches)
+			mux.Stat.Matches = matches // override, since some records can be filtered out
 		}
 	}()
 
@@ -302,6 +313,7 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 	engine.updateConfig(cfg, query.Simple)
 	cfg.KeepDataAs = dat1
 	cfg.KeepIndexAs = idx1
+	cfg.KeepViewAs = ""
 	cfg.ReportIndex = false
 	cfg.ReportData = false
 

@@ -28,79 +28,49 @@
  * ============
  */
 
-package ryfthttp
+package view
 
 import (
-	"fmt"
-	"net/url"
-
-	"github.com/getryft/ryft-server/search/utils"
+	"encoding/binary"
 )
 
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	opts := make(map[string]interface{})
-	for k, v := range engine.options {
-		opts[k] = v
+const (
+	SIGNATURE = uint64(0x7279667476696577) // "ryftview"
+	bufSize   = 256 * 1024
+)
+
+var (
+	byteOrder  = binary.BigEndian
+	headerSize = int64(binary.Size(Header{}))
+	itemSize   = int64(binary.Size(Item{}))
+)
+
+// Header is a VIEW file header.
+// [0] signature
+// [1] number of items
+// [2] index file length
+// [3] data file length
+// [4..7] reserved
+type Header [8]uint64
+
+// MakeHeader initializes new VIEW header.
+func MakeHeader(itemCount uint64, indexLength int64, dataLength int64) Header {
+	return Header{
+		SIGNATURE, itemCount,
+		uint64(indexLength),
+		uint64(dataLength),
+		0, 0, 0, 0,
 	}
-	opts["server-url"] = engine.ServerURL
-	opts["auth-token"] = engine.AuthToken
-	opts["local-only"] = engine.LocalOnly
-	opts["skip-stat"] = engine.SkipStat
-	opts["index-host"] = engine.IndexHost
-	return opts
 }
 
-// update engine options.
-func (engine *Engine) update(opts map[string]interface{}) (err error) {
-	engine.options = opts // base
+// Item is a VIEW file item.
+// [0] begin of index
+// [1] end of index
+// [2] begin of data
+// [3] end of data
+type Item [4]int64
 
-	// server URL
-	if v, ok := opts["server-url"]; ok {
-		engine.ServerURL, err = utils.AsString(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
-		}
-	} else {
-		engine.ServerURL = "http://localhost:8765"
-	}
-	if _, err := url.Parse(engine.ServerURL); err != nil {
-		return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
-	}
-
-	// auth token
-	if v, ok := opts["auth-token"]; ok {
-		engine.AuthToken, err = utils.AsString(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "auth-token" option: %s`, err)
-		}
-	} else {
-		engine.AuthToken = ""
-	}
-
-	// local only flag
-	if v, ok := opts["local-only"]; ok {
-		engine.LocalOnly, err = utils.AsBool(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "local-only" option: %s`, err)
-		}
-	}
-
-	// skip stat flag
-	if v, ok := opts["skip-stat"]; ok {
-		engine.SkipStat, err = utils.AsBool(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "skip-stat" option: %s`, err)
-		}
-	}
-
-	// index host
-	if v, ok := opts["index-host"]; ok {
-		engine.IndexHost, err = utils.AsString(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "index-host" option: %s`, err)
-		}
-	}
-
-	return nil // OK
+// MakeItem initializes new VIEW item.
+func MakeItem(indexBeg, indexEnd int64, dataBeg, dataEnd int64) Item {
+	return Item{indexBeg, indexEnd, dataBeg, dataEnd}
 }

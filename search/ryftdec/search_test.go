@@ -784,8 +784,8 @@ func TestRyftFinalResults(t *testing.T) {
 		}
 
 		mux := search.NewResult()
-		err := mpp.DrainFinalResults(task, mux,
-			"data.out", "index.out", "\n",
+		_, err := mpp.DrainFinalResults(task, mux,
+			"data.out", "index.out", "\n", "",
 			home, ryftCalls, "")
 		if !assert.NoError(t, err) {
 			return

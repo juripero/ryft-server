@@ -262,8 +262,8 @@ auth-jwt:
   lifetime: 2h
 ```
 
-Signing algorithm can be customized via `algorithm` option. It can be `RS256` for
-example.
+Signing algorithm can be customized via `algorithm` option. It can be `RS256`
+or `HS512` for example.
 
 Secret can be simple string `secret: "my super secret key"` or file reference
 `secret: "@~/.ssh/id_rsa"` to use `~/.ssh/id_rsa` file content as a secret.
@@ -363,6 +363,23 @@ post-processing-scripts:
 
 Each item is a script name and a `path` containing full path to the
 application/script and a set of additional command line options.
+
+
+### Session configuration
+
+This configuration section customizes the session related options:
+
+```{.yaml}
+sessions:
+  signing-algorithm: HS256
+  secret: session-secret-key
+```
+
+The JWT token `signing-algorithm` can be one of: `HS256`, `HS384`, `HS512`,
+`RS256`, `RS384`, `RS512`.
+
+Secret can be simple string `secret: "my super secret key"` or file reference
+`secret: "@~/.ssh/id_rsa"` to use `~/.ssh/id_rsa` file content as a secret.
 
 
 # Debian package

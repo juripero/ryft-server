@@ -15,6 +15,7 @@ func TestConfigEmpty(t *testing.T) {
 
 	assert.Empty(t, cfg.KeepDataAs)
 	assert.Empty(t, cfg.KeepIndexAs)
+	assert.Empty(t, cfg.KeepViewAs)
 	assert.Empty(t, cfg.Delimiter)
 
 	assert.Equal(t, `Config{query:, files:[], mode:"", width:0, dist:0, cs:true, nodes:0, limit:0, keep-data:"", keep-index:"", delim:"", index:false, data:false}`, cfg.String())
@@ -46,6 +47,7 @@ func TestConfigRelativeToHome(t *testing.T) {
 	cfg := NewConfig("hello", "../a.txt", "../b.txt")
 	cfg.KeepIndexAs = "../index.txt"
 	cfg.KeepDataAs = "../data.txt"
+	cfg.KeepViewAs = "../view.txt"
 
 	// input
 	if err := cfg.CheckRelativeToHome("/ryftone"); assert.Error(t, err) {
@@ -67,6 +69,13 @@ func TestConfigRelativeToHome(t *testing.T) {
 		assert.Contains(t, err.Error(), "is not relative to home")
 	}
 	cfg.KeepDataAs = ""
+
+	// view
+	if err := cfg.CheckRelativeToHome("/ryftone"); assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "view")
+		assert.Contains(t, err.Error(), "is not relative to home")
+	}
+	cfg.KeepViewAs = ""
 
 	// valid
 	assert.NoError(t, cfg.CheckRelativeToHome("/ryftone"))

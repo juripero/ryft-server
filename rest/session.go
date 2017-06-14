@@ -28,79 +28,63 @@
  * ============
  */
 
-package ryfthttp
+package rest
 
 import (
 	"fmt"
-	"net/url"
 
-	"github.com/getryft/ryft-server/search/utils"
+	"gopkg.in/dgrijalva/jwt-go.v2"
 )
 
-// Options gets all engine options.
-func (engine *Engine) Options() map[string]interface{} {
-	opts := make(map[string]interface{})
-	for k, v := range engine.options {
-		opts[k] = v
-	}
-	opts["server-url"] = engine.ServerURL
-	opts["auth-token"] = engine.AuthToken
-	opts["local-only"] = engine.LocalOnly
-	opts["skip-stat"] = engine.SkipStat
-	opts["index-host"] = engine.IndexHost
-	return opts
+// Session information
+// contains file names and other information
+// especially for cluster mode
+type Session struct {
+	token *jwt.Token
 }
 
-// update engine options.
-func (engine *Engine) update(opts map[string]interface{}) (err error) {
-	engine.options = opts // base
-
-	// server URL
-	if v, ok := opts["server-url"]; ok {
-		engine.ServerURL, err = utils.AsString(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
-		}
-	} else {
-		engine.ServerURL = "http://localhost:8765"
-	}
-	if _, err := url.Parse(engine.ServerURL); err != nil {
-		return fmt.Errorf(`failed to parse "server-url" option: %s`, err)
+// NewSession creates new empty token
+func NewSession(alg string) (*Session, error) {
+	method := jwt.GetSigningMethod(alg)
+	if method == nil {
+		return nil, fmt.Errorf("failed to get signing method for %q", alg)
 	}
 
-	// auth token
-	if v, ok := opts["auth-token"]; ok {
-		engine.AuthToken, err = utils.AsString(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "auth-token" option: %s`, err)
-		}
-	} else {
-		engine.AuthToken = ""
+	session := new(Session)
+	session.token = jwt.New(method)
+	return session, nil // OK
+}
+
+// ParseSession parses session from token string
+func ParseSession(secret []byte, token string) (*Session, error) {
+	t, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+		return secret, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse session token: %s", err)
 	}
 
-	// local only flag
-	if v, ok := opts["local-only"]; ok {
-		engine.LocalOnly, err = utils.AsBool(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "local-only" option: %s`, err)
-		}
-	}
+	session := new(Session)
+	session.token = t
+	return session, nil // OK
+}
 
-	// skip stat flag
-	if v, ok := opts["skip-stat"]; ok {
-		engine.SkipStat, err = utils.AsBool(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "skip-stat" option: %s`, err)
-		}
-	}
+// Get Session signed string.
+func (s *Session) Token(secret []byte) (string, error) {
+	return s.token.SignedString(secret)
+}
 
-	// index host
-	if v, ok := opts["index-host"]; ok {
-		engine.IndexHost, err = utils.AsString(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "index-host" option: %s`, err)
-		}
-	}
+// SetData
+func (s *Session) SetData(name string, val interface{}) {
+	s.token.Claims[name] = val
+}
 
-	return nil // OK
+// GetData
+func (s *Session) GetData(name string) interface{} {
+	return s.token.Claims[name]
+}
+
+// AllData
+func (s *Session) AllData() map[string]interface{} {
+	return s.token.Claims
 }

@@ -60,14 +60,12 @@ func (server *Server) DoClusterMembers(ctx *gin.Context) {
 	info := make([]map[string]interface{}, len(services))
 	for i, s := range services {
 		info[i] = map[string]interface{}{
-			"node": s.Node,
-			"tags": s.ServiceTags,
-			"address": func() string {
-				if s.ServicePort != 0 {
-					return fmt.Sprintf("%s:%d", s.ServiceAddress, s.ServicePort)
-				}
-				return s.ServiceAddress
-			}(),
+			"node":            s.Node,
+			"address":         s.Address,
+			"service-address": s.ServiceAddress,
+			"service-port":    s.ServicePort,
+			"service-id":      s.ServiceID,
+			"service-tags":    s.ServiceTags,
 		}
 	}
 
@@ -223,8 +221,15 @@ func (s *Server) isLocalService(service *consul.CatalogService) bool {
 		return false
 	}
 
+	var address string
+	if service.ServiceAddress != "" {
+		address = service.ServiceAddress
+	} else {
+		address = service.Address
+	}
+
 	// check each interface without mask
-	saddr := service.Address + "/"
+	saddr := address + "/"
 	for _, addr := range addrs {
 		if strings.HasPrefix(addr.String(), saddr) {
 			return true
@@ -232,6 +237,50 @@ func (s *Server) isLocalService(service *consul.CatalogService) bool {
 	}
 
 	return false
+}
+
+// check if service is local
+func (s *Server) isLocalServiceUrl(serviceUrl *url.URL) bool {
+	parts := strings.Split(serviceUrl.Host, ":")
+
+	// service port must match
+	if len(parts) < 2 || parts[1] != fmt.Sprintf("%d", s.listenAddress.Port) {
+		return false
+	}
+
+	// get all interfaces
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.WithError(err).Warnf("failed to get interface addresses")
+		return false
+	}
+
+	// check each interface without mask
+	saddr := parts[0] + "/"
+	for _, addr := range addrs {
+		if strings.HasPrefix(addr.String(), saddr) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// get service URL
+func getServiceUrl(service *consul.CatalogService) string {
+	var address string
+	if service.ServiceAddress != "" {
+		address = service.ServiceAddress
+	} else {
+		address = service.Address
+	}
+
+	port := 8765
+	if service.ServicePort != 0 {
+		port = service.ServicePort
+	}
+
+	return fmt.Sprintf("http://%s:%d", address, port)
 }
 
 // get partition info from the KV storage

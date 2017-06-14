@@ -79,8 +79,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	defer mux.ReportDone()
 
 	// communication channel to report completed results
-	resCh := make(chan *search.Result,
-		len(task.results))
+	resCh := make(chan *search.Result, len(task.results))
 
 	// start multiplexing results and errors
 	task.log().Debugf("[%s]: start subtask processing...", TAG)
@@ -91,8 +90,8 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	} else {
 		recordsLimit = math.MaxUint64
 	}
-	for _, res := range task.results {
-		go func(res *search.Result) {
+	for i, res := range task.results {
+		go func(backend search.Engine, res *search.Result) {
 			defer func() {
 				task.subtasks.Done()
 				resCh <- res
@@ -153,11 +152,21 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 						}
 					}
 
+					// set some session specific data
+					if opts := backend.Options(); opts != nil && res.Stat != nil {
+						if url, ok := opts["--cluster-node-addr"]; ok {
+							res.Stat.AddSessionData("location", url)
+						}
+						if node, ok := opts["--cluster-node-name"]; ok {
+							res.Stat.AddSessionData("node", node)
+						}
+					}
+
 					return // done!
 				}
 			}
 
-		}(res)
+		}(engine.Backends[i], res)
 	}
 
 	// wait for statistics and process cancellation
@@ -175,6 +184,7 @@ WaitLoop:
 						// create multiplexed statistics
 						mux.Stat = search.NewStat(engine.IndexHost)
 					}
+					res.Stat.Extra["--internal-cluster-mode"] = true // ! mark for sessions
 					mux.Stat.Merge(res.Stat)
 				}
 				finished[res] = true
