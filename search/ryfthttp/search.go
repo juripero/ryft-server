@@ -83,13 +83,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup
 	defer func() {
-		if r := recover(); r != nil {
-			task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
-			if err, ok := r.(error); ok {
-				res.ReportError(err)
-			}
-		}
-
+		res.ReportUnhandledPanic(log)
 		res.ReportDone()
 		res.Close()
 	}()
@@ -124,14 +118,7 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 
 	// handle task cancellation
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
-				if err, ok := r.(error); ok {
-					res.ReportError(err)
-				}
-			}
-		}()
+		defer res.ReportUnhandledPanic(log)
 
 		select {
 		case <-res.CancelChan:
@@ -225,13 +212,7 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup
 	defer func() {
-		if r := recover(); r != nil {
-			task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
-			if err, ok := r.(error); ok {
-				res.ReportError(err)
-			}
-		}
-
+		res.ReportUnhandledPanic(log)
 		res.ReportDone()
 		res.Close()
 	}()
@@ -262,14 +243,7 @@ func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result)
 
 	// handle task cancellation
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
-				if err, ok := r.(error); ok {
-					res.ReportError(err)
-				}
-			}
-		}()
+		defer res.ReportUnhandledPanic(log)
 
 		select {
 		case <-res.CancelChan:

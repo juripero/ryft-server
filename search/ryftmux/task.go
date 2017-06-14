@@ -76,13 +76,7 @@ func (task *Task) add(res *search.Result) {
 func (engine *Engine) run(task *Task, mux *search.Result) {
 	// some futher cleanup
 	defer func() {
-		if r := recover(); r != nil {
-			task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
-			if err, ok := r.(error); ok {
-				mux.ReportError(err)
-			}
-		}
-
+		mux.ReportUnhandledPanic(log)
 		mux.ReportDone()
 		mux.Close()
 	}()
@@ -102,13 +96,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	for i, res := range task.results {
 		go func(backend search.Engine, res *search.Result) {
 			defer func() {
-				if r := recover(); r != nil {
-					task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
-					if err, ok := r.(error); ok {
-						res.ReportError(err)
-					}
-				}
-
+				res.ReportUnhandledPanic(log)
 				task.subtasks.Done()
 				resCh <- res
 			}()

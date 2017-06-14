@@ -344,6 +344,7 @@ WHERE datetime(whenToRun) <= datetime(?);`, now.UTC().Format(jobTimeFormat))
 			if r := recover(); r != nil {
 				log.WithField("error", r).Errorf("[%s]: get jobs failed", CORE)
 			}
+
 			rows.Close()
 			close(ch)
 		}()

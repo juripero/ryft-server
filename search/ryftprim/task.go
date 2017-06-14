@@ -118,13 +118,7 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	task.readStartTime = time.Now() // performance metric
 	go func() {
 		defer func() {
-			if r := recover(); r != nil {
-				task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
-				if err, ok := r.(error); ok {
-					res.ReportError(err)
-				}
-			}
-
+			res.ReportUnhandledPanic(log)
 			task.resultWait.Done()
 		}()
 		rr.process(res)
