@@ -49,6 +49,12 @@ func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	for _, backend := range engine.Backends {
 		// get files in goroutine
 		go func(backend search.Engine) {
+			defer func() {
+				if r := recover(); r != nil {
+					task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+				}
+			}()
+
 			res, err := backend.Files(path, hidden)
 			if err != nil {
 				task.log().WithError(err).Warnf("failed to start /files backend")

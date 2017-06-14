@@ -49,6 +49,7 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["ryftprim-exec"] = engine.ExecPath
 	opts["ryftprim-legacy"] = engine.LegacyMode
 	opts["ryftprim-kill-on-cancel"] = engine.KillToolOnCancel
+	opts["ryftprim-abs-path"] = engine.UseAbsPath
 	opts["ryftone-mount"] = engine.MountPoint
 	opts["home-dir"] = engine.HomeDir
 	opts["open-poll"] = engine.OpenFilePollTimeout.String()
@@ -104,6 +105,16 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 	} else {
 		engine.KillToolOnCancel = false // disable by default
+	}
+
+	// `ryftprim` absolute path
+	if v, ok := opts["ryftprim-abs-path"]; ok {
+		engine.UseAbsPath, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "ryftprim-abs-path" option: %s`, err)
+		}
+	} else {
+		engine.UseAbsPath = false // disable by default
 	}
 
 	// `ryftone` mount point

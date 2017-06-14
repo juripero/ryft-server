@@ -82,8 +82,17 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 // do /search processing
 func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup
-	defer res.Close()
-	defer res.ReportDone()
+	defer func() {
+		if r := recover(); r != nil {
+			task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+			if err, ok := r.(error); ok {
+				res.ReportError(err)
+			}
+		}
+
+		res.ReportDone()
+		res.Close()
+	}()
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
@@ -115,6 +124,15 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 
 	// handle task cancellation
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+				if err, ok := r.(error); ok {
+					res.ReportError(err)
+				}
+			}
+		}()
+
 		select {
 		case <-res.CancelChan:
 			task.log().Warnf("[%s]: cancelling by client", TAG)
@@ -206,8 +224,17 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 // do /count processing
 func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup
-	defer res.Close()
-	defer res.ReportDone()
+	defer func() {
+		if r := recover(); r != nil {
+			task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+			if err, ok := r.(error); ok {
+				res.ReportError(err)
+			}
+		}
+
+		res.ReportDone()
+		res.Close()
+	}()
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
@@ -235,6 +262,15 @@ func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result)
 
 	// handle task cancellation
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				task.log().WithField("error", r).Errorf("[%s]: unhandled panic", TAG)
+				if err, ok := r.(error); ok {
+					res.ReportError(err)
+				}
+			}
+		}()
+
 		select {
 		case <-res.CancelChan:
 			task.log().Warnf("[%s]: cancelling by client", TAG)

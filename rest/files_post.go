@@ -172,7 +172,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	}
 
 	userName, authToken, homeDir, userTag := s.parseAuthAndHome(ctx)
-	mountPoint, err := s.getMountPoint(homeDir)
+	mountPoint, err := s.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))
@@ -340,6 +340,15 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				wg.Add(1)
 				go func(node *Node) {
 					defer wg.Done()
+					defer func() {
+						if r := recover(); r != nil {
+							log.WithField("error", r).Errorf("[%s]: post file failed", CORE)
+							if err, ok := r.(error); ok {
+								node.Error = err
+							}
+						}
+					}()
+
 					if node.IsLocal {
 						log.WithField("what", node.Params).Debugf("copying on local node")
 						_, node.Result, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, node.data)

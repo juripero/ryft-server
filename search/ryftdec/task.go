@@ -479,6 +479,13 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 		}
 	}
 
+	// check DATA file consistency
+	if info, err := os.Stat(dataPath); err == nil {
+		if expected, actual := dataPos, info.Size(); expected != uint64(actual) {
+			return fmt.Errorf("inconsistent data file '%s' size: expected:%d, actual:%d", dataPath, expected, actual)
+		}
+	}
+
 	return nil // OK
 }
 
@@ -505,15 +512,18 @@ func (mpp *InMemoryPostProcessing) AddCatalog(base *catalog.Catalog) error {
 }
 
 // unwind index recursively
-func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, int) {
+func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, int, error) {
 	if f, ok := mpp.indexes[index.File]; ok && f != nil {
-		tmp, shift := f.Unwind(index)
-		// task.log().Debugf("unwind %s => %s", index, tmp)
-		res, n := mpp.unwind(tmp)
-		return res, n + shift
+		if tmp, shift, err := f.Unwind(index); err != nil {
+			return tmp, shift, err // FAILED
+		} else {
+			// log.Debugf("unwind %s => %s", index, tmp)
+			res, n, err := mpp.unwind(tmp)
+			return res, n + shift, err
+		}
 	}
 
-	return index, 0 // done
+	return index, 0, nil // done
 }
 
 // in-memory index reference
@@ -599,7 +609,10 @@ BuildItems:
 			dataPos := item.DataPos
 
 			// do recursive unwinding!
-			idx, shift := mpp.unwind(item)
+			idx, shift, err := mpp.unwind(item)
+			if err != nil {
+				return fmt.Errorf("failed to unwind index: %s", err)
+			}
 			if shift != 0 || idx.Length != item.Length {
 				simple = false
 			}
@@ -926,7 +939,10 @@ func (mpp *InMemoryPostProcessing) GetUniqueFiles(task *Task, mux *search.Result
 
 		for _, item := range f.Items {
 			// do recursive unwinding!
-			idx, _ := mpp.unwind(item)
+			idx, _, err := mpp.unwind(item)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unwind index: %s", err)
+			}
 
 			// trim mount point from file name! TODO: special option for this?
 			idx.File = relativeToHome(home, idx.File)

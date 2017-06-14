@@ -157,6 +157,8 @@ type ServerConfig struct {
 		ExecCmd []string            `yaml:"exec"`
 		Images  map[string][]string `yaml:"images"`
 	} `yaml:"docker,omitempty"`
+
+	DefaultUserConfig map[string]interface{} `yaml:"default-user-config"`
 }
 
 // Server instance
@@ -177,6 +179,8 @@ type Server struct {
 	settings    *ServerSettings
 	gotJobsChan chan int // signal new jobs added
 	// newJobsCount int32    // atomic
+
+	closeCh chan struct{} // close all
 }
 
 // NewServer creates new server instance
@@ -199,7 +203,13 @@ func NewServer() *Server {
 	s.Config.Sessions.Algorithm = "HS256"
 	s.Config.Sessions.Secret = "session-secret-key"
 
+	s.closeCh = make(chan struct{})
 	return s // OK
+}
+
+// Close() closes the server
+func (s *Server) Close() {
+	close(s.closeCh)
 }
 
 // ParseConfig parses server configuration from YML file

@@ -80,6 +80,7 @@ func (f *serverConfigValue) String() string {
 // main server's entry point
 func main() {
 	server := rest.NewServer() // server instance
+	defer server.Close()
 
 	// parse command line arguments
 	kingpin.Flag("config", "Server configuration in YML format.").SetValue(&serverConfigValue{s: server})
