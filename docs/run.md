@@ -365,6 +365,35 @@ Each item is a script name and a `path` containing full path to the
 application/script and a set of additional command line options.
 
 
+### Docker configuration
+
+There is Docker-related configuration section:
+
+```{.yaml}
+docker:
+  run: ["/usr/bin/docker", "run", "--rm", "--network=none", "--volume=${RYFTHOME}:/ryftone", "--workdir=/ryftone"]
+  exec: ["/usr/bin/docker", "exec", "${CONTAINER}"]
+  images:
+    default: ["alpine:latest"]
+    alpine: ["alpine:latest"]
+    ubuntu: ["ubuntu:16.04"]
+    python: ["python:2.7"]
+```
+
+The list of `images` is used to restrict number of Docker images allowed.
+These images should be pulled from the Docker hub with `docker pull <image>` command.
+
+The `run` command is used to run custom command in a Docker container.
+
+The `exec` command is used to run custom command in an already running  Docker container.
+
+There are a few "environment" variables can be used:
+- `${RYFTONE}` path to `/ryftone` partition
+- `${RYFTHOME}` path to Ryft user's home directory: `/ryftone/user`
+- `${RYFTUSER}` name of authenticated Ryft user
+- `${CONTAINER}` Docker container identifier
+
+
 ### Session configuration
 
 This configuration section customizes the session related options:
@@ -380,6 +409,62 @@ The JWT token `signing-algorithm` can be one of: `HS256`, `HS384`, `HS512`,
 
 Secret can be simple string `secret: "my super secret key"` or file reference
 `secret: "@~/.ssh/id_rsa"` to use `~/.ssh/id_rsa` file content as a secret.
+
+
+### Ryft user configuration
+
+Some parameters of ryft-server might be customized via Ryft user configuration file.
+Every user can change some part of ryft-server behaviour uploading special `YAML`
+or `JSON` configuration file:
+
+```{.sh}
+curl -s "http://ryft-host:8765/files?file=.ryft-user.yaml&offset=0" \
+     -H 'Content-Type: application/octet-stream' --data \
+'record-queries:
+  enabled: true
+  skip: ["*.txt", "*.dat"]
+  json: ["*.json"]
+  xml: ["*.xml"]
+  csv: ["*.csv"]
+'
+```
+
+By default the `default-user-config` section from main configuration file used.
+But if the `/ryftone/${RYFTUSER}/.ryft-user.yaml` or `/ryftone/${RYFTUSER}/.ryft-user.json`
+file is present, then it will be used instead of `default-user-config` secion.
+
+Please note, if you change parameters in main configuration file and nothing is happened
+then probably there is Ryft user configuration file which overrides all parameters
+from `default-user-config`.
+
+The following parameters can be customized:
+- [automatic `RECORD` replacement](#record-queries-configuration)
+
+
+#### Record queries configuration
+
+The `record-queries` subsection contains all the parameters related to
+automatic `RECORD` [replacement](./search/README.md#automatic-record-replacement).
+
+```{.yaml}
+record-queries:
+  enabled: true
+  skip: ["*.txt", "*.dat"]
+  json: ["*.json"]
+  xml: ["*.xml"]
+  csv: ["*.csv"]
+```
+
+This feature can be disabled by `enabled: false` option.
+
+The following lists of file patterns customize extension-based file type detection:
+- `skip` ignore these extensions. The `RECORD` will be kept as is.
+- `json` extensions for `JSON` data. The `RECORD` will be replaced with `JRECORD`.
+- `xml` extensions for `XML` data. The `RECORD` will be replaced with `XRECORD`.
+- `csv` extensions for `CSV` data. The `RECORD` will be replaced with `CRECORD`.
+
+Note, the file pattern may include directory filter, the `json: ["foo/*.json"]`
+matches all JSON files in `foo` directory.
 
 
 # Debian package

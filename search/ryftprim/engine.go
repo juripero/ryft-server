@@ -52,6 +52,7 @@ type Engine struct {
 	ExecPath         string // "/usr/bin/ryftprim" by default
 	LegacyMode       bool   // legacy mode to get machine readable statistics
 	KillToolOnCancel bool   // flag to kill ryftprim if cancelled
+	UseAbsPath       bool   // flag to use absolute path
 	MountPoint       string // "/ryftone" by default
 	HomeDir          string // subdir of mountpoint
 

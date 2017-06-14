@@ -57,6 +57,12 @@ func (server *Server) startJobsProcessing() {
 
 // process pending jobs (separate goroutine)
 func (server *Server) processJobs() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.WithField("error", r).Errorf("[%s]: process jobs failed", CORE)
+		}
+	}()
+
 	// sleep a while before start
 	time.Sleep(1 * time.Second)
 
@@ -103,9 +109,13 @@ func (server *Server) processJobs() {
 		select {
 		case <-time.After(sleep):
 			continue
+
 		case <-server.gotJobsChan:
 			// atomic.AddInt32(&server.newJobsCount, -1)
 			continue
+
+		case <-server.closeCh:
+			return
 		}
 	}
 }

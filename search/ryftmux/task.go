@@ -75,8 +75,11 @@ func (task *Task) add(res *search.Result) {
 // process and wait all subtasks
 func (engine *Engine) run(task *Task, mux *search.Result) {
 	// some futher cleanup
-	defer mux.Close()
-	defer mux.ReportDone()
+	defer func() {
+		mux.ReportUnhandledPanic(log)
+		mux.ReportDone()
+		mux.Close()
+	}()
 
 	// communication channel to report completed results
 	resCh := make(chan *search.Result, len(task.results))
@@ -93,6 +96,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	for i, res := range task.results {
 		go func(backend search.Engine, res *search.Result) {
 			defer func() {
+				res.ReportUnhandledPanic(log)
 				task.subtasks.Done()
 				resCh <- res
 			}()

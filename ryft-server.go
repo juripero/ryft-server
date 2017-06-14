@@ -80,6 +80,7 @@ func (f *serverConfigValue) String() string {
 // main server's entry point
 func main() {
 	server := rest.NewServer() // server instance
+	defer server.Close()
 
 	// parse command line arguments
 	kingpin.Flag("config", "Server configuration in YML format.").SetValue(&serverConfigValue{s: server})
@@ -280,6 +281,7 @@ func main() {
 	private.GET("/search/show", server.DoSearchShow)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
+	private.GET("/run", server.DoRun)
 
 	// need to provide both URLs to disable redirecting
 	private.GET("/files", server.DoGetFiles)

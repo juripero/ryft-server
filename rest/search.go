@@ -296,7 +296,8 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			// but just an error, we panic to return 500 status code
 			if res.RecordsReported() == 0 && res.Stat == nil &&
 				res.ErrorsReported() == 1 && lastError != nil {
-				panic(lastError)
+				panic(NewError(http.StatusInternalServerError, lastError.Error()).
+					WithDetails("failed to do search"))
 			}
 
 			if params.Stats && res.Stat != nil {
@@ -484,7 +485,7 @@ func updateSession(session *Session, stat *search.Stat) {
 
 // mark output files to delete later
 func (server *Server) cleanupSession(homeDir string, cfg *search.Config) {
-	mountPoint, _ := server.getMountPoint(homeDir)
+	mountPoint, _ := server.getMountPoint()
 	now := time.Now()
 
 	if len(cfg.KeepIndexAs) != 0 {

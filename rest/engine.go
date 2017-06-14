@@ -31,7 +31,11 @@
 package rest
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
@@ -39,6 +43,7 @@ import (
 	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils"
+	"gopkg.in/yaml.v2"
 )
 
 // get search backend with options
@@ -190,6 +195,12 @@ func (s *Server) getLocalSearchEngine(homeDir string, nodeName, nodeAddr string)
 		}
 	}
 
+	userCfg, err := s.getUserConfig(homeDir)
+	if err != nil {
+		return nil, err
+	}
+
+	opts["user-config"] = userCfg
 	backend, err := search.NewEngine(s.Config.SearchBackend, opts)
 	if err != nil {
 		return backend, err
@@ -198,24 +209,68 @@ func (s *Server) getLocalSearchEngine(homeDir string, nodeName, nodeAddr string)
 	return ryftdec.NewEngine(backend, opts)
 }
 
+// deep map clone
+func mapClone(x map[string]interface{}) map[string]interface{} {
+	res := make(map[string]interface{}, len(x))
+	for k, v := range x {
+		if vv, ok := v.(map[string]interface{}); ok {
+			res[k] = mapClone(vv)
+		} else {
+			res[k] = v
+		}
+	}
+	return res
+}
+
 // deep copy of backend options
 func (s *Server) getBackendOptions() map[string]interface{} {
-	opts := make(map[string]interface{})
-	for k, v := range s.Config.BackendOptions {
-		opts[k] = v
+	return mapClone(s.Config.BackendOptions)
+}
+
+// deep copy of user configuration
+func (s *Server) getUserConfig(homeDir string) (map[string]interface{}, error) {
+	userCfg := mapClone(s.Config.DefaultUserConfig)
+	mountPoint, err := s.getMountPoint()
+	if err != nil {
+		return userCfg, fmt.Errorf("failed to get mount point: %s", err)
 	}
-	return opts
+
+	// try to read as YAML
+	if data, err := ioutil.ReadFile(filepath.Join(mountPoint, homeDir, ".ryft-user.yaml")); err == nil {
+		// workaround on YAML decoder: it unmarshals to map[interface{}]interface{}
+		// but we need map[string]interface{}
+		var tmp struct {
+			Queries map[string]interface{} `yaml:"record-queries"`
+		}
+		if err := yaml.Unmarshal(data, &tmp); err != nil {
+			return userCfg, fmt.Errorf("failed to parse YAML user config: %s", err)
+		}
+
+		userCfg["record-queries"] = tmp.Queries
+		// TODO: more user options here
+
+		return userCfg, nil // YAML config!
+	} else if !os.IsNotExist(err) {
+		return userCfg, fmt.Errorf("failed to read YAML user config: %s", err)
+	}
+
+	// try to read as JSON
+	if data, err := ioutil.ReadFile(filepath.Join(mountPoint, homeDir, ".ryft-user.json")); err == nil {
+		if err := json.Unmarshal(data, &userCfg); err != nil {
+			return userCfg, fmt.Errorf("failed to parse JSON user config: %s", err)
+		}
+
+		return userCfg, nil // JSON config!
+	} else if !os.IsNotExist(err) {
+		return userCfg, fmt.Errorf("failed to read JSON user config: %s", err)
+	}
+
+	return userCfg, nil // return default config
 }
 
 // get mount point path from local search engine
-func (s *Server) getMountPoint(homeDir string) (string, error) {
-	engine, err := s.getLocalSearchEngine(homeDir, "", "")
-	if err != nil {
-		return "", err
-	}
-
-	opts := engine.Options()
-	return utils.AsString(opts["ryftone-mount"])
+func (s *Server) getMountPoint() (string, error) {
+	return utils.AsString(s.Config.BackendOptions["ryftone-mount"])
 }
 
 // cancels results if not done

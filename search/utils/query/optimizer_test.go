@@ -50,6 +50,15 @@ func TestOptimizerCombine(t *testing.T) {
 		` RECORD CONTAINS       "hello"`,
 		`(RECORD CONTAINS EXACT("hello"))[es]`)
 	check(true,
+		` jRECORD CONTAINS       "hello"`,
+		`(JRECORD CONTAINS EXACT("hello"))[es]`)
+	check(true,
+		` xRECORD CONTAINS       "hello"`,
+		`(XRECORD CONTAINS EXACT("hello"))[es]`)
+	check(true,
+		` cRECORD CONTAINS       "hello"`,
+		`(CRECORD CONTAINS EXACT("hello"))[es]`)
+	check(true,
 		`(RECORD CONTAINS       "hello")`,
 		`(RECORD CONTAINS EXACT("hello"))[es]`)
 	check(true,

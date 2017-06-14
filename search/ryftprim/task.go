@@ -117,7 +117,10 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	task.resultWait.Add(1)
 	task.readStartTime = time.Now() // performance metric
 	go func() {
-		defer task.resultWait.Done()
+		defer func() {
+			res.ReportUnhandledPanic(log)
+			task.resultWait.Done()
+		}()
 		rr.process(res)
 	}()
 

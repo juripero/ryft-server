@@ -205,7 +205,7 @@ func (f *IndexFile) Find(offset uint64) int {
 }
 
 // Unwind unwinds the index
-func (f *IndexFile) Unwind(index *Index) (*Index, int) {
+func (f *IndexFile) Unwind(index *Index) (*Index, int, error) {
 	// we should take into account surrounding width.
 	// in common case data are surrounded: [w]data[w]
 	// but at begin or end of file no surrounding
@@ -238,6 +238,10 @@ func (f *IndexFile) Unwind(index *Index) (*Index, int) {
 		end := index.Offset + index.Length
 		Len := index.Length
 
+		if end <= baseBeg || baseEnd <= beg {
+			return index, 0, fmt.Errorf("bad base:[%d..%d) for index:[%d..%d)", baseBeg, baseEnd, beg, end)
+		}
+
 		var shift uint64
 		if baseBeg <= beg {
 			// data offset is within our base
@@ -261,8 +265,8 @@ func (f *IndexFile) Unwind(index *Index) (*Index, int) {
 		res.Fuzziness = index.Fuzziness
 		res.DataPos = index.DataPos
 		res.Host = index.Host
-		return res, int(shift)
+		return res, int(shift), nil // OK
 	}
 
-	return index, 0 // "as is" fallback
+	return index, 0, fmt.Errorf("no base found") // "as is" fallback
 }

@@ -26,12 +26,21 @@ consisting of a relational expression which takes the following form:
 `input_specifier` specifies how the input data is arranged. The possible values are:
 
 - `RAW_TEXT` - The input is a sequence of raw bytes with no implicit formatting or grouping.
-- `RECORD` - The input is a series of records. Search all records.
+- `RECORD` - The input is a series of records. Search all fields.
 - `RECORD.<field_name>` - The input is a series of records.
    Search only the field called `<field_name>` in each record.
    Note: for JSON input records, multiple field names can be specified
    with `'.'` separators between them to specify a field hierarchy,
    or with `'[]'` separators to specify array hierarchy.
+- `JRECORD` - The input is a series of JSON records. Search all fields.
+- `JRECORD.<field_name>` - The input is a series of JSON records.
+   Search only the field called `<field_name>` in each record.
+- `XRECORD` - The input is a series of XML records. Search all fields.
+- `XRECORD.<field_name>` - The input is a series of XML records.
+   Search only the field called `<field_name>` in each record.
+- `CRECORD` - The input is a series of CSV records. Search all fields.
+- `CRECORD.<field_name>` - The input is a series of CSV records.
+   Search only the field called `<field_name>` in each record.
 
 
 `relational_operator` specifies how the input relates to the expression. The possible values are:
@@ -154,6 +163,27 @@ home directory. Otherwise no files will be found for the second Ryft call.
 
 This feature is used to do subsequent search on catalogs. In conjunction with
 the [FILTER](./README.md#filter-option) option it is used for GoogleEarth demo.
+
+
+# Automatic `RECORD` replacement
+
+If no RDF schemes are available (no RHFS) then dedicated keywords like `JRECORD` or `XRECORD`
+should be used instead of `RECORD` to specify which data type input is of.
+
+Ryft server is able to automatically detect input file type and replace
+`RECORD` to appropriate data-specific keyword:
+- `JRECORD` for JSON data
+- `XRECORD` for XML data
+- `CRECORD` for CSV data
+
+The input file type detection is done in a few steps:
+- the [file extension](../run.md#record-queries-configuration) is checked first
+- if no extension is matched, the file content is checked.
+
+Note, the first step is preffered in terms of performance. So it's recommeded
+to specify extension for all the data files.
+
+See [corresponding demo](../demo/2017-06-06-xrecord-support.md) for examples.
 
 
 # Option types

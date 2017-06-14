@@ -40,4 +40,8 @@ chown "$target_uid:$target_gid" -f -R /ryftone/.rest-*
 chown "$target_uid:$target_gid" -f /var/log/ryft/server.log
 
 echo $NAME starting...
-service $NAME start
+if [ -z `which systemctl` ]; then
+	service $NAME start
+else
+	systemctl start $NAME
+fi

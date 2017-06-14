@@ -146,7 +146,7 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 
 	// get search engine
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	mountPoint, err := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))
@@ -273,7 +273,8 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 			// but just an error, we panic to return 500 status code
 			if res.RecordsReported() == 0 && res.Stat == nil &&
 				res.ErrorsReported() == 1 && lastError != nil {
-				panic(lastError)
+				panic(NewError(http.StatusInternalServerError, lastError.Error()).
+					WithDetails("failed to do search/show"))
 			}
 
 			// close encoder
@@ -330,6 +331,7 @@ func doLocalSearchShowNoView(mountPoint string, params SearchShowParams) (*searc
 	go func() {
 		defer res.Close()
 		defer res.ReportDone()
+		defer res.ReportUnhandledPanic(log)
 
 		// close at the end
 		if idxFd != nil {
@@ -496,6 +498,7 @@ func doLocalSearchShowView(mountPoint string, params SearchShowParams) (*search.
 	go func() {
 		defer res.Close()
 		defer res.ReportDone()
+		defer res.ReportUnhandledPanic(log)
 
 		// close at the end
 		if idxFd != nil {
@@ -720,6 +723,7 @@ func doRemoteSearchShowHttp(serverUrl, authToken string, params SearchShowParams
 		// some futher cleanup
 		defer res.Close()
 		defer res.ReportDone()
+		defer res.ReportUnhandledPanic(log)
 
 		doneCh := make(chan struct{})
 		defer close(doneCh)
@@ -750,6 +754,8 @@ func doRemoteSearchShowHttp(serverUrl, authToken string, params SearchShowParams
 
 		// handle task cancellation
 		go func() {
+			defer res.ReportUnhandledPanic(log)
+
 			select {
 			case <-res.CancelChan:
 				// task.log().Warnf("[%s]: cancelling by client", TAG)
@@ -958,6 +964,7 @@ func doRemoteSearchShowMux(mountPoint string, authToken string, nodes []nodeSear
 		// some futher cleanup
 		defer mux.Close()
 		defer mux.ReportDone()
+		defer mux.ReportUnhandledPanic(log)
 
 		// communication channel to report completed results
 		resCh := make(chan *search.Result, len(results))
@@ -967,6 +974,7 @@ func doRemoteSearchShowMux(mountPoint string, authToken string, nodes []nodeSear
 		//var recordsReported uint64 // for all subtasks, atomic
 		for _, res := range results {
 			go func(res *search.Result) {
+				defer res.ReportUnhandledPanic(log)
 				defer func() {
 					subtasks.Done()
 					resCh <- res
