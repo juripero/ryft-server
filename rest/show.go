@@ -96,7 +96,7 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 
 	var sessionInfo []interface{}
 	if len(params.Session) != 0 {
-		session, err := ParseSession(server.Config.Sessions.Secret, params.Session)
+		session, err := ParseSession(server.Config.Sessions.secret, params.Session)
 		if err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()).
 				WithDetails("failed to parse session token"))

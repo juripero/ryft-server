@@ -321,7 +321,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 
 				if session != nil && !params.InternalNoSessionId {
 					updateSession(session, res.Stat)
-					token, err := session.Token(server.Config.Sessions.Secret)
+					token, err := session.Token(server.Config.Sessions.secret)
 					if err != nil {
 						panic(err)
 					}

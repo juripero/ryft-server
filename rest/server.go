@@ -142,6 +142,7 @@ type ServerConfig struct {
 	Sessions struct {
 		Algorithm string `yaml:"signing-algorithm,omitempty"`
 		Secret    string `yaml:"secret,omitempty"`
+		secret    []byte `yaml:"-"`
 		// Lifetime  string `yaml:"lifetime,omitempty"`
 	} `yaml:"sessions,omitempty"`
 
@@ -241,6 +242,12 @@ func (s *Server) Prepare() (err error) {
 	_ = os.MkdirAll(settingsDir, 0755)
 	if s.settings, err = OpenSettings(s.Config.SettingsPath); err != nil {
 		return fmt.Errorf("failed to open settings: %s", err)
+	}
+
+	// parse session secret
+	s.Config.Sessions.secret, err = auth.ParseSecret(s.Config.Sessions.Secret)
+	if err != nil {
+		return fmt.Errorf("failed to parse session secret: %s", err)
 	}
 
 	// hostname

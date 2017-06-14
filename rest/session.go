@@ -56,9 +56,9 @@ func NewSession(alg string) (*Session, error) {
 }
 
 // ParseSession parses session from token string
-func ParseSession(secret string, token string) (*Session, error) {
+func ParseSession(secret []byte, token string) (*Session, error) {
 	t, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
-		return []byte(secret), nil
+		return secret, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse session token: %s", err)
@@ -70,8 +70,8 @@ func ParseSession(secret string, token string) (*Session, error) {
 }
 
 // Get Session signed string.
-func (s *Session) Token(secret string) (string, error) {
-	return s.token.SignedString([]byte(secret))
+func (s *Session) Token(secret []byte) (string, error) {
+	return s.token.SignedString(secret)
 }
 
 // SetData

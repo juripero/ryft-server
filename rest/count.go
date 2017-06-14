@@ -255,7 +255,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 
 				if session != nil && !params.InternalNoSessionId { // session
 					updateSession(session, res.Stat)
-					token, err := session.Token(server.Config.Sessions.Secret)
+					token, err := session.Token(server.Config.Sessions.secret)
 					if err != nil {
 						panic(err)
 					}
