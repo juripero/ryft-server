@@ -365,6 +365,35 @@ Each item is a script name and a `path` containing full path to the
 application/script and a set of additional command line options.
 
 
+### Docker configuration
+
+There is Docker-related configuration section:
+
+```{.yaml}
+docker:
+  run: ["/usr/bin/docker", "run", "--rm", "--network=none", "--volume=${RYFTHOME}:/ryftone", "--workdir=/ryftone"]
+  exec: ["/usr/bin/docker", "exec", "${CONTAINER}"]
+  images:
+    default: ["alpine:latest"]
+    alpine: ["alpine:latest"]
+    ubuntu: ["ubuntu:16.04"]
+    python: ["python:2.7"]
+```
+
+The list of `images` is used to restrict number of Docker images allowed.
+These images should be pulled from the Docker hub with `docker pull <image>` command.
+
+The `run` command is used to run custom command in a Docker container.
+
+The `exec` command is used to run custom command in an already running  Docker container.
+
+There are a few "environment" variables can be used:
+- `${RYFTONE}` path to `/ryftone` partition
+- `${RYFTHOME}` path to Ryft user's home directory: `/ryftone/user`
+- `${RYFTUSER}` name of authenticated Ryft user
+- `${CONTAINER}` Docker container identifier
+
+
 ### Session configuration
 
 This configuration section customizes the session related options:

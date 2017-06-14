@@ -1,13 +1,23 @@
 To change name of any file, directory, catalog or file inside catalog the PUT `/rename` endpoint is used.
 
-### PUT `rename` parameters
+## PUT `rename` parameters
+
+The list of supported query parameters are the following:
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| `file`    | string  | [The filename to change](#put-file-parameter). |
+| `dir`     | string  | [The directory name to change](#put-dir-parameter). |
+| `catalog` | string  | [The catalog name to change](#put-catalog-parameter). |
+| `new`     | string  | [The new name](#put-new-parameter). |
+| `local`   | boolean | [The local/cluster flag](#search-local-parameter). |
 
 
 ### PUT `file` parameter
 
-The filename to change
+The filename to change.
 
-For standalone file it is the full file path. 
+For standalone file it is the full file path.
 File extension can not be changed.
 If file moves outside from the current directory corresponding directory will be created.
 
@@ -38,7 +48,7 @@ This parameter allows massive renaming throught the all cluster machines. Defaul
 
 
 
-### URL-path
+## URL-path
 
 You can also set path to the source file, directory or catalog right in URL-path. 
 ```
