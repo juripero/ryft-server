@@ -146,7 +146,7 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 
 	// get search engine
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	mountPoint, err := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))

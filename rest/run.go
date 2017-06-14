@@ -67,7 +67,7 @@ func (server *Server) DoRun(ctx *gin.Context) {
 
 	// get search engine
 	userName, _, homeDir, _ := server.parseAuthAndHome(ctx)
-	mountPoint, err := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get ryftone mount point"))

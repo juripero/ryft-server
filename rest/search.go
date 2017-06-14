@@ -485,7 +485,7 @@ func updateSession(session *Session, stat *search.Stat) {
 
 // mark output files to delete later
 func (server *Server) cleanupSession(homeDir string, cfg *search.Config) {
-	mountPoint, _ := server.getMountPoint(homeDir)
+	mountPoint, _ := server.getMountPoint()
 	now := time.Now()
 
 	if len(cfg.KeepIndexAs) != 0 {

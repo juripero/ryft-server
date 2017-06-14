@@ -611,7 +611,7 @@ BuildItems:
 			// do recursive unwinding!
 			idx, shift, err := mpp.unwind(item)
 			if err != nil {
-				return fmt.Errorf("failed to unwind index: %s", err)
+				return 0, fmt.Errorf("failed to unwind index: %s", err)
 			}
 			if shift != 0 || idx.Length != item.Length {
 				simple = false
