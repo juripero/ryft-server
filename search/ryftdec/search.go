@@ -239,7 +239,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		}
 
 		drainStart := time.Now()
-		err = task.result.DrainFinalResults(task, mux,
+		matches, err := task.result.DrainFinalResults(task, mux,
 			keepDataAs, keepIndexAs, delimiter, keepViewAs,
 			filepath.Join(opts.MountPoint, opts.HomeDir),
 			res.Output, findLastFilter(task.rootQuery))
@@ -276,7 +276,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			mux.Stat.AddSessionData("view", task.config.KeepViewAs)
 			mux.Stat.AddSessionData("delim", task.config.Delimiter)
 			mux.Stat.AddSessionData("width", task.config.Width)
-			mux.Stat.AddSessionData("matches", mux.Stat.Matches)
+			mux.Stat.AddSessionData("matches", matches)
+			mux.Stat.Matches = matches // override, since some records can be filtered out
 		}
 	}()
 
