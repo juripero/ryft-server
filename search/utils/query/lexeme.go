@@ -294,3 +294,15 @@ func (lex Lexeme) IsIP() bool {
 
 	return strings.EqualFold(lex.literal, "IP")
 }
+
+// IsRegex checks "REGEX" search type.
+func (lex Lexeme) IsRegex() bool {
+	if lex.token != IDENT {
+		return false
+	}
+
+	// a few aliases
+	return strings.EqualFold(lex.literal, "PCRE2") ||
+		strings.EqualFold(lex.literal, "REGEX") ||
+		strings.EqualFold(lex.literal, "REGEXP")
+}
