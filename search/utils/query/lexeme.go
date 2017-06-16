@@ -303,6 +303,7 @@ func (lex Lexeme) IsRegex() bool {
 
 	// a few aliases
 	return strings.EqualFold(lex.literal, "PCRE2") ||
+		strings.EqualFold(lex.literal, "RE") ||
 		strings.EqualFold(lex.literal, "REGEX") ||
 		strings.EqualFold(lex.literal, "REGEXP")
 }
