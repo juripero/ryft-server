@@ -77,8 +77,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 
 	// parse request parameters
 	params := DeleteFilesParams{}
-	b := binding.Default(ctx.Request.Method, ctx.ContentType())
-	if err := b.Bind(ctx.Request, &params); err != nil {
+	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}

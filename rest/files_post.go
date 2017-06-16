@@ -134,8 +134,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		Offset:    -1, // mark as "unspecified"
 		Length:    -1,
 	}
-	b := binding.Default(ctx.Request.Method, ctx.ContentType())
-	if err := b.Bind(ctx.Request, &params); err != nil {
+	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}
@@ -199,6 +198,9 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 	switch strings.ToLower(strings.TrimSpace(contentType)) {
 	case "multipart/form-data":
 		f, _, err := ctx.Request.FormFile("file")
+		if err != nil {
+			f, _, err = ctx.Request.FormFile("content") // for backward compatibility with the SwaggerUI
+		}
 		if err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()).
 				WithDetails(`no "file" form data provided`))
@@ -639,6 +641,28 @@ func (fw *FileWriter) Append(length int64) (int64, error) {
 func createFile(mountPoint string, params PostFilesParams, content io.Reader) (string, int64, int64, error) {
 	rbase := randomizePath(params.File) // first replace all {{random}} tokens
 	rpath := rbase
+
+	if params.Length < 0 {
+		// save to temp file to determine data length
+		if len(catalog.DefaultTempDirectory) > 0 {
+			_ = os.MkdirAll(catalog.DefaultTempDirectory, 0755)
+		}
+		tmp, err := ioutil.TempFile(catalog.DefaultTempDirectory, filepath.Base(params.File))
+		if err != nil {
+			return rpath, 0, 0, fmt.Errorf("failed to create temp file: %s", err)
+		}
+		defer func() {
+			tmp.Close()
+			os.RemoveAll(tmp.Name())
+		}()
+
+		params.Length, err = io.Copy(tmp, content)
+		if err != nil {
+			return rpath, 0, 0, fmt.Errorf("failed to copy content to temp file: %s", err)
+		}
+		tmp.Seek(0, os.SEEK_SET /*TODO: io.SeekStart*/)
+		content = tmp
+	}
 
 	// create all parent directories
 	pdir := filepath.Join(mountPoint, filepath.Dir(rpath))

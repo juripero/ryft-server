@@ -308,11 +308,10 @@ func (r catalogFileRename) Validate() error {
 // DoRenameFiles RENAME files method
 func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	defer RecoverFromPanic(ctx)
+
 	// parse request parameters
 	params := RenameFileParams{}
-
-	b := binding.Default(ctx.Request.Method, ctx.ContentType())
-	if err := b.Bind(ctx.Request, &params); err != nil {
+	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
 	}
