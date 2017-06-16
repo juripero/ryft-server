@@ -64,6 +64,7 @@ type SearchParams struct {
 	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`    // FEDS only
 	Nodes  uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
 
+	Backend     string `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"` // "" | "ryftprim" | "ryftx"
 	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	KeepViewAs  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
@@ -163,6 +164,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
+	cfg.BackendTool = params.Backend
 	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)

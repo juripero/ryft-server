@@ -34,10 +34,41 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 )
+
+// get backend path (ryftprim or ryftx)
+func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
+	// if backend tool is specified use it
+	switch strings.ToLower(cfg.BackendTool) {
+	case "ryftprim", "prim", "1":
+		return engine.RyftprimExec, nil
+
+	case "ryftx", "x":
+		return engine.RyftxExec, nil
+
+	case "":
+		break // auto-select, see below
+
+	default:
+		return "", fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
+	}
+
+	// if both tools are provided
+	if engine.RyftprimExec != "" || engine.RyftxExec != "" {
+		return engine.RyftprimExec, nil // TODO: select the best tool
+	} else if engine.RyftprimExec != "" {
+		return engine.RyftprimExec, nil
+	} else if engine.RyftxExec != "" {
+		return engine.RyftxExec, nil
+	}
+
+	return "", fmt.Errorf("no any backend found") // should be impossible
+}
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
@@ -46,7 +77,8 @@ func (engine *Engine) Options() map[string]interface{} {
 		opts[k] = v
 	}
 	opts["instance-name"] = engine.Instance
-	opts["ryftprim-exec"] = engine.ExecPath
+	opts["ryftprim-exec"] = engine.RyftprimExec
+	opts["ryftx-exec"] = engine.RyftxExec
 	opts["ryftprim-legacy"] = engine.LegacyMode
 	opts["ryftprim-kill-on-cancel"] = engine.KillToolOnCancel
 	opts["ryftprim-abs-path"] = engine.UseAbsPath
@@ -75,16 +107,40 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// `ryftprim` executable path
 	if v, ok := opts["ryftprim-exec"]; ok {
-		engine.ExecPath, err = utils.AsString(v)
+		engine.RyftprimExec, err = utils.AsString(v)
 		if err != nil {
 			return fmt.Errorf(`failed to parse "ryftprim-exec" option: %s`, err)
 		}
 	} else {
-		engine.ExecPath = "/usr/bin/ryftprim"
+		engine.RyftprimExec = "/usr/bin/ryftprim"
 	}
-	// check ExecPath exists
-	if _, err := os.Stat(engine.ExecPath); err != nil {
-		return fmt.Errorf("failed to locate ryftprim executable: %s", err)
+
+	// `ryftx` executable path
+	if v, ok := opts["ryftx-exec"]; ok {
+		engine.RyftxExec, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "ryftx-exec" option: %s`, err)
+		}
+	} else {
+		engine.RyftxExec = "/usr/bin/ryftx"
+	}
+
+	// one of ryftprim or ryftx should exists
+	backendTools := 0
+	for _, path := range []string{engine.RyftprimExec, engine.RyftxExec} {
+		if path == "" {
+			continue // skip empty
+		}
+
+		// check file exists
+		if _, err := os.Stat(engine.RyftprimExec); err != nil {
+			return fmt.Errorf("%s tool not found: %s", path, err)
+		} else {
+			backendTools++ // tool found
+		}
+	}
+	if 0 == backendTools {
+		return fmt.Errorf("neither ryftprim nor ryftx found")
 	}
 
 	// `ryftprim` legacy mode

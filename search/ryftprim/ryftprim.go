@@ -225,11 +225,19 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
+	tool, err := engine.getExecPath(task.config)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
+		return fmt.Errorf("failed to find tool: %s", err)
+	} else if tool == "" {
+		task.log().WithError(err).Warnf("[%s]: no appropriate tool found", TAG)
+		return fmt.Errorf("no tool found: %s", err)
+	}
 	task.log().WithFields(map[string]interface{}{
-		"tool": engine.ExecPath,
+		"tool": tool,
 		"args": task.toolArgs,
 	}).Infof("[%s]: executing tool", TAG)
-	task.toolCmd = exec.Command(engine.ExecPath, task.toolArgs...)
+	task.toolCmd = exec.Command(tool, task.toolArgs...)
 
 	// prepare combined STDERR&STDOUT output
 	task.toolOut = new(bytes.Buffer)
@@ -237,7 +245,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.toolCmd.Stderr = task.toolOut
 
 	task.toolStartTime = time.Now() // performance metric
-	err := task.toolCmd.Start()
+	err = task.toolCmd.Start()
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to start tool", TAG)
 		return fmt.Errorf("failed to start tool: %s", err)
