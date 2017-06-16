@@ -171,7 +171,7 @@ func TestParserParseSimpleQuery(t *testing.T) {
 		`(RAW_TEXT CONTAINS IPV6(IP != "1::0"))[ipv6]`)
 	check(false,
 		` RAW_TEXT CONTAINS PCRE2("(?i)[a|b]", W=1) `,
-		`(RAW_TEXT CONTAINS PCRE2("(?i)[a|b]"))[pcre2,w=1]`,
+		`(RAW_TEXT CONTAINS "(?i)[a|b]")[pcre2,w=1]`,
 		`(RAW_TEXT CONTAINS PCRE2("(?i)[a|b]", WIDTH="1"))[pcre2,w=1]`)
 	bad(` RAW_TEXT CONTAINS 123 `, "is unexpected expression")
 }
@@ -420,7 +420,7 @@ func TestParserParse(t *testing.T) {
 
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS PCRE2("(?i)[a|b]"))`,
-		`P{(RECORD.body CONTAINS PCRE2("(?i)[a|b]"))[pcre2]}`)
+		`P{(RECORD.body CONTAINS "(?i)[a|b]")[pcre2]}`)
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "100")`,

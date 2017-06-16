@@ -449,8 +449,7 @@ func getExprOld(expr string, opts Options) string {
 
 	// PCRE2 search
 	case "pcre2":
-		return fmt.Sprintf("PCRE2(%s)", expr)
-
+		return expr // "as is"
 	}
 
 	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
