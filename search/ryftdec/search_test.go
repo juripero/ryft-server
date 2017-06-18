@@ -839,11 +839,11 @@ dd-hello-dd
 cc-hello-cc
 ee-hello-ee
 `,
-		`X.dat,21,11,0
-X.dat,3,11,0
-X.dat,57,11,0
-X.dat,39,11,0
-X.dat,75,11,0
+		`/tmp/ryft-test3/X.dat,21,11,0
+/tmp/ryft-test3/X.dat,3,11,0
+/tmp/ryft-test3/X.dat,57,11,0
+/tmp/ryft-test3/X.dat,39,11,0
+/tmp/ryft-test3/X.dat,75,11,0
 `)
 
 	// "hello", W=3 AND "hello", W=5
@@ -891,10 +891,10 @@ dd-hello-dd
 cc-hello-cc
 ee-hello-ee
 `,
-		`X.dat,21,11,0
-X.dat,3,11,0
-X.dat,57,11,0
-X.dat,39,11,0
-X.dat,75,11,0
+		`/tmp/ryft-test3/X.dat,21,11,0
+/tmp/ryft-test3/X.dat,3,11,0
+/tmp/ryft-test3/X.dat,57,11,0
+/tmp/ryft-test3/X.dat,39,11,0
+/tmp/ryft-test3/X.dat,75,11,0
 `)
 }

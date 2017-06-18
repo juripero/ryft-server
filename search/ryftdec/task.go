@@ -871,7 +871,8 @@ ItemsLoop:
 		indexEnd := indexBeg
 		if idxFile != nil {
 			start := time.Now()
-			indexStr := fmt.Sprintf("%s,%d,%d,%d\n", item.Index.File, item.Index.Offset, item.Index.Length, item.Index.Fuzziness)
+			indexStr := fmt.Sprintf("%s,%d,%d,%d\n", filepath.Join(home, item.Index.File),
+				item.Index.Offset, item.Index.Length, item.Index.Fuzziness)
 			_, err := idxFile.WriteString(indexStr)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write INDEX: %s", err))
