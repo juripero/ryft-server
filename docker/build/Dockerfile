@@ -1,6 +1,7 @@
-FROM golang:1.8-alpine
+# do not use alpine because it uses incompatible libc!
+FROM golang:1.8
 
-RUN apk add --update git build-base dpkg tar xz
+RUN apt-get update && apt-get install -y git dpkg
 
 # manage dependencies
 RUN go get -u github.com/kardianos/govendor
@@ -13,4 +14,4 @@ WORKDIR ${RYFTPATH}
 COPY build.sh /build.sh
 RUN chmod +x /build.sh
 
-ENTRYPOINT ["/build.sh"]
+CMD ["/build.sh"]
