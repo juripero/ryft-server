@@ -61,7 +61,7 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
 	}
 
 	// if both tools are provided
-	if engine.RyftprimExec != "" || engine.RyftxExec != "" {
+	if engine.RyftprimExec != "" && engine.RyftxExec != "" {
 
 		// select backend based on search type
 		switch strings.ToLower(cfg.Mode) {
@@ -155,7 +155,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 			return fmt.Errorf(`failed to parse "ryftx-exec" option: %s`, err)
 		}
 	} else {
-		engine.RyftxExec = "/usr/bin/ryftx"
+		// engine.RyftxExec = "/usr/bin/ryftx"
 	}
 
 	// one of ryftprim or ryftx should exists

@@ -86,7 +86,7 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q, ryftprim:%q ryftx:%q}",
+	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q, ryftprim:%q, ryftx:%q}",
 		engine.Instance, engine.MountPoint, engine.HomeDir, engine.RyftprimExec, engine.RyftxExec)
 	// TODO: other parameters?
 }
