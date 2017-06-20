@@ -120,7 +120,12 @@ func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery) {
 		cfg.Query = q.ExprOld
 	} else {
 		cfg.Query = q.ExprNew
-		cfg.Mode = "g" // generic!
+		if q.Options.Mode != "" {
+			// notify backend about search mode
+			cfg.Mode = fmt.Sprintf("g/%s", q.Options.Mode)
+		} else {
+			cfg.Mode = "g" // generic!
+		}
 	}
 }
 

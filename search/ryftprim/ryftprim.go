@@ -65,7 +65,8 @@ func (engine *Engine) prepare(task *Task) error {
 	// select search mode
 	genericMode := false
 	switch strings.ToLower(cfg.Mode) {
-	case "", "g", "generic":
+	case "", "g", "generic", "g/es", "g/fhs", "g/feds", "g/ds",
+		"g/ts", "g/ns", "g/cs", "g/ipv4", "g/ipv6": // TODO: pcre2
 		args = append(args, "-p", "g")
 		genericMode = true
 	case "es", "exact", "exact_search":
@@ -87,6 +88,7 @@ func (engine *Engine) prepare(task *Task) error {
 		args = append(args, "-p", "ipv4")
 	case "ipv6", "ipv6_search":
 		args = append(args, "-p", "ipv6")
+	// TODO: pcre2
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}

@@ -51,6 +51,8 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
 	case "ryftx", "x":
 		return engine.RyftxExec, nil
 
+	// TODO: pcre2
+
 	case "":
 		break // auto-select, see below
 
@@ -60,7 +62,38 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
 
 	// if both tools are provided
 	if engine.RyftprimExec != "" || engine.RyftxExec != "" {
-		return engine.RyftprimExec, nil // TODO: select the best tool
+
+		// select backend based on search type
+		switch strings.ToLower(cfg.Mode) {
+		case "g/es", "es":
+			return engine.RyftxExec, nil
+		case "g/ds", "ds":
+			return engine.RyftxExec, nil
+		case "g/ts", "ts":
+			return engine.RyftxExec, nil
+		case "g/ns", "ns":
+			return engine.RyftxExec, nil
+		case "g/cs", "cs":
+			return engine.RyftxExec, nil
+		case "g/ipv4", "ipv4":
+			return engine.RyftxExec, nil
+		case "g/ipv6", "ipv6":
+			return engine.RyftxExec, nil
+
+		case "g/fhs", "fhs":
+			if cfg.Dist > 1 {
+				return engine.RyftprimExec, nil
+			} else {
+				return engine.RyftxExec, nil
+			}
+
+		case "g/feds", "feds":
+			return engine.RyftprimExec, nil
+
+			// TODO: pcre2
+		}
+
+		return engine.RyftprimExec, nil // use ryftprim as fallback
 	} else if engine.RyftprimExec != "" {
 		return engine.RyftprimExec, nil
 	} else if engine.RyftxExec != "" {
