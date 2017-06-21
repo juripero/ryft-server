@@ -425,7 +425,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 				continue // nothing to do
 			}
 			result := make(map[string]interface{})
-			result["host"] = node.Name
+			result["hostname"] = node.Name
 			if node.Error != nil {
 				result["error"] = node.Error.Error()
 			} else {
@@ -439,7 +439,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			panic(NewError(http.StatusBadRequest, err.Error()))
 		}
 		result := make(map[string]interface{})
-		result["host"] = server.Config.HostName
+		result["hostname"] = server.Config.HostName
 		if details := server.RenameLocalFile(fileRename); len(details) > 0 {
 			result["details"] = details
 		}
