@@ -64,7 +64,7 @@ type PostFilesDetails struct {
 type PostFilesNodeResult struct {
 	Details  PostFilesDetails `json:"details,omitempty"`
 	Error    error            `json:"error,omitempty"`
-	Hostname string           `json:"hostname"`
+	Hostname string           `json:"host"`
 }
 
 // PostFilesParams query parameters for POST /files

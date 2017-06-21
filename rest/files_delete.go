@@ -47,7 +47,7 @@ import (
 )
 
 type FilesNodeResult struct {
-	Hostname string            `json:"hostname"`
+	Hostname string            `json:"host"`
 	Error    error             `json:"error,omitempty"`
 	Details  map[string]string `json:"details,omitempty"`
 }

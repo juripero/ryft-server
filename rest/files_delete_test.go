@@ -50,15 +50,15 @@ func TestDeleteDirs(t *testing.T) {
 
 	// OK to delete non-existing directories
 	check([]string{"non_existing_dir", "non_existing_dir2"}, http.StatusOK,
-		`[{"hostname":"`+hostname+`"}]`)
+		`[{"host":"`+hostname+`"}]`)
 
 	// OK to delete empty directory
 	check([]string{"foo/empty-dir"}, http.StatusOK,
-		`[{"details": {"foo/empty-dir":"OK"}, "hostname":"`+hostname+`"}]`)
+		`[{"details": {"foo/empty-dir":"OK"}, "host":"`+hostname+`"}]`)
 
 	// OK to delete non-empty directory
 	check([]string{"foo"}, http.StatusOK,
-		`[{"details": {"foo":"OK"}, "hostname":"`+hostname+`"}]`)
+		`[{"details": {"foo":"OK"}, "host":"`+hostname+`"}]`)
 }
 
 // DELETE files
@@ -102,15 +102,15 @@ func TestDeleteFiles(t *testing.T) {
 
 	// OK to delete non-existing files
 	check([]string{"/non_existing_file", "/non_existing_file2"}, http.StatusOK,
-		`[{"hostname":"`+hostname+`"}]`)
+		`[{"host":"`+hostname+`"}]`)
 
 	// OK to delete specific files
 	check([]string{"/foo/dir/file0.txt", "/foo/dir/file1.txt"}, http.StatusOK,
-		`[{"details": {"foo/dir/file0.txt":"OK", "foo/dir/file1.txt":"OK"}, "hostname": "`+hostname+`"}]`)
+		`[{"details": {"foo/dir/file0.txt":"OK", "foo/dir/file1.txt":"OK"}, "host": "`+hostname+`"}]`)
 
 	// OK to delete by mask
 	check([]string{"/foo/dir/*.txt"}, http.StatusOK,
-		`[{"details": {"foo/dir/file2.txt":"OK", "foo/dir/file3.txt":"OK", "foo/dir/file4.txt":"OK"}, "hostname": "`+hostname+`"}]`)
+		`[{"details": {"foo/dir/file2.txt":"OK", "foo/dir/file3.txt":"OK", "foo/dir/file4.txt":"OK"}, "host": "`+hostname+`"}]`)
 }
 
 // DELETE catalogs
