@@ -270,7 +270,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	// we can pass this query directly to the backend
 	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 && len(cfg.Transforms) == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
-		engine.updateConfig(cfg, sq)
+		engine.updateConfig(cfg, sq, task.rootQuery.BoolOps)
 		return engine.Backend.Search(cfg)
 	}
 
@@ -399,7 +399,7 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 		task.Identifier, task.subtaskId, ".txt"))
 
 	// prepare search configuration
-	engine.updateConfig(cfg, query.Simple)
+	engine.updateConfig(cfg, query.Simple, query.BoolOps)
 	cfg.KeepDataAs = dat1
 	cfg.KeepIndexAs = idx1
 	cfg.KeepViewAs = ""

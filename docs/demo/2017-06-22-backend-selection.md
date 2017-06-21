@@ -25,7 +25,6 @@ By default the following table is used to automatically select backend tool:
 | TIME       |              |   X   |            |
 | PCRE2      | X (Ryft box) |       | X (AWS/F1) |
 
-RyfX for simple queries. For complex queries the ryftprim is preffered.
 
 Let's try a few examples:
 
@@ -89,9 +88,9 @@ All options can have the following values:
 So, even if table says to use `ryftx` backend tool we can force `ryftprim` selection:
 
 ```{.sh}
-ryftrest -q "Joe" -f passengers.txt --format=utf8 --search --backend=1 | jq .
-```
-```{.json}
+$ ryftrest -p=es -w=5 -q "mich AND mic" -i -f passengers.txt --backend=1 | jq -c '.details[] | {"backend": .extra.backend}'
+{"backend":"ryftprim"}
+{"backend":"ryftprim"}
 ```
 
 
