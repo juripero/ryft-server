@@ -66,7 +66,7 @@ func (engine *Engine) prepare(task *Task) error {
 	genericMode := false
 	switch strings.ToLower(cfg.Mode) {
 	case "", "g", "generic", "g/es", "g/fhs", "g/feds", "g/ds",
-		"g/ts", "g/ns", "g/cs", "g/ipv4", "g/ipv6": // TODO: pcre2
+		"g/ts", "g/ns", "g/cs", "g/ipv4", "g/ipv6", "g/pcre2":
 		args = append(args, "-p", "g")
 		genericMode = true
 	case "es", "exact", "exact_search":

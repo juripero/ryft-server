@@ -50,7 +50,8 @@ var (
 type Engine struct {
 	Instance         string // empty by default. might be some server instance name like ".server-1234"
 	RyftprimExec     string // "/usr/bin/ryftprim" by default
-	RyftxExec        string // "/usr/bin/ryftx" by default
+	RyftxExec        string // usually "/usr/bin/ryftx" but "" by default
+	Ryftpcre2Exec    string // "/usr/bin/ryftprim" by default
 	LegacyMode       bool   // legacy mode to get machine readable statistics
 	KillToolOnCancel bool   // flag to kill ryftprim if cancelled
 	UseAbsPath       bool   // flag to use absolute path

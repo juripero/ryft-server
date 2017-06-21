@@ -51,7 +51,8 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
 	case "ryftx", "x":
 		return engine.RyftxExec, nil
 
-	// TODO: pcre2
+	case "pcre2", "regexp", "regex", "re":
+		return engine.Ryftpcre2Exec, nil
 
 	case "":
 		break // auto-select, see below
@@ -90,7 +91,8 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
 		case "g/feds", "feds":
 			return engine.RyftprimExec, nil
 
-			// TODO: pcre2
+		case "g/pcre2", "pcre2":
+			return engine.Ryftpcre2Exec, nil
 		}
 
 		return engine.RyftprimExec, nil // use ryftprim as fallback
@@ -112,6 +114,7 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["instance-name"] = engine.Instance
 	opts["ryftprim-exec"] = engine.RyftprimExec
 	opts["ryftx-exec"] = engine.RyftxExec
+	opts["ryftpcre2-exec"] = engine.Ryftpcre2Exec
 	opts["ryftprim-legacy"] = engine.LegacyMode
 	opts["ryftprim-kill-on-cancel"] = engine.KillToolOnCancel
 	opts["ryftprim-abs-path"] = engine.UseAbsPath
@@ -156,6 +159,16 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 	} else {
 		// engine.RyftxExec = "/usr/bin/ryftx"
+	}
+
+	// `ryftpcre2` executable path
+	if v, ok := opts["ryftpcre2-exec"]; ok {
+		engine.Ryftpcre2Exec, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "ryftpcre2-exec" option: %s`, err)
+		}
+	} else {
+		engine.Ryftpcre2Exec = "/usr/bin/ryftprim"
 	}
 
 	// one of ryftprim or ryftx should exists
