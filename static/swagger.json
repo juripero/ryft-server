@@ -1001,7 +1001,7 @@
       "items": {
         "type": "object",
         "properties": {
-          "hostname": {
+          "host": {
             "type": "string"
           },
           "error": {
@@ -1023,7 +1023,7 @@
       "items": {
         "type": "object",
         "properties": {
-          "hostname": {
+          "host": {
             "type": "string"
           },
           "error": {
@@ -1054,7 +1054,7 @@
       "items": {
         "type": "object",
         "properties": {
-          "hostname": {
+          "host": {
             "type": "string"
           },
           "error": {
