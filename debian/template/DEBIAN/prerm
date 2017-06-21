@@ -2,11 +2,19 @@
 
 NAME=ryft-server-d
 
-echo $NAME uninstalling from autostart...
-update-rc.d -f $NAME remove
+if [ -z `which systemctl` ]; then
+	echo $NAME uninstalling from autostart...
+	update-rc.d -f $NAME remove
 
-echo $NAME stopping...
-service $NAME stop
+	echo $NAME stopping...
+	service $NAME stop
+else
+	echo $NAME uninstalling from autostart...
+	systemctl disable $NAME
+
+	echo $NAME stopping...
+	systemctl stop $NAME
+fi
 
 # have to return success
 exit 0

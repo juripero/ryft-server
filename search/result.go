@@ -33,6 +33,8 @@ package search
 import (
 	"fmt"
 	"sync/atomic"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // Result is asynchronous search result structure.
@@ -176,4 +178,27 @@ func (res *Result) IsDone() bool {
 func (res *Result) Close() {
 	close(res.RecordChan)
 	close(res.ErrorChan)
+}
+
+// ReportUnhandledPanic tries to recover from panic and report error
+// via provided logger (should be logrus logger instance)
+func (res *Result) ReportUnhandledPanic(logger interface{}) {
+	if r := recover(); r != nil {
+		// write it to log
+		switch log := logger.(type) {
+		case *logrus.Logger:
+			log.Errorf("UNHANDLED PANIC: %s", r)
+
+		case *logrus.Entry:
+			log.Errorf("UNHANDLED PANIC: %s", r)
+
+		case nil:
+			// no logging, ignored
+		}
+
+		// report to user
+		if err, ok := r.(error); ok {
+			res.ReportError(err)
+		}
+	}
 }

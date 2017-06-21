@@ -120,9 +120,9 @@ func TestEngineSearchAnd3(t *testing.T) {
 			}, strRecords)
 
 			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hell", WIDTH="3")), files:[".work/.temp-dat-dec-00000001-2.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("he", WIDTH="3")), files:[".work/.temp-dat-dec-00000001-3.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-4.txt", keep-index:".work/.temp-idx-dec-00000001-4.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[2].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hell", WIDTH="3")), files:[".work/.temp-dat-dec-00000001-2"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("he", WIDTH="3")), files:[".work/.temp-dat-dec-00000001-3"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-4", keep-index:".work/.temp-idx-dec-00000001-4.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[2].String())
 			}
 		}
 	}
@@ -188,9 +188,9 @@ func TestEngineSearchOr3(t *testing.T) {
 			}, strRecords)
 
 			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hell", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("he", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-4.txt", keep-index:".work/.temp-idx-dec-00000001-4.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[2].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hell", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("he", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-4", keep-index:".work/.temp-idx-dec-00000001-4.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[2].String())
 			}
 		}
 	}
@@ -226,9 +226,9 @@ func TestEngineSearchOr3(t *testing.T) {
 			}, strRecords)
 
 			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-4.txt", keep-index:".work/.temp-idx-dec-00000001-4.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[2].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-4", keep-index:".work/.temp-idx-dec-00000001-4.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[2].String())
 			}
 		}
 	}
@@ -546,11 +546,14 @@ func TestEngineSearchBad(t *testing.T) {
 
 	// bad extension
 	if assert.NotNil(t, engine) {
-		cfg := search.NewConfig("hello AND bye", "*.txt", "*.dat")
+		cfg := search.NewConfig(`(RECORD CONTAINS "hello") AND (RECORD CONTAINS "bye")`, "*.txt", "*.dat")
 		cfg.ReportIndex = true
 		cfg.ReportData = false
 
+		old := engine.optimizer.CombineLimit
+		engine.optimizer.CombineLimit = 0
 		_, err := engine.Search(cfg)
+		engine.optimizer.CombineLimit = old
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "failed to detect extension")
 		}
@@ -691,8 +694,8 @@ eeeee-hello-eeeee
 
 			if assert.EqualValues(t, 2, len(f1.SearchCfgLogTrace)) {
 				f1.SearchCfgLogTrace[0].Files = []string{"*.txt"} // skip catalog's data files
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"\n", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["X.dat"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"\n", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["X.dat"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
 			}
 		}
 	}
@@ -737,8 +740,8 @@ zzzzz-hello-zzzzz
 			if assert.EqualValues(t, 2, len(f1.SearchCfgLogTrace)) {
 				f1.SearchCfgLogTrace[0].Files = []string{"*.txt"} // skip catalog's data files
 				sort.Strings(f1.SearchCfgLogTrace[1].Files)
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2.txt", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"\n", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
-				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt" "3.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3.txt", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["*.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-2", keep-index:".work/.temp-idx-dec-00000001-2.txt", delim:"\n", index:false, data:false}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RAW_TEXT CONTAINS EXACT("hello", WIDTH="3")), files:["1.txt" "3.txt"], mode:"g", width:3, dist:0, cs:true, nodes:0, limit:0, keep-data:".work/.temp-dat-dec-00000001-3", keep-index:".work/.temp-idx-dec-00000001-3.txt", delim:"", index:false, data:false}`, f1.SearchCfgLogTrace[1].String())
 			}
 		}
 	}
@@ -784,8 +787,8 @@ func TestRyftFinalResults(t *testing.T) {
 		}
 
 		mux := search.NewResult()
-		err := mpp.DrainFinalResults(task, mux,
-			"data.out", "index.out", "\n",
+		_, err := mpp.DrainFinalResults(task, mux,
+			"data.out", "index.out", "\n", "",
 			home, ryftCalls, "")
 		if !assert.NoError(t, err) {
 			return
@@ -836,11 +839,11 @@ dd-hello-dd
 cc-hello-cc
 ee-hello-ee
 `,
-		`X.dat,21,11,0
-X.dat,3,11,0
-X.dat,57,11,0
-X.dat,39,11,0
-X.dat,75,11,0
+		`/tmp/ryft-test3/X.dat,21,11,0
+/tmp/ryft-test3/X.dat,3,11,0
+/tmp/ryft-test3/X.dat,57,11,0
+/tmp/ryft-test3/X.dat,39,11,0
+/tmp/ryft-test3/X.dat,75,11,0
 `)
 
 	// "hello", W=3 AND "hello", W=5
@@ -888,10 +891,10 @@ dd-hello-dd
 cc-hello-cc
 ee-hello-ee
 `,
-		`X.dat,21,11,0
-X.dat,3,11,0
-X.dat,57,11,0
-X.dat,39,11,0
-X.dat,75,11,0
+		`/tmp/ryft-test3/X.dat,21,11,0
+/tmp/ryft-test3/X.dat,3,11,0
+/tmp/ryft-test3/X.dat,57,11,0
+/tmp/ryft-test3/X.dat,39,11,0
+/tmp/ryft-test3/X.dat,75,11,0
 `)
 }

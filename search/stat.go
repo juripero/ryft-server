@@ -164,24 +164,58 @@ func (stat *Stat) Combine(other *Stat) {
 	stat.Details = append(stat.Details, other)
 }
 
+const (
+	ExtraPerformance = "performance"
+	ExtraSessionData = "session-data"
+)
+
 // AddPerfStat ands extra performance metrics.
 func (stat *Stat) AddPerfStat(name string, data interface{}) {
-	if perf_, ok := stat.Extra["performance"]; ok {
+	if perf_, ok := stat.Extra[ExtraPerformance]; ok {
 		if perf, ok := perf_.(map[string]interface{}); ok {
 			perf[name] = data
 		}
 	} else {
 		// put new item
-		stat.Extra["performance"] = map[string]interface{}{name: data}
+		stat.Extra[ExtraPerformance] = map[string]interface{}{name: data}
 	}
 }
 
 // ClearPerfStat clears all performance metrics
 func (stat *Stat) ClearPerfStat() {
-	delete(stat.Extra, "performance")
+	delete(stat.Extra, ExtraPerformance)
 }
 
 // GetAllPerfStat gets all performance metrics
 func (stat *Stat) GetAllPerfStat() interface{} {
-	return stat.Extra["performance"]
+	return stat.Extra[ExtraPerformance]
+}
+
+// AddSessionData ands extra session data.
+func (stat *Stat) AddSessionData(name string, data interface{}) {
+	if sd_, ok := stat.Extra[ExtraSessionData]; ok {
+		if sd, ok := sd_.(map[string]interface{}); ok {
+			sd[name] = data
+		}
+	} else {
+		// put new item
+		stat.Extra[ExtraSessionData] = map[string]interface{}{name: data}
+	}
+}
+
+// ClearSessionData clears all session data.
+func (stat *Stat) ClearSessionData(clearDetails bool) {
+	if clearDetails {
+		// clear "Details" recursively
+		for _, d := range stat.Details {
+			d.ClearSessionData(clearDetails)
+		}
+	}
+
+	delete(stat.Extra, ExtraSessionData)
+}
+
+// GetSessionData gets all session data.
+func (stat *Stat) GetSessionData() interface{} {
+	return stat.Extra[ExtraSessionData]
 }

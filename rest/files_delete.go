@@ -105,7 +105,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 	}
 
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	mountPoint, err := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))
@@ -154,14 +154,9 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 
 		for i, service := range services {
 			node := new(Node)
-			scheme := "http"
-			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.ServiceAddress)
-			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.ServiceAddress, port)
-				// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
-			}
+			node.Address = getServiceUrl(service)
 			node.IsLocal = server.isLocalService(service)
+			// node.Name = fmt.Sprintf("%s-%d", service.Node, service.Port)
 			node.Name = service.Node
 			node.Params.Local = true
 
@@ -190,6 +185,14 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 			wg.Add(1)
 			go func(node *Node) {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						log.WithField("error", r).Errorf("[%s]: delete file failed", CORE)
+						if err, ok := r.(error); ok {
+							node.Error = err
+						}
+					}
+				}()
 				nodeResult := &FilesNodeResult{}
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("deleting on local node")

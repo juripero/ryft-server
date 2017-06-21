@@ -1,0 +1,12 @@
+[Unit]
+Description=Ryft REST API server
+After=network.target
+
+[Service]
+Type=simple
+User=ryftuser
+Group=ryftuser
+ExecStart=/bin/sh -c '/usr/bin/ryft-server --config=/etc/ryft-server.conf > /var/log/ryft/server.log 2>&1'
+
+[Install]
+WantedBy=multi-user.target

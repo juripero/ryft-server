@@ -33,6 +33,7 @@ package search
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -52,9 +53,12 @@ type Config struct {
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
+	// VIEW file is used to speedup INDEX/DATA access
 	KeepDataAs  string
 	KeepIndexAs string
+	KeepViewAs  string
 	Delimiter   string
+	Lifetime    time.Duration
 
 	// post-processing transformations
 	Transforms []Transform
@@ -127,6 +131,11 @@ func (cfg *Config) CheckRelativeToHome(home string) error {
 	// output DATA file
 	if len(cfg.KeepDataAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepDataAs)) {
 		return fmt.Errorf("data %q is not relative to home", cfg.KeepDataAs)
+	}
+
+	// output VIEW file
+	if len(cfg.KeepViewAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepViewAs)) {
+		return fmt.Errorf("view %q is not relative to home", cfg.KeepViewAs)
 	}
 
 	return nil // OK

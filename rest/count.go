@@ -62,7 +62,9 @@ type CountParams struct {
 
 	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
+	KeepViewAs  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
+	Lifetime    string `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
@@ -71,6 +73,10 @@ type CountParams struct {
 	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
 
 	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
+
+	// internal parameters
+	//InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
+	InternalNoSessionId bool `form:"--internal-no-session-id"`
 }
 
 // Handle /count endpoint.
@@ -128,9 +134,16 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.KeepDataAs = params.KeepDataAs
-	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
+	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
+	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
+	if len(params.Lifetime) > 0 {
+		if cfg.Lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
+			panic(NewError(http.StatusBadRequest, err.Error()).
+				WithDetails("failed to parse lifetime"))
+		}
+	}
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
 	// cfg.Limit = 0
@@ -146,6 +159,13 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse transformations"))
+	}
+
+	// session preparation
+	session, err := NewSession(server.Config.Sessions.Algorithm)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to create session token"))
 	}
 
 	log.WithFields(map[string]interface{}{
@@ -194,7 +214,8 @@ func (server *Server) DoCount(ctx *gin.Context) {
 		case err, ok := <-res.ErrorChan:
 			if ok && err != nil {
 				// log.WithField("error", err).Debugf("[%s]: error received", CORE) // FIXME: DEBUG
-				panic(err) // TODO: check this? no other ways to report errors
+				panic(NewError(http.StatusInternalServerError, err.Error()).
+					WithDetails("failed to do search"))
 			}
 
 		case <-res.DoneChan:
@@ -207,7 +228,8 @@ func (server *Server) DoCount(ctx *gin.Context) {
 			// ... and errors
 			for err := range res.ErrorChan {
 				// log.WithField("error", err).Debugf("[%s]: error received", CORE) // FIXME: DEBUG
-				panic(err) // TODO: check this? no other ways to report errors
+				panic(NewError(http.StatusInternalServerError, err.Error()).
+					WithDetails("failed to do search"))
 			}
 
 			transferStopTime := time.Now() // performance metric
@@ -217,6 +239,12 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					// save request parameters in "extra"
 					res.Stat.Extra["request"] = &params
 				}
+
+				if cfg.Lifetime != 0 {
+					// delete output INDEX&DATA&VIEW files later
+					server.cleanupSession(homeDir, cfg)
+				}
+
 				if params.Performance {
 					metrics := map[string]interface{}{
 						"prepare":  searchStartTime.Sub(requestStartTime).String(),
@@ -226,6 +254,17 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					}
 					res.Stat.AddPerfStat("rest-count", metrics)
 				}
+
+				if session != nil && !params.InternalNoSessionId { // session
+					updateSession(session, res.Stat)
+					token, err := session.Token(server.Config.Sessions.secret)
+					if err != nil {
+						panic(err)
+					}
+					log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
+					res.Stat.Extra["session"] = token
+				}
+
 				xstat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)
 			} else {
@@ -293,6 +332,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
+	cfg.KeepViewAs = params.KeepViewAs
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false

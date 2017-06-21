@@ -55,6 +55,11 @@ const (
 	SM_SKIP   ShareMode = -2 // special value for "skip" flag
 )
 
+// init
+func init() {
+	SafeSetLogLevel(logrus.WarnLevel)
+}
+
 // SafeSetLogLevelString changes global module log level.
 func SafeSetLogLevelString(level string) error {
 	ll, err := logrus.ParseLevel(level)

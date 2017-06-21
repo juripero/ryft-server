@@ -53,6 +53,12 @@ func (server *Server) startUpdatingBusyness() {
 	go func(metric int32) {
 		var reported int32 = -1 // to force update metric ASAP
 
+		defer func() {
+			if r := recover(); r != nil {
+				log.WithField("error", r).Errorf("[%s]: update busyness thread failed", CORE)
+			}
+		}()
+
 		for {
 			select {
 			case metric = <-server.busynessChanged:
@@ -68,7 +74,8 @@ func (server *Server) startUpdatingBusyness() {
 					}
 				}
 
-				// TODO: graceful goroutine shutdown
+			case <-server.closeCh:
+				return
 			}
 		}
 	}(server.activeSearchCount)

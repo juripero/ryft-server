@@ -82,8 +82,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 // do /search processing
 func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup
-	defer res.Close()
-	defer res.ReportDone()
+	defer func() {
+		res.ReportUnhandledPanic(log)
+		res.ReportDone()
+		res.Close()
+	}()
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
@@ -115,6 +118,8 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 
 	// handle task cancellation
 	go func() {
+		defer res.ReportUnhandledPanic(log)
+
 		select {
 		case <-res.CancelChan:
 			task.log().Warnf("[%s]: cancelling by client", TAG)
@@ -206,8 +211,11 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 // do /count processing
 func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup
-	defer res.Close()
-	defer res.ReportDone()
+	defer func() {
+		res.ReportUnhandledPanic(log)
+		res.ReportDone()
+		res.Close()
+	}()
 
 	doneCh := make(chan struct{})
 	defer close(doneCh)
@@ -235,6 +243,8 @@ func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result)
 
 	// handle task cancellation
 	go func() {
+		defer res.ReportUnhandledPanic(log)
+
 		select {
 		case <-res.CancelChan:
 			task.log().Warnf("[%s]: cancelling by client", TAG)

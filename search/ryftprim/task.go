@@ -52,6 +52,7 @@ type Task struct {
 	Identifier    string // unique
 	IndexFileName string // INDEX filename, absolute
 	DataFileName  string // DATA filename, absolute
+	ViewFileName  string // VIEW filename, absolute
 
 	// flags to keep results
 	KeepIndexFile bool
@@ -98,7 +99,7 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 
 	rr := NewResultsReader(task,
 		task.DataFileName, task.IndexFileName,
-		task.config.Delimiter)
+		task.ViewFileName, task.config.Delimiter)
 
 	// result reader options
 	rr.Limit = uint64(task.config.Limit) // limit the total number of records
@@ -116,7 +117,10 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	task.resultWait.Add(1)
 	task.readStartTime = time.Now() // performance metric
 	go func() {
-		defer task.resultWait.Done()
+		defer func() {
+			res.ReportUnhandledPanic(log)
+			task.resultWait.Done()
+		}()
 		rr.process(res)
 	}()
 

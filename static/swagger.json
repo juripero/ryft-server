@@ -3,7 +3,7 @@
   "info": {
     "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "RyftOne REST API",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "paths": {
     "/search": {
@@ -99,14 +99,21 @@
             "type": "string",
             "x-go-name": "Data",
             "name": "data",
-            "description": "Name of data file to keep. WARNING: file will be overriden!"
+            "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
             "type": "string",
             "name": "index",
             "x-go-name": "Index",
-            "description": "Name of index file to keep. WARNING: file will be overriden!"
+            "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
@@ -114,6 +121,13 @@
             "name": "delimiter",
             "x-go-name": "Delimiter",
             "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "x-go-name": "Lifetime",
+            "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
           },
           {
             "in": "query",
@@ -193,7 +207,7 @@
       "get": {
         "description": "Endpoint for the count. Does the search but returns just statistics.",
         "tags": [
-          "count"
+          "search"
         ],
         "summary": "Count the search matches",
         "operationId": "count",
@@ -263,14 +277,21 @@
             "type": "string",
             "x-go-name": "Data",
             "name": "data",
-            "description": "Name of data file to keep. WARNING: file will be overriden!"
+            "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
             "type": "string",
             "name": "index",
             "x-go-name": "Index",
-            "description": "Name of index file to keep. WARNING: file will be overriden!"
+            "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
@@ -278,6 +299,13 @@
             "name": "delimiter",
             "x-go-name": "Delimiter",
             "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "x-go-name": "Lifetime",
+            "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
           },
           {
             "in": "query",
@@ -438,10 +466,58 @@
         }
       }
     },
+    "/run": {
+      "get": {
+        "tags": [
+          "run"
+        ],
+        "summary": "Run custom command on server side",
+        "description": "Endpoint to run custom command",
+        "operationId": "run",
+        "parameters": [
+          {
+            "name": "image",
+            "type": "string",
+            "description": "The Docker image to run command in.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "command",
+            "type": "string",
+            "description": "Command to run.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "name": "arg",
+            "description": "Set of arguments.",
+            "collectionFormat": "multi",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "STDOUT and STDERR combined output of the command"
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/rename": {
       "put": {
         "tags": [
-          "rename"
+          "files"
         ],
         "summary": "Change file/directory/catalog name or file name in catalog",
         "description": "Endpoint for the file renaming",
@@ -609,7 +685,7 @@
             "in": "query",
             "type": "string",
             "name": "lifetime",
-            "description": "The file or catalog lifetime, for example '2h'."
+            "description": "The file or catalog lifetime, for example \"2h\"."
           },
           {
             "in": "query",
@@ -766,7 +842,7 @@
     "/token/refresh": {
       "get": {
         "tags": [
-          "token_refresh"
+          "login"
         ],
         "summary": "Refresh authentication",
         "description": "Endpoint to refresh existing authentication token",

@@ -41,24 +41,30 @@ import (
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"instance-name":           engine.Instance,
-		"ryftprim-exec":           engine.ExecPath,
-		"ryftprim-legacy":         engine.LegacyMode,
-		"ryftprim-kill-on-cancel": engine.KillToolOnCancel,
-		"ryftone-mount":           engine.MountPoint,
-		"home-dir":                engine.HomeDir,
-		"open-poll":               engine.OpenFilePollTimeout.String(),
-		"read-poll":               engine.ReadFilePollTimeout.String(),
-		"read-limit":              engine.ReadFilePollLimit,
-		"keep-files":              engine.KeepResultFiles,
-		"minimize-latency":        engine.MinimizeLatency,
-		"index-host":              engine.IndexHost,
+	opts := make(map[string]interface{})
+	for k, v := range engine.options {
+		opts[k] = v
 	}
+	opts["instance-name"] = engine.Instance
+	opts["ryftprim-exec"] = engine.ExecPath
+	opts["ryftprim-legacy"] = engine.LegacyMode
+	opts["ryftprim-kill-on-cancel"] = engine.KillToolOnCancel
+	opts["ryftprim-abs-path"] = engine.UseAbsPath
+	opts["ryftone-mount"] = engine.MountPoint
+	opts["home-dir"] = engine.HomeDir
+	opts["open-poll"] = engine.OpenFilePollTimeout.String()
+	opts["read-poll"] = engine.ReadFilePollTimeout.String()
+	opts["read-limit"] = engine.ReadFilePollLimit
+	opts["keep-files"] = engine.KeepResultFiles
+	opts["minimize-latency"] = engine.MinimizeLatency
+	opts["index-host"] = engine.IndexHost
+	return opts
 }
 
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
+	engine.options = opts // base
+
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)
@@ -99,6 +105,16 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 	} else {
 		engine.KillToolOnCancel = false // disable by default
+	}
+
+	// `ryftprim` absolute path
+	if v, ok := opts["ryftprim-abs-path"]; ok {
+		engine.UseAbsPath, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "ryftprim-abs-path" option: %s`, err)
+		}
+	} else {
+		engine.UseAbsPath = false // disable by default
 	}
 
 	// `ryftone` mount point

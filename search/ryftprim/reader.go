@@ -41,6 +41,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/view"
 )
 
 // ResultsReader reads INDEX and DATA files.
@@ -49,6 +50,7 @@ type ResultsReader struct {
 
 	IndexPath string // INDEX file path (absolute)
 	DataPath  string // DATA file path (absolute)
+	ViewPath  string // VIEW file path (absolute)
 	Delimiter string // DATA delimiter string
 
 	// options
@@ -72,14 +74,18 @@ type ResultsReader struct {
 	finishing  int32         // finishing flag, atomic
 
 	// some processing statistics
-	totalDataLength uint64 // total DATA length expected, sum of all index.Length and delimiters
+	totalIndexLength uint64 // total INDEX length read
+	totalDataLength  uint64 // total DATA length expected, sum of all index.Length and delimiters
+
+	view *view.Writer // VIEW writer
 }
 
 // NewResultsReader creates new reader
-func NewResultsReader(task *Task, dataPath, indexPath string, delimiter string) *ResultsReader {
+func NewResultsReader(task *Task, dataPath, indexPath, viewPath string, delimiter string) *ResultsReader {
 	rr := new(ResultsReader)
 	rr.IndexPath = indexPath
 	rr.DataPath = dataPath
+	rr.ViewPath = viewPath
 	rr.Delimiter = delimiter
 
 	rr.cancelChan = make(chan struct{})
@@ -160,6 +166,35 @@ func (rr *ResultsReader) process(res *search.Result) {
 		idxRd = bufio.NewReaderSize(f, 256*1024)
 	}
 
+	if len(rr.ViewPath) != 0 {
+		var err error
+		rr.view, err = view.Create(rr.ViewPath)
+		if err != nil {
+			rr.log().WithError(err).WithField("path", rr.ViewPath).
+				Warnf("[%s/reader]: failed to create VIEW file", TAG)
+			res.ReportError(fmt.Errorf("failed to create VIEW file: %s", err))
+			return // failed
+		}
+
+		defer func() {
+			if rr.view != nil {
+				// update expected length
+				if err := rr.view.Update(int64(rr.totalIndexLength), int64(rr.totalDataLength)); err != nil {
+					rr.log().WithError(err).WithField("path", rr.ViewPath).
+						Warnf("[%s/reader]: failed to update VIEW file", TAG)
+					res.ReportError(fmt.Errorf("failed to update VIEW file: %s", err))
+				}
+
+				// close VIEW file
+				if err := rr.view.Close(); err != nil {
+					rr.log().WithError(err).WithField("path", rr.ViewPath).
+						Warnf("[%s/reader]: failed to close VIEW file", TAG)
+					res.ReportError(fmt.Errorf("failed to close VIEW file: %s", err))
+				}
+			}
+		}()
+	}
+
 	// INDEX line can be read partially
 	// we need to save all parts to collect whole line
 	var parts [][]byte
@@ -208,7 +243,29 @@ func (rr *ResultsReader) process(res *search.Result) {
 					continue
 				*/
 			} else {
+				// update VIEW file
+				if rr.view != nil {
+					indexBeg := rr.totalDataLength
+					indexEnd := indexBeg + uint64(len(line))
+					dataBeg := rr.totalDataLength
+					dataEnd := rr.totalDataLength + index.Length
+					err := rr.view.Put(int64(indexBeg), int64(indexEnd),
+						int64(dataBeg), int64(dataEnd))
+					if err != nil {
+						rr.log().WithError(err).WithField("path", rr.ViewPath).
+							Warnf("[%s/reader]: failed to write VIEW file", TAG)
+						res.ReportError(fmt.Errorf("failed to write VIEW file: %s", err))
+
+						// remove VIEW file and process without VIEW
+						_ = rr.view.Close()
+						rr.view = nil
+						os.RemoveAll(rr.ViewPath)
+						// return // failed
+					}
+				}
+
 				// update expected length
+				rr.totalIndexLength += uint64(len(line))
 				rr.totalDataLength += index.Length + uint64(len(rr.Delimiter))
 
 				var data []byte
@@ -412,4 +469,61 @@ func (rr *ResultsReader) readData(f *bufio.Reader, length uint64) ([]byte, error
 	return buf[0:pos], fmt.Errorf("[%s/reader]: cancelled by attempt limit %s (%dx%s)",
 		TAG, rr.ReadFilePollTimeout*time.Duration(rr.ReadFilePollLimit),
 		rr.ReadFilePollLimit, rr.ReadFilePollTimeout)
+}
+
+// CreateViewFile creates VIEW file based on INDEX
+func CreateViewFile(indexPath, viewPath string, delimiter string) error {
+	// open INDEX file
+	file, err := os.Open(indexPath)
+	if err != nil {
+		return fmt.Errorf("failed to open INDEX: %s", err)
+	}
+	defer file.Close() // close at the end
+
+	// create VIEW file
+	w, err := view.Create(viewPath)
+	if err != nil {
+		return fmt.Errorf("failed to create VIEW: %s", err)
+	}
+	defer w.Close()
+
+	// read all index records
+	rd := bufio.NewReaderSize(file, 256*1024)
+	delimLen := int64(len(delimiter))
+	indexPos := int64(0)
+	dataPos := int64(0)
+	for {
+		// read line by line
+		line, err := rd.ReadBytes('\n')
+		if len(line) > 0 {
+			index, err := search.ParseIndex(line)
+			if err != nil {
+				return fmt.Errorf("failed to parse index: %s", err)
+			}
+
+			err = w.Put(indexPos, indexPos+int64(len(line)),
+				dataPos, dataPos+int64(index.Length))
+			if err != nil {
+				return fmt.Errorf("failed to write VIEW: %s", err)
+			}
+
+			indexPos += int64(len(line))
+			dataPos += int64(index.Length) + delimLen
+		}
+
+		if err != nil {
+			if err == io.EOF {
+				break // done
+			} else {
+				return fmt.Errorf("failed to read: %s", err)
+			}
+		}
+	}
+
+	// update lengths
+	if err := w.Update(indexPos, dataPos); err != nil {
+		return fmt.Errorf("failed to update VIEW: %s", err)
+	}
+
+	return nil // OK
 }

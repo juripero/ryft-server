@@ -321,7 +321,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	}
 
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	mountPoint, err := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))
@@ -369,13 +369,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 		nodes := make([]*Node, len(services))
 		for i, service := range services {
 			node := new(Node)
-			scheme := "http"
-			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.ServiceAddress)
-			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.ServiceAddress, port)
-			}
-
+			node.Address = getServiceUrl(service)
 			node.IsLocal = server.isLocalService(service)
 			node.Params = RenameFileParams{
 				File:    params.File,
@@ -396,6 +390,15 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			wg.Add(1)
 			go func(node *Node, path string) {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						log.WithField("error", r).Errorf("[%s]: rename file failed", CORE)
+						if err, ok := r.(error); ok {
+							node.Error = err
+						}
+					}
+				}()
+
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("renaming on local node")
 					// checks all the inputs are relative to home

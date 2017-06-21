@@ -39,17 +39,22 @@ import (
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"server-url": engine.ServerURL,
-		"auth-token": engine.AuthToken,
-		"local-only": engine.LocalOnly,
-		"skip-stat":  engine.SkipStat,
-		"index-host": engine.IndexHost,
+	opts := make(map[string]interface{})
+	for k, v := range engine.options {
+		opts[k] = v
 	}
+	opts["server-url"] = engine.ServerURL
+	opts["auth-token"] = engine.AuthToken
+	opts["local-only"] = engine.LocalOnly
+	opts["skip-stat"] = engine.SkipStat
+	opts["index-host"] = engine.IndexHost
+	return opts
 }
 
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
+	engine.options = opts // base
+
 	// server URL
 	if v, ok := opts["server-url"]; ok {
 		engine.ServerURL, err = utils.AsString(v)

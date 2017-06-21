@@ -44,6 +44,8 @@ type Parser struct {
 	scanner  *Scanner
 	baseOpts Options
 	lexBuf   []Lexeme // last read lexem
+
+	replaceRecord string // replace RECORD with
 }
 
 // NewParser returns a new instance of Parser.
@@ -68,8 +70,19 @@ func ParseQuery(query string) (res Query, err error) {
 
 // ParseQueryOpt parses a query from input string using non-default base options.
 func ParseQueryOpt(query string, opts Options) (res Query, err error) {
+	return parseQueryOpt(query, opts, "")
+}
+
+// ParseQueryOptEx parses a query from input string and replaces RECORD with provided keyword.
+func ParseQueryOptEx(query string, opts Options, newRecord string) (res Query, err error) {
+	return parseQueryOpt(query, opts, newRecord)
+}
+
+// parseQueryOpt parses a query from input string using non-default base options.
+func parseQueryOpt(query string, opts Options, newRecord string) (res Query, err error) {
 	p := NewParserString(query)
 	p.SetBaseOptions(opts)
+	p.replaceRecord = newRecord
 	res, err = p.ParseQuery()
 	if err == nil && !p.EOF() {
 		// check all data parsed, no more queries expected
@@ -371,6 +384,11 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		// no surrounding width should be used
 		// for structured search!
 		res.Options.Width = 0
+
+		// RECORD => new keyword (JRECORD, XRECORD, CRECORD)
+		if p.replaceRecord != "" && strings.HasPrefix(input, IN_RECORD) {
+			input = strings.Replace(input, IN_RECORD, p.replaceRecord, 1)
+		}
 	}
 
 	res.ExprOld = fmt.Sprintf("(%s %s %s)", input,

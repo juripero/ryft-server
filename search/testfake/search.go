@@ -42,6 +42,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftprim"
 )
 
 // Search starts asynchronous "/search" or "/count" operation.
@@ -137,6 +138,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		defer func() {
 			res.Stat.Duration = uint64(time.Since(started).Nanoseconds() / 1000)
 			res.Stat.FabricDuration = res.Stat.Duration / 2
+
+			if res.Stat != nil {
+				res.Stat.AddSessionData("index", cfg.KeepIndexAs)
+				res.Stat.AddSessionData("data", cfg.KeepDataAs)
+				res.Stat.AddSessionData("view", cfg.KeepViewAs)
+				res.Stat.AddSessionData("delim", cfg.Delimiter)
+				res.Stat.AddSessionData("width", cfg.Width)
+				res.Stat.AddSessionData("matches", res.Stat.Matches)
+			}
 
 			if engine.SearchNoStat {
 				res.Stat = nil // reset
@@ -236,8 +246,19 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 						if err == nil {
 							log.WithField("path", f.Name()).Infof("[fake]: saving INDEX to...")
 							idxWr = bufio.NewWriter(f)
-							defer f.Close()
-							defer idxWr.Flush()
+							defer func() {
+								idxWr.Flush()
+								f.Close()
+
+								if len(cfg.KeepViewAs) != 0 {
+									log.WithField("path", filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)).Infof("[fake]: saving VIEW to...")
+									err := ryftprim.CreateViewFile(filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepIndexAs),
+										filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs), cfg.Delimiter)
+									if err != nil {
+										log.WithError(err).Errorf("failed to create VIEW file")
+									}
+								}
+							}()
 						} else {
 							log.WithError(err).Errorf("[fake]: failed to save INDEX")
 						}
