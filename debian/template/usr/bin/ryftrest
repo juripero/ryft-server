@@ -36,6 +36,7 @@ Search specific:
 -oi|--index=<file> Used to keep an index results file.
 -ov|--view=<file>  Used to keep a view results file. To speed up /search/show.
 --lifetime=<T>     Used to automatically cleanup results files. Examples: 1h, 1m, 20s.
+--backend=<X>      Used to select "ryftprim" or "ryftx" backend.
 
 REST specific:
 -a|--address=<addr> Specifies the ryft-server address.
@@ -114,6 +115,7 @@ DATA=
 INDEX=
 VIEW=
 LIFETIME=
+BACKEND=
 
 ADDRESS=http://localhost:8765
 AUTH_USER=
@@ -301,6 +303,14 @@ while [[ $# > 0 ]]; do
         LIFETIME="$2"
         shift 2
         ;;
+    --backend=*)
+        BACKEND="${1#*=}"
+        shift
+        ;;
+    --backend)
+        BACKEND="$2"
+        shift 2
+        ;;
     -a=*|--address=*)
         ADDRESS="${1#*=}"
         shift
@@ -473,6 +483,7 @@ done
 [[ ! -z "$INDEX" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "index=$INDEX")
 [[ ! -z "$VIEW" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "view=$VIEW")
 [[ ! -z "$LIFETIME" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "lifetime=$LIFETIME")
+[[ ! -z "$BACKEND" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "backend=$BACKEND")
 [[ ! -z "$FORMAT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "format=$FORMAT")
 [[ ! -z "$FIELDS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fields=$FIELDS")
 for tx in "${TRANSFORMS[@]}"; do

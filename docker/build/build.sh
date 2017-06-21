@@ -1,13 +1,11 @@
-#!/bin/bash
-
-echo "RUNNER"
+#!/bin/sh -e
 cd ${RYFTPATH}
 
-# get deps
+echo "syncing vendor sources..."
 govendor sync
 
 # build Debian package
 make debian
 
 # build go binary file
-make build
+# make build
