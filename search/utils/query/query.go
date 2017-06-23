@@ -55,6 +55,7 @@ type Query struct {
 	Arguments []Query
 
 	boolOps int // number of boolean operations inside (optimizer). -1 is shouldn't combined
+	BoolOps int // actual number of booleans inside
 }
 
 // String gets query as a string (generic format).

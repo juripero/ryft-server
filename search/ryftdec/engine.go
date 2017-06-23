@@ -114,13 +114,18 @@ func (engine *Engine) getBackendOptions() backendOptions {
 }
 
 // updates the seach configuration
-func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery) {
+func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery, boolOps int) {
 	updateConfig(cfg, q.Options)
 	if engine.CompatMode {
 		cfg.Query = q.ExprOld
 	} else {
 		cfg.Query = q.ExprNew
-		cfg.Mode = "g" // generic!
+		if q.Options.Mode != "" && boolOps == 0 {
+			// notify backend about search mode
+			cfg.Mode = fmt.Sprintf("g/%s", q.Options.Mode)
+		} else {
+			cfg.Mode = "g" // generic!
+		}
 	}
 }
 

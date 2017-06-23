@@ -87,7 +87,10 @@ func (o *Optimizer) process(q Query) Query {
 			if o.canCombine(a, b, q.Operator) {
 				// combine two arguments into one
 				// both a & b should have simple queries!
-				tmp := Query{boolOps: a.boolOps + b.boolOps + 1}
+				tmp := Query{
+					boolOps: a.boolOps + b.boolOps + 1,
+					BoolOps: a.BoolOps + b.BoolOps + 1,
+				}
 				tmp.Simple = &SimpleQuery{}
 				tmp.Simple.Structured = a.Simple.Structured && b.Simple.Structured
 				ff := selectFileFilter(a.Simple.Options, b.Simple.Options)
@@ -188,6 +191,7 @@ func (o *Optimizer) combine(q Query) Query {
 		structured := true
 		res := Query{
 			boolOps: len(q.Arguments) - 1,
+			BoolOps: len(q.Arguments) - 1,
 		}
 		for i := 0; i < len(q.Arguments); i++ {
 			// print operator
@@ -204,6 +208,7 @@ func (o *Optimizer) combine(q Query) Query {
 			// combine argument
 			a := o.combine(q.Arguments[i])
 			res.boolOps += a.boolOps
+			res.BoolOps += a.BoolOps
 			if a.boolOps != 0 {
 				exprOld.WriteRune('(')
 				exprOld.WriteString(a.Simple.ExprOld)

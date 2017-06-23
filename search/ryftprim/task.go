@@ -59,6 +59,7 @@ type Task struct {
 	KeepDataFile  bool
 
 	// `ryftprim` process & output
+	toolPath string        // tool path
 	toolArgs []string      // command line arguments
 	toolCmd  *exec.Cmd     // ryftprim executable process
 	toolOut  *bytes.Buffer // combined STDOUT and STDERR

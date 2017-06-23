@@ -70,6 +70,10 @@ type Config struct {
 	// upload/search share mode
 	ShareMode utils.ShareMode
 
+	// backend tool, autoselect if empty
+	// should be "ryftprim" or "ryftx"
+	BackendTool string
+
 	// report performance metrics
 	Performance bool
 }

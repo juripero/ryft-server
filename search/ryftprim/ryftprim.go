@@ -65,7 +65,8 @@ func (engine *Engine) prepare(task *Task) error {
 	// select search mode
 	genericMode := false
 	switch strings.ToLower(cfg.Mode) {
-	case "", "g", "generic":
+	case "", "g", "generic", "g/es", "g/fhs", "g/feds", "g/ds",
+		"g/ts", "g/ns", "g/cs", "g/ipv4", "g/ipv6": // TODO: pcre2
 		args = append(args, "-p", "g")
 		genericMode = true
 	case "es", "exact", "exact_search":
@@ -87,6 +88,7 @@ func (engine *Engine) prepare(task *Task) error {
 		args = append(args, "-p", "ipv4")
 	case "ipv6", "ipv6_search":
 		args = append(args, "-p", "ipv6")
+	// TODO: pcre2
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
@@ -225,11 +227,20 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
+	var err error
+	task.toolPath, err = engine.getExecPath(task.config)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
+		return fmt.Errorf("failed to find tool: %s", err)
+	} else if task.toolPath == "" {
+		task.log().Warnf("[%s]: no appropriate tool found", TAG)
+		return fmt.Errorf("no tool found: %s", task.toolPath)
+	}
 	task.log().WithFields(map[string]interface{}{
-		"tool": engine.ExecPath,
+		"tool": task.toolPath,
 		"args": task.toolArgs,
 	}).Infof("[%s]: executing tool", TAG)
-	task.toolCmd = exec.Command(engine.ExecPath, task.toolArgs...)
+	task.toolCmd = exec.Command(task.toolPath, task.toolArgs...)
 
 	// prepare combined STDERR&STDOUT output
 	task.toolOut = new(bytes.Buffer)
@@ -237,7 +248,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.toolCmd.Stderr = task.toolOut
 
 	task.toolStartTime = time.Now() // performance metric
-	err := task.toolCmd.Start()
+	err = task.toolCmd.Start()
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to start tool", TAG)
 		return fmt.Errorf("failed to start tool: %s", err)
@@ -326,6 +337,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 			res.Stat.AddPerfStat("ryftprim", metrics)
 		}
+
 		if res.Stat != nil {
 			res.Stat.AddSessionData("index", task.config.KeepIndexAs)
 			res.Stat.AddSessionData("data", task.config.KeepDataAs)
@@ -333,7 +345,12 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			res.Stat.AddSessionData("delim", task.config.Delimiter)
 			res.Stat.AddSessionData("width", task.config.Width)
 			res.Stat.AddSessionData("matches", res.Stat.Matches)
+
+			// save backend tool used
+			_, tool := filepath.Split(task.toolPath)
+			res.Stat.Extra["backend"] = tool
 		}
+
 		res.ReportDone()
 		res.Close()
 	}()
