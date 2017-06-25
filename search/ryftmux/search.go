@@ -56,3 +56,32 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	go engine.run(task, mux)
 	return mux, nil // OK for now
 }
+
+// Show starts asynchronous "/search/show" operation.
+func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(cfg)
+	mux := search.NewResult()
+
+	// prepare requests
+	for _, backend := range engine.Backends {
+		bcfg := cfg.Clone()
+
+		// apply overrided options
+		if opts, ok := engine.override[backend]; ok {
+			bcfg.Offset = opts.Offset
+			bcfg.Limit = opts.Limit
+		}
+
+		res, err := backend.Show(bcfg)
+		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to start /search/show backend", TAG)
+			mux.ReportError(fmt.Errorf("failed to start /search/show backend: %s", err))
+			continue
+		}
+
+		task.add(res)
+	}
+
+	go engine.run(task, mux)
+	return mux, nil // OK for now
+}
