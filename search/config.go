@@ -49,7 +49,8 @@ type Config struct {
 	Dist   uint     // fuzziness distance (FHS, FEDS)
 	Reduce bool     // reduce for FEDS
 	Nodes  uint     // number of hardware nodes to use (0..4)
-	Limit  uint     // limit  the number of records (0 - no limit)
+	Limit  uint     // limit the number of records (0 - no limit)
+	Offset uint     // first record index (/show feature)
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
@@ -113,9 +114,9 @@ func (cfg *Config) AddFiles(files []string) {
 
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
-	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, width:%d, dist:%d, cs:%t, nodes:%d, limit:%d, keep-data:%q, keep-index:%q, delim:%q, index:%t, data:%t}",
-		cfg.Query, cfg.Files, cfg.Mode, cfg.Width, cfg.Dist, cfg.Case, cfg.Nodes, cfg.Limit,
-		cfg.KeepDataAs, cfg.KeepIndexAs, cfg.Delimiter, cfg.ReportIndex, cfg.ReportData)
+	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, width:%d, dist:%d, cs:%t, nodes:%d, offset:%d, limit:%d, keep-data:%q, keep-index:%q, keep-view:%q, delim:#%x, index:%t, data:%t}",
+		cfg.Query, cfg.Files, cfg.Mode, cfg.Width, cfg.Dist, cfg.Case, cfg.Nodes, cfg.Offset, cfg.Limit,
+		cfg.KeepDataAs, cfg.KeepIndexAs, cfg.KeepViewAs, cfg.Delimiter, cfg.ReportIndex, cfg.ReportData)
 }
 
 // CheckRelativeToHome checks all the input/output filenames are relative to home

@@ -18,7 +18,7 @@ func TestConfigEmpty(t *testing.T) {
 	assert.Empty(t, cfg.KeepViewAs)
 	assert.Empty(t, cfg.Delimiter)
 
-	assert.Equal(t, `Config{query:, files:[], mode:"", width:0, dist:0, cs:true, nodes:0, limit:0, keep-data:"", keep-index:"", delim:"", index:false, data:false}`, cfg.String())
+	assert.Equal(t, `Config{query:, files:[], mode:"", width:0, dist:0, cs:true, nodes:0, offset:0, limit:0, keep-data:"", keep-index:"", keep-view:"", delim:#, index:false, data:false}`, cfg.String())
 }
 
 // test simple configuration
@@ -39,7 +39,7 @@ func TestConfigSimple(t *testing.T) {
 	cfg.Delimiter = "\r\n\f"
 	cfg.ReportIndex = true
 	cfg.ReportData = true
-	assert.Equal(t, `Config{query:hello, files:["a.txt" "b.txt" "c.txt" "d.txt"], mode:"fhs", width:0, dist:0, cs:true, nodes:0, limit:0, keep-data:"", keep-index:"", delim:"\r\n\f", index:true, data:true}`, cfg.String())
+	assert.Equal(t, `Config{query:hello, files:["a.txt" "b.txt" "c.txt" "d.txt"], mode:"fhs", width:0, dist:0, cs:true, nodes:0, offset:0, limit:0, keep-data:"", keep-index:"", keep-view:"", delim:#0d0a0c, index:true, data:true}`, cfg.String())
 }
 
 // test relative to home

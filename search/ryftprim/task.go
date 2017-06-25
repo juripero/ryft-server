@@ -103,8 +103,9 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 		task.ViewFileName, task.config.Delimiter)
 
 	// result reader options
-	rr.Limit = uint64(task.config.Limit) // limit the total number of records
-	rr.ReadData = task.config.ReportData // if `false` only indexes will be reported
+	rr.Offset = uint64(task.config.Offset) // start from this record
+	rr.Limit = uint64(task.config.Limit)   // limit the total number of records
+	rr.ReadData = task.config.ReportData   // if `false` only indexes will be reported
 
 	// report filepath relative to home and update index's host
 	rr.RelativeToHome = filepath.Join(engine.MountPoint, engine.HomeDir)
@@ -118,10 +119,8 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	task.resultWait.Add(1)
 	task.readStartTime = time.Now() // performance metric
 	go func() {
-		defer func() {
-			res.ReportUnhandledPanic(log)
-			task.resultWait.Done()
-		}()
+		defer res.ReportUnhandledPanic(log)
+		defer task.resultWait.Done()
 		rr.process(res)
 	}()
 

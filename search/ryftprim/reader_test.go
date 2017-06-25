@@ -214,7 +214,8 @@ func TestReaderLimit(t *testing.T) {
 	rr.ReadFilePollTimeout = 50 * time.Millisecond
 	rr.ReadFilePollLimit = 20
 	rr.ReadData = true
-	rr.Limit = 2 // !!! only TWO records expected
+	rr.Offset = 1 // skip 1 record
+	rr.Limit = 2  // !!! only TWO records expected
 
 	var wg sync.WaitGroup
 
@@ -246,23 +247,23 @@ func TestReaderLimit(t *testing.T) {
 	// log.Debugf("done, check results read")
 	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
 		assert.EqualValues(t, 2, res.RecordsReported()) {
-		assert.EqualValues(t, 2*(5+len(delimiter)), rr.totalDataLength)
+		assert.EqualValues(t, 3*(5+len(delimiter)), rr.totalDataLength)
 
 		// check first record
-		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
-			assert.EqualValues(t, "1.txt", rec.Index.File)
-			assert.EqualValues(t, 100, rec.Index.Offset)
-			assert.EqualValues(t, 5, rec.Index.Length)
-			assert.EqualValues(t, 0, rec.Index.Fuzziness)
+		/*if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{1.txt#100, len:5, d:0}", rec.Index.String())
 			assert.EqualValues(t, "hello", rec.RawData)
-		}
+		}*/
 
 		// check second record
 		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
-			assert.EqualValues(t, "2.txt", rec.Index.File)
-			assert.EqualValues(t, 200, rec.Index.Offset)
-			assert.EqualValues(t, 5, rec.Index.Length)
-			assert.EqualValues(t, -1, rec.Index.Fuzziness)
+			assert.EqualValues(t, "{2.txt#200, len:5, d:-1}", rec.Index.String())
+			assert.EqualValues(t, "hello", rec.RawData)
+		}
+
+		// check third record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{3.txt#300, len:5, d:1}", rec.Index.String())
 			assert.EqualValues(t, "hello", rec.RawData)
 		}
 	}

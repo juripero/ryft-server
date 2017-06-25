@@ -54,6 +54,7 @@ type ResultsReader struct {
 	Delimiter string // DATA delimiter string
 
 	// options
+	Offset   uint64 // start from the record
 	Limit    uint64 // limit the total number of records
 	ReadData bool   // if `false` only indexes will be reported
 
@@ -198,6 +199,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 	// INDEX line can be read partially
 	// we need to save all parts to collect whole line
 	var parts [][]byte
+	var recId uint64 // record identifer (ordinal number)
 
 	// if ryftprim tool is not finished (no INDEX/DATA available)
 	// attempt limit check should be disabled (rr.isStopped() == 0)!
@@ -267,6 +269,45 @@ func (rr *ResultsReader) process(res *search.Result) {
 				// update expected length
 				rr.totalIndexLength += uint64(len(line))
 				rr.totalDataLength += index.Length + uint64(len(rr.Delimiter))
+				recId += 1
+
+				// skip requested number of records
+				if recId <= rr.Offset {
+					if rr.ReadData {
+						if datRd == nil {
+							// try to open DATA file
+							// if operation is cancelled `f` is nil
+							f, err := rr.openFile(rr.DataPath)
+							if err != nil {
+								rr.log().WithError(err).WithField("path", rr.DataPath).
+									Warnf("[%s/reader]: failed to open DATA file", TAG)
+								res.ReportError(fmt.Errorf("failed to open DATA file: %s", err))
+								return // failed
+							} else if f == nil {
+								return // cancelled
+							}
+
+							defer f.Close() // close at the end
+							datRd = bufio.NewReaderSize(f, 256*1024)
+						}
+
+						n := int(index.Length) + len(rr.Delimiter)
+						m, err := datRd.Discard(n)
+						if err != nil {
+							log.WithError(err).Warnf("[%s/reader]: failed to skip DATA", TAG)
+							res.ReportError(fmt.Errorf("failed to skip DATA: %s", err))
+							return // failed
+						} else if m != n {
+							log.Warnf("[%s/reader]: not all DATA skipped: %d of %d", TAG, m, n)
+							res.ReportError(fmt.Errorf("not all DATA skipped: %d of %d", m, n))
+							return // failed
+						}
+
+						dataPos += uint64(m)
+					}
+
+					continue // go to next RECORD
+				}
 
 				var data []byte
 				if rr.ReadData {
