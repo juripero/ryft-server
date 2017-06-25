@@ -93,7 +93,7 @@ func NewTask(config *search.Config) *Task {
 }
 
 // start processing in goroutine
-func (task *Task) startProcessing(engine *Engine, res *search.Result) {
+func (task *Task) startProcessing(engine *Engine, res *search.Result, isShow bool) {
 	if task.results != nil {
 		return // already started
 	}
@@ -106,6 +106,7 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	rr.Offset = uint64(task.config.Offset) // start from this record
 	rr.Limit = uint64(task.config.Limit)   // limit the total number of records
 	rr.ReadData = task.config.ReportData   // if `false` only indexes will be reported
+	rr.MakeView = !isShow                  // if /show do not create VIEW file, just use it
 
 	// report filepath relative to home and update index's host
 	rr.RelativeToHome = filepath.Join(engine.MountPoint, engine.HomeDir)

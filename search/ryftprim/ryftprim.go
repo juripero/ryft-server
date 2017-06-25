@@ -281,7 +281,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	// start INDEX&DATA processing (if latency is minimized)
 	// otherwise wait until ryftprim tool is finished
 	if minimizeLatency && task.config.ReportIndex {
-		task.startProcessing(engine, res)
+		task.startProcessing(engine, res, false)
 	}
 
 	select {
@@ -290,7 +290,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	case err := <-doneCh: // process done
 		// start INDEX&DATA processing (if latency is NOT minimized)
 		if !minimizeLatency && task.config.ReportIndex && err == nil {
-			task.startProcessing(engine, res)
+			task.startProcessing(engine, res, false)
 		}
 		engine.finish(err, task, res)
 

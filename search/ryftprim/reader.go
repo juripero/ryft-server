@@ -57,6 +57,7 @@ type ResultsReader struct {
 	Offset   uint64 // start from the record
 	Limit    uint64 // limit the total number of records
 	ReadData bool   // if `false` only indexes will be reported
+	MakeView bool   // if `false` do not create VIEW file
 
 	RelativeToHome string // report filepath relative to home
 	UpdateHostTo   string // update index's host
@@ -78,7 +79,7 @@ type ResultsReader struct {
 	totalIndexLength uint64 // total INDEX length read
 	totalDataLength  uint64 // total DATA length expected, sum of all index.Length and delimiters
 
-	view *view.Writer // VIEW writer
+	viewWr *view.Writer // VIEW writer
 }
 
 // NewResultsReader creates new reader
@@ -167,9 +168,9 @@ func (rr *ResultsReader) process(res *search.Result) {
 		idxRd = bufio.NewReaderSize(f, 256*1024)
 	}
 
-	if len(rr.ViewPath) != 0 {
+	if rr.MakeView && len(rr.ViewPath) != 0 {
 		var err error
-		rr.view, err = view.Create(rr.ViewPath)
+		rr.viewWr, err = view.Create(rr.ViewPath)
 		if err != nil {
 			rr.log().WithError(err).WithField("path", rr.ViewPath).
 				Warnf("[%s/reader]: failed to create VIEW file", TAG)
@@ -178,16 +179,16 @@ func (rr *ResultsReader) process(res *search.Result) {
 		}
 
 		defer func() {
-			if rr.view != nil {
+			if rr.viewWr != nil {
 				// update expected length
-				if err := rr.view.Update(int64(rr.totalIndexLength), int64(rr.totalDataLength)); err != nil {
+				if err := rr.viewWr.Update(int64(rr.totalIndexLength), int64(rr.totalDataLength)); err != nil {
 					rr.log().WithError(err).WithField("path", rr.ViewPath).
 						Warnf("[%s/reader]: failed to update VIEW file", TAG)
 					res.ReportError(fmt.Errorf("failed to update VIEW file: %s", err))
 				}
 
 				// close VIEW file
-				if err := rr.view.Close(); err != nil {
+				if err := rr.viewWr.Close(); err != nil {
 					rr.log().WithError(err).WithField("path", rr.ViewPath).
 						Warnf("[%s/reader]: failed to close VIEW file", TAG)
 					res.ReportError(fmt.Errorf("failed to close VIEW file: %s", err))
@@ -246,12 +247,12 @@ func (rr *ResultsReader) process(res *search.Result) {
 				*/
 			} else {
 				// update VIEW file
-				if rr.view != nil {
-					indexBeg := rr.totalDataLength
+				if rr.viewWr != nil {
+					indexBeg := rr.totalIndexLength
 					indexEnd := indexBeg + uint64(len(line))
 					dataBeg := rr.totalDataLength
 					dataEnd := rr.totalDataLength + index.Length
-					err := rr.view.Put(int64(indexBeg), int64(indexEnd),
+					err := rr.viewWr.Put(int64(indexBeg), int64(indexEnd),
 						int64(dataBeg), int64(dataEnd))
 					if err != nil {
 						rr.log().WithError(err).WithField("path", rr.ViewPath).
@@ -259,8 +260,8 @@ func (rr *ResultsReader) process(res *search.Result) {
 						res.ReportError(fmt.Errorf("failed to write VIEW file: %s", err))
 
 						// remove VIEW file and process without VIEW
-						_ = rr.view.Close()
-						rr.view = nil
+						_ = rr.viewWr.Close()
+						rr.viewWr = nil
 						os.RemoveAll(rr.ViewPath)
 						// return // failed
 					}

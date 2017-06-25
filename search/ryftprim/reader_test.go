@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/view"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,7 +65,7 @@ func TestReaderUsual(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -91,29 +92,119 @@ func TestReaderUsual(t *testing.T) {
 
 		// check first record
 		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
-			assert.EqualValues(t, "1.txt", rec.Index.File)
-			assert.EqualValues(t, 100, rec.Index.Offset)
-			assert.EqualValues(t, 5, rec.Index.Length)
-			assert.EqualValues(t, 0, rec.Index.Fuzziness)
+			assert.EqualValues(t, "{1.txt#100, len:5, d:0}", rec.Index.String())
 			assert.EqualValues(t, "hello", rec.RawData)
 		}
 
 		// check second record
 		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
-			assert.EqualValues(t, "2.txt", rec.Index.File)
-			assert.EqualValues(t, 200, rec.Index.Offset)
-			assert.EqualValues(t, 5, rec.Index.Length)
-			assert.EqualValues(t, -1, rec.Index.Fuzziness)
+			assert.EqualValues(t, "{2.txt#200, len:5, d:-1}", rec.Index.String())
 			assert.EqualValues(t, "hello", rec.RawData)
 		}
 
 		// check third record
 		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
-			assert.EqualValues(t, "3.txt", rec.Index.File)
-			assert.EqualValues(t, 300, rec.Index.Offset)
-			assert.EqualValues(t, 5, rec.Index.Length)
-			assert.EqualValues(t, 1, rec.Index.Fuzziness)
+			assert.EqualValues(t, "{3.txt#300, len:5, d:1}", rec.Index.String())
 			assert.EqualValues(t, "hello", rec.RawData)
+		}
+	}
+}
+
+// valid results + VIEW file
+func TestReaderView(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+
+	indexPath := "/tmp/ryftprim-index.txt"
+	dataPath := "/tmp/ryfptrim-data.bin"
+	viewPath := "/tmp/ryfptrim-view.bin"
+	delimiter := "\r\n\f"
+
+	defer os.RemoveAll(indexPath)
+	defer os.RemoveAll(dataPath)
+	defer os.RemoveAll(viewPath)
+
+	rr := NewResultsReader(NewTask(nil), dataPath, indexPath, viewPath, delimiter)
+	rr.RelativeToHome = "/ryftone"
+	rr.OpenFilePollTimeout = 50 * time.Millisecond
+	rr.ReadFilePollTimeout = 50 * time.Millisecond
+	rr.ReadFilePollLimit = 20
+	rr.ReadData = true
+	rr.MakeView = true
+
+	var wg sync.WaitGroup
+
+	// emulate ryftprim work:
+	// write fake INDEX/DATA files
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(200 * time.Millisecond) // initial delay
+
+		od, _ := os.Create(dataPath)
+		oi, _ := os.Create(indexPath)
+		assert.NotNil(t, od)
+		assert.NotNil(t, oi)
+		defer od.Close()
+		defer oi.Close()
+
+		testFakeRyftprim3(od, oi, delimiter)
+
+		// soft stop
+		time.Sleep(100 * time.Millisecond)
+		rr.stop()
+	}()
+
+	res := search.NewResult()
+	rr.process(res)
+	wg.Wait()
+
+	// log.Debugf("done, check results read")
+	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
+		assert.EqualValues(t, 3, res.RecordsReported()) {
+		assert.EqualValues(t, 3*(5+len(delimiter)), rr.totalDataLength)
+
+		// check first record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{1.txt#100, len:5, d:0}", rec.Index.String())
+			assert.EqualValues(t, "hello", rec.RawData)
+		}
+
+		// check second record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{2.txt#200, len:5, d:-1}", rec.Index.String())
+			assert.EqualValues(t, "hello", rec.RawData)
+		}
+
+		// check third record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{3.txt#300, len:5, d:1}", rec.Index.String())
+			assert.EqualValues(t, "hello", rec.RawData)
+		}
+	}
+
+	// check the VIEW file created
+	if vf, err := view.Open(viewPath); assert.NoError(t, err) {
+		if assert.EqualValues(t, 3, vf.Count()) {
+			// first record
+			if iBeg, iEnd, dBeg, dEnd, err := vf.Get(0); assert.NoError(t, err) {
+				assert.EqualValues(t, []int64{0, 23, 0, 5}, []int64{iBeg, iEnd, dBeg, dEnd})
+			}
+
+			// second record
+			if iBeg, iEnd, dBeg, dEnd, err := vf.Get(1); assert.NoError(t, err) {
+				assert.EqualValues(t, []int64{23, 39, 8, 13}, []int64{iBeg, iEnd, dBeg, dEnd})
+			}
+
+			// third record
+			if iBeg, iEnd, dBeg, dEnd, err := vf.Get(2); assert.NoError(t, err) {
+				assert.EqualValues(t, []int64{39, 62, 16, 21}, []int64{iBeg, iEnd, dBeg, dEnd})
+			}
+
+			// failed
+			if iBeg, iEnd, dBeg, dEnd, err := vf.Get(3); assert.Error(t, err) {
+				assert.EqualValues(t, []int64{-1, -1, -1, -1}, []int64{iBeg, iEnd, dBeg, dEnd})
+				assert.Contains(t, err.Error(), "VIEW out of range")
+			}
 		}
 	}
 }
@@ -143,7 +234,7 @@ func TestReaderNoData(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -170,28 +261,19 @@ func TestReaderNoData(t *testing.T) {
 
 		// check first record
 		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
-			assert.EqualValues(t, "1.txt", rec.Index.File)
-			assert.EqualValues(t, 100, rec.Index.Offset)
-			assert.EqualValues(t, 5, rec.Index.Length)
-			assert.EqualValues(t, 0, rec.Index.Fuzziness)
+			assert.EqualValues(t, "{1.txt#100, len:5, d:0}", rec.Index.String())
 			assert.Nil(t, rec.RawData) // assert.EqualValues(t, "hello", rec.RawData)
 		}
 
 		// check second record
 		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
-			assert.EqualValues(t, "2.txt", rec.Index.File)
-			assert.EqualValues(t, 200, rec.Index.Offset)
-			assert.EqualValues(t, 5, rec.Index.Length)
-			assert.EqualValues(t, -1, rec.Index.Fuzziness)
+			assert.EqualValues(t, "{2.txt#200, len:5, d:-1}", rec.Index.String())
 			assert.Nil(t, rec.RawData) // assert.EqualValues(t, "hello", rec.RawData)
 		}
 
 		// check third record
 		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
-			assert.EqualValues(t, "3.txt", rec.Index.File)
-			assert.EqualValues(t, 300, rec.Index.Offset)
-			assert.EqualValues(t, 5, rec.Index.Length)
-			assert.EqualValues(t, 1, rec.Index.Fuzziness)
+			assert.EqualValues(t, "{3.txt#300, len:5, d:1}", rec.Index.String())
 			assert.Nil(t, rec.RawData) // assert.EqualValues(t, "hello", rec.RawData)
 		}
 	}
@@ -224,7 +306,7 @@ func TestReaderLimit(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -294,7 +376,7 @@ func TestReaderFailedToOpenIndex(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.OpenFile(dataPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0222)  // WRITE-ONLY
 		oi, _ := os.OpenFile(indexPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0222) // WRITE-ONLY
@@ -346,7 +428,7 @@ func TestReaderFailedToOpenData(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.OpenFile(dataPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0222) // WRITE-ONLY
 		oi, _ := os.Create(indexPath)
@@ -398,7 +480,7 @@ func TestReaderCancelToOpenIndex(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		rr.cancel()
 	}()
@@ -440,7 +522,7 @@ func TestReaderFailedToReadIndex(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -495,7 +577,7 @@ func TestReaderCancelToReadIndex(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -601,7 +683,7 @@ func TestReaderFailedToParseIndex(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -665,7 +747,7 @@ func TestReaderFailedToReadData(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -722,7 +804,7 @@ func TestReaderCancelToReadData(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -777,7 +859,7 @@ func TestReaderFailedToReadDelim(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -835,7 +917,7 @@ func TestReaderUnexpectedDelim(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
@@ -893,7 +975,7 @@ func TestReaderCancelToReadDelim(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(1 * time.Second) // initial delay
+		time.Sleep(200 * time.Millisecond) // initial delay
 
 		od, _ := os.Create(dataPath)
 		oi, _ := os.Create(indexPath)
