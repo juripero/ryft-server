@@ -142,6 +142,9 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	if cfg.Limit > 0 {
 		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
 	}
+	if cfg.Offset > 0 {
+		q.Set("offset", fmt.Sprintf("%d", cfg.Offset))
+	}
 	if cfg.Performance {
 		q.Set("performance", fmt.Sprintf("%t", cfg.Performance))
 	}

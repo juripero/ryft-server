@@ -57,6 +57,7 @@ func newFake(records, errors int) *fakeServer {
 
 	mux.HandleFunc("/search", fs.doSearch)
 	mux.HandleFunc("/count", fs.doCount)
+	//mux.HandleFunc("/search/show", fs.doSearchShow)
 	mux.HandleFunc("/files", fs.doFiles)
 
 	return fs

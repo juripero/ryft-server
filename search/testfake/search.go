@@ -294,7 +294,16 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}()
 
 	return res, nil // OK for now
+}
 
+// Show starts asynchronous "/search/show" operation.
+func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
+	backend, err := ryftprim.NewEngine(engine.Options())
+	if err != nil {
+		return nil, err
+	}
+
+	return backend.Show(cfg)
 }
 
 // drain the full results
