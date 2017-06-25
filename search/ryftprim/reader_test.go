@@ -207,6 +207,102 @@ func TestReaderView(t *testing.T) {
 			}
 		}
 	}
+
+	// read with VIEW file
+	if true {
+		rr := NewResultsReader(NewTask(nil), dataPath, indexPath, viewPath, delimiter)
+		rr.RelativeToHome = "/ryftone"
+		rr.OpenFilePollTimeout = 50 * time.Millisecond
+		rr.ReadFilePollTimeout = 50 * time.Millisecond
+		rr.ReadFilePollLimit = 20
+		rr.ReadData = true
+		rr.MakeView = false
+
+		// emulate work:
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// soft stop
+			time.Sleep(100 * time.Millisecond)
+			rr.stop()
+		}()
+
+		res := search.NewResult()
+		rr.process(res)
+		wg.Wait()
+
+		if assert.EqualValues(t, 0, res.ErrorsReported()) &&
+			assert.EqualValues(t, 3, res.RecordsReported()) {
+
+			// check first record
+			if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{1.txt#100, len:5, d:0}", rec.Index.String())
+				assert.EqualValues(t, "hello", rec.RawData)
+			}
+
+			// check second record
+			if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{2.txt#200, len:5, d:-1}", rec.Index.String())
+				assert.EqualValues(t, "hello", rec.RawData)
+			}
+
+			// check third record
+			if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{3.txt#300, len:5, d:1}", rec.Index.String())
+				assert.EqualValues(t, "hello", rec.RawData)
+			}
+		}
+	}
+
+	// read with VIEW file
+	if true {
+		rr := NewResultsReader(NewTask(nil), dataPath, indexPath, viewPath, delimiter)
+		rr.RelativeToHome = "/ryftone"
+		rr.OpenFilePollTimeout = 50 * time.Millisecond
+		rr.ReadFilePollTimeout = 50 * time.Millisecond
+		rr.ReadFilePollLimit = 20
+		rr.ReadData = true
+		rr.MakeView = false
+		rr.Offset = 1
+		rr.Limit = 1
+
+		// emulate work:
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// soft stop
+			time.Sleep(100 * time.Millisecond)
+			rr.stop()
+		}()
+
+		res := search.NewResult()
+		rr.process(res)
+		wg.Wait()
+
+		if assert.EqualValues(t, 0, res.ErrorsReported()) &&
+			assert.EqualValues(t, 1, res.RecordsReported()) {
+
+			// check first record
+			/*if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{1.txt#100, len:5, d:0}", rec.Index.String())
+				assert.EqualValues(t, "hello", rec.RawData)
+			}*/
+
+			// check second record
+			if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{2.txt#200, len:5, d:-1}", rec.Index.String())
+				assert.EqualValues(t, "hello", rec.RawData)
+			}
+
+			// check third record
+			/*if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{3.txt#300, len:5, d:1}", rec.Index.String())
+				assert.EqualValues(t, "hello", rec.RawData)
+			}*/
+		}
+	}
 }
 
 // valid results (no data read)
