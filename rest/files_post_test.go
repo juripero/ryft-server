@@ -77,4 +77,21 @@ func TestPostFiles(t *testing.T) {
 			`y!!`, 0, http.StatusOK, `{"length":3, "offset":2, "path":"foo/2.txt"}`)
 		checkFile("foo/2.txt", `hey!! world`)
 	}
+
+	if all || true {
+		// upload a file
+		check("/raw?file=foo/3.txt", "", "application/octet-stream",
+			`hello`, 0, http.StatusOK, `{"length":5, "offset":0, "path":"foo/3.txt"}`)
+		checkFile("foo/3.txt", `hello`)
+
+		// append a file
+		check("/raw?file=foo/3.txt", "", "application/octet-stream",
+			` world`, 0, http.StatusOK, `{"length":6, "offset":5, "path":"foo/3.txt"}`)
+		checkFile("foo/3.txt", `hello world`)
+
+		// replace a part of file
+		check("/raw?file=foo/3.txt&offset=2", "", "application/octet-stream",
+			`y!!`, 0, http.StatusOK, `{"length":3, "offset":2, "path":"foo/3.txt"}`)
+		checkFile("foo/3.txt", `hey!! world`)
+	}
 }

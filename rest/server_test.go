@@ -84,6 +84,13 @@ func newFake() *fakeServer {
 	mux.PUT("/rename", fs.server.DoRenameFiles)
 	mux.PUT("/rename/*path", fs.server.DoRenameFiles)
 
+	mux.GET("/file", fs.server.DoGetFiles)         // alias used in integration tests
+	mux.GET("/file/*path", fs.server.DoGetFiles)   // alias used in integration tests
+	mux.POST("/file", fs.server.DoPostFiles)       // alias used in integration tests
+	mux.POST("/file/*path", fs.server.DoPostFiles) // alias used in integration tests
+	mux.POST("/raw", fs.server.DoPostFiles)        // alias used in integration tests
+	mux.POST("/raw/*path", fs.server.DoPostFiles)  // alias used in integration tests
+
 	// DEBUG mode
 	mux.GET("/logging/level", fs.server.DoLoggingLevel)
 
