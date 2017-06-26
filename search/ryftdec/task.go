@@ -512,13 +512,13 @@ func (mpp *InMemoryPostProcessing) AddCatalog(base *catalog.Catalog) error {
 }
 
 // unwind index recursively
-func (mpp *InMemoryPostProcessing) unwind(index *search.Index) (*search.Index, int, error) {
+func (mpp *InMemoryPostProcessing) unwind(index *search.Index, width int) (*search.Index, int, error) {
 	if f, ok := mpp.indexes[index.File]; ok && f != nil {
-		if tmp, shift, err := f.Unwind(index); err != nil {
+		if tmp, shift, err := f.Unwind(index, width); err != nil {
 			return tmp, shift, err // FAILED
 		} else {
 			// log.Debugf("unwind %s => %s", index, tmp)
-			res, n, err := mpp.unwind(tmp)
+			res, n, err := mpp.unwind(tmp, f.Width)
 			return res, n + shift, err
 		}
 	}
@@ -575,7 +575,7 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 
 	start := time.Now()
 	defer func() {
-		log.WithField("t", time.Since(start)).Debugf("[%s]: drain-final-results duration", TAG)
+		task.log().WithField("t", time.Since(start)).Debugf("[%s]: drain-final-results duration", TAG)
 	}()
 
 	// unwind all indexes first and check if it's simple case
@@ -609,7 +609,7 @@ BuildItems:
 			dataPos := item.DataPos
 
 			// do recursive unwinding!
-			idx, shift, err := mpp.unwind(item)
+			idx, shift, err := mpp.unwind(item, f.Width)
 			if err != nil {
 				return 0, fmt.Errorf("failed to unwind index: %s", err)
 			}
@@ -657,6 +657,7 @@ BuildItems:
 		sortedItems = sortedItems[:k+1]
 
 		if len(sortedItems) != len(items) {
+			task.log().Debugf("[%s]: some results was filtered out was:%d now:%d", TAG, len(items), len(sortedItems))
 			// that means: not a "simple" case
 			items = sortedItems
 			simple = false
@@ -675,10 +676,10 @@ BuildItems:
 			oldPath := filepath.Join(home, ryftCalls[0].DataFile)
 			newPath := filepath.Join(home, dataPath)
 			if err := os.Rename(oldPath, newPath); err != nil {
-				log.WithError(err).Warnf("[%s]: failed to move DATA file", TAG)
+				task.log().WithError(err).Warnf("[%s]: failed to move DATA file", TAG)
 				mux.ReportError(fmt.Errorf("failed to move DATA file: %s", err))
 			} else {
-				log.WithFields(map[string]interface{}{
+				task.log().WithFields(map[string]interface{}{
 					"old": oldPath,
 					"new": newPath,
 				}).Infof("[%s]: use DATA file from last Ryft call", TAG)
@@ -918,7 +919,7 @@ func (mpp *InMemoryPostProcessing) GetUniqueFiles(task *Task, mux *search.Result
 
 	start := time.Now()
 	defer func() {
-		log.WithField("t", time.Since(start)).Debugf("[%s]: get-unique-files duration", TAG)
+		task.log().WithField("t", time.Since(start)).Debugf("[%s]: get-unique-files duration", TAG)
 	}()
 
 	// file filter
@@ -940,7 +941,7 @@ func (mpp *InMemoryPostProcessing) GetUniqueFiles(task *Task, mux *search.Result
 
 		for _, item := range f.Items {
 			// do recursive unwinding!
-			idx, _, err := mpp.unwind(item)
+			idx, _, err := mpp.unwind(item, f.Width)
 			if err != nil {
 				return nil, fmt.Errorf("failed to unwind index: %s", err)
 			}

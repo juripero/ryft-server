@@ -66,6 +66,7 @@ func TestOptionsSetMode(t *testing.T) {
 	assert.Equal(t, `[cs,w=1,sym="$",sep=",",dot="."]`, fake(1).SetMode("cs").String())
 	assert.Equal(t, `[ipv4,w=1,octal]`, fake(1).SetMode("ipv4").String())
 	assert.Equal(t, `[ipv6,w=1]`, fake(1).SetMode("ipv6").String())
+	assert.Equal(t, `[pcre2,w=1]`, fake(1).SetMode("pcre2").String())
 }
 
 // test for set options

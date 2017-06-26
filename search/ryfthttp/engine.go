@@ -121,6 +121,9 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	q.Set("--internal-error-prefix", fmt.Sprintf("%t", true))  // enable error prefixes!
 	q.Set("--internal-no-session-id", fmt.Sprintf("%t", true)) // disable sessions!
 
+	if len(cfg.BackendTool) != 0 {
+		q.Set("backend", cfg.BackendTool)
+	}
 	if len(cfg.KeepDataAs) != 0 {
 		q.Set("data", cfg.KeepDataAs)
 	}

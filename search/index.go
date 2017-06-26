@@ -205,7 +205,7 @@ func (f *IndexFile) Find(offset uint64) int {
 }
 
 // Unwind unwinds the index
-func (f *IndexFile) Unwind(index *Index) (*Index, int, error) {
+func (f *IndexFile) Unwind(index *Index, width int) (*Index, int, error) {
 	// we should take into account surrounding width.
 	// in common case data are surrounded: [w]data[w]
 	// but at begin or end of file no surrounding
@@ -213,18 +213,18 @@ func (f *IndexFile) Unwind(index *Index) (*Index, int, error) {
 	// in case of --line option the width is negative
 	// and we should take middle of the data as a reference
 	var n int // base item index
-	if f.Width < 0 {
+	if width < 0 {
 		// middle: [...]data[...]
 		dataMid := index.Offset + index.Length/2
 		n = f.Find(dataMid)
 	} else if index.Offset == 0 {
 		// begin: [0..w]data[w]
-		dataEnd := index.Length - uint64(f.Width+1)
+		dataEnd := index.Length - uint64(width+1)
 		n = f.Find(dataEnd)
 	} else {
 		// middle: [w]data[w]
 		// or end: [w]data[0..w]
-		dataBeg := index.Offset + uint64(f.Width)
+		dataBeg := index.Offset + uint64(width)
 		n = f.Find(dataBeg)
 	}
 

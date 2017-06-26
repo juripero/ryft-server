@@ -39,6 +39,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
+| `backend`     | string  | [The backend tool](#search-backend-parameter). |
 | `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
 | `view`        | string  | [The name of VIEW file to keep](#search-data-and-index-parameters). |
@@ -259,6 +260,18 @@ A few transformations can be specified with several `transform` parameters.
 In this case all tranformations are combined into transformation chain.
 
 See [more details](./README.md#post-process-transformations).
+
+
+### Search `backend` parameter
+
+On those ryft-server instances where both `ryftprim` and `ryftx` backends are
+present it is possible to manually select backend tool.
+
+If `backend=ryftprim` options is used, then `ryftprim` tool will be used.
+And `ryftx` tool is used in case of `backend=ryftx`.
+
+If `backend` is empty (by default) then the most appropriate backend
+is selected automatically.
 
 
 ### Search `data` and `index` parameters
@@ -610,6 +623,7 @@ The list of supported query parameters are the following:
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
+| `backend`     | string  | [The backend tool](#search-backend-parameter). |
 | `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
 | `view`        | string  | [The name of VIEW file to keep](#search-data-and-index-parameters). |

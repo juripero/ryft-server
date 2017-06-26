@@ -86,6 +86,10 @@ func TestLexemeIs(t *testing.T) {
 	assert.False(t, NewLexemeStr(INT, "IPv6").IsIPv6())
 	assert.True(t, NewLexemeStr(IDENT, "IP").IsIP())
 	assert.False(t, NewLexemeStr(INT, "IP").IsIP())
+	assert.True(t, NewLexemeStr(IDENT, "RegEx").IsRegex())
+	assert.True(t, NewLexemeStr(IDENT, "RegExP").IsRegex())
+	assert.True(t, NewLexemeStr(IDENT, "pcRe2").IsRegex())
+	assert.False(t, NewLexemeStr(INT, "PCRE2").IsRegex())
 }
 
 // test lexem unquote

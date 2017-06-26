@@ -49,7 +49,9 @@ var (
 // RyftPrim engine uses `ryftprim` utility as a backend.
 type Engine struct {
 	Instance         string // empty by default. might be some server instance name like ".server-1234"
-	ExecPath         string // "/usr/bin/ryftprim" by default
+	RyftprimExec     string // "/usr/bin/ryftprim" by default
+	RyftxExec        string // usually "/usr/bin/ryftx" but "" by default
+	Ryftpcre2Exec    string // "/usr/bin/ryftprim" by default
 	LegacyMode       bool   // legacy mode to get machine readable statistics
 	KillToolOnCancel bool   // flag to kill ryftprim if cancelled
 	UseAbsPath       bool   // flag to use absolute path
@@ -85,8 +87,8 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q, ryftprim:%q}",
-		engine.Instance, engine.MountPoint, engine.HomeDir, engine.ExecPath)
+	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q, ryftprim:%q, ryftx:%q}",
+		engine.Instance, engine.MountPoint, engine.HomeDir, engine.RyftprimExec, engine.RyftxExec)
 	// TODO: other parameters?
 }
 
