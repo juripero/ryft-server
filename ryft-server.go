@@ -293,12 +293,13 @@ func main() {
 	private.PUT("/rename", server.DoRenameFiles)
 	private.PUT("/rename/*path", server.DoRenameFiles)
 
-	private.GET("/file", server.DoGetFiles)         // alias used in integration tests
-	private.GET("/file/*path", server.DoGetFiles)   // alias used in integration tests
-	private.POST("/file", server.DoPostFiles)       // alias used in integration tests
-	private.POST("/file/*path", server.DoPostFiles) // alias used in integration tests
-	private.POST("/raw", server.DoPostFiles)        // alias used in integration tests
-	private.POST("/raw/*path", server.DoPostFiles)  // alias used in integration tests
+	// alias used for swagger clients
+	private.GET("/file", server.DoGetFiles)
+	private.GET("/file/*path", server.DoGetFiles)
+	private.POST("/file", server.DoPostFiles)
+	private.POST("/file/*path", server.DoPostFiles)
+	private.POST("/raw", server.DoPostFiles)
+	private.POST("/raw/*path", server.DoPostFiles)
 
 	// debug API endpoints
 	if server.Config.DebugMode {
