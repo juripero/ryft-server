@@ -45,38 +45,28 @@ var (
 	TAG = "ryftmux"
 )
 
-// options to override on backend
-type backendOverride struct {
-	Offset uint
-	Limit  uint
-}
-
 // RyftMUX engine uses set of abstract engines as backends.
 type Engine struct {
-	Backends []search.Engine
-	override map[search.Engine]backendOverride
-
+	Backends  []search.Engine
 	IndexHost string // optional host in cluster mode
 
-	options map[string]interface{}
+	options  map[string]interface{}
+	override map[search.Engine]*search.Config
 }
 
 // NewEngine creates new RyftMUX search engine.
 func NewEngine(backends ...search.Engine) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backends = backends
-	engine.override = make(map[search.Engine]backendOverride)
+	engine.override = make(map[search.Engine]*search.Config)
 	return engine, nil // OK
 }
 
-// AddShowBackend adds new backend with offset/count override.
+// AddBackend adds new backend with configuration override.
 // MUX engine should be created with ryftmux.NewEngine() method.
-func (engine *Engine) AddShowBackend(backend search.Engine, offset, count uint) {
+func (engine *Engine) AddBackend(backend search.Engine, cfg *search.Config) {
 	engine.Backends = append(engine.Backends, backend)
-	engine.override[backend] = backendOverride{
-		Offset: offset,
-		Limit:  count,
-	}
+	engine.override[backend] = cfg
 }
 
 // String gets string representation of the engine.

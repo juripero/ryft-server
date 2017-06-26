@@ -80,10 +80,9 @@ type SearchParams struct {
 	Stats  bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
 	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 
-	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
-	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
-
-	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
+	Local       bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	ShareMode   string `form:"share-mode" json:"share-mode"` // share mode to use
+	Performance bool   `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 
 	// internal parameters
 	InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
@@ -177,6 +176,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	}
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)
+	cfg.Offset = 0
 	cfg.Limit = uint(params.Limit)
 	cfg.Performance = params.Performance
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
@@ -222,14 +222,66 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	server.onSearchStarted(cfg)
 	defer server.onSearchStopped(cfg)
 
-	// ctx.Stream() logic
-	var lastError error
-
 	// error prefix
 	var errorPrefix string
 	if params.InternalErrorPrefix {
 		errorPrefix = server.Config.HostName
 	}
+
+	// drain all results
+	transferStartTime := time.Now() // performance metric
+	server.drain(ctx, enc, tcode, cfg, res, errorPrefix)
+	transferStopTime := time.Now() // performance metric
+
+	if params.Stats && res.Stat != nil {
+		if server.Config.ExtraRequest {
+			res.Stat.Extra["request"] = &params
+		}
+
+		if cfg.Lifetime != 0 {
+			// delete output INDEX&DATA&VIEW files later
+			server.cleanupSession(homeDir, cfg)
+		}
+
+		if params.Performance {
+			metrics := map[string]interface{}{
+				"prepare":  searchStartTime.Sub(requestStartTime).String(),
+				"engine":   transferStartTime.Sub(searchStartTime).String(),
+				"transfer": transferStopTime.Sub(transferStartTime).String(),
+				"total":    transferStopTime.Sub(requestStartTime).String(),
+			}
+			res.Stat.AddPerfStat("rest-search", metrics)
+		}
+
+		if session != nil && !params.InternalNoSessionId {
+			updateSession(session, res.Stat)
+			token, err := session.Token(server.Config.Sessions.secret)
+			if err != nil {
+				panic(err)
+			}
+			log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
+			res.Stat.Extra["session"] = token
+		}
+
+		xstat := tcode.FromStat(res.Stat)
+		err := enc.EncodeStat(xstat)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// close encoder
+	err = enc.Close()
+	if err != nil {
+		panic(err)
+	}
+}
+
+// drain and report search results
+func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Format,
+	cfg *search.Config, res *search.Result, errorPrefix string) {
+	// ctx.Stream() logic
+	var lastError error
 
 	// put error to stream
 	putErr := func(err_ error) {
@@ -249,7 +301,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	putRec := func(rec *search.Record) {
 		xrec := tcode.FromRecord(rec)
 		if xrec != nil {
-			err = enc.EncodeRecord(xrec)
+			err := enc.EncodeRecord(xrec)
 			if err != nil {
 				panic(err)
 			}
@@ -258,7 +310,6 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	}
 
 	// process results!
-	transferStartTime := time.Now() // performance metric
 	for {
 		select {
 		case <-ctx.Writer.CloseNotify(): // cancel processing
@@ -292,57 +343,12 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 				putErr(err)
 			}
 
-			transferStopTime := time.Now() // performance metric
-
 			// special case: if no records and no stats were received
 			// but just an error, we panic to return 500 status code
 			if res.RecordsReported() == 0 && res.Stat == nil &&
 				res.ErrorsReported() == 1 && lastError != nil {
 				panic(NewError(http.StatusInternalServerError, lastError.Error()).
 					WithDetails("failed to do search"))
-			}
-
-			if params.Stats && res.Stat != nil {
-				if server.Config.ExtraRequest {
-					res.Stat.Extra["request"] = &params
-				}
-
-				if cfg.Lifetime != 0 {
-					// delete output INDEX&DATA&VIEW files later
-					server.cleanupSession(homeDir, cfg)
-				}
-
-				if params.Performance {
-					metrics := map[string]interface{}{
-						"prepare":  searchStartTime.Sub(requestStartTime).String(),
-						"engine":   transferStartTime.Sub(searchStartTime).String(),
-						"transfer": transferStopTime.Sub(transferStartTime).String(),
-						"total":    transferStopTime.Sub(requestStartTime).String(),
-					}
-					res.Stat.AddPerfStat("rest-search", metrics)
-				}
-
-				if session != nil && !params.InternalNoSessionId {
-					updateSession(session, res.Stat)
-					token, err := session.Token(server.Config.Sessions.secret)
-					if err != nil {
-						panic(err)
-					}
-					log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
-					res.Stat.Extra["session"] = token
-				}
-
-				xstat := tcode.FromStat(res.Stat)
-				err := enc.EncodeStat(xstat)
-				if err != nil {
-					panic(err)
-				}
-			}
-
-			// close encoder
-			err := enc.Close()
-			if err != nil {
-				panic(err)
 			}
 
 			return // done

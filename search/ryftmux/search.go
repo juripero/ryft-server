@@ -43,7 +43,14 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 	// prepare requests
 	for _, backend := range engine.Backends {
-		res, err := backend.Search(cfg.Clone())
+		var bcfg *search.Config
+		if ocfg, ok := engine.override[backend]; ok {
+			bcfg = ocfg.Clone()
+		} else {
+			bcfg = cfg.Clone()
+		}
+
+		res, err := backend.Search(bcfg)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to start /search backend", TAG)
 			mux.ReportError(fmt.Errorf("failed to start /search backend: %s", err))
@@ -64,12 +71,11 @@ func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 
 	// prepare requests
 	for _, backend := range engine.Backends {
-		bcfg := cfg.Clone()
-
-		// apply overrided options
-		if opts, ok := engine.override[backend]; ok {
-			bcfg.Offset = opts.Offset
-			bcfg.Limit = opts.Limit
+		var bcfg *search.Config
+		if ocfg, ok := engine.override[backend]; ok {
+			bcfg = ocfg.Clone()
+		} else {
+			bcfg = cfg.Clone()
 		}
 
 		res, err := backend.Show(bcfg)

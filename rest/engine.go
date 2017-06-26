@@ -131,7 +131,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 
 		engine, err := search.NewEngine("ryfthttp", opts)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create HTTP engine: %s", err)
 		}
 		backends = append(backends, engine)
 		nodes = append(nodes, service.Node)
