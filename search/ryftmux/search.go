@@ -38,6 +38,19 @@ import (
 
 // Search starts asynchronous "/search" or "/count" operation.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
+	// redirect if we have only one backend
+	if len(engine.Backends) == 1 {
+		backend := engine.Backends[0]
+		var bcfg *search.Config
+		if ocfg, ok := engine.override[backend]; ok {
+			bcfg = ocfg.Clone()
+		} else {
+			bcfg = cfg.Clone()
+		}
+
+		return backend.Search(bcfg)
+	}
+
 	task := NewTask(cfg)
 	mux := search.NewResult()
 
@@ -66,6 +79,19 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 // Show starts asynchronous "/search/show" operation.
 func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
+	// redirect if we have only one backend
+	if len(engine.Backends) == 1 {
+		backend := engine.Backends[0]
+		var bcfg *search.Config
+		if ocfg, ok := engine.override[backend]; ok {
+			bcfg = ocfg.Clone()
+		} else {
+			bcfg = cfg.Clone()
+		}
+
+		return backend.Show(bcfg)
+	}
+
 	task := NewTask(cfg)
 	mux := search.NewResult()
 
