@@ -286,8 +286,14 @@ func main() {
 	// need to provide both URLs to disable redirecting
 	private.GET("/files", server.DoGetFiles)
 	private.GET("/files/*path", server.DoGetFiles)
+	private.GET("/file", server.DoGetFiles)       // alias used in integration tests
+	private.GET("/file/*path", server.DoGetFiles) // alias used in integration tests
 	private.DELETE("/files", server.DoDeleteFiles)
 	private.DELETE("/files/*path", server.DoDeleteFiles)
+	private.POST("/files/file", server.DoPostFiles)       // alias used in integration tests
+	private.POST("/files/file/*path", server.DoPostFiles) // alias used in integration tests
+	private.POST("/files/raw", server.DoPostFiles)        // alias used in integration tests
+	private.POST("/files/raw/*path", server.DoPostFiles)  // alias used in integration tests
 	private.POST("/files", server.DoPostFiles)
 	private.POST("/files/*path", server.DoPostFiles)
 	private.PUT("/rename", server.DoRenameFiles)

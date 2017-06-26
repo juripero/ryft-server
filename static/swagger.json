@@ -590,6 +590,62 @@
         }
       }
     },
+    "/file": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "download a file",
+        "description": "Endpoint to download a file",
+        "operationId": "getFile",
+        "parameters": [
+          {
+            "name": "dir",
+            "type": "string",
+            "description": "The folder path to return child items of. Default '/'",
+            "in": "query"
+          },
+          {
+            "name": "hidden",
+            "type": "boolean",
+            "description": "Report hidden files",
+            "in": "query"
+          },
+          {
+            "name": "local",
+            "type": "boolean",
+            "description": "Return file structure from local node only or whole cluster",
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The path to catalog to download file of",
+            "in": "query"
+          },
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The filepath to download",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content",
+            "schema": {
+              "$ref": "#/definitions/GetFileResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/files": {
       "get": {
         "tags": [
@@ -794,6 +850,185 @@
         }
       }
     },
+    "/files/raw": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload files",
+        "description": "Endpoint to upload files",
+        "operationId": "postFiles",
+        "consumes": [
+          "application/octet-stream"
+        ],
+        "parameters": [
+          {
+            "name": "content",
+            "in": "body",
+             "schema": {
+                "type": "string",
+                "format": "byte"
+            },
+            "description": "Byte content to upload",
+            "required": true
+          },
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The uploading filename. Use {{random}} for random names.",
+            "required": true,
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The catalog to append file to.",
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "description": "The delimiter is used between file parts in catalog."
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part offset.",
+            "in": "query"
+          },
+          {
+            "name": "length",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part length.",
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "description": "The file or catalog lifetime, for example \"2h\"."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "description": "Perform action only on this cluster member. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of files and directories uploaded",
+            "schema": {
+              "$ref": "#/definitions/PostFilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/files/file": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload files",
+        "description": "Endpoint to upload files",
+        "operationId": "postFiles",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "parameters": [
+          {
+            "name": "content",
+            "in": "formData",
+            "type": "file",
+            "description": "File content to upload",
+            "required": true
+          },
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The uploading filename. Use {{random}} for random names.",
+            "required": true,
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The catalog to append file to.",
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "description": "The delimiter is used between file parts in catalog."
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part offset.",
+            "in": "query"
+          },
+          {
+            "name": "length",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part length.",
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "description": "The file or catalog lifetime, for example \"2h\"."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "description": "Perform action only on this cluster member. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of files and directories uploaded",
+            "schema": {
+              "$ref": "#/definitions/PostFilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/version": {
       "get": {
         "tags": [
@@ -936,7 +1171,11 @@
         }
       }
     },
-    "FilesResponse": {
+    "GetFileResponse": {
+      "type":"string",
+      "format": "byte"
+    },
+    "GetFilesResponse": {
       "type": "object",
       "properties": {
         "folders": {
@@ -1024,10 +1263,12 @@
       "type": "object",
       "properties": {
         "length": {
-          "type": "integer"
+          "type": "integer",
+          "format": "int64"
         },
         "offset": {
-          "type": "integer"
+          "type": "integer",
+          "format": "int64"
         },
         "path": {
           "type": "string"
@@ -1041,9 +1282,6 @@
           "type": "string"
         }
       }
-    },
-    "GetFilesResponse": {
-      "type":"string"
     }
   },
   "securityDefinitions": {
