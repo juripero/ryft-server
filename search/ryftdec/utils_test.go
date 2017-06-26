@@ -1,10 +1,12 @@
 package ryftdec
 
 import (
-	// "fmt"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/query"
@@ -148,48 +150,49 @@ func TestFileFormat(t *testing.T) {
 	}
 	_ = bad
 
-	os.MkdirAll("/tmp/ryft/test", 0755)
-	defer os.RemoveAll("/tmp/ryft/test")
-	ioutil.WriteFile("/tmp/ryft/test/1.xml",
+	root := fmt.Sprintf("/tmp/ryft-%u", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(root)
+	ioutil.WriteFile(filepath.Join(root, "1.xml"),
 		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
 <root>
   <rec>
   </rec>
 </root>`), 0644)
-	ioutil.WriteFile("/tmp/ryft/test/2.xmlx",
+	ioutil.WriteFile(filepath.Join(root, "2.xmlx"),
 		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
 <root>
   <rec>
   </rec>
 </root>`), 0644)
-	ioutil.WriteFile("/tmp/ryft/test/1.csv",
+	ioutil.WriteFile(filepath.Join(root, "1.csv"),
 		[]byte(`1,2,3
 4,5,6
 `), 0644)
-	ioutil.WriteFile("/tmp/ryft/test/2.csvx",
+	ioutil.WriteFile(filepath.Join(root, "2.csvx"),
 		[]byte(`1,2,3
 4,5,6
 `), 0644)
-	ioutil.WriteFile("/tmp/ryft/test/1.bin",
+	ioutil.WriteFile(filepath.Join(root, "1.bin"),
 		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0}, 0644)
 
-	check("/tmp/ryft/test/1.xml", "XML", "rec") // by extension
-	// check("/tmp/ryft/test/3.xml", "XML", "rec")  // by extension
-	check("/tmp/ryft/test/2.xmlx", "XML", "rec") // by content
+	check(filepath.Join(root, "1.xml"), "XML", "rec") // by extension
+	// check(filepath.Join(root, "3.xml"), "XML", "rec")  // by extension
+	check(filepath.Join(root, "2.xmlx"), "XML", "rec") // by content
 
-	// check("/tmp/ryft/test/foo/3.myxml", "XML", "rec") // by extension
-	bad("/tmp/ryft/test/3.myxml", "no such file or directory")
+	// check(filepath.Join(root, "foo/3.myxml"), "XML", "rec") // by extension
+	bad(filepath.Join(root, "3.myxml"), "no such file or directory")
 
-	check("/tmp/ryft/test/1.csv", "CSV", "")  // by extension
-	check("/tmp/ryft/test/3.csv", "CSV", "")  // by extension
-	check("/tmp/ryft/test/2.csvx", "CSV", "") // by content
+	check(filepath.Join(root, "1.csv"), "CSV", "")  // by extension
+	check(filepath.Join(root, "3.csv"), "CSV", "")  // by extension
+	check(filepath.Join(root, "2.csvx"), "CSV", "") // by content
 
-	check("/tmp/ryft/test/foo/3.mycsv", "CSV", "") // by extension
-	bad("/tmp/ryft/test/3.mycsv", "no such file or directory")
+	check(filepath.Join(root, "foo/3.mycsv"), "CSV", "") // by extension
+	bad(filepath.Join(root, "3.mycsv"), "no such file or directory")
 
-	bad("/tmp/ryft/test/foo/1.bin", "no such file or directory")
-	bad("/tmp/ryft/test/1.bin", "unknown file format")
+	bad(filepath.Join(root, "foo/1.bin"), "no such file or directory")
+	bad(filepath.Join(root, "1.bin"), "unknown file format")
 
-	check("/tmp/ryft/test/1.txt", "", "")      // skip
-	check("/tmp/ryft/test/1.json", "JSON", "") // by extension
+	check(filepath.Join(root, "1.txt"), "", "")      // skip
+	check(filepath.Join(root, "1.json"), "JSON", "") // by extension
 }

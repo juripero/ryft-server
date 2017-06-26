@@ -38,17 +38,20 @@ func TestLogging(t *testing.T) {
 
 	go func() {
 		err := fs.worker.ListenAndServe()
-		assert.NoError(t, err, "failed to start fake server")
+		assert.NoError(t, err, "failed to serve fake server")
 	}()
-	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		fs.worker.Stop(0)
-		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+		t.Log("stopping the server...")
+		fs.worker.Stop(testServerStopTO)
+		t.Log("waiting the server...")
+		<-fs.worker.StopChan()
+		t.Log("server stopped")
 	}()
 
 	// test case
 	check := func(url string, expectedStatus int, expectedErrors ...string) {
-		body, status, err := fs.GET(url, "application/json", 0)
+		body, status, err := fs.GET(url, "application/json", time.Minute)
 		if err != nil {
 			for _, msg := range expectedErrors {
 				assert.Contains(t, err.Error(), msg)

@@ -22,12 +22,15 @@ func TestSearchShowNoView(t *testing.T) {
 
 	go func() {
 		err := fs.worker.ListenAndServe()
-		assert.NoError(t, err, "failed to start fake server")
+		assert.NoError(t, err, "failed to serve fake server")
 	}()
-	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		fs.worker.Stop(0)
-		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+		t.Log("stopping the server...")
+		fs.worker.Stop(testServerStopTO)
+		t.Log("waiting the server...")
+		<-fs.worker.StopChan()
+		t.Log("server stopped")
 	}()
 
 	// test case
@@ -145,12 +148,15 @@ func TestSearchShowView(t *testing.T) {
 
 	go func() {
 		err := fs.worker.ListenAndServe()
-		assert.NoError(t, err, "failed to start fake server")
+		assert.NoError(t, err, "failed to serve fake server")
 	}()
-	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		fs.worker.Stop(0)
-		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+		t.Log("stopping the server...")
+		fs.worker.Stop(testServerStopTO)
+		t.Log("waiting the server...")
+		<-fs.worker.StopChan()
+		t.Log("server stopped")
 	}()
 
 	// test case

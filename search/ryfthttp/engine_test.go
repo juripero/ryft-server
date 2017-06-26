@@ -1,6 +1,8 @@
 package ryfthttp
 
 import (
+	"fmt"
+	"math/rand"
 	"net/http"
 	"testing"
 	"time"
@@ -12,7 +14,6 @@ import (
 
 var (
 	testLogLevel = "error"
-	testFakePort = ":12345"
 )
 
 // fake server to generate random data
@@ -49,7 +50,7 @@ func newFake(records, errors int) *fakeServer {
 		server: &graceful.Server{
 			Timeout: 100 * time.Millisecond,
 			Server: &http.Server{
-				Addr:    testFakePort,
+				Addr:    fmt.Sprintf(":%d", rand.Intn(50000)+10000),
 				Handler: mux,
 			},
 		},
@@ -60,6 +61,11 @@ func newFake(records, errors int) *fakeServer {
 	mux.HandleFunc("/files", fs.doFiles)
 
 	return fs
+}
+
+// get service location
+func (fs *fakeServer) location() string {
+	return fmt.Sprintf("http://localhost%s", fs.server.Server.Addr)
 }
 
 // create engine

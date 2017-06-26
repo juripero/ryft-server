@@ -1,7 +1,9 @@
 package catalog
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,10 +17,11 @@ func TestCatalogGetIndex(t *testing.T) {
 	DefaultDataDelimiter = "\n\f\n"
 	DefaultDataSizeLimit = 128
 
-	os.MkdirAll("/tmp/ryft/", 0755)
-	defer os.RemoveAll("/tmp/ryft/")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(root)
 
-	catalog := "/tmp/ryft/foo.txt"
+	catalog := filepath.Join(root, "foo.txt")
 	os.RemoveAll(catalog) // just in case
 
 	// open catalog

@@ -1,8 +1,10 @@
 package ryftdec
 
 import (
+	"fmt"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/getryft/ryft-server/search/testfake"
 	"github.com/getryft/ryft-server/search/utils/catalog"
@@ -16,7 +18,7 @@ var (
 
 // create new fake engine
 func testNewFake() *testfake.Engine {
-	engine, _ := testfake.NewEngine("/tmp", "/ryft")
+	engine, _ := testfake.NewEngine(fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano()), "ryftdec")
 	return engine
 }
 
@@ -60,21 +62,32 @@ func TestEngineOptions(t *testing.T) {
 		assert.Contains(t, err.Error(), "not a valid logrus Level")
 	}
 
+	backend := testNewFake()
+
 	// check for good case
 	check := func(opts map[string]interface{}) {
-		if engine, err := NewEngine(testNewFake(), opts); assert.NoError(t, err) {
+		b := testNewFake()
+		b.MountPoint = backend.MountPoint
+		b.HomeDir = backend.HomeDir
+		if engine, err := NewEngine(b, opts); assert.NoError(t, err) {
 			assert.EqualValues(t, opts, engine.Options())
 		}
 	}
 	check2 := func(opts map[string]interface{}, expectedOpts map[string]interface{}) {
-		if engine, err := NewEngine(testNewFake(), opts); assert.NoError(t, err) {
+		b := testNewFake()
+		b.MountPoint = backend.MountPoint
+		b.HomeDir = backend.HomeDir
+		if engine, err := NewEngine(b, opts); assert.NoError(t, err) {
 			assert.EqualValues(t, expectedOpts, engine.Options())
 		}
 	}
 
 	// check for bad case
 	bad := func(opts map[string]interface{}, expectedError string) {
-		if _, err := NewEngine(testNewFake(), opts); assert.Error(t, err) {
+		b := testNewFake()
+		b.MountPoint = backend.MountPoint
+		b.HomeDir = backend.HomeDir
+		if _, err := NewEngine(b, opts); assert.Error(t, err) {
 			assert.Contains(t, err.Error(), expectedError)
 		}
 	}
@@ -83,8 +96,8 @@ func TestEngineOptions(t *testing.T) {
 	fake := func(name string, val interface{}) map[string]interface{} {
 		opts := map[string]interface{}{
 			"instance-name":            ".work",
-			"ryftone-mount":            "/tmp",
-			"home-dir":                 "/ryft",
+			"ryftone-mount":            backend.MountPoint,
+			"home-dir":                 backend.HomeDir,
 			"host-name":                "",
 			"compat-mode":              false,
 			"optimizer-limit":          -1,
@@ -99,14 +112,14 @@ func TestEngineOptions(t *testing.T) {
 	}
 
 	// check default options
-	engine, err := NewEngine(testNewFake(), nil)
+	engine, err := NewEngine(backend, nil)
 	assert.NoError(t, err)
 	if assert.NotNil(t, engine) {
-		assert.EqualValues(t, "ryftdec{backend:fake{home:/tmp/ryft}, compat:false}", engine.String())
+		assert.EqualValues(t, fmt.Sprintf("ryftdec{backend:fake{home:%s/%s}, compat:false}", backend.MountPoint, backend.HomeDir), engine.String())
 		assert.EqualValues(t, map[string]interface{}{
 			"instance-name":            ".work",
-			"ryftone-mount":            "/tmp",
-			"home-dir":                 "/ryft",
+			"ryftone-mount":            backend.MountPoint,
+			"home-dir":                 backend.HomeDir,
 			"host-name":                "",
 			"compat-mode":              false,
 			"optimizer-limit":          -1,

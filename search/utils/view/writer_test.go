@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +17,7 @@ func TestWriter(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to create VIEW file")
 	}
 
-	path := "/tmp/test.ryft.view"
+	path := fmt.Sprintf("/tmp/test-ryft-%x.view", time.Now().UnixNano())
 	w, err = Create(path)
 	if assert.NoError(t, err) {
 		defer os.RemoveAll(path)

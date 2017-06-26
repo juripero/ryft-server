@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/testfake"
@@ -20,12 +21,12 @@ func TestEngineSearchBypass(t *testing.T) {
 	taskId = 0 // reset to check intermediate file names
 
 	f1 := testNewFake()
-	f1.HomeDir = "/ryft-test"
+	f1.HomeDir = "ryft-test"
 	f1.HostName = "host"
 
 	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
-	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
+	assert.NoError(t, os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755))
 	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
 11111-hello-11111
 22222-hello-22222
@@ -57,11 +58,11 @@ func TestEngineSearchBypass(t *testing.T) {
 
 			assert.Empty(t, errors)
 			assert.EqualValues(t, []string{
-				`Record{{/tmp/ryft-test/1.txt#22, len:11, d:0}, data:"22-hello-22"}`,
-				`Record{{/tmp/ryft-test/1.txt#4, len:11, d:0}, data:"11-hello-11"}`,
-				`Record{{/tmp/ryft-test/1.txt#40, len:11, d:0}, data:"33-hello-33"}`,
-				`Record{{/tmp/ryft-test/1.txt#58, len:11, d:0}, data:"44-hello-44"}`,
-				`Record{{/tmp/ryft-test/1.txt#76, len:11, d:0}, data:"55-hello-55"}`,
+				fmt.Sprintf(`Record{{%s/%s/1.txt#22, len:11, d:0}, data:"22-hello-22"}`, f1.MountPoint, f1.HomeDir),
+				fmt.Sprintf(`Record{{%s/%s/1.txt#4, len:11, d:0}, data:"11-hello-11"}`, f1.MountPoint, f1.HomeDir),
+				fmt.Sprintf(`Record{{%s/%s/1.txt#40, len:11, d:0}, data:"33-hello-33"}`, f1.MountPoint, f1.HomeDir),
+				fmt.Sprintf(`Record{{%s/%s/1.txt#58, len:11, d:0}, data:"44-hello-44"}`, f1.MountPoint, f1.HomeDir),
+				fmt.Sprintf(`Record{{%s/%s/1.txt#76, len:11, d:0}, data:"55-hello-55"}`, f1.MountPoint, f1.HomeDir),
 			}, strRecords)
 
 			if assert.EqualValues(t, 1, len(f1.SearchCfgLogTrace)) {
@@ -82,7 +83,7 @@ func TestEngineSearchAnd3(t *testing.T) {
 
 	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
-	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
+	assert.NoError(t, os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755))
 	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
 11111-hello-11111
 22222-hello-22222
@@ -137,7 +138,7 @@ func TestEngineSearchOr3(t *testing.T) {
 
 	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
-	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
+	assert.NoError(t, os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755))
 	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
 11111-hello-11111
 22222-hello-22222
@@ -291,7 +292,7 @@ func TestEngineSearchCatalog(t *testing.T) {
 	catalog.DefaultDataDelimiter = "\n"
 	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
-	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
+	assert.NoError(t, os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755))
 	cat, err := catalog.OpenCatalogNoCache(filepath.Join(f1.MountPoint, f1.HomeDir, "cat.txt"))
 	if !assert.NoError(t, err) {
 		return
@@ -486,7 +487,7 @@ func TestEngineSearchBad(t *testing.T) {
 	f1.HomeDir = "/ryft-test"
 	f1.HostName = "host"
 
-	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
+	assert.NoError(t, os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755))
 	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
 11111-hello-11111
 22222-hello-22222
@@ -624,7 +625,7 @@ func TestEngineSearchIndexAnd(t *testing.T) {
 	catalog.DefaultDataDelimiter = "\n"
 	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
 	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
-	os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755)
+	assert.NoError(t, os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755))
 	cat, err := catalog.OpenCatalogNoCache(filepath.Join(f1.MountPoint, f1.HomeDir, "cat.txt"))
 	if !assert.NoError(t, err) {
 		return
@@ -751,7 +752,9 @@ zzzzz-hello-zzzzz
 func TestRyftFinalResults(t *testing.T) {
 	testSetLogLevel()
 
-	home := "/tmp/ryft-test3"
+	root := fmt.Sprintf("/tmp/ryft-%u", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(root)
 
 	check := func(dataPath, indexPath []string, width []int, expectedData, expectedIndex string) {
 		n := len(dataPath)
@@ -778,8 +781,8 @@ func TestRyftFinalResults(t *testing.T) {
 			}
 			ryftCalls[i] = rc
 
-			err := mpp.AddRyftResults(filepath.Join(home, rc.DataFile),
-				filepath.Join(home, rc.IndexFile),
+			err := mpp.AddRyftResults(filepath.Join(root, rc.DataFile),
+				filepath.Join(root, rc.IndexFile),
 				rc.Delimiter, rc.Width, opt)
 			if !assert.NoError(t, err) {
 				return
@@ -789,25 +792,22 @@ func TestRyftFinalResults(t *testing.T) {
 		mux := search.NewResult()
 		_, err := mpp.DrainFinalResults(task, mux,
 			"data.out", "index.out", "\n", "",
-			home, ryftCalls, "")
+			root, ryftCalls, "")
 		if !assert.NoError(t, err) {
 			return
 		}
 
-		if data, err := ioutil.ReadFile(filepath.Join(home, "data.out")); assert.NoError(t, err) {
+		if data, err := ioutil.ReadFile(filepath.Join(root, "data.out")); assert.NoError(t, err) {
 			assert.EqualValues(t, expectedData, string(data))
 		}
-		if data, err := ioutil.ReadFile(filepath.Join(home, "index.out")); assert.NoError(t, err) {
+		if data, err := ioutil.ReadFile(filepath.Join(root, "index.out")); assert.NoError(t, err) {
 			assert.EqualValues(t, expectedIndex, string(data))
 		}
 	}
 
 	catalog.DefaultDataDelimiter = "\n"
-	assert.NoError(t, os.RemoveAll(home))
-	defer os.RemoveAll(home)
-	os.MkdirAll(home, 0755)
 
-	ioutil.WriteFile(filepath.Join(home, "X.dat"),
+	ioutil.WriteFile(filepath.Join(root, "X.dat"),
 		[]byte(`aaaaa-hello-aaaaa
 bbbbb-hello-bbbbb
 ccccc-hello-ccccc
@@ -816,19 +816,19 @@ eeeee-hello-eeeee
 `), 0644)
 
 	// "hello", W=3
-	ioutil.WriteFile(filepath.Join(home, "data-0.dat"),
+	ioutil.WriteFile(filepath.Join(root, "data-0.dat"),
 		[]byte(`bb-hello-bb
 aa-hello-aa
 dd-hello-dd
 cc-hello-cc
 ee-hello-ee
 `), 0644)
-	ioutil.WriteFile(filepath.Join(home, "index-0.txt"), // shuffle output
-		[]byte(`/tmp/ryft-test3/X.dat,21,11,0
-/tmp/ryft-test3/X.dat,3,11,0
-/tmp/ryft-test3/X.dat,57,11,0
-/tmp/ryft-test3/X.dat,39,11,0
-/tmp/ryft-test3/X.dat,75,11,0`), 0644)
+	ioutil.WriteFile(filepath.Join(root, "index-0.txt"), // shuffle output
+		[]byte(fmt.Sprintf(`%[1]s/X.dat,21,11,0
+%[1]s/X.dat,3,11,0
+%[1]s/X.dat,57,11,0
+%[1]s/X.dat,39,11,0
+%[1]s/X.dat,75,11,0`, root)), 0644)
 
 	check([]string{"data-0.dat"},
 		[]string{"index-0.txt"},
@@ -839,28 +839,28 @@ dd-hello-dd
 cc-hello-cc
 ee-hello-ee
 `,
-		`/tmp/ryft-test3/X.dat,21,11,0
-/tmp/ryft-test3/X.dat,3,11,0
-/tmp/ryft-test3/X.dat,57,11,0
-/tmp/ryft-test3/X.dat,39,11,0
-/tmp/ryft-test3/X.dat,75,11,0
-`)
+		fmt.Sprintf(`%[1]s/X.dat,21,11,0
+%[1]s/X.dat,3,11,0
+%[1]s/X.dat,57,11,0
+%[1]s/X.dat,39,11,0
+%[1]s/X.dat,75,11,0
+`, root))
 
 	// "hello", W=3 AND "hello", W=5
-	ioutil.WriteFile(filepath.Join(home, "data-1a.dat"),
+	ioutil.WriteFile(filepath.Join(root, "data-1a.dat"),
 		[]byte(`bb-hello-bb
 aa-hello-aa
 dd-hello-dd
 cc-hello-cc
 ee-hello-ee
 `), 0644)
-	ioutil.WriteFile(filepath.Join(home, "index-1a.txt"), // shuffle output
-		[]byte(`/tmp/ryft-test3/X.dat,21,11,0
-/tmp/ryft-test3/X.dat,3,11,0
-/tmp/ryft-test3/X.dat,57,11,0
-/tmp/ryft-test3/X.dat,39,11,0
-/tmp/ryft-test3/X.dat,75,11,0`), 0644)
-	ioutil.WriteFile(filepath.Join(home, "data-1b.dat"),
+	ioutil.WriteFile(filepath.Join(root, "index-1a.txt"), // shuffle output
+		[]byte(fmt.Sprintf(`%[1]s/X.dat,21,11,0
+%[1]s/X.dat,3,11,0
+%[1]s/X.dat,57,11,0
+%[1]s/X.dat,39,11,0
+%[1]s/X.dat,75,11,0`, root)), 0644)
+	ioutil.WriteFile(filepath.Join(root, "data-1b.dat"),
 		[]byte(`bb-hello-bb
 a
 b
@@ -875,12 +875,12 @@ e
 c
 ee-hello-ee
 `), 0644)
-	ioutil.WriteFile(filepath.Join(home, "index-1b.txt"),
-		[]byte(`/tmp/ryft-test3/data-1a.dat,0,13,0
-/tmp/ryft-test3/data-1a.dat,10,15,0
-/tmp/ryft-test3/data-1a.dat,22,15,0
-/tmp/ryft-test3/data-1a.dat,34,15,0
-/tmp/ryft-test3/data-1a.dat,46,13,0`), 0644)
+	ioutil.WriteFile(filepath.Join(root, "index-1b.txt"),
+		[]byte(fmt.Sprintf(`%[1]s/data-1a.dat,0,13,0
+%[1]s/data-1a.dat,10,15,0
+%[1]s/data-1a.dat,22,15,0
+%[1]s/data-1a.dat,34,15,0
+%[1]s/data-1a.dat,46,13,0`, root)), 0644)
 
 	check([]string{"data-1a.dat", "data-1b.dat"},
 		[]string{"index-1a.txt", "index-1b.txt"},
@@ -891,10 +891,10 @@ dd-hello-dd
 cc-hello-cc
 ee-hello-ee
 `,
-		`/tmp/ryft-test3/X.dat,21,11,0
-/tmp/ryft-test3/X.dat,3,11,0
-/tmp/ryft-test3/X.dat,57,11,0
-/tmp/ryft-test3/X.dat,39,11,0
-/tmp/ryft-test3/X.dat,75,11,0
-`)
+		fmt.Sprintf(`%[1]s/X.dat,21,11,0
+%[1]s/X.dat,3,11,0
+%[1]s/X.dat,57,11,0
+%[1]s/X.dat,39,11,0
+%[1]s/X.dat,75,11,0
+`, root))
 }

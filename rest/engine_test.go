@@ -2,9 +2,12 @@ package rest
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,6 +25,10 @@ func toJson(v interface{}) string {
 func TestUserConfig(t *testing.T) {
 	var server Server
 
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	os.MkdirAll(filepath.Join(root, "test"), 0755)
+	defer os.RemoveAll(root)
+
 	server.Config.DefaultUserConfig = map[string]interface{}{
 		"record-queries": map[string]interface{}{
 			"enabled": false,
@@ -30,18 +37,15 @@ func TestUserConfig(t *testing.T) {
 		},
 	}
 	server.Config.BackendOptions = map[string]interface{}{
-		"ryftone-mount": "/tmp/ryft",
+		"ryftone-mount": root,
 	}
-
-	os.MkdirAll("/tmp/ryft/test", 0755)
-	defer os.RemoveAll("/tmp/ryft")
 
 	cfg, err := server.getUserConfig("test")
 	if assert.NoError(t, err) {
 		assert.JSONEq(t, `{"record-queries": {"enabled":false, "xml":["*.xml"], "csv":["*.csv"]}}`, toJson(cfg))
 	}
 
-	ioutil.WriteFile("/tmp/ryft/test/.ryft-user.json",
+	ioutil.WriteFile(filepath.Join(root, "test/.ryft-user.json"),
 		[]byte(`
 {"record-queries": {
 	"enabled":true,
@@ -53,7 +57,7 @@ func TestUserConfig(t *testing.T) {
 		assert.JSONEq(t, `{"record-queries": {"enabled":true, "xml":["*.xml1"], "csv":["*.csv1"]}}`, toJson(cfg))
 	}
 
-	ioutil.WriteFile("/tmp/ryft/test/.ryft-user.yaml",
+	ioutil.WriteFile(filepath.Join(root, "test/.ryft-user.yaml"),
 		[]byte(`# YAML config
 record-queries:
   enabled: false

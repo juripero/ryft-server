@@ -17,12 +17,15 @@ func TestPostFiles(t *testing.T) {
 
 	go func() {
 		err := fs.worker.ListenAndServe()
-		assert.NoError(t, err, "failed to start fake server")
+		assert.NoError(t, err, "failed to serve fake server")
 	}()
-	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		fs.worker.Stop(0)
-		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+		t.Log("stopping the server...")
+		fs.worker.Stop(testServerStopTO)
+		t.Log("waiting the server...")
+		<-fs.worker.StopChan()
+		t.Log("server stopped")
 	}()
 
 	// test case
@@ -53,28 +56,29 @@ func TestPostFiles(t *testing.T) {
 	}
 
 	all := false // false
+	TO := 30 * time.Second
 
 	if all {
-		check("/files1", "", "", "hello", 0, http.StatusNotFound, "page not found")
+		check("/files1", "", "", "hello", TO, http.StatusNotFound, "page not found")
 
-		check("/files?dir=foo&file=1.txt", "", "", "hello", 0,
+		check("/files?dir=foo&file=1.txt", "", "", "hello", TO,
 			http.StatusBadRequest, "unexpected content type")
 	}
 
 	if all || true {
 		// upload a file
 		check("/files?file=foo/2.txt", "", "application/octet-stream",
-			`hello`, 0, http.StatusOK, `{"length":5, "offset":0, "path":"foo/2.txt"}`)
+			`hello`, TO, http.StatusOK, `{"length":5, "offset":0, "path":"foo/2.txt"}`)
 		checkFile("foo/2.txt", `hello`)
 
 		// append a file
 		check("/files?file=foo/2.txt", "", "application/octet-stream",
-			` world`, 0, http.StatusOK, `{"length":6, "offset":5, "path":"foo/2.txt"}`)
+			` world`, TO, http.StatusOK, `{"length":6, "offset":5, "path":"foo/2.txt"}`)
 		checkFile("foo/2.txt", `hello world`)
 
 		// replace a part of file
 		check("/files?file=foo/2.txt&offset=2", "", "application/octet-stream",
-			`y!!`, 0, http.StatusOK, `{"length":3, "offset":2, "path":"foo/2.txt"}`)
+			`y!!`, TO, http.StatusOK, `{"length":3, "offset":2, "path":"foo/2.txt"}`)
 		checkFile("foo/2.txt", `hey!! world`)
 	}
 }

@@ -1,7 +1,9 @@
 package catalog
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -18,14 +20,16 @@ func TestCacheUsual(t *testing.T) {
 	}
 	cc.DropTimeout = 100 * time.Millisecond
 
-	os.MkdirAll("/tmp/ryft/", 0755)
-	defer os.RemoveAll("/tmp/ryft/")
-	assert.Nil(t, cc.Get("/tmp/ryft/foo.catalog"))
-	assert.False(t, cc.Drop("/tmp/ryft/foo.catalog"))
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(root)
+
+	assert.Nil(t, cc.Get(filepath.Join(root, "foo.catalog")))
+	assert.False(t, cc.Drop(filepath.Join(root, "foo.catalog")))
 
 	// open/close without cache
 	log.Debugf("[test]: check simple open/close")
-	cat, err := OpenCatalogNoCache("/tmp/ryft/foo.catalog")
+	cat, err := OpenCatalogNoCache(filepath.Join(root, "foo.catalog"))
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		assert.EqualValues(t, 0, cat.cacheRef)
 		assert.NoError(t, cat.Close())
@@ -36,7 +40,7 @@ func TestCacheUsual(t *testing.T) {
 
 	// open and get a few copies from cache
 	log.Debugf("[test]: check open/close and cache put/get/drop")
-	cat, err = OpenCatalogNoCache("/tmp/ryft/foo.catalog")
+	cat, err = OpenCatalogNoCache(filepath.Join(root, "foo.catalog"))
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		assert.EqualValues(t, 0, cat.cacheRef)
 		cc.Put(cat.GetPath(), cat)
@@ -65,12 +69,12 @@ func TestCacheUsual(t *testing.T) {
 		assert.EqualValues(t, 0, cat.cacheRef)
 		assert.Nil(t, cat.db) // DB is closed
 
-		assert.Nil(t, cc.Get("/tmp/ryft/foo.catalog"))
+		assert.Nil(t, cc.Get(filepath.Join(root, "foo.catalog")))
 	}
 
 	// open and get a few copies from cache (check drop timeout)
 	log.Debugf("[test]: check open/close and cache put/get/drop by timeout")
-	cat, err = OpenCatalogNoCache("/tmp/ryft/foo.catalog")
+	cat, err = OpenCatalogNoCache(filepath.Join(root, "foo.catalog"))
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		assert.EqualValues(t, 0, cat.cacheRef)
 		cc.Put(cat.GetPath(), cat)
@@ -106,7 +110,7 @@ func TestCacheUsual(t *testing.T) {
 		assert.EqualValues(t, 0, cat.cacheRef)
 		assert.Nil(t, cat.db) // DB is closed
 
-		assert.Nil(t, cc.Get("/tmp/ryft/foo.catalog"))
+		assert.Nil(t, cc.Get(filepath.Join(root, "foo.catalog")))
 	}
 
 	assert.Empty(t, cc.cached)

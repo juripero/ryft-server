@@ -133,7 +133,7 @@ func TestEngineSearchUsual(t *testing.T) {
 
 	// valid (usual case)
 	engine, err := NewEngine(map[string]interface{}{
-		"server-url": fmt.Sprintf("http://localhost%s", testFakePort),
+		"server-url": fs.location(),
 		"auth-token": "Basic: any-value-ignored",
 		"local-only": true,
 	})
@@ -216,7 +216,7 @@ func TestEngineCountUsual(t *testing.T) {
 
 	// valid (usual case)
 	engine, err := NewEngine(map[string]interface{}{
-		"server-url": fmt.Sprintf("http://localhost%s", testFakePort),
+		"server-url": fs.location(),
 		"auth-token": "Basic: any-value-ignored",
 		"local-only": true,
 	})
@@ -254,7 +254,7 @@ func TestEngineSearchFailedToDecode(t *testing.T) {
 	}()
 
 	engine, err := NewEngine(map[string]interface{}{
-		"server-url": fmt.Sprintf("http://localhost%s", testFakePort),
+		"server-url": fs.location(),
 		"auth-token": "Basic: any-value-ignored",
 		"local-only": true,
 	})
@@ -394,7 +394,7 @@ func TestEngineSearchCancel(t *testing.T) {
 
 	// valid (usual case)
 	engine, err := NewEngine(map[string]interface{}{
-		"server-url": fmt.Sprintf("http://localhost%s", testFakePort),
+		"server-url": fs.location(),
 		"auth-token": "Basic: any-value-ignored",
 		"local-only": true,
 	})

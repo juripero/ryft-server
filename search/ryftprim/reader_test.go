@@ -1,6 +1,7 @@
 package ryftprim
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -39,14 +40,19 @@ func testFakeRyftprim3(od, oi *os.File, delim string) {
 	//oi.Flush()
 }
 
+// get reader's fake paths
+func testReaderFake() (index, data, delim string) {
+	index = fmt.Sprintf("/tmp/ryftprim-%x-index.txt", time.Now().UnixNano())
+	data = fmt.Sprintf("/tmp/ryfptrim-%x-data.bin", time.Now().UnixNano())
+	delim = "\r\n\f"
+	return
+}
+
 // valid results
 func TestReaderUsual(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -122,10 +128,7 @@ func TestReaderUsual(t *testing.T) {
 func TestReaderNoData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -201,10 +204,7 @@ func TestReaderNoData(t *testing.T) {
 func TestReaderLimit(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -272,10 +272,7 @@ func TestReaderLimit(t *testing.T) {
 func TestReaderFailedToOpenIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -324,10 +321,7 @@ func TestReaderFailedToOpenIndex(t *testing.T) {
 func TestReaderFailedToOpenData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -376,10 +370,7 @@ func TestReaderFailedToOpenData(t *testing.T) {
 func TestReaderCancelToOpenIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -418,10 +409,7 @@ func TestReaderCancelToOpenIndex(t *testing.T) {
 func TestReaderFailedToReadIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -473,10 +461,7 @@ func TestReaderFailedToReadIndex(t *testing.T) {
 func TestReaderCancelToReadIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -526,10 +511,7 @@ func TestReaderCancelToReadIndex(t *testing.T) {
 func TestReaderCancelToOpenData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -579,10 +561,7 @@ func TestReaderCancelToOpenData(t *testing.T) {
 func TestReaderFailedToParseIndex(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -643,10 +622,7 @@ func TestReaderFailedToParseIndex(t *testing.T) {
 func TestReaderFailedToReadData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -700,10 +676,7 @@ func TestReaderFailedToReadData(t *testing.T) {
 func TestReaderCancelToReadData(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -755,10 +728,7 @@ func TestReaderCancelToReadData(t *testing.T) {
 func TestReaderFailedToReadDelim(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -813,10 +783,7 @@ func TestReaderFailedToReadDelim(t *testing.T) {
 func TestReaderUnexpectedDelim(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 
@@ -871,10 +838,7 @@ func TestReaderUnexpectedDelim(t *testing.T) {
 func TestReaderCancelToReadDelim(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	indexPath := "/tmp/ryftprim-index.txt"
-	dataPath := "/tmp/ryfptrim-data.bin"
-	delimiter := "\r\n\f"
-
+	indexPath, dataPath, delimiter := testReaderFake()
 	defer os.RemoveAll(indexPath)
 	defer os.RemoveAll(dataPath)
 

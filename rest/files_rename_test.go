@@ -19,12 +19,15 @@ func TestRenameFiles(t *testing.T) {
 
 	go func() {
 		err := fs.worker.ListenAndServe()
-		assert.NoError(t, err, "failed to start fake server")
+		assert.NoError(t, err, "failed to serve fake server")
 	}()
-	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		fs.worker.Stop(0)
-		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+		t.Log("stopping the server...")
+		fs.worker.Stop(testServerStopTO)
+		t.Log("waiting the server...")
+		<-fs.worker.StopChan()
+		t.Log("server stopped")
 	}()
 
 	// test case
@@ -42,26 +45,28 @@ func TestRenameFiles(t *testing.T) {
 		}
 	}
 
-	check("/rename2", "", "", "", 0, http.StatusNotFound, "page not found")
+	TO := 30 * time.Second
+
+	check("/rename2", "", "", "", TO, http.StatusNotFound, "page not found")
 	// file
-	check("/rename?new=1.txt", "", "", "", 0, http.StatusBadRequest, "missing source filename")
-	check("/rename?file=1.txt&new=2.pdf", "", "", "", 0, http.StatusBadRequest, "changing the file extention is not allowed")
-	check("/rename?file=1.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
-	check("/rename/foo?file=a.txt&new=b.txt", "", "", "", 0, http.StatusOK, `{"/foo/a.txt":"OK"}`)
-	check("/rename/foo?file=b.txt&new=../b.txt", "", "", "", 0, http.StatusOK, `{"/foo/b.txt":"OK"}`)
-	check("/rename?file=3.txt&new=/../../var/data/3.txt", "", "", "", 0, http.StatusBadRequest, `path \"/var/data/3.txt\" is not relative to home`)
+	check("/rename?new=1.txt", "", "", "", TO, http.StatusBadRequest, "missing source filename")
+	check("/rename?file=1.txt&new=2.pdf", "", "", "", TO, http.StatusBadRequest, "changing the file extention is not allowed")
+	check("/rename?file=1.txt&new=2.txt", "", "", "", TO, http.StatusOK, `{"1.txt":"OK"}`)
+	check("/rename/foo?file=a.txt&new=b.txt", "", "", "", TO, http.StatusOK, `{"/foo/a.txt":"OK"}`)
+	check("/rename/foo?file=b.txt&new=../b.txt", "", "", "", TO, http.StatusOK, `{"/foo/b.txt":"OK"}`)
+	check("/rename?file=3.txt&new=/../../var/data/3.txt", "", "", "", TO, http.StatusBadRequest, `path \"/var/data/3.txt\" is not relative to home`)
 	// directory
-	check("/rename?dir=/foo&new=/bar", "", "", "", 0, http.StatusOK, `{"/foo":"OK"}`)
-	check("/rename?dir=/foo&new=/../../var/data/bar", "", "", "", 0, http.StatusBadRequest, `path \"/../../var/data/bar\" is not relative to home`)
-	check("/rename/bar?dir=/&new=../bar2", "", "", "", 0, http.StatusOK, `{"/bar":"OK"}`)
+	check("/rename?dir=/foo&new=/bar", "", "", "", TO, http.StatusOK, `{"/foo":"OK"}`)
+	check("/rename?dir=/foo&new=/../../var/data/bar", "", "", "", TO, http.StatusBadRequest, `path \"/../../var/data/bar\" is not relative to home`)
+	check("/rename/bar?dir=/&new=../bar2", "", "", "", TO, http.StatusOK, `{"/bar":"OK"}`)
 	// catalog and file
-	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", 0, http.StatusOK, `failed to move catalog data`, `no such file or directory`)
-	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"file '2.txt' already exists"}`)
-	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=100.txt", "", "", "", 0, http.StatusOK, `{"notexistfile.txt":"OK"}`)
-	check("/rename?catalog=/catalog.test&new=/catalog.test2", "", "", "", 0, http.StatusBadRequest, `changing catalog extention is not allowed`)
-	check("/rename?catalog=/catalog.test&new=/bar2/catalog.test", "", "", "", 0, http.StatusOK, `{"/catalog.test":"OK"}`)
-	check("/rename?catalog=/catalog.test&new=/../../var/data/catalog.test", "", "", "", 0, http.StatusBadRequest, `catalog path \"/../../var/data/catalog.test\" is not relative to home`)
-	check("/rename/bar2?catalog=catalog.test&new=catalog2.test", "", "", "", 0, http.StatusOK, `{"/bar2/catalog.test":"OK"}`)
-	check("/rename?catalog=/bar2/catalog2.test2&file=1.txt&new=4.txt", "", "", "", 0, http.StatusOK, `{"1.txt":"OK"}`)
-	check("/rename/bar2?catalog=catalog2.test2&file=4.txt&new=1.txt", "", "", "", 0, http.StatusOK, `{"4.txt":"OK"}`)
+	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", TO, http.StatusOK, `failed to move catalog data`, `no such file or directory`)
+	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", TO, http.StatusOK, `{"notexistfile.txt":"file '2.txt' already exists"}`)
+	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=100.txt", "", "", "", TO, http.StatusOK, `{"notexistfile.txt":"OK"}`)
+	check("/rename?catalog=/catalog.test&new=/catalog.test2", "", "", "", TO, http.StatusBadRequest, `changing catalog extention is not allowed`)
+	check("/rename?catalog=/catalog.test&new=/bar2/catalog.test", "", "", "", TO, http.StatusOK, `{"/catalog.test":"OK"}`)
+	check("/rename?catalog=/catalog.test&new=/../../var/data/catalog.test", "", "", "", TO, http.StatusBadRequest, `catalog path \"/../../var/data/catalog.test\" is not relative to home`)
+	check("/rename/bar2?catalog=catalog.test&new=catalog2.test", "", "", "", TO, http.StatusOK, `{"/bar2/catalog.test":"OK"}`)
+	check("/rename?catalog=/bar2/catalog2.test2&file=1.txt&new=4.txt", "", "", "", TO, http.StatusOK, `{"1.txt":"OK"}`)
+	check("/rename/bar2?catalog=catalog2.test2&file=4.txt&new=1.txt", "", "", "", TO, http.StatusOK, `{"4.txt":"OK"}`)
 }

@@ -1,11 +1,13 @@
 package catalog
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -14,11 +16,11 @@ import (
 func TestParts(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	os.RemoveAll("/tmp/ryft/")
-	os.MkdirAll("/tmp/ryft/", 0755)
-	defer os.RemoveAll("/tmp/ryft/")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(root)
 
-	cat, err := OpenCatalogNoCache("/tmp/ryft/foo.txt")
+	cat, err := OpenCatalogNoCache(filepath.Join(root, "foo.txt"))
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		cat.DataSizeLimit = 50
 		DefaultDataDelimiter = "\r\n"

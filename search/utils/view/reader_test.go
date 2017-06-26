@@ -1,15 +1,17 @@
 package view
 
 import (
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 // test reader
 func TestReader(t *testing.T) {
-	path := "/tmp/test.ryft.view"
+	path := fmt.Sprintf("/tmp/test-ryft-%x.view", time.Now().UnixNano())
 	w, err := Create(path)
 	if assert.NoError(t, err) {
 		defer os.RemoveAll(path)

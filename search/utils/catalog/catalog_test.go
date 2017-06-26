@@ -23,10 +23,11 @@ var (
 func TestCatalogRegexp(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	os.MkdirAll("/tmp/ryft/", 0755)
-	defer os.RemoveAll("/tmp/ryft/")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(root)
 
-	cat, err := OpenCatalogNoCache("/tmp/ryft/foo.txt")
+	cat, err := OpenCatalogNoCache(filepath.Join(root, "foo.txt"))
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		cat.DataSizeLimit = 50
 		defer cat.Close()
@@ -75,20 +76,21 @@ func TestCatalogCommon(t *testing.T) {
 	}
 	SetDefaultCacheDropTimeout(100 * time.Millisecond)
 
-	os.MkdirAll("/tmp/ryft/", 0755)
-	defer os.RemoveAll("/tmp/ryft/")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(root)
 
 	// open missing catalog
 	log.Debugf("[test]: check open read-only missing/bad catalogs")
-	_, err := OpenCatalogReadOnly("/tmp/ryft/foo.catalog")
+	_, err := OpenCatalogReadOnly(filepath.Join(root, "foo.catalog"))
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "not a catalog")
 	}
 
 	// bad catalog file
-	ioutil.WriteFile("/tmp/ryft/bad.catalog", []byte("hello"), 0644)
-	os.MkdirAll(getDataDir("/tmp/ryft/bad.catalog"), 0755) // fake data dir
-	cat, err := OpenCatalogReadOnly("/tmp/ryft/bad.catalog")
+	ioutil.WriteFile(filepath.Join(root, "bad.catalog"), []byte("hello"), 0644)
+	assert.NoError(t, os.MkdirAll(getDataDir(filepath.Join(root, "bad.catalog")), 0755)) // fake data dir
+	cat, err := OpenCatalogReadOnly(filepath.Join(root, "bad.catalog"))
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		// assert.Contains(t, err.Error(), "not a catalog")
 		assert.False(t, cat.CheckScheme())
@@ -98,10 +100,10 @@ func TestCatalogCommon(t *testing.T) {
 
 	// open catalog
 	log.Debugf("[test]: open catalog and check scheme")
-	cat, err = OpenCatalog("/tmp/ryft/foo.txt")
+	cat, err = OpenCatalog(filepath.Join(root, "foo.txt"))
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
 		assert.True(t, cat.CheckScheme())
-		assert.EqualValues(t, "/tmp/ryft/.foo.txt.catalog", cat.GetDataDir())
+		assert.EqualValues(t, filepath.Join(root, ".foo.txt.catalog"), cat.GetDataDir())
 		if files, err := cat.GetDataFiles("", false); assert.NoError(t, err) {
 			assert.Empty(t, files)
 		}
@@ -140,10 +142,11 @@ func TestCatalogAddFilePart(t *testing.T) {
 	DefaultDataDelimiter = "\n\f\n"
 	DefaultDataSizeLimit = 10 * 1024
 
-	os.MkdirAll("/tmp/ryft/", 0755)
-	defer os.RemoveAll("/tmp/ryft/")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(root)
 
-	catalog := "/tmp/ryft/foo.txt"
+	catalog := filepath.Join(root, "foo.txt")
 	os.RemoveAll(catalog) // just in case
 
 	resCh := make(chan addFilePartResult)
@@ -264,11 +267,11 @@ func TestCatalogRename(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 	SetDefaultCacheDropTimeout(100 * time.Millisecond)
 
-	rootPath := "/tmp/ryft"
-	os.MkdirAll(filepath.Join(rootPath, "foo"), 0755)
-	defer os.RemoveAll(rootPath)
-	oldCatPath := filepath.Join(rootPath, "test-catalog.txt")
-	newCatPath := filepath.Join(rootPath, "foo/test-catalog-new.txt")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(filepath.Join(root, "foo"), 0755))
+	defer os.RemoveAll(root)
+	oldCatPath := filepath.Join(root, "test-catalog.txt")
+	newCatPath := filepath.Join(root, "foo/test-catalog-new.txt")
 
 	cat, err := OpenCatalogNoCache(oldCatPath)
 	if assert.NoError(t, err) && assert.NotNil(t, cat) {
