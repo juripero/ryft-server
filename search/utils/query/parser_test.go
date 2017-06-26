@@ -169,6 +169,10 @@ func TestParserParseSimpleQuery(t *testing.T) {
 		` RAW_TEXT CONTAINS IPv6(IP != "1::0") `,
 		`(RAW_TEXT CONTAINS IPV6(IP != "1::0"))[ipv6]`,
 		`(RAW_TEXT CONTAINS IPV6(IP != "1::0"))[ipv6]`)
+	check(false,
+		` RAW_TEXT CONTAINS PCRE2("(?i)[a|b]", W=1) `,
+		`(RAW_TEXT CONTAINS "(?i)[a|b]")[pcre2,w=1]`,
+		`(RAW_TEXT CONTAINS PCRE2("(?i)[a|b]", WIDTH="1"))[pcre2,w=1]`)
 	bad(` RAW_TEXT CONTAINS 123 `, "is unexpected expression")
 }
 
@@ -413,6 +417,10 @@ func TestParserParse(t *testing.T) {
 	testParserParse(t, true,
 		`  (RECORD.body CONTAINS IPV6(IP > "10::1"))`,
 		`P{(RECORD.body CONTAINS IPV6(IP > "10::1"))[ipv6]}`)
+
+	testParserParse(t, true,
+		`  (RECORD.body CONTAINS PCRE2("(?i)[a|b]"))`,
+		`P{(RECORD.body CONTAINS "(?i)[a|b]")[pcre2]}`)
 
 	testParserParse(t, false,
 		`  (RAW_TEXT CONTAINS "100")`,
@@ -1094,4 +1102,17 @@ func TestParserParseIPv6(t *testing.T) {
 	testParserBad(t, `(RAW_TEXT CONTAINS IPV6("123" <= JP == "0"))`, "found instead of IP")
 	testParserBad(t, `(RAW_TEXT CONTAINS IPV6("123" <= IP == "0"))`, "found instead of < or <=")
 	testParserBad(t, `(RAW_TEXT CONTAINS IPV6("123" <= IP / "0"))`, "found instead of < or <=")
+}
+
+// test for PCRE2 (generic queries)
+func TestParserParsePCRE2(t *testing.T) {
+	// simple cases
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS PCRE2("(?i)[a|b]", W=1))`,
+		`P{(RAW_TEXT CONTAINS PCRE2("(?i)[a|b]", WIDTH="1"))[pcre2,w=1]}`)
+	testParserParseG(t, false,
+		`(RAW_TEXT CONTAINS PCRE2("(?i)[a|b]", L=true))`,
+		`P{(RAW_TEXT CONTAINS PCRE2("(?i)[a|b]", LINE="true"))[pcre2,line]}`)
+
+	// TODO: compatibility mode
 }

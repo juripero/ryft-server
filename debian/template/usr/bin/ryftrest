@@ -18,6 +18,7 @@ Search specific:
                      - numeric_search (or ns) also used for currency
                      - ipv4_search (or ipv4)
                      - ipv6_search (or ipv6)
+                     - pcre2_search (or pcre2)
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.

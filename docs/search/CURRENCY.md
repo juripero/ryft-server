@@ -258,3 +258,4 @@ For all cases the `SYMBOL="$"`, `SEPARATOR=","` and `DECIMAL="."`.
 - [Number search](./NUMBER.md)
 - [IPv4 search](./IPV4.md)
 - [IPv6 search](./IPV6.md)
+- [Regexp search](./PCRE2.md)

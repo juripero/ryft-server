@@ -166,3 +166,4 @@ the `LINE` option can be set.
 - [Number search](./NUMBER.md)
 - [Currency search](./CURRENCY.md)
 - [IPv6 search](./IPV6.md)
+- [Regexp search](./PCRE2.md)

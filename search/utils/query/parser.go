@@ -369,6 +369,10 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression, res.Options = p.parseIPv6Expr(res.Options)
 			res.Options.SetMode("ipv6")
 
+		case lex.IsRegex(): // PCRE2 + options
+			expression, res.Options = p.parseSearchExpr(res.Options)
+			res.Options.SetMode("pcre2")
+
 		// consume all continous strings and wildcards
 		case lex.token == STRING,
 			lex.token == WCARD:
@@ -443,6 +447,9 @@ func getExprOld(expr string, opts Options) string {
 	case "ipv6":
 		return fmt.Sprintf("IPV6(%s)", expr)
 
+	// PCRE2 search
+	case "pcre2":
+		return expr // "as is"
 	}
 
 	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
@@ -580,6 +587,16 @@ func getExprNew(expr string, opts Options) string {
 		}
 
 		return fmt.Sprintf("IPV6(%s)", strings.Join(args, ", "))
+
+	// PCRE2 search
+	case "pcre2":
+		if opts.Width < 0 { // LINE is mutual exclusive with WIDTH
+			args = append(args, fmt.Sprintf(`LINE="%t"`, true))
+		} else if opts.Width > 0 {
+			args = append(args, fmt.Sprintf(`WIDTH="%d"`, opts.Width))
+		}
+
+		return fmt.Sprintf("PCRE2(%s)", strings.Join(args, ", "))
 	}
 
 	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))

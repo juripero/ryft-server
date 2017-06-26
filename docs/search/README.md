@@ -10,6 +10,7 @@ various search types:
 - [Currency search](./CURRENCY.md)
 - [IPv4 search](./IPV4.md)
 - [IPv6 search](./IPV6.md)
+- [Regexp search](./PCRE2.md)
 
 
 # General search syntax
@@ -72,7 +73,7 @@ consisting of a relational expression which takes the following form:
 - [CURRENCY](./CURRENCY.md) - Search for a monetary value or a range of monetary values.
 - [IPV4](./IPV4.md) - Search for an IPv4 address or a range of IPv4 addresses.
 - [IPV6](./IPV6.md) - Search for an IPv6 address or a range of IPv6 addresses.
-
+- [PCRE2](./PCRE2.md) - Search for a regular expression according to [PCRE2 specifications](http://www.pcre.org/current/doc/html/pcre2syntax.html).
 
 `expression` specifies the expression to be matched. The possible values are:
 

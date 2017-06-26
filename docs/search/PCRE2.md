@@ -1,65 +1,64 @@
-The `IPv6` Search operation can be used to search for exact IPv6 addresses or
-IPv6 addresses in a particular range in both structured and unstructured text
-using the standard `"a:b:c:d:e:f:g:h"` format for IPv6 addresses.
-The double colon (::) is also supported, per RFC guidelines.
+The `PCRE2` search performs a search that adheres strictly to the PCRE2 regular
+expression rules. Ryft supports the totality of the PCRE2 specification as described
+[here](http://www.pcre.org/current/doc/html/pcre2syntax.html) as of June 5, 2017.
 
-IPv6 searches extend the general relational expression defined
-[previously](./README.md#general-search-syntax) as follows:
-
-```
-(input_specifier relational_operator IPV6(expression[, options]))
-```
-
-Different ranges can be searched for by modifying the expression in the relational
-expression above. There are two general expression types supported:
-
-- `IP operator "ValueB"`
-- `"ValueA" operator IP operator "ValueB"`
-
-The box below contains of list of supported expressions. `ValueA` and `ValueB`
-represent the IP addresses to compare the input data against.
-
-- `IP = "ValueB"`
-- `IP != "ValueB"` (Not equals operator)
-- `IP >= "ValueB"`
-- `IP > "ValueB"`
-- `IP <= "ValueB"`
-- `IP < "ValueB"`
-- `"ValueA" <= IP <= "ValueB"`
-- `"ValueA" < IP < "ValueB"`
-- `"ValueA" < IP <= "ValueB"`
-- `"ValueA" <= IP < "ValueB"`
-
-In addition to `ryftprim` the following formats are supported:
-- `IP == "ValueB"`
-- `ValueA >= IP >= ValueB`
-- `ValueA > IP > ValueB`
-- `ValueA > IP >= ValueB`
-- `ValueA >= IP > ValueB`
-
-For example, to find all IP addresses greater than `1abc:2::8`,
-use the following search query criteria:
+`PCRE2` is a standards-based regular expression format that is heavily used by the
+search and analytics community for a variety of important search use cases,
+including cyber use cases. `PCRE2` searches extend the general relational
+expression defined [previously](./README.md#general-search-syntax) as follows:
 
 ```
-(RAW_TEXT CONTAINS IPV6(IP > "1abc:2::8"))
+(input_specifier relational_operator PCRE2(expression[, options]))
 ```
 
-To find all matching IPv6 addresses between `10::1` and `10::1:1`, inclusive,
-in a record/field construct where the field tag is `ipaddr6`, use:
+The following aliases can be used to specify `PCRE2` primitive as well:
+- **`PCRE2`**
+- `REGEXP`
+- `REGEX`
+- `RE`
+
+so the following queries are the same:
 
 ```
-(RECORD.ipaddr6 CONTAINS IPV6("10::1" <= IP <= "10::1:1"))
+(RECORD CONTAINS PCRE2("(?i)(orange|apple)"))
+(RECORD CONTAINS REGEX("(?i)(orange|apple)"))
+(RECORD CONTAINS REGEX("(?i)orange|apple)"))
 ```
+
+# Compatible syntax
+
+For the backward compatibility the term `PCRE2` can be omitted:
+
+```
+(input_specifier relational_operator expression)
+```
+
+Note, there is no way to specify additional options in this syntax!
+The global options will be used.
 
 
 # Options
 
-The available comma-separated options for the `IPV6` primitive are:
+The available comma-separated options for the `PCRE2` primitive are:
 
 - [WIDTH](#width-option)
 - [LINE](#line-option)
 - [FILTER](./README.md#filter-option)
 
+
+Note that many query-related options, such as case-insensitive options,
+are not supported in the options field, but are instead supported through
+standard `PCRE2` syntax internal to the expression itself.
+
+In addition, similar to exact search, the WIDTH and LINE options can aid in
+downstream analysis of contextual use of the match results against unstructured
+raw text data. A fully qualified `PCRE2` clause looking for various spellings
+of the often-misspelled word "misspell" in case-insensitive fashion allowing
+for one or more internal `'s'` characters would be:
+
+```
+(RAW_TEXT CONTAINS PCRE2("(?i)mis+pell"))
+```
 
 ## `WIDTH` option
 
@@ -84,9 +83,9 @@ The following aliases can be used to specify `WIDTH` as well:
 so the following queries are the same:
 
 ```
-(RAW_TEXT CONTAINS IPV6(IP > "1abc:2::8", SURROUNDING=5))
-(RAW_TEXT CONTAINS IPV6(IP > "1abc:2::8", WIDTH=5))
-(RAW_TEXT CONTAINS IPV6(IP > "1abc:2::8", W=5))
+(RECORD CONTAINS PCRE2("(orange|apple)", SURROUNDING=5))
+(RECORD CONTAINS PCRE2("(orange|apple)", WIDTH=5))
+(RECORD CONTAINS PCRE2("(orange|apple)", W=5))
 ```
 
 
@@ -118,13 +117,12 @@ The following aliases can be used to specify `LINE` as well:
 so the following queries are the same:
 
 ```
-(RAW_TEXT CONTAINS IPV6(IP > "1abc:2::8", LINE=true))
-(RAW_TEXT CONTAINS IPV6(IP > "1abc:2::8", L=true))
+(RECORD CONTAINS PCRE2("(orange|apple)", LINE=true))
+(RECORD CONTAINS PCRE2("(orange|apple)", L=true))
 ```
 
 Please see [boolean type](./README.md#booleans) to get the ways
 the `LINE` option can be set.
-
 
 # See Also
 
@@ -136,4 +134,4 @@ the `LINE` option can be set.
 - [Number search](./NUMBER.md)
 - [Currency search](./CURRENCY.md)
 - [IPv4 search](./IPV4.md)
-- [Regexp search](./PCRE2.md)
+- [IPv6 search](./IPV6.md)
