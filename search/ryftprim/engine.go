@@ -98,7 +98,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// or just be silent: cfg.ReportIndex = true
 	}
 
-	task := NewTask(cfg)
+	task := NewTask(cfg, false)
 	if cfg.ReportIndex {
 		task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
 	} else {
@@ -143,7 +143,7 @@ func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 		// or just be silent: cfg.ReportIndex = true
 	}
 
-	task := NewTask(cfg)
+	task := NewTask(cfg, true)
 	task.log().WithField("cfg", cfg).Infof("[%s]: start /search/show", TAG)
 
 	// check file names are relative to home (without ..)
@@ -168,7 +168,7 @@ func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 		task.log().Debugf("[%s]: start /show TASK...", TAG)
 
 		// start INDEX&DATA processing
-		task.startProcessing(engine, res, true)
+		task.startProcessing(engine, res)
 		engine.finish(nil, task, res)
 	}()
 

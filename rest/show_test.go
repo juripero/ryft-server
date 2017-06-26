@@ -98,9 +98,9 @@ func TestSearchShowNoView(t *testing.T) {
 		}
 
 		check("/search/show?format=utf8&data=data1.txt&index=index1.txt&delimiter=\\r\\n&local=true", "application/json", 0,
-			http.StatusInternalServerError, "failed to get search results", "failed to open INDEX file", "no such file or directory")
+			http.StatusInternalServerError, "failed to do search", "failed to open INDEX file", "no such file or directory")
 		check("/search/show?format=utf8&data=data1.txt&index=index.txt&delimiter=\\r\\n&local=true", "application/json", 0,
-			http.StatusInternalServerError, "failed to get search results", "failed to open DATA file", "no such file or directory")
+			http.StatusInternalServerError, "failed to do search", "failed to open DATA file", "no such file or directory")
 
 		check("/search/show?format=utf8&data=data.txt&index=index.txt&delimiter=\\r\\n&local=true", "application/json", 0,
 			http.StatusOK, `{"results":[{"_index":{"file":"1.txt","offset":4,"length":11,"fuzziness":0,"host":"node-1"},"data":"11-hello-11"}
@@ -221,9 +221,9 @@ func TestSearchShowView(t *testing.T) {
 		}
 
 		check("/search/show?format=utf8&data=data1.txt&index=index1.txt&view=view.bin&delimiter=\\r\\n&local=true", "application/json", 0,
-			http.StatusInternalServerError, "failed to get search results", "failed to open INDEX file", "no such file or directory")
+			http.StatusInternalServerError, "failed to do search", "failed to open INDEX file", "no such file or directory")
 		check("/search/show?format=utf8&data=data1.txt&index=index.txt&view=view.bin&delimiter=\\r\\n&local=true", "application/json", 0,
-			http.StatusInternalServerError, "failed to get search results", "failed to open DATA file", "no such file or directory")
+			http.StatusInternalServerError, "failed to do search", "failed to open DATA file", "no such file or directory")
 
 		check("/search/show?format=utf8&data=data.txt&index=index.txt&view=view.bin&delimiter=\\r\\n&local=true", "application/json", 0,
 			http.StatusOK, `{"results":[{"_index":{"file":"1.txt","offset":4,"length":11,"fuzziness":0,"host":"node-1"},"data":"11-hello-11"}

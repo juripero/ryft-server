@@ -68,6 +68,7 @@ type Task struct {
 	config     *search.Config
 	results    *ResultsReader
 	resultWait sync.WaitGroup
+	isShow     bool
 
 	// list of locked files
 	lockedFiles    []string
@@ -81,7 +82,7 @@ type Task struct {
 }
 
 // NewTask creates new task.
-func NewTask(config *search.Config) *Task {
+func NewTask(config *search.Config, isShow bool) *Task {
 	id := atomic.AddUint64(&taskId, 1)
 
 	task := new(Task)
@@ -89,11 +90,12 @@ func NewTask(config *search.Config) *Task {
 	task.taskStartTime = time.Now() // performance metric
 
 	task.config = config
+	task.isShow = isShow
 	return task
 }
 
 // start processing in goroutine
-func (task *Task) startProcessing(engine *Engine, res *search.Result, isShow bool) {
+func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	if task.results != nil {
 		return // already started
 	}
@@ -106,13 +108,14 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result, isShow boo
 	rr.Offset = uint64(task.config.Offset) // start from this record
 	rr.Limit = uint64(task.config.Limit)   // limit the total number of records
 	rr.ReadData = task.config.ReportData   // if `false` only indexes will be reported
-	rr.MakeView = !isShow                  // if /show do not create VIEW file, just use it
+	rr.MakeView = !task.isShow             // if /show do not create VIEW file, just use it
 
 	// report filepath relative to home and update index's host
 	rr.RelativeToHome = filepath.Join(engine.MountPoint, engine.HomeDir)
 	rr.UpdateHostTo = engine.IndexHost
 
 	// intrusive mode: poll timeouts & limits
+	rr.IntrusiveMode = !task.isShow
 	rr.OpenFilePollTimeout = engine.OpenFilePollTimeout
 	rr.ReadFilePollTimeout = engine.ReadFilePollTimeout
 	rr.ReadFilePollLimit = engine.ReadFilePollLimit

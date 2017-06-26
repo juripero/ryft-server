@@ -63,6 +63,7 @@ type ResultsReader struct {
 	UpdateHostTo   string // update index's host
 
 	// intrusive mode: poll timeouts & limits
+	IntrusiveMode       bool
 	OpenFilePollTimeout time.Duration
 	ReadFilePollTimeout time.Duration
 	ReadFilePollLimit   int
@@ -87,6 +88,8 @@ func NewResultsReader(task *Task, dataPath, indexPath, viewPath string, delimite
 	rr.DataPath = dataPath
 	rr.ViewPath = viewPath
 	rr.Delimiter = delimiter
+
+	rr.IntrusiveMode = true
 
 	rr.cancelChan = make(chan struct{})
 	// rr.cancelled = 0
@@ -696,7 +699,7 @@ func (rr *ResultsReader) openFile(path string) (*os.File, error) {
 		f, err := os.Open(path)
 		if err == nil {
 			return f, nil // OK
-		} else if os.IsNotExist(err) {
+		} else if os.IsNotExist(err) && rr.IntrusiveMode {
 			// rr.log().WithError(err).Warnf("[%s/reader]: failed to open file", TAG) // FIXME: DEBUG
 			// ignore just "not exists" errors
 			// will sleep a while and try again...

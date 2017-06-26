@@ -173,7 +173,7 @@ func (s *Server) getLocalSearchEngine(homeDir string, nodeName, nodeAddr string)
 
 	// some auto-options
 	switch s.Config.SearchBackend {
-	case "ryftprim", "ryftone":
+	case "ryftprim", "ryftone", "fake":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
 			opts["instance-name"] = fmt.Sprintf(".rest-%d", s.listenAddress.Port)

@@ -281,7 +281,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	// start INDEX&DATA processing (if latency is minimized)
 	// otherwise wait until ryftprim tool is finished
 	if minimizeLatency && task.config.ReportIndex {
-		task.startProcessing(engine, res, false)
+		task.startProcessing(engine, res)
 	}
 
 	select {
@@ -290,7 +290,7 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	case err := <-doneCh: // process done
 		// start INDEX&DATA processing (if latency is NOT minimized)
 		if !minimizeLatency && task.config.ReportIndex && err == nil {
-			task.startProcessing(engine, res, false)
+			task.startProcessing(engine, res)
 		}
 		engine.finish(err, task, res)
 
@@ -361,8 +361,17 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	task.lockInProgress = false
 	task.releaseLockedFiles()
 
+	// notify processing subtasks the tool is finished!
+	// (now it can check attempt limits)
+	if task.results != nil {
+		task.results.finish()
+	}
+
 	// tool output
-	out := task.toolOut.Bytes()
+	var out []byte
+	if task.toolOut != nil {
+		out = task.toolOut.Bytes()
+	}
 	if err != ErrCancelled {
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: tool failed", TAG)
@@ -373,14 +382,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 	}
 
-	// notify processing subtasks the tool is finished!
-	// (now it can check attempt limits)
-	if task.results != nil {
-		task.results.finish()
-	}
-
 	// parse statistics from output
-	if err == nil {
+	if err == nil && !task.isShow {
 		res.Stat, err = ParseStat(out, engine.IndexHost)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
@@ -447,7 +450,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 
 		task.log().Debugf("[%s]: done reading", TAG)
-	} else {
+	} else if !task.isShow {
 		// it's /count, check if we have to create VIEW file
 		if len(task.ViewFileName) != 0 {
 			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter); err != nil {
@@ -460,13 +463,13 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing
-	if !engine.KeepResultFiles && !task.KeepIndexFile && len(task.IndexFileName) != 0 {
+	if !task.isShow && !engine.KeepResultFiles && !task.KeepIndexFile && len(task.IndexFileName) != 0 {
 		if err := os.RemoveAll(task.IndexFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove INDEX file", TAG)
 			// WARN: error actually ignored!
 		}
 	}
-	if !engine.KeepResultFiles && !task.KeepDataFile && len(task.DataFileName) != 0 {
+	if !task.isShow && !engine.KeepResultFiles && !task.KeepDataFile && len(task.DataFileName) != 0 {
 		if err := os.RemoveAll(task.DataFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove DATA file", TAG)
 			// WARN: error actually ignored!
