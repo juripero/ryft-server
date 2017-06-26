@@ -57,7 +57,7 @@ type PostFilesDetails struct {
 	File    string `json:"file,omitempty"`
 	Error   error  `json:"error,omitempty"`
 	Offset  int64  `json:"offset"`
-	Length  int64  `json:"length"`
+	Length  uint64 `json:"length"`
 	Path    string `json:"path,omitempty"`
 }
 
@@ -443,7 +443,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
 			res.Error = err
-			res.Length = int64(length)
+			res.Length = length
 		} else {
 			if params.lifetime > 0 {
 				s.addJob("delete-catalog",
@@ -452,7 +452,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 			}
 			res.Catalog = catalog
 			res.File = filePath
-			res.Length = int64(length) // not total, just this part
+			res.Length = length // not total, just this part
 		}
 		return status, res, err
 	} else { // standalone file
@@ -460,7 +460,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
 			res.Error = err
-			res.Length = length
+			res.Length = uint64(length)
 			res.Offset = offset
 		} else {
 			if params.lifetime > 0 {
@@ -469,7 +469,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 					time.Now().Add(params.lifetime))
 			}
 			res.Path = path
-			res.Length = length
+			res.Length = uint64(length)
 			res.Offset = offset
 		}
 		return status, res, err
