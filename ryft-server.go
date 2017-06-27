@@ -293,6 +293,14 @@ func main() {
 	private.PUT("/rename", server.DoRenameFiles)
 	private.PUT("/rename/*path", server.DoRenameFiles)
 
+	// alias used for swagger clients
+	private.GET("/file", server.DoGetFiles)
+	private.GET("/file/*path", server.DoGetFiles)
+	private.POST("/file", server.DoPostFiles)
+	private.POST("/file/*path", server.DoPostFiles)
+	private.POST("/raw", server.DoPostFiles)
+	private.POST("/raw/*path", server.DoPostFiles)
+
 	// debug API endpoints
 	if server.Config.DebugMode {
 		router.GET("/debug/stack", server.DoDebugStack)

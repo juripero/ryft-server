@@ -55,7 +55,7 @@ func TestPostFiles(t *testing.T) {
 		}
 	}
 
-	all := false // false
+	all := true // false
 	TO := 30 * time.Second
 
 	if all {
@@ -65,7 +65,7 @@ func TestPostFiles(t *testing.T) {
 			http.StatusBadRequest, "unexpected content type")
 	}
 
-	if all || true {
+	if all {
 		// upload a file
 		check("/files?file=foo/2.txt", "", "application/octet-stream",
 			`hello`, TO, http.StatusOK, `{"length":5, "offset":0, "path":"foo/2.txt"}`)
