@@ -326,9 +326,11 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// some futher cleanup
 	defer func() {
 		if res.Stat != nil && task.config.Performance {
-			metrics := map[string]interface{}{
-				"prepare":   task.toolStartTime.Sub(task.taskStartTime).String(),
-				"tool-exec": task.toolStopTime.Sub(task.toolStartTime).String(),
+			metrics := make(map[string]interface{})
+
+			if !task.toolStartTime.IsZero() {
+				metrics["prepare"] = task.toolStartTime.Sub(task.taskStartTime).String()
+				metrics["tool-exec"] = task.toolStopTime.Sub(task.toolStartTime).String()
 			}
 
 			if !task.readStartTime.IsZero() {
@@ -360,8 +362,17 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	task.lockInProgress = false
 	task.releaseLockedFiles()
 
+	// notify processing subtasks the tool is finished!
+	// (now it can check attempt limits)
+	if task.results != nil {
+		task.results.finish()
+	}
+
 	// tool output
-	out := task.toolOut.Bytes()
+	var out []byte
+	if task.toolOut != nil {
+		out = task.toolOut.Bytes()
+	}
 	if err != ErrCancelled {
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: tool failed", TAG)
@@ -372,14 +383,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 	}
 
-	// notify processing subtasks the tool is finished!
-	// (now it can check attempt limits)
-	if task.results != nil {
-		task.results.finish()
-	}
-
 	// parse statistics from output
-	if err == nil {
+	if err == nil && !task.isShow {
 		res.Stat, err = ParseStat(out, engine.IndexHost)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
@@ -446,7 +451,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 
 		task.log().Debugf("[%s]: done reading", TAG)
-	} else {
+	} else if !task.isShow {
 		// it's /count, check if we have to create VIEW file
 		if len(task.ViewFileName) != 0 {
 			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter); err != nil {
@@ -459,13 +464,13 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing
-	if !engine.KeepResultFiles && !task.KeepIndexFile && len(task.IndexFileName) != 0 {
+	if !task.isShow && !engine.KeepResultFiles && !task.KeepIndexFile && len(task.IndexFileName) != 0 {
 		if err := os.RemoveAll(task.IndexFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove INDEX file", TAG)
 			// WARN: error actually ignored!
 		}
 	}
-	if !engine.KeepResultFiles && !task.KeepDataFile && len(task.DataFileName) != 0 {
+	if !task.isShow && !engine.KeepResultFiles && !task.KeepDataFile && len(task.DataFileName) != 0 {
 		if err := os.RemoveAll(task.DataFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove DATA file", TAG)
 			// WARN: error actually ignored!

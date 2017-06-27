@@ -55,6 +55,7 @@ type Result struct {
 	// Done channel is used to notify client search is done (Engine -> Client)
 	DoneChan chan struct{}
 	isDone   int32 // atomic access
+	isClosed int32 // atomic access
 
 	// Cancel channel is used to notify search engine
 	// to stop processing immideatelly (Client -> Engine)
@@ -176,8 +177,15 @@ func (res *Result) IsDone() bool {
 // Is called by search Engine.
 // Do not call it twice!
 func (res *Result) Close() {
-	close(res.RecordChan)
-	close(res.ErrorChan)
+	if atomic.CompareAndSwapInt32(&res.isClosed, 0, 1) {
+		close(res.RecordChan)
+		close(res.ErrorChan)
+	}
+}
+
+// IsClosed checks are the result channels closed?
+func (res *Result) IsClosed() bool {
+	return atomic.LoadInt32(&res.isClosed) != 0
 }
 
 // ReportUnhandledPanic tries to recover from panic and report error
@@ -196,8 +204,8 @@ func (res *Result) ReportUnhandledPanic(logger interface{}) {
 			// no logging, ignored
 		}
 
-		// report to user
-		if err, ok := r.(error); ok {
+		// report to user if channel is still not closed
+		if err, ok := r.(error); ok && !res.IsClosed() {
 			res.ReportError(err)
 		}
 	}

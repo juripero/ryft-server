@@ -68,6 +68,7 @@ type Task struct {
 	config     *search.Config
 	results    *ResultsReader
 	resultWait sync.WaitGroup
+	isShow     bool
 
 	// list of locked files
 	lockedFiles    []string
@@ -81,7 +82,7 @@ type Task struct {
 }
 
 // NewTask creates new task.
-func NewTask(config *search.Config) *Task {
+func NewTask(config *search.Config, isShow bool) *Task {
 	id := atomic.AddUint64(&taskId, 1)
 
 	task := new(Task)
@@ -89,6 +90,7 @@ func NewTask(config *search.Config) *Task {
 	task.taskStartTime = time.Now() // performance metric
 
 	task.config = config
+	task.isShow = isShow
 	return task
 }
 
@@ -103,14 +105,17 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 		task.ViewFileName, task.config.Delimiter)
 
 	// result reader options
-	rr.Limit = uint64(task.config.Limit) // limit the total number of records
-	rr.ReadData = task.config.ReportData // if `false` only indexes will be reported
+	rr.Offset = uint64(task.config.Offset) // start from this record
+	rr.Limit = uint64(task.config.Limit)   // limit the total number of records
+	rr.ReadData = task.config.ReportData   // if `false` only indexes will be reported
+	rr.MakeView = !task.isShow             // if /show do not create VIEW file, just use it
 
 	// report filepath relative to home and update index's host
 	rr.RelativeToHome = filepath.Join(engine.MountPoint, engine.HomeDir)
 	rr.UpdateHostTo = engine.IndexHost
 
 	// intrusive mode: poll timeouts & limits
+	rr.IntrusiveMode = !task.isShow
 	rr.OpenFilePollTimeout = engine.OpenFilePollTimeout
 	rr.ReadFilePollTimeout = engine.ReadFilePollTimeout
 	rr.ReadFilePollLimit = engine.ReadFilePollLimit
@@ -118,10 +123,8 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	task.resultWait.Add(1)
 	task.readStartTime = time.Now() // performance metric
 	go func() {
-		defer func() {
-			res.ReportUnhandledPanic(log)
-			task.resultWait.Done()
-		}()
+		defer res.ReportUnhandledPanic(log)
+		defer task.resultWait.Done()
 		rr.process(res)
 	}()
 

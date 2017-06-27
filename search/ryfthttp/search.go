@@ -79,6 +79,34 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return res, nil // OK for now
 }
 
+// Show implements "/search/show" endpoint
+func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(cfg)
+	url := engine.prepareSearchUrl(cfg)
+	url.Path += "/show" // should be /search/show!
+
+	// prepare request
+	task.log().WithField("url", url.String()).Infof("[%s]: sending GET", TAG)
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to create request", TAG)
+		return nil, fmt.Errorf("failed to create request: %s", err)
+	}
+
+	// we expect MSGPACK format for streaming
+	req.Header.Set("Accept", codec.MIME)
+
+	// authorization
+	if len(engine.AuthToken) != 0 {
+		req.Header.Set("Authorization", engine.AuthToken)
+	}
+
+	res := search.NewResult()
+	go engine.doSearch(task, req, res)
+
+	return res, nil // OK for now
+}
+
 // do /search processing
 func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup

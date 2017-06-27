@@ -38,6 +38,12 @@ import (
 
 // Files starts synchronous "/files" operation.
 func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
+	// redirect if we have only one backend
+	if len(engine.Backends) == 1 {
+		backend := engine.Backends[0]
+		return backend.Files(path, hidden)
+	}
+
 	task := NewTask(nil)
 
 	task.log().WithField("path", path).Infof("[%s]: start /files", TAG)

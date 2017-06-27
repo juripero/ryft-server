@@ -38,15 +38,76 @@ import (
 
 // Search starts asynchronous "/search" or "/count" operation.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
+	// redirect if we have only one backend
+	if len(engine.Backends) == 1 {
+		backend := engine.Backends[0]
+		var bcfg *search.Config
+		if ocfg, ok := engine.override[backend]; ok {
+			bcfg = ocfg.Clone()
+		} else {
+			bcfg = cfg.Clone()
+		}
+
+		return backend.Search(bcfg)
+	}
+
 	task := NewTask(cfg)
 	mux := search.NewResult()
 
 	// prepare requests
 	for _, backend := range engine.Backends {
-		res, err := backend.Search(cfg.Clone())
+		var bcfg *search.Config
+		if ocfg, ok := engine.override[backend]; ok {
+			bcfg = ocfg.Clone()
+		} else {
+			bcfg = cfg.Clone()
+		}
+
+		res, err := backend.Search(bcfg)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to start /search backend", TAG)
 			mux.ReportError(fmt.Errorf("failed to start /search backend: %s", err))
+			continue
+		}
+
+		task.add(res)
+	}
+
+	go engine.run(task, mux)
+	return mux, nil // OK for now
+}
+
+// Show starts asynchronous "/search/show" operation.
+func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
+	// redirect if we have only one backend
+	if len(engine.Backends) == 1 {
+		backend := engine.Backends[0]
+		var bcfg *search.Config
+		if ocfg, ok := engine.override[backend]; ok {
+			bcfg = ocfg.Clone()
+		} else {
+			bcfg = cfg.Clone()
+		}
+
+		return backend.Show(bcfg)
+	}
+
+	task := NewTask(cfg)
+	mux := search.NewResult()
+
+	// prepare requests
+	for _, backend := range engine.Backends {
+		var bcfg *search.Config
+		if ocfg, ok := engine.override[backend]; ok {
+			bcfg = ocfg.Clone()
+		} else {
+			bcfg = cfg.Clone()
+		}
+
+		res, err := backend.Show(bcfg)
+		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to start /search/show backend", TAG)
+			mux.ReportError(fmt.Errorf("failed to start /search/show backend: %s", err))
 			continue
 		}
 
