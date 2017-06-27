@@ -47,6 +47,13 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
+// RenameFileResult contains information related to RENAME operation.
+type RenameFileResult struct {
+	Status map[string]interface{} `json:"details,omitempty"` // list of items renamed and associated status
+	Host   string                 `json:"host,omitempty"`
+	Error  error                  `json:"error,omitempty"`
+}
+
 // RenameFileParams request body struct
 type RenameFileParams struct {
 	File    string `form:"file" json:"file"`
@@ -137,7 +144,7 @@ func (r fileRename) Rename() (string, error) {
 	// check file path can be derived
 	newPath := filepath.Join(r.mountPoint, r.newPath)
 	// check destination path doesn't exist or is not directory
-	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) { // FIXME: review this condition!!!
 		return r.path, err
 	}
 	if path == newPath {
@@ -197,7 +204,7 @@ func (r dirRename) Rename() (string, error) {
 
 	newPath := filepath.Join(r.mountPoint, r.newPath)
 	// check destination path doesn't exist
-	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) { // FIXME: review this condition!!!
 		return r.path, err
 	}
 	if path == newPath {
@@ -347,8 +354,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	// for each node (with non empty list) call PUT /files passing
 	// list of files whose tags are matched.
 
-	results := []map[string]interface{}{}
-
+	results := make([]RenameFileResult, 0, 1)
 	if !params.Local && !server.Config.LocalOnly {
 		files := []string{fileRename.GetPath()}
 		services, tags, err := server.getConsulInfoForFiles(userTag, files)
@@ -356,15 +362,19 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
 				WithDetails("failed to map files to tags"))
 		}
+
 		type Node struct {
+			// input
 			IsLocal bool
 			Name    string
 			Address string
 			Params  RenameFileParams
 
-			Result interface{}
-			Error  error
+			// output
+			Results []RenameFileResult
+			Error   error
 		}
+
 		// build list of nodes to call
 		nodes := make([]*Node, len(services))
 		for i, service := range services {
@@ -387,6 +397,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			if node.Params.isEmpty() {
 				continue // nothing to do
 			}
+
 			wg.Add(1)
 			go func(node *Node, path string) {
 				defer wg.Done()
@@ -405,15 +416,19 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 					if err := fileRename.Validate(); err != nil {
 						panic(NewError(http.StatusBadRequest, err.Error()))
 					}
-					// rename local file
-					node.Result, node.Error = server.RenameLocalFile(fileRename), nil
+					status := server.renameLocalFile(fileRename)
+					node.Results = append(node.Results, RenameFileResult{
+						Status: status,
+						Host:   server.Config.HostName,
+					})
+					node.Error = nil // OK
 				} else {
-					log.WithField("what", node.Params).
-						WithField("node", node.Name).
-						WithField("addr", node.Address).
-						Debugf("renaming on remote node")
-					// rename remote file
-					node.Result, node.Error = server.RenameRemoteFile(node.Address, authToken, node.Params, path)
+					log.WithFields(map[string]interface{}{
+						"what": node.Params,
+						"node": node.Name,
+						"addr": node.Address,
+					}).Debugf("renaming on remote node")
+					node.Results, node.Error = server.renameRemoteFile(node.Address, authToken, node.Params, path)
 				}
 			}(node, ctx.Param("path"))
 		}
@@ -424,35 +439,38 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			if node.Params.isEmpty() {
 				continue // nothing to do
 			}
-			result := make(map[string]interface{})
-			result["host"] = node.Name
+
 			if node.Error != nil {
-				result["error"] = node.Error.Error()
+				// failed, no status
+				results = append(results, RenameFileResult{
+					Host:  node.Name,
+					Error: node.Error,
+				})
 			} else {
-				result["details"] = node.Result
+				results = append(results, node.Results...)
 			}
-			results = append(results, result)
 		}
 	} else {
 		// checks all the inputs are relative to home
 		if err := fileRename.Validate(); err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()))
 		}
-		result := make(map[string]interface{})
-		result["host"] = server.Config.HostName
-		if details := server.RenameLocalFile(fileRename); len(details) > 0 {
-			result["details"] = details
-		}
-		results = append(results, result)
+		status := server.renameLocalFile(fileRename)
+		results = append(results, RenameFileResult{
+			Host:   server.Config.HostName,
+			Status: status,
+			Error:  nil, // OK
+		})
 	}
+
 	ctx.JSON(http.StatusOK, results)
 }
 
-// RenameLocalFile rename local file, directory, catalog
-func (server *Server) RenameLocalFile(fileRename filesRenamer) map[string]interface{} {
+// renameLocalFile rename local file, directory, catalog
+func (server *Server) renameLocalFile(renamer filesRenamer) map[string]interface{} {
 	res := make(map[string]interface{})
 	// rename
-	if item, err := fileRename.Rename(); err != nil {
+	if item, err := renamer.Rename(); err != nil {
 		res[item] = err.Error()
 	} else {
 		res[item] = "OK"
@@ -460,8 +478,8 @@ func (server *Server) RenameLocalFile(fileRename filesRenamer) map[string]interf
 	return res
 }
 
-// RenameRemoteFile rename remote file, directory, catalog
-func (server *Server) RenameRemoteFile(address string, authToken string, params RenameFileParams, path string) (map[string]interface{}, error) {
+// renameRemoteFile rename remote file, directory, catalog
+func (server *Server) renameRemoteFile(address string, authToken string, params RenameFileParams, path string) ([]RenameFileResult, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {
@@ -477,6 +495,7 @@ func (server *Server) RenameRemoteFile(address string, authToken string, params 
 	u.RawQuery = q.Encode()
 	u.Path += "/rename"
 	u.Path = filepath.Join(u.Path, path)
+
 	// prepare request
 	req, err := http.NewRequest("PUT", u.String(), nil)
 	if err != nil {
@@ -501,12 +520,11 @@ func (server *Server) RenameRemoteFile(address string, authToken string, params 
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	results := []map[string]interface{}{}
-	result := make(map[string]interface{})
+	var results []RenameFileResult
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
-	result = results[0]
-	return result, nil // OK
+
+	return results, nil // OK
 }

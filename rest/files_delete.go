@@ -154,7 +154,6 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 
 		// build list of nodes to call
 		nodes := make([]*Node, len(services))
-
 		for i, service := range services {
 			node := new(Node)
 			node.Address = getServiceUrl(service)
