@@ -260,8 +260,8 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 	if res.Options.Dist != 0 {
 		plainMode = "fhs" // by default (dist!=0)
 	}
-	switch mode := res.Options.Mode; mode {
-	case "es", "fhs", "feds":
+	switch mode := strings.ToLower(res.Options.Mode); mode {
+	case "es", "fhs", "feds", "pcre2":
 		plainMode = mode
 	}
 
