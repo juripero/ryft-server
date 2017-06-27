@@ -17,6 +17,8 @@ func TestRenameFiles(t *testing.T) {
 	fs := newFake()
 	defer fs.cleanup()
 
+	hostname := fs.server.Config.HostName
+
 	go func() {
 		err := fs.worker.ListenAndServe()
 		assert.NoError(t, err, "failed to serve fake server")
@@ -51,22 +53,22 @@ func TestRenameFiles(t *testing.T) {
 	// file
 	check("/rename?new=1.txt", "", "", "", TO, http.StatusBadRequest, "missing source filename")
 	check("/rename?file=1.txt&new=2.pdf", "", "", "", TO, http.StatusBadRequest, "changing the file extention is not allowed")
-	check("/rename?file=1.txt&new=2.txt", "", "", "", TO, http.StatusOK, `{"1.txt":"OK"}`)
-	check("/rename/foo?file=a.txt&new=b.txt", "", "", "", TO, http.StatusOK, `{"/foo/a.txt":"OK"}`)
-	check("/rename/foo?file=b.txt&new=../b.txt", "", "", "", TO, http.StatusOK, `{"/foo/b.txt":"OK"}`)
+	check("/rename?file=1.txt&new=2.txt", "", "", "", TO, http.StatusOK, `[{"details":{"1.txt":"OK"},"host":"`+hostname+`"}]`)
+	check("/rename/foo?file=a.txt&new=b.txt", "", "", "", TO, http.StatusOK, `[{"details":{"/foo/a.txt":"OK"},"host":"`+hostname+`"}]`)
+	check("/rename/foo?file=b.txt&new=../b.txt", "", "", "", TO, http.StatusOK, `[{"details":{"/foo/b.txt":"OK"},"host":"`+hostname+`"}]`)
 	check("/rename?file=3.txt&new=/../../var/data/3.txt", "", "", "", TO, http.StatusBadRequest, `path \"/var/data/3.txt\" is not relative to home`)
 	// directory
-	check("/rename?dir=/foo&new=/bar", "", "", "", TO, http.StatusOK, `{"/foo":"OK"}`)
+	check("/rename?dir=/foo&new=/bar", "", "", "", TO, http.StatusOK, `[{"details":{"/foo":"OK"},"host":"`+hostname+`"}]`)
 	check("/rename?dir=/foo&new=/../../var/data/bar", "", "", "", TO, http.StatusBadRequest, `path \"/../../var/data/bar\" is not relative to home`)
-	check("/rename/bar?dir=/&new=../bar2", "", "", "", TO, http.StatusOK, `{"/bar":"OK"}`)
+	check("/rename/bar?dir=/&new=../bar2", "", "", "", TO, http.StatusOK, `[{"details":{"/bar":"OK"},"host":"`+hostname+`"}]`)
 	// catalog and file
 	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", TO, http.StatusOK, `failed to move catalog data`, `no such file or directory`)
-	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", TO, http.StatusOK, `{"notexistfile.txt":"file '2.txt' already exists"}`)
-	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=100.txt", "", "", "", TO, http.StatusOK, `{"notexistfile.txt":"OK"}`)
+	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", TO, http.StatusOK, `[{"details":{"notexistfile.txt":"file '2.txt' already exists"},"host":"`+hostname+`"}]`)
+	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=100.txt", "", "", "", TO, http.StatusOK, `[{"details":{"notexistfile.txt":"OK"},"host":"`+hostname+`"}]`)
 	check("/rename?catalog=/catalog.test&new=/catalog.test2", "", "", "", TO, http.StatusBadRequest, `changing catalog extention is not allowed`)
-	check("/rename?catalog=/catalog.test&new=/bar2/catalog.test", "", "", "", TO, http.StatusOK, `{"/catalog.test":"OK"}`)
+	check("/rename?catalog=/catalog.test&new=/bar2/catalog.test", "", "", "", TO, http.StatusOK, `[{"details":{"/catalog.test":"OK"},"host":"`+hostname+`"}]`)
 	check("/rename?catalog=/catalog.test&new=/../../var/data/catalog.test", "", "", "", TO, http.StatusBadRequest, `catalog path \"/../../var/data/catalog.test\" is not relative to home`)
-	check("/rename/bar2?catalog=catalog.test&new=catalog2.test", "", "", "", TO, http.StatusOK, `{"/bar2/catalog.test":"OK"}`)
-	check("/rename?catalog=/bar2/catalog2.test2&file=1.txt&new=4.txt", "", "", "", TO, http.StatusOK, `{"1.txt":"OK"}`)
-	check("/rename/bar2?catalog=catalog2.test2&file=4.txt&new=1.txt", "", "", "", TO, http.StatusOK, `{"4.txt":"OK"}`)
+	check("/rename/bar2?catalog=catalog.test&new=catalog2.test", "", "", "", TO, http.StatusOK, `[{"details":{"/bar2/catalog.test":"OK"},"host":"`+hostname+`"}]`)
+	check("/rename?catalog=/bar2/catalog2.test2&file=1.txt&new=4.txt", "", "", "", TO, http.StatusOK, `[{"details":{"1.txt":"OK"},"host":"`+hostname+`"}]`)
+	check("/rename/bar2?catalog=catalog2.test2&file=4.txt&new=1.txt", "", "", "", TO, http.StatusOK, `[{"details":{"4.txt":"OK"},"host":"`+hostname+`"}]`)
 }

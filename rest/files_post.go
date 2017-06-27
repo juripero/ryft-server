@@ -52,6 +52,21 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
+type PostFilesDetails struct {
+	Catalog string `json:"catalog,omitempty"`
+	File    string `json:"file,omitempty"`
+	Error   error  `json:"error,omitempty"`
+	Offset  int64  `json:"offset"`
+	Length  uint64 `json:"length"`
+	Path    string `json:"path,omitempty"`
+}
+
+type PostFilesNodeResult struct {
+	Details  PostFilesDetails `json:"details,omitempty"`
+	Error    error            `json:"error,omitempty"`
+	Hostname string           `json:"host"`
+}
+
 // PostFilesParams query parameters for POST /files
 type PostFilesParams struct {
 	Catalog   string `form:"catalog" json:"catalog"`     // catalog to save to
@@ -234,7 +249,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		}
 	}
 
-	result := map[string]interface{}{}
+	results := []*PostFilesNodeResult{}
 	log.WithField("params", params).
 		WithField("user", userName).
 		WithField("home", homeDir).
@@ -262,7 +277,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 			Params PostFilesParams
 			data   io.Reader
 
-			Result map[string]interface{}
+			Result PostFilesNodeResult
 			Error  error
 		}
 
@@ -285,10 +300,6 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 			nodes[i] = node
 		}
-
-		minLen := []int64{}
-		allPath := []string{}
-		allCat := []string{}
 
 		if Ncopies > 1 {
 			// save to temp file to get multiple copies
@@ -351,13 +362,17 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 
 					if node.IsLocal {
 						log.WithField("what", node.Params).Debugf("copying on local node")
-						_, node.Result, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, node.data)
+						details := &PostFilesDetails{}
+						_, details, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, node.data)
+						node.Result = PostFilesNodeResult{Details: *details}
 					} else {
 						log.WithField("what", node.Params).
 							WithField("node", node.Name).
 							WithField("addr", node.Address).
 							Debugf("copying on remote node")
-						node.Result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, node.data)
+						result, err := s.postRemoteFiles(node.Address, authToken, node.Params, delim, node.data)
+						node.Error = err
+						node.Result = *result
 					}
 				}(node)
 			}
@@ -370,22 +385,12 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				}
 
 				if node.Error != nil {
-					result[node.Name] = map[string]interface{}{
-						"error": node.Error.Error(),
-					}
+					results = append(results, &PostFilesNodeResult{
+						Hostname: node.Name,
+						Error:    node.Error,
+					})
 				} else {
-					result[node.Name] = node.Result
-				}
-
-				// combine results
-				if x, err := utils.AsUint64(node.Result["length"]); err == nil {
-					minLen = append(minLen, int64(x))
-				}
-				if x, err := utils.AsString(node.Result["path"]); err == nil {
-					allPath = append(allPath, x)
-				}
-				if x, err := utils.AsString(node.Result["catalog"]); err == nil {
-					allCat = append(allCat, x)
+					results = append(results, &node.Result)
 				}
 			}
 		} else {
@@ -393,60 +398,44 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				if node.Params.isEmpty() {
 					continue // nothing to do
 				}
-
+				result := &PostFilesNodeResult{}
 				if node.IsLocal {
 					log.WithField("what", node.Params).Debugf("*copying on local node")
-					_, node.Result, node.Error = s.postLocalFiles(mountPoint, node.Params, delim, file)
+					// hide error response because result already contains that
+					details := &PostFilesDetails{}
+					_, details, _ = s.postLocalFiles(mountPoint, node.Params, delim, file)
+					result.Details = *details
+					result.Hostname = node.Name
 				} else {
 					log.WithField("what", node.Params).
 						WithField("node", node.Name).
 						WithField("addr", node.Address).
 						Debugf("*copying on remote node")
-					node.Result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, file)
-				}
+					result, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, file)
 
-				if node.Error != nil {
-					result[node.Name] = map[string]interface{}{
-						"error": err.Error(),
+					if node.Error != nil {
+						result.Error = node.Error
 					}
-				} else {
-					result[node.Name] = node.Result
 				}
-
-				// combine results
-				if x, err := utils.AsUint64(node.Result["length"]); err == nil {
-					minLen = append(minLen, int64(x))
-				}
-				if x, err := utils.AsString(node.Result["path"]); err == nil {
-					allPath = append(allPath, x)
-				}
-				if x, err := utils.AsString(node.Result["catalog"]); err == nil {
-					allCat = append(allCat, x)
-				}
+				results = append(results, result)
 				break // one node enough
 			}
 		}
-
-		result = map[string]interface{}{
-			"details": result,
-			"length":  findMinLength(minLen),
-		}
-		if x := getUniqueOrEmpty(allPath); len(x) > 0 {
-			result["path"] = x
-		}
-		if x := getUniqueOrEmpty(allCat); len(x) > 0 {
-			result["catalog"] = x
-		}
 	} else {
-		status, result, _ = s.postLocalFiles(mountPoint, params, delim, file)
+		details := &PostFilesDetails{}
+		status, details, _ = s.postLocalFiles(mountPoint, params, delim, file)
+		results = append(results, &PostFilesNodeResult{
+			Hostname: s.Config.HostName,
+			Details:  *details,
+		})
 	}
 
-	ctx.JSON(status, result)
+	ctx.JSON(status, results)
 }
 
 // post local nodes: files, dirs, catalogs
-func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, map[string]interface{}, error) {
-	res := make(map[string]interface{})
+func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim *string, file io.Reader) (int, *PostFilesDetails, error) {
+	res := &PostFilesDetails{}
 	status := http.StatusOK
 
 	if len(params.Catalog) != 0 { // append to catalog
@@ -454,17 +443,17 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
-			res["error"] = err.Error()
-			res["length"] = length
+			res.Error = err
+			res.Length = length
 		} else {
 			if params.lifetime > 0 {
 				s.addJob("delete-catalog",
 					filepath.Join(mountPoint, catalog),
 					time.Now().Add(params.lifetime))
 			}
-			res["catalog"] = catalog
-			res["file"] = filePath
-			res["length"] = length // not total, just this part
+			res.Catalog = catalog
+			res.File = filePath
+			res.Length = length // not total, just this part
 		}
 
 		return status, res, err
@@ -473,18 +462,18 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 
 		if err != nil {
 			status = http.StatusBadRequest // TODO: appropriate status code?
-			res["error"] = err.Error()
-			res["length"] = length
-			res["offset"] = offset
+			res.Error = err
+			res.Length = uint64(length)
+			res.Offset = offset
 		} else {
 			if params.lifetime > 0 {
 				s.addJob("delete-file",
 					filepath.Join(mountPoint, path),
 					time.Now().Add(params.lifetime))
 			}
-			res["path"] = path
-			res["length"] = length
-			res["offset"] = offset
+			res.Path = path
+			res.Length = uint64(length)
+			res.Offset = offset
 		}
 
 		return status, res, err
@@ -492,7 +481,7 @@ func (s *Server) postLocalFiles(mountPoint string, params PostFilesParams, delim
 }
 
 // post remote nodes: files
-func (s *Server) postRemoteFiles(address string, authToken string, params PostFilesParams, delim *string, file io.Reader) (map[string]interface{}, error) {
+func (s *Server) postRemoteFiles(address string, authToken string, params PostFilesParams, delim *string, file io.Reader) (*PostFilesNodeResult, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {
@@ -550,13 +539,13 @@ func (s *Server) postRemoteFiles(address string, authToken string, params PostFi
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	res := make(map[string]interface{})
+	results := []*PostFilesNodeResult{}
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&res); err != nil {
+	if err := dec.Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
-
-	return res, nil // OK
+	result := results[0]
+	return result, nil // OK
 }
 
 // file lock system

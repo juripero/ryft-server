@@ -347,7 +347,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	// for each node (with non empty list) call PUT /files passing
 	// list of files whose tags are matched.
 
-	result := make(map[string]interface{})
+	results := []map[string]interface{}{}
 
 	if !params.Local && !server.Config.LocalOnly {
 		files := []string{fileRename.GetPath()}
@@ -424,22 +424,28 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			if node.Params.isEmpty() {
 				continue // nothing to do
 			}
+			result := make(map[string]interface{})
+			result["host"] = node.Name
 			if node.Error != nil {
-				result[node.Name] = map[string]interface{}{
-					"error": node.Error.Error(),
-				}
+				result["error"] = node.Error.Error()
 			} else {
-				result[node.Name] = node.Result
+				result["details"] = node.Result
 			}
+			results = append(results, result)
 		}
 	} else {
 		// checks all the inputs are relative to home
 		if err := fileRename.Validate(); err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()))
 		}
-		result = server.RenameLocalFile(fileRename)
+		result := make(map[string]interface{})
+		result["host"] = server.Config.HostName
+		if details := server.RenameLocalFile(fileRename); len(details) > 0 {
+			result["details"] = details
+		}
+		results = append(results, result)
 	}
-	ctx.JSON(http.StatusOK, result)
+	ctx.JSON(http.StatusOK, results)
 }
 
 // RenameLocalFile rename local file, directory, catalog
@@ -495,11 +501,12 @@ func (server *Server) RenameRemoteFile(address string, authToken string, params 
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	res := make(map[string]interface{})
+	results := []map[string]interface{}{}
+	result := make(map[string]interface{})
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&res); err != nil {
+	if err := dec.Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
-
-	return res, nil // OK
+	result = results[0]
+	return result, nil // OK
 }

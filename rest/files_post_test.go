@@ -14,6 +14,7 @@ import (
 func TestPostFiles(t *testing.T) {
 	fs := newFake()
 	defer fs.cleanup()
+	hostname := fs.server.Config.HostName
 
 	go func() {
 		err := fs.worker.ListenAndServe()
@@ -68,17 +69,17 @@ func TestPostFiles(t *testing.T) {
 	if all {
 		// upload a file
 		check("/files?file=foo/2.txt", "", "application/octet-stream",
-			`hello`, TO, http.StatusOK, `{"length":5, "offset":0, "path":"foo/2.txt"}`)
+			`hello`, TO, http.StatusOK, `[{"details":{"length":5, "offset":0, "path":"foo/2.txt"}, "host":"`+hostname+`"}]`)
 		checkFile("foo/2.txt", `hello`)
 
 		// append a file
 		check("/files?file=foo/2.txt", "", "application/octet-stream",
-			` world`, TO, http.StatusOK, `{"length":6, "offset":5, "path":"foo/2.txt"}`)
+			` world`, TO, http.StatusOK, `[{"details":{"length":6, "offset":5, "path":"foo/2.txt"}, "host":"`+hostname+`"}]`)
 		checkFile("foo/2.txt", `hello world`)
 
 		// replace a part of file
 		check("/files?file=foo/2.txt&offset=2", "", "application/octet-stream",
-			`y!!`, TO, http.StatusOK, `{"length":3, "offset":2, "path":"foo/2.txt"}`)
+			`y!!`, TO, http.StatusOK, `[{"details":{"length":3, "offset":2, "path":"foo/2.txt"}, "host":"`+hostname+`"}]`)
 		checkFile("foo/2.txt", `hey!! world`)
 	}
 }
