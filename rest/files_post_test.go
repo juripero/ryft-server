@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -68,18 +69,18 @@ func TestPostFiles(t *testing.T) {
 
 	if all {
 		// upload a file
-		check("/files?file=foo/2.txt", "", "application/octet-stream",
-			`hello`, TO, http.StatusOK, `[{"details":{"length":5, "offset":0, "path":"foo/2.txt"}, "host":"`+hostname+`"}]`)
+		check("/files?file=foo/2.txt", "", "application/octet-stream", `hello`, TO, http.StatusOK,
+			fmt.Sprintf(`[{"details":{"length":5, "offset":0, "path":"foo/2.txt"}, "host":"%[1]s"}]`, hostname))
 		checkFile("foo/2.txt", `hello`)
 
 		// append a file
-		check("/files?file=foo/2.txt", "", "application/octet-stream",
-			` world`, TO, http.StatusOK, `[{"details":{"length":6, "offset":5, "path":"foo/2.txt"}, "host":"`+hostname+`"}]`)
+		check("/files?file=foo/2.txt", "", "application/octet-stream", ` world`, TO, http.StatusOK,
+			fmt.Sprintf(`[{"details":{"length":6, "offset":5, "path":"foo/2.txt"}, "host":"%[1]s"}]`, hostname))
 		checkFile("foo/2.txt", `hello world`)
 
 		// replace a part of file
-		check("/files?file=foo/2.txt&offset=2", "", "application/octet-stream",
-			`y!!`, TO, http.StatusOK, `[{"details":{"length":3, "offset":2, "path":"foo/2.txt"}, "host":"`+hostname+`"}]`)
+		check("/files?file=foo/2.txt&offset=2", "", "application/octet-stream", `y!!`, TO, http.StatusOK,
+			fmt.Sprintf(`[{"details":{"length":3, "offset":2, "path":"foo/2.txt"}, "host":"%[1]s"}]`, hostname))
 		checkFile("foo/2.txt", `hey!! world`)
 	}
 }
