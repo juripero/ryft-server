@@ -8,7 +8,7 @@ all: build
 # build Debian package in Docker container
 # the output will be placed in ../debian/
 build: build-image
-	docker run -v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
+	docker run --rm -v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
 		ryft/build:${VERSION}
 
 # create image to build sources
