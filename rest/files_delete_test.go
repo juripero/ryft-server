@@ -29,11 +29,11 @@ func TestDeleteDirs(t *testing.T) {
 	time.Sleep(testServerStartTO) // wait a bit until server is started
 
 	defer func() {
-		t.Log("stopping the server...")
+		//t.Log("stopping the server...")
 		fs.worker.Stop(testServerStopTO)
-		t.Log("waiting the server...")
+		//t.Log("waiting the server...")
 		<-fs.worker.StopChan()
-		t.Log("server stopped")
+		//t.Log("server stopped")
 	}()
 
 	hostname := fs.server.Config.HostName
@@ -82,11 +82,11 @@ func TestDeleteFiles(t *testing.T) {
 	}()
 	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		t.Log("stopping the server...")
+		//t.Log("stopping the server...")
 		fs.worker.Stop(testServerStopTO)
-		t.Log("waiting the server...")
+		//t.Log("waiting the server...")
 		<-fs.worker.StopChan()
-		t.Log("server stopped")
+		//t.Log("server stopped")
 	}()
 
 	os.MkdirAll(filepath.Join(fs.homeDir(), "foo/empty-dir"), 0755)
