@@ -56,7 +56,7 @@ import (
 type PostFileResult struct {
 	Status map[string]interface{} `json:"details,omitempty"`
 	Host   string                 `json:"host,omitempty"`
-	Error  error                  `json:"error,omitempty"`
+	Error  string                 `json:"error,omitempty"`
 }
 
 // PostFilesParams query parameters for POST /files
@@ -354,7 +354,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 					}()
 
 					if node.IsLocal {
-						log.WithField("what", node.Params).Debugf("copying on local node")
+						log.WithField("what", node.Params).Debugf("[%s]: copying on local node", CORE)
 						status, err := s.postLocalFiles(mountPoint, node.Params, delim, node.data)
 						node.Results = append(node.Results, PostFileResult{
 							Status: status,
@@ -366,7 +366,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 							"what": node.Params,
 							"node": node.Name,
 							"addr": node.Address,
-						}).Debugf("copying on remote node")
+						}).Debugf("[%s]: copying on remote node", CORE)
 						node.Results, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, node.data)
 					}
 				}(node)
@@ -379,11 +379,11 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 					continue // nothing to do
 				}
 
-				if node.Error != nil {
+				if err := node.Error; err != nil {
 					// failed, no status
 					results = append(results, PostFileResult{
 						Host:  node.Name,
-						Error: node.Error,
+						Error: err.Error(),
 					})
 				} else {
 					results = append(results, node.Results...)
@@ -396,7 +396,7 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 				}
 
 				if node.IsLocal {
-					log.WithField("what", node.Params).Debugf("*copying on local node")
+					log.WithField("what", node.Params).Debugf("[%s]: *copying on local node", CORE)
 					status, err := s.postLocalFiles(mountPoint, node.Params, delim, file)
 					node.Results = append(node.Results, PostFileResult{
 						Status: status,
@@ -408,15 +408,15 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 						"what": node.Params,
 						"node": node.Name,
 						"addr": node.Address,
-					}).Debugf("*copying on remote node")
+					}).Debugf("[%s]: *copying on remote node", CORE)
 					node.Results, node.Error = s.postRemoteFiles(node.Address, authToken, node.Params, delim, file)
 				}
 
-				if node.Error != nil {
+				if err := node.Error; err != nil {
 					// failed, no status
 					results = append(results, PostFileResult{
 						Host:  node.Name,
-						Error: node.Error,
+						Error: err.Error(),
 					})
 				} else {
 					results = append(results, node.Results...)
@@ -427,11 +427,20 @@ func (s *Server) DoPostFiles(ctx *gin.Context) {
 		}
 	} else {
 		status, err := s.postLocalFiles(mountPoint, params, delim, file)
-		results = append(results, PostFileResult{
+		result := PostFileResult{
 			Host:   s.Config.HostName,
 			Status: status,
-			Error:  err,
-		})
+		}
+		if err != nil {
+			result.Error = err.Error()
+		}
+		results = append(results, result)
+	}
+
+	// detect errors (skip in cluster mode)
+	if len(results) == 1 && results[0].Error != "" {
+		panic(NewError(http.StatusInternalServerError, results[0].Error).
+			WithDetails("failed to POST files"))
 	}
 
 	ctx.JSON(http.StatusOK, results)
@@ -532,6 +541,15 @@ func (s *Server) postRemoteFiles(address string, authToken string, params PostFi
 
 	// check status code
 	if resp.StatusCode != http.StatusOK {
+		// try to decode error response
+		var errorBody map[string]interface{}
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&errorBody); err == nil {
+			if msg, err := utils.AsString(errorBody["message"]); err == nil {
+				return nil, fmt.Errorf("%d: %s", resp.StatusCode, msg)
+			}
+		}
+
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
