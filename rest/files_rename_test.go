@@ -3,6 +3,8 @@ package rest
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -48,33 +50,80 @@ func TestRenameFiles(t *testing.T) {
 		}
 	}
 
+	// ensure file exists
+	exists := func(path string) {
+		_, err := os.Stat(path)
+		assert.False(t, os.IsNotExist(err))
+	}
+
+	// ensure file does not exist
+	notExists := func(path string) {
+		_, err := os.Stat(path)
+		assert.True(t, os.IsNotExist(err))
+	}
+
 	TO := 30 * time.Second
 
 	check("/rename2", "", "", "", TO, http.StatusNotFound, "page not found")
 
-	// file
+	// files
 	check("/rename?new=1.txt", "", "", "", TO, http.StatusBadRequest, "missing source filename")
 	check("/rename?file=1.txt&new=2.pdf", "", "", "", TO, http.StatusBadRequest, "changing the file extention is not allowed")
+	check("/rename?file=3.txt&new=/../../var/data/3.txt", "", "", "", TO, http.StatusBadRequest, `is not relative to home`)
+
+	exists(filepath.Join(fs.homeDir(), "1.txt"))
+	notExists(filepath.Join(fs.homeDir(), "2.txt"))
 	check("/rename?file=1.txt&new=2.txt", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"1.txt":"OK"},"host":"%[1]s"}]`, hostname))
+	notExists(filepath.Join(fs.homeDir(), "1.txt"))
+	exists(filepath.Join(fs.homeDir(), "2.txt"))
+
+	exists(filepath.Join(fs.homeDir(), "foo/a.txt"))
+	notExists(filepath.Join(fs.homeDir(), "foo/b.txt"))
 	check("/rename/foo?file=a.txt&new=b.txt", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"/foo/a.txt":"OK"},"host":"%[1]s"}]`, hostname))
+	notExists(filepath.Join(fs.homeDir(), "foo/a.txt"))
+	exists(filepath.Join(fs.homeDir(), "foo/b.txt"))
+
+	exists(filepath.Join(fs.homeDir(), "foo/b.txt"))
+	notExists(filepath.Join(fs.homeDir(), "b.txt"))
 	check("/rename/foo?file=b.txt&new=../b.txt", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"/foo/b.txt":"OK"},"host":"%[1]s"}]`, hostname))
-	check("/rename?file=3.txt&new=/../../var/data/3.txt", "", "", "", TO, http.StatusBadRequest, `path \"/var/data/3.txt\" is not relative to home`)
+	notExists(filepath.Join(fs.homeDir(), "foo/b.txt"))
+	exists(filepath.Join(fs.homeDir(), "b.txt"))
 
-	// directory
+	exists(filepath.Join(fs.homeDir(), "b.txt"))
+	exists(filepath.Join(fs.homeDir(), "2.txt"))
+	check("/rename?file=b.txt&new=2.txt", "", "", "", TO, http.StatusInternalServerError, "failed to RENAME files", "already exists")
+	exists(filepath.Join(fs.homeDir(), "b.txt"))
+	exists(filepath.Join(fs.homeDir(), "2.txt"))
+
+	// directories
+	check("/rename?dir=/foo&new=/../../var/data/bar", "", "", "", TO, http.StatusBadRequest, `is not relative to home`)
+
+	exists(filepath.Join(fs.homeDir(), "foo"))
+	notExists(filepath.Join(fs.homeDir(), "bar"))
 	check("/rename?dir=/foo&new=/bar", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"/foo":"OK"},"host":"%[1]s"}]`, hostname))
-	check("/rename?dir=/foo&new=/../../var/data/bar", "", "", "", TO, http.StatusBadRequest, `path \"/../../var/data/bar\" is not relative to home`)
-	check("/rename/bar?dir=/&new=../bar2", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"/bar":"OK"},"host":"%[1]s"}]`, hostname))
+	notExists(filepath.Join(fs.homeDir(), "foo"))
+	exists(filepath.Join(fs.homeDir(), "bar"))
 
-	// catalog and file
-	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", TO, http.StatusOK, `failed to move catalog data`, `no such file or directory`)
-	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"notexistfile.txt":"file '2.txt' already exists"},"host":"%[1]s"}]`, hostname))
+	exists(filepath.Join(fs.homeDir(), "bar"))
+	notExists(filepath.Join(fs.homeDir(), "bar2"))
+	check("/rename/bar?dir=/&new=../bar2", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"/bar":"OK"},"host":"%[1]s"}]`, hostname))
+	notExists(filepath.Join(fs.homeDir(), "bar"))
+	exists(filepath.Join(fs.homeDir(), "bar2"))
+
+	exists(filepath.Join(fs.homeDir(), "bar2"))
+	exists(filepath.Join(fs.homeDir(), "bad.dat"))
+	check("/rename/bar2?dir=/&new=../bad.dat", "", "", "", TO, http.StatusInternalServerError, "failed to RENAME files", "already exists")
+	exists(filepath.Join(fs.homeDir(), "bar2"))
+	exists(filepath.Join(fs.homeDir(), "bad.dat"))
+
+	// catalogs
+	check("/rename?catalog=/foo.txt&new=/bar.txt", "", "", "", TO, http.StatusInternalServerError, `failed to move catalog data`, `no such file or directory`)
+	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=2.txt", "", "", "", TO, http.StatusInternalServerError, "failed to RENAME files", "already exists")
 	check("/rename?catalog=/catalog.test&file=notexistfile.txt&new=100.txt", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"notexistfile.txt":"OK"},"host":"%[1]s"}]`, hostname))
 	check("/rename?catalog=/catalog.test&new=/catalog.test2", "", "", "", TO, http.StatusBadRequest, `changing catalog extention is not allowed`)
 	check("/rename?catalog=/catalog.test&new=/bar2/catalog.test", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"/catalog.test":"OK"},"host":"%[1]s"}]`, hostname))
-	check("/rename?catalog=/catalog.test&new=/../../var/data/catalog.test", "", "", "", TO, http.StatusBadRequest, `catalog path \"/../../var/data/catalog.test\" is not relative to home`)
+	check("/rename?catalog=/catalog.test&new=/../../var/data/catalog.test", "", "", "", TO, http.StatusBadRequest, `is not relative to home`)
 	check("/rename/bar2?catalog=catalog.test&new=catalog2.test", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"/bar2/catalog.test":"OK"},"host":"%[1]s"}]`, hostname))
 	check("/rename?catalog=/bar2/catalog2.test2&file=1.txt&new=4.txt", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"1.txt":"OK"},"host":"%[1]s"}]`, hostname))
 	check("/rename/bar2?catalog=catalog2.test2&file=4.txt&new=1.txt", "", "", "", TO, http.StatusOK, fmt.Sprintf(`[{"details":{"4.txt":"OK"},"host":"%[1]s"}]`, hostname))
-
-	// TODO: check physical files and case when destination exist!
 }

@@ -145,8 +145,8 @@ func (r fileRename) Rename() (string, error) {
 	// check file path can be derived
 	newPath := filepath.Join(r.mountPoint, r.newPath)
 	// check destination path doesn't exist or is not directory
-	if _, err := os.Stat(newPath); !os.IsNotExist(err) { // FIXME: review this condition!!!
-		return r.path, err
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+		return r.path, fmt.Errorf("%q already exists", newPath)
 	}
 	if path == newPath {
 		return r.path, nil
@@ -205,8 +205,8 @@ func (r dirRename) Rename() (string, error) {
 
 	newPath := filepath.Join(r.mountPoint, r.newPath)
 	// check destination path doesn't exist
-	if _, err := os.Stat(newPath); !os.IsNotExist(err) { // FIXME: review this condition!!!
-		return r.path, err
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+		return r.path, fmt.Errorf("%q already exists", newPath)
 	}
 	if path == newPath {
 		return r.path, nil
@@ -417,12 +417,12 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 					if err := fileRename.Validate(); err != nil {
 						panic(NewError(http.StatusBadRequest, err.Error()))
 					}
-					status := server.renameLocalFile(fileRename)
+					status, err := server.renameLocalFile(fileRename)
 					node.Results = append(node.Results, RenameFileResult{
 						Status: status,
 						Host:   server.Config.HostName,
 					})
-					node.Error = nil // OK
+					node.Error = err
 				} else {
 					log.WithFields(map[string]interface{}{
 						"what": node.Params,
@@ -456,11 +456,15 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 		if err := fileRename.Validate(); err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()))
 		}
-		status := server.renameLocalFile(fileRename)
-		results = append(results, RenameFileResult{
+		status, err := server.renameLocalFile(fileRename)
+		res := RenameFileResult{
 			Host:   server.Config.HostName,
 			Status: status,
-		})
+		}
+		if err != nil {
+			res.Error = err.Error()
+		}
+		results = append(results, res)
 	}
 
 	// detect errors (skip in cluster mode)
@@ -473,15 +477,16 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 }
 
 // renameLocalFile rename local file, directory, catalog
-func (server *Server) renameLocalFile(renamer filesRenamer) map[string]interface{} {
+func (server *Server) renameLocalFile(renamer filesRenamer) (map[string]interface{}, error) {
 	res := make(map[string]interface{})
 	// rename
 	if item, err := renamer.Rename(); err != nil {
 		res[item] = err.Error()
+		return res, err
 	} else {
 		res[item] = "OK"
 	}
-	return res
+	return res, nil // OK
 }
 
 // renameRemoteFile rename remote file, directory, catalog
