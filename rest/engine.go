@@ -131,7 +131,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 
 		engine, err := search.NewEngine("ryfthttp", opts)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create HTTP engine: %s", err)
 		}
 		backends = append(backends, engine)
 		nodes = append(nodes, service.Node)
@@ -173,7 +173,7 @@ func (s *Server) getLocalSearchEngine(homeDir string, nodeName, nodeAddr string)
 
 	// some auto-options
 	switch s.Config.SearchBackend {
-	case "ryftprim", "ryftone":
+	case "ryftprim", "ryftone", "fake":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
 			opts["instance-name"] = fmt.Sprintf(".rest-%d", s.listenAddress.Port)

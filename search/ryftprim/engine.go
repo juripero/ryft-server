@@ -99,7 +99,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// or just be silent: cfg.ReportIndex = true
 	}
 
-	task := NewTask(cfg)
+	task := NewTask(cfg, false)
 	if cfg.ReportIndex {
 		task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
 	} else {
@@ -134,6 +134,45 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to run", TAG)
 		return nil, fmt.Errorf("failed to run %s: %s", TAG, err)
 	}
+	return res, nil // OK
+}
+
+// Show implements "/search/show" endpoint
+func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
+	if cfg.ReportData && !cfg.ReportIndex {
+		return nil, fmt.Errorf("failed to report DATA without INDEX")
+		// or just be silent: cfg.ReportIndex = true
+	}
+
+	task := NewTask(cfg, true)
+	task.log().WithField("cfg", cfg).Infof("[%s]: start /search/show", TAG)
+
+	// check file names are relative to home (without ..)
+	home := filepath.Join(engine.MountPoint, engine.HomeDir)
+	if err := cfg.CheckRelativeToHome(home); err != nil {
+		task.log().WithError(err).Warnf("[%s]: bad file names detected", TAG)
+		return nil, err
+	}
+
+	// prepare command line arguments
+	err := engine.prepare(task)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
+		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
+	}
+
+	res := search.NewResult()
+	go func() {
+		defer res.ReportUnhandledPanic(log)
+
+		defer task.log().WithField("result", res).Debugf("[%s]: end /show TASK", TAG)
+		task.log().Debugf("[%s]: start /show TASK...", TAG)
+
+		// start INDEX&DATA processing
+		task.startProcessing(engine, res)
+		engine.finish(nil, task, res)
+	}()
+
 	return res, nil // OK
 }
 

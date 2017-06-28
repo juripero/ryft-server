@@ -89,6 +89,14 @@ func newFake() *fakeServer {
 	mux.PUT("/rename", fs.server.DoRenameFiles)
 	mux.PUT("/rename/*path", fs.server.DoRenameFiles)
 
+	// aliases used for swagger clients
+	mux.GET("/file", fs.server.DoGetFiles)
+	mux.GET("/file/*path", fs.server.DoGetFiles)
+	mux.POST("/file", fs.server.DoPostFiles)
+	mux.POST("/file/*path", fs.server.DoPostFiles)
+	mux.POST("/raw", fs.server.DoPostFiles)
+	mux.POST("/raw/*path", fs.server.DoPostFiles)
+
 	// DEBUG mode
 	mux.GET("/logging/level", fs.server.DoLoggingLevel)
 

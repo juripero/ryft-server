@@ -184,6 +184,22 @@ func main() {
 	// Create a router
 	router := gin.New()
 
+	// default 404 error
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(404, gin.H{
+			"code":    "404",
+			"message": "Page not found",
+		})
+	})
+
+	// default 405 error
+	router.NoMethod(func(c *gin.Context) {
+		c.JSON(405, gin.H{
+			"code":    "405",
+			"message": "Method not allowed",
+		})
+	})
+
 	// /version API endpoint (without logging!)
 	router.GET("/version", func(ctx *gin.Context) {
 		info := map[string]interface{}{
@@ -292,6 +308,14 @@ func main() {
 	private.POST("/files/*path", server.DoPostFiles)
 	private.PUT("/rename", server.DoRenameFiles)
 	private.PUT("/rename/*path", server.DoRenameFiles)
+
+	// alias used for swagger clients
+	private.GET("/file", server.DoGetFiles)
+	private.GET("/file/*path", server.DoGetFiles)
+	private.POST("/file", server.DoPostFiles)
+	private.POST("/file/*path", server.DoPostFiles)
+	private.POST("/raw", server.DoPostFiles)
+	private.POST("/raw/*path", server.DoPostFiles)
 
 	// debug API endpoints
 	if server.Config.DebugMode {

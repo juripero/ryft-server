@@ -298,6 +298,11 @@ func asStringMap(v interface{}) (map[string]interface{}, error) {
 	return nil, fmt.Errorf("not a map[string]interface{} (but %T)", v)
 }
 
+// Show starts asynchronous "/search/show" operation.
+func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
+	return engine.Backend.Show(cfg)
+}
+
 // Files starts synchronous "/files" operation.
 func (engine *Engine) Files(path string, hidden bool) (*search.DirInfo, error) {
 	return engine.Backend.Files(path, hidden)
