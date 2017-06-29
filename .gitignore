@@ -7,3 +7,5 @@
 .idea/
 /docker-compose.yml
 /vendor/*/
+ryft-docker/
+ryft-integration-test/
