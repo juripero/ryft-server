@@ -8,6 +8,7 @@ import (
 )
 
 // Convert to JSON
+/*
 func TestQueryToJSON(t *testing.T) {
 	// check function
 	check := func(hasRec bool, query string, expected string) {
@@ -32,6 +33,7 @@ func TestQueryToJSON(t *testing.T) {
 	check(true, `RAW_TEXT CONTAINS "world" OR RECORD.[] CONTAINS "hello"`,
 		`OR{(RAW_TEXT CONTAINS EXACT("world"))[es], (JRECORD.[] CONTAINS EXACT("hello"))[es]}`)
 }
+*/
 
 // Convert to XML
 func TestQueryToXML(t *testing.T) {
@@ -45,7 +47,7 @@ func TestQueryToXML(t *testing.T) {
 	}
 
 	check(false, `RAW_TEXT CONTAINS "hello"`, `(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
-	check(true, `JRECORD CONTAINS "hello"`, `(JRECORD CONTAINS EXACT("hello"))[es]`)
+	// check(true, `JRECORD CONTAINS "hello"`, `(JRECORD CONTAINS EXACT("hello"))[es]`)
 	check(true, `XRECORD CONTAINS "hello"`, `(XRECORD CONTAINS EXACT("hello"))[es]`)
 	check(true, `CRECORD CONTAINS "hello"`, `(CRECORD CONTAINS EXACT("hello"))[es]`)
 
@@ -71,7 +73,7 @@ func TestQueryToCSV(t *testing.T) {
 	}
 
 	check(false, `RAW_TEXT CONTAINS "hello"`, `(RAW_TEXT CONTAINS EXACT("hello"))[es]`)
-	check(true, `JRECORD CONTAINS "hello"`, `(JRECORD CONTAINS EXACT("hello"))[es]`)
+	// check(true, `JRECORD CONTAINS "hello"`, `(JRECORD CONTAINS EXACT("hello"))[es]`)
 	check(true, `XRECORD CONTAINS "hello"`, `(XRECORD CONTAINS EXACT("hello"))[es]`)
 	check(true, `CRECORD CONTAINS "hello"`, `(CRECORD CONTAINS EXACT("hello"))[es]`)
 
