@@ -519,7 +519,10 @@
         ],
         "responses": {
           "200": {
-            "description": "STDOUT and STDERR combined output of the command"
+            "description": "STDOUT and STDERR combined output of the command",
+            "schema":{
+              "type": "string"
+            }
           },
           "default": {
             "description": "Error responses",
@@ -1038,6 +1041,24 @@
         "totalBytes": {
           "type": "number",
           "format": "int32"
+        },
+        "fabricDuration": {
+          "type": "number",
+          "format": "int32"
+        },
+        "host": {
+          "type": "string"
+        },
+        "extra": {
+          "type": "object",
+          "properties": {
+            "backend": {
+              "type": "string"
+            },
+            "session": {
+              "type": "string"
+            }
+          }
         }
       }
     },
