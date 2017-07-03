@@ -89,7 +89,7 @@ clean:
 build_container:
 	if [ ! -d ./ryft-docker ]; then git clone git@github.com:getryft/ryft-docker.git; fi
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=../../../../ build
-	@make -C ./ryft-docker/ryft-server-cluster APP_VERSION=${DOCKER_TAG} app
+	@make -C ./ryft-docker/ryft-server-cluster VERSION=${DOCKER_TAG} app
 
 .PHONY: integration_test
 # integration_test: build_container
