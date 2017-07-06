@@ -1049,6 +1049,15 @@
         "host": {
           "type": "string"
         },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "schema": {
+              "$ref": "#/definitions/CountResponse"
+            }
+          }
+        },
         "extra": {
           "type": "object",
           "properties": {
