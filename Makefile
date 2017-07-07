@@ -2,7 +2,7 @@ GOBINDATA = ${GOPATH}/bin/go-bindata
 ASSETS = bindata.go
 BINARIES = ryft-server
 HINT=ryft-server
-DOCKER_TAG ?= latest
+APP_VERSION ?= latest
 
 all: $(ASSETS) build version
 
@@ -89,10 +89,10 @@ clean:
 build_container:
 	if [ ! -d ./ryft-docker ]; then git clone git@github.com:getryft/ryft-docker.git; fi
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=../../../../ build
-	@make -C ./ryft-docker/ryft-server-cluster APP_VERSION=${DOCKER_TAG} app
+	@make -C ./ryft-docker/ryft-server-cluster VERSION=${APP_VERSION} app
 
 .PHONY: integration_test
 # integration_test: build_container
 integration_test:
 	if [ ! -d ./ryft-integration-test ]; then git clone git@github.com:getryft/ryft-integration-test.git; fi
-	@make -C ./ryft-integration-test APP_VERSION=${DOCKER_TAG} TEST_TAGS="not ryftx and not compound" all
+	@make -C ./ryft-integration-test APP_VERSION=${APP_VERSION} TEST_TAGS="not ryftx and not compound" all

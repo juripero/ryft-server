@@ -41,6 +41,15 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
+// GetenvFallback returns environment variable or predefined fallback value
+func GetenvFallback(name, fallback string) string {
+	val, ok := os.LookupEnv(name)
+	if !ok {
+		return fallback
+	}
+	return val
+}
+
 // RunParams contains all the bound parameters for the /run endpoint.
 type RunParams struct {
 	Image   string   `form:"image" json:"image" msgpack:"image"`
@@ -82,13 +91,12 @@ func (server *Server) DoRun(ctx *gin.Context) {
 		expand := func(name string) string {
 			switch name {
 			case "RYFTUSER":
-				return userName
+				return GetenvFallback("RYFTUSER", userName)
 			case "RYFTHOME":
-				return filepath.Join(mountPoint, homeDir)
+				return GetenvFallback("RYFTHOME", filepath.Join(mountPoint, homeDir))
 			case "RYFTONE":
-				return mountPoint
+				return GetenvFallback("RYFTONE", mountPoint)
 			}
-
 			return os.Getenv(name) // system fallback
 		}
 

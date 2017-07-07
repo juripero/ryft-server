@@ -631,7 +631,8 @@
           "200": {
             "description": "File content",
             "schema": {
-              "$ref": "#/definitions/GetFileResponse"
+              "type":"string",
+              "format": "byte"
             }
           },
           "default": {
@@ -1049,6 +1050,15 @@
         "host": {
           "type": "string"
         },
+        "details": {
+          "type": "string",
+          "items": {
+            "type": "object",
+            "schema": {
+              "$ref": "#/definitions/CountResponse"
+            }
+          }
+        },
         "extra": {
           "type": "object",
           "properties": {
@@ -1090,10 +1100,6 @@
           "$ref": "#/definitions/CountResponse"
         }
       }
-    },
-    "GetFileResponse": {
-      "type":"string",
-      "format": "byte"
     },
     "GetFilesResponse": {
       "type": "object",
