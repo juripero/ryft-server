@@ -37,10 +37,9 @@ import (
 const (
 	IN_RAW_TEXT = "RAW_TEXT"
 	IN_RECORD   = "RECORD"
-	// TODO: uncomment when ryftx will support JRECORD
-	// IN_JRECORD  = "JRECORD"
-	IN_XRECORD = "XRECORD"
-	IN_CRECORD = "CRECORD"
+	IN_JRECORD  = "JRECORD"
+	IN_XRECORD  = "XRECORD"
+	IN_CRECORD  = "CRECORD"
 
 	OP_CONTAINS     = "CONTAINS"
 	OP_NOT_CONTAINS = "NOT_CONTAINS"
@@ -135,7 +134,7 @@ func (lex Lexeme) IsRecord() bool {
 	}
 
 	return strings.EqualFold(lex.literal, IN_RECORD) ||
-		// strings.EqualFold(lex.literal, IN_JRECORD) ||
+		strings.EqualFold(lex.literal, IN_JRECORD) ||
 		strings.EqualFold(lex.literal, IN_XRECORD) ||
 		strings.EqualFold(lex.literal, IN_CRECORD)
 }

@@ -243,15 +243,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			return nil, fmt.Errorf("failed to decompose XML query: %s", err)
 		}
 		task.rootQuery = engine.Optimize(q)
-		/* TODO: uncomment when ryftx will support JRECORD
-		} else if strings.EqualFold(autoFormat, "JSON") {
-			task.log().Debugf("[%s]: converting query to JSON-based JRECORD", TAG)
-			q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_JRECORD)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decompose JSON query: %s", err)
-			}
-			task.rootQuery = engine.Optimize(q)
-		*/
+	} else if strings.EqualFold(autoFormat, "JSON") {
+		task.log().Debugf("[%s]: converting query to JSON-based JRECORD", TAG)
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_JRECORD)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decompose JSON query: %s", err)
+		}
+		task.rootQuery = engine.Optimize(q)
 	} else if strings.EqualFold(autoFormat, "CSV") {
 		task.log().Debugf("[%s]: converting query to CSV-based CRECORD", TAG)
 		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_CRECORD)
