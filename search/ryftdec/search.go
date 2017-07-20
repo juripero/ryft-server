@@ -75,12 +75,12 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 			        continue
 			} */
 
-			log.WithField("file", filePath).Debugf("[%s]: checking catalog file...", TAG)
+			//log.WithField("file", filePath).Debugf("[%s]: checking catalog file...", TAG)
 			cat, err := catalog.OpenCatalogReadOnly(filePath)
 			if err != nil {
 				if err == catalog.ErrNotACatalog {
 					// just a regular file, use it "as is"
-					log.WithField("file", filePath).Debugf("[%s]: ... just a regular file", TAG)
+					log.WithField("file", filePath).Debugf("[%s]: is a regular file", TAG)
 					newFiles = append(newFiles, relativeToHome(home, filePath))
 
 					if autoRecord {
@@ -104,7 +104,7 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 			}
 			defer cat.Close()
 
-			log.WithField("file", filePath).Debugf("[%s]: ... is a catalog", TAG)
+			log.WithField("file", filePath).Debugf("[%s]: is a catalog", TAG)
 			wcat.AddCatalog(cat)
 			NoCatalogs++
 
