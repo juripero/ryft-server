@@ -105,3 +105,19 @@ func (q Query) IsStructured() bool {
 
 	return true
 }
+
+// IsSomeStructured returns `true` for at least one structured query, `false` for RAW text only.
+func (q Query) IsSomeStructured() bool {
+	if q.Simple != nil {
+		return q.Simple.Structured
+	}
+
+	// some argument should be structured
+	for _, arg := range q.Arguments {
+		if arg.IsSomeStructured() {
+			return true
+		}
+	}
+
+	return false
+}
