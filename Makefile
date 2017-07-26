@@ -85,14 +85,26 @@ test:
 clean:
 	rm -f $(ASSETS)
 	rm -f $(BINARIES)
+
+.PHONY: pull_ryft_docker
+pull_ryft_docker: ryft-docker/.git/HEAD
+ryft-docker/.git/HEAD:
+	git clone git@github.com:getryft/ryft-docker.git
+
+.PHONY: pull_ryft_integration_test
+pull_ryft_integration_test: ryft-integration-test/.git/HEAD
+ryft-integration-test/.git/HEAD:
+	git clone git@github.com:getryft/ryft-integration-test.git;
+
 .PHONY: build_container
-build_container:
-	if [ ! -d ./ryft-docker ]; then git clone git@github.com:getryft/ryft-docker.git; fi
+build_container: pull_ryft_docker
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=../../../../ build
 	@make -C ./ryft-docker/ryft-server-cluster VERSION=${APP_VERSION} app
 
 .PHONY: integration_test
-# integration_test: build_container
-integration_test:
-	if [ ! -d ./ryft-integration-test ]; then git clone git@github.com:getryft/ryft-integration-test.git; fi
-	@make -C ./ryft-integration-test APP_VERSION=${APP_VERSION} TEST_TAGS="not ryftx and not compound" all
+integration_test: pull_ryft_integration_test
+	@make -C ./ryft-integration-test APP_VERSION=${APP_VERSION} TEST_TAGS="not ryftx and not compound and not backend_selection" all
+
+.PHONY: unit_test
+unit_test: pull_ryft_docker
+	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} unit_test
