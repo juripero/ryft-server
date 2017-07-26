@@ -1051,12 +1051,9 @@
           "type": "string"
         },
         "details": {
-          "type": "string",
+          "type": "array",
           "items": {
-            "type": "object",
-            "schema": {
-              "$ref": "#/definitions/CountResponse"
-            }
+            "$ref": "#/definitions/CountResponse"
           }
         },
         "extra": {
