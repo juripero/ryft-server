@@ -13,8 +13,7 @@ import (
 func TestSettingsJobs(t *testing.T) {
 	setLoggingLevel("core/pending-jobs", testLogLevel)
 
-	path := "/tmp/ryft-test.settings"
-	os.RemoveAll(path)
+	path := fmt.Sprintf("/tmp/ryft-test-%x.settings", time.Now().UnixNano())
 	defer os.RemoveAll(path)
 
 	s, err := OpenSettings(path)

@@ -55,6 +55,7 @@ type Query struct {
 	Arguments []Query
 
 	boolOps int // number of boolean operations inside (optimizer). -1 is shouldn't combined
+	BoolOps int // actual number of booleans inside
 }
 
 // String gets query as a string (generic format).
@@ -103,4 +104,20 @@ func (q Query) IsStructured() bool {
 	}
 
 	return true
+}
+
+// IsSomeStructured returns `true` for at least one structured query, `false` for RAW text only.
+func (q Query) IsSomeStructured() bool {
+	if q.Simple != nil {
+		return q.Simple.Structured
+	}
+
+	// some argument should be structured
+	for _, arg := range q.Arguments {
+		if arg.IsSomeStructured() {
+			return true
+		}
+	}
+
+	return false
 }

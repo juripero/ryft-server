@@ -34,31 +34,105 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 )
 
+// get backend path (ryftprim or ryftx)
+func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
+	// if backend tool is specified use it
+	switch strings.ToLower(cfg.BackendTool) {
+	case "ryftprim", "prim", "1":
+		return engine.RyftprimExec, nil
+
+	case "ryftx", "x":
+		return engine.RyftxExec, nil
+
+	case "pcre2", "regexp", "regex", "re":
+		return engine.Ryftpcre2Exec, nil
+
+	case "":
+		break // auto-select, see below
+
+	default:
+		return "", fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
+	}
+
+	// if both tools are provided
+	if engine.RyftprimExec != "" && engine.RyftxExec != "" {
+
+		// select backend based on search type
+		switch strings.ToLower(cfg.Mode) {
+		case "g/es", "es":
+			return engine.RyftxExec, nil
+		case "g/ds", "ds":
+			return engine.RyftxExec, nil
+		case "g/ts", "ts":
+			return engine.RyftxExec, nil
+		case "g/ns", "ns":
+			return engine.RyftxExec, nil
+		case "g/cs", "cs":
+			return engine.RyftxExec, nil
+		case "g/ipv4", "ipv4":
+			return engine.RyftxExec, nil
+		case "g/ipv6", "ipv6":
+			return engine.RyftxExec, nil
+
+		case "g/fhs", "fhs":
+			if cfg.Dist > 1 {
+				return engine.RyftprimExec, nil
+			} else {
+				return engine.RyftxExec, nil
+			}
+
+		case "g/feds", "feds":
+			return engine.RyftprimExec, nil
+
+		case "g/pcre2", "pcre2":
+			return engine.Ryftpcre2Exec, nil
+		}
+
+		return engine.RyftprimExec, nil // use ryftprim as fallback
+	} else if engine.RyftprimExec != "" {
+		return engine.RyftprimExec, nil
+	} else if engine.RyftxExec != "" {
+		return engine.RyftxExec, nil
+	}
+
+	return "", fmt.Errorf("no any backend found") // should be impossible
+}
+
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"instance-name":           engine.Instance,
-		"ryftprim-exec":           engine.ExecPath,
-		"ryftprim-legacy":         engine.LegacyMode,
-		"ryftprim-kill-on-cancel": engine.KillToolOnCancel,
-		"ryftone-mount":           engine.MountPoint,
-		"home-dir":                engine.HomeDir,
-		"open-poll":               engine.OpenFilePollTimeout.String(),
-		"read-poll":               engine.ReadFilePollTimeout.String(),
-		"read-limit":              engine.ReadFilePollLimit,
-		"keep-files":              engine.KeepResultFiles,
-		"minimize-latency":        engine.MinimizeLatency,
-		"index-host":              engine.IndexHost,
+	opts := make(map[string]interface{})
+	for k, v := range engine.options {
+		opts[k] = v
 	}
+	opts["instance-name"] = engine.Instance
+	opts["ryftprim-exec"] = engine.RyftprimExec
+	opts["ryftx-exec"] = engine.RyftxExec
+	opts["ryftpcre2-exec"] = engine.Ryftpcre2Exec
+	opts["ryftprim-legacy"] = engine.LegacyMode
+	opts["ryftprim-kill-on-cancel"] = engine.KillToolOnCancel
+	opts["ryftprim-abs-path"] = engine.UseAbsPath
+	opts["ryftone-mount"] = engine.MountPoint
+	opts["home-dir"] = engine.HomeDir
+	opts["open-poll"] = engine.OpenFilePollTimeout.String()
+	opts["read-poll"] = engine.ReadFilePollTimeout.String()
+	opts["read-limit"] = engine.ReadFilePollLimit
+	opts["keep-files"] = engine.KeepResultFiles
+	opts["minimize-latency"] = engine.MinimizeLatency
+	opts["index-host"] = engine.IndexHost
+	return opts
 }
 
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
+	engine.options = opts // base
+
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)
@@ -69,16 +143,50 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// `ryftprim` executable path
 	if v, ok := opts["ryftprim-exec"]; ok {
-		engine.ExecPath, err = utils.AsString(v)
+		engine.RyftprimExec, err = utils.AsString(v)
 		if err != nil {
 			return fmt.Errorf(`failed to parse "ryftprim-exec" option: %s`, err)
 		}
 	} else {
-		engine.ExecPath = "/usr/bin/ryftprim"
+		engine.RyftprimExec = "/usr/bin/ryftprim"
 	}
-	// check ExecPath exists
-	if _, err := os.Stat(engine.ExecPath); err != nil {
-		return fmt.Errorf("failed to locate ryftprim executable: %s", err)
+
+	// `ryftx` executable path
+	if v, ok := opts["ryftx-exec"]; ok {
+		engine.RyftxExec, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "ryftx-exec" option: %s`, err)
+		}
+	} else {
+		// engine.RyftxExec = "/usr/bin/ryftx"
+	}
+
+	// `ryftpcre2` executable path
+	if v, ok := opts["ryftpcre2-exec"]; ok {
+		engine.Ryftpcre2Exec, err = utils.AsString(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "ryftpcre2-exec" option: %s`, err)
+		}
+	} else {
+		engine.Ryftpcre2Exec = "/usr/bin/ryftprim"
+	}
+
+	// one of ryftprim or ryftx should exists
+	backendTools := 0
+	for _, path := range []string{engine.RyftprimExec, engine.RyftxExec} {
+		if path == "" {
+			continue // skip empty
+		}
+
+		// check file exists
+		if _, err := os.Stat(engine.RyftprimExec); err != nil {
+			return fmt.Errorf("%s tool not found: %s", path, err)
+		} else {
+			backendTools++ // tool found
+		}
+	}
+	if 0 == backendTools {
+		return fmt.Errorf("neither ryftprim nor ryftx found")
 	}
 
 	// `ryftprim` legacy mode
@@ -99,6 +207,16 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 	} else {
 		engine.KillToolOnCancel = false // disable by default
+	}
+
+	// `ryftprim` absolute path
+	if v, ok := opts["ryftprim-abs-path"]; ok {
+		engine.UseAbsPath, err = utils.AsBool(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "ryftprim-abs-path" option: %s`, err)
+		}
+	} else {
+		engine.UseAbsPath = false // disable by default
 	}
 
 	// `ryftone` mount point

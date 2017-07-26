@@ -19,12 +19,15 @@ func TestCountUsual(t *testing.T) {
 
 	go func() {
 		err := fs.worker.ListenAndServe()
-		assert.NoError(t, err, "failed to start fake server")
+		assert.NoError(t, err, "failed to serve fake server")
 	}()
-	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		fs.worker.Stop(0)
-		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+		//t.Log("stopping the server...")
+		fs.worker.Stop(testServerStopTO)
+		//t.Log("waiting the server...")
+		<-fs.worker.StopChan()
+		//t.Log("server stopped")
 	}()
 
 	// test case
@@ -44,27 +47,28 @@ func TestCountUsual(t *testing.T) {
 	}
 
 	all := true // false
+	TO := 30 * time.Second
 
 	if all {
-		check("/count1", "", 0, http.StatusNotFound, "page not found")
+		check("/count1", "", TO, http.StatusNotFound, "page not found")
 
-		check("/count", "", 0, http.StatusBadRequest,
+		check("/count", "", TO, http.StatusBadRequest,
 			"Field validation for 'Query' failed on the 'required' tag",
 			"failed to parse request parameters")
 
-		check("/count?query=hello", "", 0, http.StatusBadRequest,
+		check("/count?query=hello", "", TO, http.StatusBadRequest,
 			"no any file or catalog provided")
 
-		check("/count?query=hello&file=*.txt", "application/msgpack", 0,
+		check("/count?query=hello&file=*.txt", "application/msgpack", TO,
 			http.StatusUnsupportedMediaType, "only JSON format is supported for now")
 
-		check("/count?query=hello&file=*.txt&surrounding=bad", "", 0,
+		check("/count?query=hello&file=*.txt&surrounding=bad", "", TO,
 			http.StatusBadRequest, "failed to parse surrounding width", "invalid syntax")
 	}
 
 	if oldSearchBackend := fs.server.Config.SearchBackend; all {
 		fs.server.Config.SearchBackend = "bad"
-		check("/count?query=hello&file=*.txt", "application/json", 0,
+		check("/count?query=hello&file=*.txt", "application/json", TO,
 			http.StatusInternalServerError, "failed to get search engine", "unknown search engine")
 		fs.server.Config.SearchBackend = oldSearchBackend
 	}
@@ -72,13 +76,13 @@ func TestCountUsual(t *testing.T) {
 	if all {
 		fs.server.Config.BackendOptions["search-report-error"] = "simulated-error"
 		check("/count?query=hello&file=*.txt&surrounding=line", "application/octet-stream", // should be changed to JSON
-			0, http.StatusInternalServerError, "failed to start search", "simulated-error")
+			TO, http.StatusInternalServerError, "failed to start search", "simulated-error")
 		delete(fs.server.Config.BackendOptions, "search-report-error")
 	}
 
 	if all {
 		fs.server.Config.BackendOptions["search-no-stat"] = true
-		check("/count?query=hello&file=*.txt&surrounding=line", "", 0,
+		check("/count?query=hello&file=*.txt&surrounding=line", "", TO,
 			http.StatusInternalServerError, "no search statistics available")
 		delete(fs.server.Config.BackendOptions, "search-no-stat")
 	}
@@ -87,7 +91,7 @@ func TestCountUsual(t *testing.T) {
 		fs.server.Config.BackendOptions["search-report-records"] = 0
 		fs.server.Config.BackendOptions["search-report-errors"] = 1
 		check("/count?query=hello&file=*.txt&surrounding=0", "application/json",
-			0, http.StatusInternalServerError, `"message": "error-1"`)
+			TO, http.StatusInternalServerError, `"message": "error-1"`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}
@@ -96,7 +100,7 @@ func TestCountUsual(t *testing.T) {
 		fs.server.Config.BackendOptions["search-report-records"] = 100000
 		fs.server.Config.BackendOptions["search-report-errors"] = 0
 		check("/count?query=hello&file=*.txt&stats=true", "application/json",
-			0, http.StatusOK, `"matches":100000`)
+			TO, http.StatusOK, `"matches":100000`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}

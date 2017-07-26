@@ -18,6 +18,7 @@ Search specific:
                      - numeric_search (or ns) also used for currency
                      - ipv4_search (or ipv4)
                      - ipv6_search (or ipv6)
+                     - pcre2_search (or pcre2)
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
@@ -33,6 +34,9 @@ Search specific:
   |--query=<query>
 -od|--data=<file>  Used to keep a data results file.
 -oi|--index=<file> Used to keep an index results file.
+-ov|--view=<file>  Used to keep a view results file. To speed up /search/show.
+--lifetime=<T>     Used to automatically cleanup results files. Examples: 1h, 1m, 20s.
+--backend=<X>      Used to select "ryftprim" or "ryftx" backend.
 
 REST specific:
 -a|--address=<addr> Specifies the ryft-server address.
@@ -109,6 +113,9 @@ SHARE_MODE=
 QUERY=
 DATA=
 INDEX=
+VIEW=
+LIFETIME=
+BACKEND=
 
 ADDRESS=http://localhost:8765
 AUTH_USER=
@@ -278,6 +285,30 @@ while [[ $# > 0 ]]; do
         ;;
     -oi|--index)
         INDEX="$2"
+        shift 2
+        ;;
+    -ov=*|--view=*)
+        VIEW="${1#*=}"
+        shift
+        ;;
+    -ov|--view)
+        VIEW="$2"
+        shift 2
+        ;;
+    --lifetime=*)
+        LIFETIME="${1#*=}"
+        shift
+        ;;
+    --lifetime)
+        LIFETIME="$2"
+        shift 2
+        ;;
+    --backend=*)
+        BACKEND="${1#*=}"
+        shift
+        ;;
+    --backend)
+        BACKEND="$2"
         shift 2
         ;;
     -a=*|--address=*)
@@ -450,6 +481,9 @@ done
 [[ ! -z "$LIMIT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "limit=$LIMIT")
 [[ ! -z "$DATA" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "data=$DATA")
 [[ ! -z "$INDEX" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "index=$INDEX")
+[[ ! -z "$VIEW" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "view=$VIEW")
+[[ ! -z "$LIFETIME" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "lifetime=$LIFETIME")
+[[ ! -z "$BACKEND" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "backend=$BACKEND")
 [[ ! -z "$FORMAT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "format=$FORMAT")
 [[ ! -z "$FIELDS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fields=$FIELDS")
 for tx in "${TRANSFORMS[@]}"; do

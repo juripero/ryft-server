@@ -55,6 +55,7 @@ type Engine struct {
 	IndexHost string // optional host in cluster mode
 
 	httpClient *http.Client
+	options    map[string]interface{}
 }
 
 // NewEngine creates new RyftHTTP search engine.
@@ -116,16 +117,33 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
 	q.Set("stats", fmt.Sprintf("%t", !engine.SkipStat))
 	q.Set("stream", fmt.Sprintf("%t", true))
-	q.Set("ep", fmt.Sprintf("%t", true)) // enable error prefixes!
 
+	q.Set("--internal-error-prefix", fmt.Sprintf("%t", true))  // enable error prefixes!
+	q.Set("--internal-no-session-id", fmt.Sprintf("%t", true)) // disable sessions!
+
+	if len(cfg.BackendTool) != 0 {
+		q.Set("backend", cfg.BackendTool)
+	}
 	if len(cfg.KeepDataAs) != 0 {
 		q.Set("data", cfg.KeepDataAs)
 	}
 	if len(cfg.KeepIndexAs) != 0 {
 		q.Set("index", cfg.KeepIndexAs)
 	}
+	if len(cfg.KeepViewAs) != 0 {
+		q.Set("view", cfg.KeepViewAs)
+	}
+	if len(cfg.Delimiter) != 0 {
+		q.Set("delimiter", cfg.Delimiter)
+	}
+	if cfg.Lifetime != 0 {
+		q.Set("lifetime", cfg.Lifetime.String())
+	}
 	if cfg.Limit > 0 {
 		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
+	}
+	if cfg.Offset > 0 {
+		q.Set("offset", fmt.Sprintf("%d", cfg.Offset))
 	}
 	if cfg.Performance {
 		q.Set("performance", fmt.Sprintf("%t", cfg.Performance))

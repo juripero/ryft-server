@@ -136,3 +136,4 @@ the `LINE` option can be set.
 - [Number search](./NUMBER.md)
 - [Currency search](./CURRENCY.md)
 - [IPv4 search](./IPV4.md)
+- [Regexp search](./PCRE2.md)

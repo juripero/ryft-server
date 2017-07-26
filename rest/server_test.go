@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,7 +20,9 @@ import (
 
 var (
 	testLogLevel = "error"
-	testFakePort = ":12345"
+
+	testServerStartTO = 100 * time.Millisecond
+	testServerStopTO  = 100 * time.Millisecond
 )
 
 // set test log level
@@ -39,12 +42,14 @@ func newFake() *fakeServer {
 	gin.SetMode(gin.ReleaseMode)
 	mux := gin.Default()
 
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+
 	fs := &fakeServer{
 		server: NewServer(),
 		worker: &graceful.Server{
 			Timeout: 100 * time.Millisecond,
 			Server: &http.Server{
-				Addr:    testFakePort,
+				Addr:    fmt.Sprintf(":%d", rand.Intn(50000)+10000),
 				Handler: mux,
 			},
 		},
@@ -54,16 +59,16 @@ func newFake() *fakeServer {
 	//fs.server.Config.BackendOptions
 	//fs.server.Config.SearchBackend
 	fs.server.Config.LocalOnly = true
-	fs.server.Config.ListenAddress = testFakePort
+	fs.server.Config.ListenAddress = fs.worker.Server.Addr
 
 	fs.server.Config.SearchBackend = testfake.TAG
 	fs.server.Config.BackendOptions = map[string]interface{}{
 		"instance-name": ".work",
 		"home-dir":      "/",
-		"ryftone-mount": "/tmp/ryft",
+		"ryftone-mount": root,
 		"host-name":     "",
 	}
-	fs.server.Config.SettingsPath = "/tmp/ryft/.settings"
+	fs.server.Config.SettingsPath = filepath.Join(root, ".settings")
 	fs.server.Config.HostName = "node-1"
 
 	fs.server.Config.ExtraRequest = true
@@ -73,6 +78,7 @@ func newFake() *fakeServer {
 	}
 
 	mux.GET("/search", fs.server.DoSearch)
+	mux.GET("/search/show", fs.server.DoSearchShow)
 	mux.GET("/count", fs.server.DoCount)
 	mux.GET("/files", fs.server.DoGetFiles)
 	mux.GET("/files/*path", fs.server.DoGetFiles)
@@ -83,11 +89,19 @@ func newFake() *fakeServer {
 	mux.PUT("/rename", fs.server.DoRenameFiles)
 	mux.PUT("/rename/*path", fs.server.DoRenameFiles)
 
+	// aliases used for swagger clients
+	mux.GET("/file", fs.server.DoGetFiles)
+	mux.GET("/file/*path", fs.server.DoGetFiles)
+	mux.POST("/file", fs.server.DoPostFiles)
+	mux.POST("/file/*path", fs.server.DoPostFiles)
+	mux.POST("/raw", fs.server.DoPostFiles)
+	mux.POST("/raw/*path", fs.server.DoPostFiles)
+
 	// DEBUG mode
 	mux.GET("/logging/level", fs.server.DoLoggingLevel)
 
-	os.MkdirAll("/tmp/ryft/foo", 0755) // see BackendOptions above!
-	ioutil.WriteFile("/tmp/ryft/1.txt", []byte(`
+	os.MkdirAll(filepath.Join(root, "foo"), 0755) // see BackendOptions above!
+	ioutil.WriteFile(filepath.Join(root, "1.txt"), []byte(`
 11111-hello-11111
 22222-hello-22222
 33333-hello-33333
@@ -95,16 +109,16 @@ func newFake() *fakeServer {
 55555-hello-55555
 `), 0644)
 
-	ioutil.WriteFile("/tmp/ryft/foo/a.txt", []byte(`
+	ioutil.WriteFile(filepath.Join(root, "foo/a.txt"), []byte(`
 11111-hello-11111
 22222-hello-22222
 33333-hello-33333
 44444-hello-44444
 55555-hello-55555
 `), 0644)
-	ioutil.WriteFile("/tmp/ryft/bad.dat", []byte(`hello`), 0222)
+	ioutil.WriteFile(filepath.Join(root, "bad.dat"), []byte(`hello`), 0222)
 
-	if cat, err := catalog.OpenCatalogNoCache("/tmp/ryft/catalog.test"); err != nil {
+	if cat, err := catalog.OpenCatalogNoCache(filepath.Join(root, "catalog.test")); err != nil {
 		panic(err)
 	} else {
 		cat.DataSizeLimit = 50
@@ -141,6 +155,11 @@ func newFake() *fakeServer {
 	return fs
 }
 
+// get service location
+func (fs *fakeServer) location() string {
+	return fmt.Sprintf("http://localhost%s", fs.worker.Server.Addr)
+}
+
 // get home's directory
 func (fs *fakeServer) homeDir() string {
 	mount := fmt.Sprintf("%v", fs.server.Config.BackendOptions["ryftone-mount"])
@@ -151,6 +170,7 @@ func (fs *fakeServer) homeDir() string {
 // cleanup - delete whole home directory
 func (fs *fakeServer) cleanup() {
 	os.RemoveAll(fs.homeDir())
+	fs.server.Close()
 }
 
 // do a request
@@ -235,5 +255,7 @@ func (fs *fakeServer) PUT(url, accept string, contentType, data string, cancelIn
 // create engine
 func TestServerCreate(t *testing.T) {
 	server := NewServer() // valid (usual case)
-	assert.NotNil(t, server)
+	if assert.NotNil(t, server) {
+		defer server.Close()
+	}
 }

@@ -1,31 +1,16 @@
-SOURCE ?= `cd ../../../ && pwd`
+SOURCE ?= $(dir ${CURDIR})
 VERSION ?= latest
-REGISTRY ?= 172.16.34.3:5000
 
-.PHONY: builder build app clear
+all: build
 
-builder:
-	cd builder && \
-	docker build --no-cache --rm -t=${REGISTRY}/ryft/builder:${VERSION} . && \
-	docker push ${REGISTRY}/ryft/builder:${VERSION}
+.PHONY: build-image build
 
-build:
-	cd builder && \
-	mkdir -p .tmp && \
-	rsync -avz --exclude=".tmp" --exclude="debian" --exclude="docker" ${SOURCE} .tmp/ && \
-	docker run -v ${SOURCE}:/go/src/github.com/getryft ${REGISTRY}/ryft/builder:${VERSION} && \
-	rm -rf .tmp
+# build Debian package in Docker container
+# the output will be placed in ../debian/
+build: build-image
+	docker run --rm -v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
+		ryft/build:${VERSION}
 
-app:
-	cd app && \
-	mkdir -p .tmp && \
-	cp ${SOURCE}/ryft-server/ryft-server .tmp/ryft-server && \
-	docker build -t=${REGISTRY}/ryft/app:${VERSION} . && \
-	docker push ${REGISTRY}/ryft/app:${VERSION} && \
-	rm -rf .tmp
-
-clear:
-	rm -rfv app/.tmp
-	rm -rfv builder/.tmp
-	-docker rm `docker ps -qa`
-	-docker rmi `docker images -f "dangling=true" -q`
+# create image to build sources
+build-image:
+	docker build -q -t=ryft/build:${VERSION} build

@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -14,15 +15,19 @@ import (
 func TestPostFiles(t *testing.T) {
 	fs := newFake()
 	defer fs.cleanup()
+	hostname := fs.server.Config.HostName
 
 	go func() {
 		err := fs.worker.ListenAndServe()
-		assert.NoError(t, err, "failed to start fake server")
+		assert.NoError(t, err, "failed to serve fake server")
 	}()
-	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		fs.worker.Stop(0)
-		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+		//t.Log("stopping the server...")
+		fs.worker.Stop(testServerStopTO)
+		//t.Log("waiting the server...")
+		<-fs.worker.StopChan()
+		//t.Log("server stopped")
 	}()
 
 	// test case
@@ -52,29 +57,30 @@ func TestPostFiles(t *testing.T) {
 		}
 	}
 
-	all := false // false
+	all := true // false
+	TO := 30 * time.Second
 
 	if all {
-		check("/files1", "", "", "hello", 0, http.StatusNotFound, "page not found")
+		check("/files1", "", "", "hello", TO, http.StatusNotFound, "page not found")
 
-		check("/files?dir=foo&file=1.txt", "", "", "hello", 0,
+		check("/files?dir=foo&file=1.txt", "", "", "hello", TO,
 			http.StatusBadRequest, "unexpected content type")
 	}
 
-	if all || true {
+	if all {
 		// upload a file
-		check("/files?file=foo/2.txt", "", "application/octet-stream",
-			`hello`, 0, http.StatusOK, `{"length":5, "offset":0, "path":"foo/2.txt"}`)
+		check("/files?file=foo/2.txt", "", "application/octet-stream", `hello`, TO, http.StatusOK,
+			fmt.Sprintf(`[{"details":{"length":5, "offset":0, "path":"foo/2.txt"}, "host":"%[1]s"}]`, hostname))
 		checkFile("foo/2.txt", `hello`)
 
 		// append a file
-		check("/files?file=foo/2.txt", "", "application/octet-stream",
-			` world`, 0, http.StatusOK, `{"length":6, "offset":5, "path":"foo/2.txt"}`)
+		check("/files?file=foo/2.txt", "", "application/octet-stream", ` world`, TO, http.StatusOK,
+			fmt.Sprintf(`[{"details":{"length":6, "offset":5, "path":"foo/2.txt"}, "host":"%[1]s"}]`, hostname))
 		checkFile("foo/2.txt", `hello world`)
 
 		// replace a part of file
-		check("/files?file=foo/2.txt&offset=2", "", "application/octet-stream",
-			`y!!`, 0, http.StatusOK, `{"length":3, "offset":2, "path":"foo/2.txt"}`)
+		check("/files?file=foo/2.txt&offset=2", "", "application/octet-stream", `y!!`, TO, http.StatusOK,
+			fmt.Sprintf(`[{"details":{"length":3, "offset":2, "path":"foo/2.txt"}, "host":"%[1]s"}]`, hostname))
 		checkFile("foo/2.txt", `hey!! world`)
 	}
 }

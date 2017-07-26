@@ -41,10 +41,18 @@ import (
 	"sync"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
+
+// DeleteFilesResult contains information related to DELETE operation.
+type DeleteFilesResult struct {
+	Status map[string]interface{} `json:"details,omitempty"` // list of items deleted and associated status
+	Host   string                 `json:"host,omitempty"`
+	Error  string                 `json:"error,omitempty"`
+}
 
 // DeleteFilesParams query parameters for DELETE /files
 // there is no actual difference between dirs and files - everything will be deleted
@@ -99,7 +107,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 	}
 
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	mountPoint, err := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))
@@ -125,7 +133,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 	// for each node (with non empty list) call DELETE /files passing
 	// list of files whose tags are matched.
 
-	result := make(map[string]interface{})
+	results := make([]DeleteFilesResult, 0, 1)
 	if !params.Local && !server.Config.LocalOnly && !params.isEmpty() {
 		services, tags, err := server.getConsulInfoForFiles(userTag, params.Files)
 		if err != nil || len(tags) != len(params.Files) {
@@ -134,28 +142,24 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 		}
 
 		type Node struct {
+			// input
 			IsLocal bool
 			Name    string
 			Address string
 			Params  DeleteFilesParams
 
-			Result interface{}
-			Error  error
+			// output
+			Results []DeleteFilesResult
+			Error   error
 		}
 
 		// build list of nodes to call
 		nodes := make([]*Node, len(services))
-
 		for i, service := range services {
 			node := new(Node)
-			scheme := "http"
-			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
-			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-				// node.Name = fmt.Sprintf("%s-%d", service.Node, port)
-			}
+			node.Address = getServiceUrl(service)
 			node.IsLocal = server.isLocalService(service)
+			// node.Name = fmt.Sprintf("%s-%d", service.Node, service.Port)
 			node.Name = service.Node
 			node.Params.Local = true
 
@@ -163,7 +167,7 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 			for k, f := range params.Files {
 				if i == 0 {
 					// print for the first service only
-					log.WithField("item", f).WithField("tags", tags[k]).Debugf("related tags")
+					log.WithField("item", f).WithField("tags", tags[k]).Debugf("[%s]: related tags", CORE)
 				}
 				if len(tags[k]) == 0 || hasSomeTag(service.ServiceTags, tags[k]) {
 					// based on 'k' index detect what the 'f' is: dir, file or catalog
@@ -184,15 +188,30 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 			wg.Add(1)
 			go func(node *Node) {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						log.WithField("error", r).Errorf("[%s]: delete file failed", CORE)
+						if err, ok := r.(error); ok {
+							node.Error = err
+						}
+					}
+				}()
+
 				if node.IsLocal {
-					log.WithField("what", node.Params).Debugf("deleting on local node")
-					node.Result, node.Error = server.deleteLocalFiles(mountPoint, node.Params), nil
+					log.WithField("what", node.Params).Debugf("[%s]: deleting on local node", CORE)
+					status := server.deleteLocalFiles(mountPoint, node.Params)
+					node.Results = append(node.Results, DeleteFilesResult{
+						Status: status,
+						Host:   server.Config.HostName,
+					})
+					node.Error = nil // OK
 				} else {
-					log.WithField("what", node.Params).
-						WithField("node", node.Name).
-						WithField("addr", node.Address).
-						Debugf("deleting on remote node")
-					node.Result, node.Error = server.deleteRemoteFiles(node.Address, authToken, node.Params)
+					log.WithFields(map[string]interface{}{
+						"what": node.Params,
+						"node": node.Name,
+						"addr": node.Address,
+					}).Debugf("[%s]: deleting on remote node", CORE)
+					node.Results, node.Error = server.deleteRemoteFiles(node.Address, authToken, node.Params)
 				}
 			}(node)
 		}
@@ -204,20 +223,31 @@ func (server *Server) DoDeleteFiles(ctx *gin.Context) {
 				continue // nothing to do
 			}
 
-			if node.Error != nil {
-				result[node.Name] = map[string]interface{}{
-					"error": node.Error.Error(),
-				}
+			if err := node.Error; err != nil {
+				// failed, no status
+				results = append(results, DeleteFilesResult{
+					Host:  node.Name,
+					Error: err.Error(),
+				})
 			} else {
-				result[node.Name] = node.Result
+				results = append(results, node.Results...)
 			}
 		}
-
 	} else {
-		result = server.deleteLocalFiles(mountPoint, params)
+		status := server.deleteLocalFiles(mountPoint, params)
+		results = append(results, DeleteFilesResult{
+			Host:   server.Config.HostName,
+			Status: status,
+		})
 	}
 
-	ctx.JSON(http.StatusOK, result)
+	// detect errors (skip in cluster mode)
+	if len(results) == 1 && results[0].Error != "" {
+		panic(NewError(http.StatusInternalServerError, results[0].Error).
+			WithDetails("failed to DELETE files"))
+	}
+
+	ctx.JSON(http.StatusOK, results)
 }
 
 // delete local nodes: files, dirs, catalogs
@@ -243,7 +273,7 @@ func (s *Server) deleteLocalFiles(mountPoint string, params DeleteFilesParams) m
 }
 
 // delete remote nodes: files, dirs, catalogs
-func (s *Server) deleteRemoteFiles(address string, authToken string, params DeleteFilesParams) (map[string]interface{}, error) {
+func (s *Server) deleteRemoteFiles(address string, authToken string, params DeleteFilesParams) ([]DeleteFilesResult, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {
@@ -284,16 +314,25 @@ func (s *Server) deleteRemoteFiles(address string, authToken string, params Dele
 
 	// check status code
 	if resp.StatusCode != http.StatusOK {
+		// try to decode error response
+		var errorBody map[string]interface{}
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&errorBody); err == nil {
+			if msg, err := utils.AsString(errorBody["message"]); err == nil {
+				return nil, fmt.Errorf("%d: %s", resp.StatusCode, msg)
+			}
+		}
+
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	res := make(map[string]interface{})
+	var results []DeleteFilesResult
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&res); err != nil {
+	if err := dec.Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
 
-	return res, nil // OK
+	return results, nil // OK
 }
 
 // remove directories or/and files

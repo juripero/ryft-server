@@ -49,9 +49,12 @@ var (
 // RyftPrim engine uses `ryftprim` utility as a backend.
 type Engine struct {
 	Instance         string // empty by default. might be some server instance name like ".server-1234"
-	ExecPath         string // "/usr/bin/ryftprim" by default
+	RyftprimExec     string // "/usr/bin/ryftprim" by default
+	RyftxExec        string // usually "/usr/bin/ryftx" but "" by default
+	Ryftpcre2Exec    string // "/usr/bin/ryftprim" by default
 	LegacyMode       bool   // legacy mode to get machine readable statistics
 	KillToolOnCancel bool   // flag to kill ryftprim if cancelled
+	UseAbsPath       bool   // flag to use absolute path
 	MountPoint       string // "/ryftone" by default
 	HomeDir          string // subdir of mountpoint
 
@@ -67,6 +70,8 @@ type Engine struct {
 	ReadFilePollLimit   int
 
 	IndexHost string // optional host (cluster mode)
+
+	options map[string]interface{}
 }
 
 // NewEngine creates new RyftPrim search engine.
@@ -82,8 +87,8 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q, ryftprim:%q}",
-		engine.Instance, engine.MountPoint, engine.HomeDir, engine.ExecPath)
+	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q, ryftprim:%q, ryftx:%q}",
+		engine.Instance, engine.MountPoint, engine.HomeDir, engine.RyftprimExec, engine.RyftxExec)
 	// TODO: other parameters?
 }
 
@@ -94,7 +99,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// or just be silent: cfg.ReportIndex = true
 	}
 
-	task := NewTask(cfg)
+	task := NewTask(cfg, false)
 	if cfg.ReportIndex {
 		task.log().WithField("cfg", cfg).Infof("[%s]: start /search", TAG)
 	} else {
@@ -129,6 +134,45 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to run", TAG)
 		return nil, fmt.Errorf("failed to run %s: %s", TAG, err)
 	}
+	return res, nil // OK
+}
+
+// Show implements "/search/show" endpoint
+func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
+	if cfg.ReportData && !cfg.ReportIndex {
+		return nil, fmt.Errorf("failed to report DATA without INDEX")
+		// or just be silent: cfg.ReportIndex = true
+	}
+
+	task := NewTask(cfg, true)
+	task.log().WithField("cfg", cfg).Infof("[%s]: start /search/show", TAG)
+
+	// check file names are relative to home (without ..)
+	home := filepath.Join(engine.MountPoint, engine.HomeDir)
+	if err := cfg.CheckRelativeToHome(home); err != nil {
+		task.log().WithError(err).Warnf("[%s]: bad file names detected", TAG)
+		return nil, err
+	}
+
+	// prepare command line arguments
+	err := engine.prepare(task)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
+		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
+	}
+
+	res := search.NewResult()
+	go func() {
+		defer res.ReportUnhandledPanic(log)
+
+		defer task.log().WithField("result", res).Debugf("[%s]: end /show TASK", TAG)
+		task.log().Debugf("[%s]: start /show TASK...", TAG)
+
+		// start INDEX&DATA processing
+		task.startProcessing(engine, res)
+		engine.finish(nil, task, res)
+	}()
+
 	return res, nil // OK
 }
 

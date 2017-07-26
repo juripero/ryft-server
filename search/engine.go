@@ -43,6 +43,9 @@ type Engine interface {
 	// if cfg.ReportIndex == false then "/count" is assumed.
 	Search(cfg *Config) (*Result, error)
 
+	// Run asynchronous "/search/show" operation.
+	Show(cfg *Config) (*Result, error)
+
 	// Run *synchronous* "/files" operation.
 	Files(path string, hidden bool) (*DirInfo, error)
 }

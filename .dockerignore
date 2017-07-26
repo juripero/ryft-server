@@ -2,3 +2,5 @@
 ryft-server
 bindata.go
 debian/*.deb
+ryft-docker
+ryft-integration-test

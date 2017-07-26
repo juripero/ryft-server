@@ -1,10 +1,13 @@
-There are two REST API endpoints related to search:
+There are a few REST API endpoints related to search:
 
 - [/search](#search)
 - [/count](#count)
+- [/search/show](#show)
 
 First one reports the data found. The seconds one reports
 just search statistics, no any data.
+
+The `search/show` endpoint is used to access already existing results.
 
 
 # Search
@@ -36,9 +39,12 @@ The list of supported query parameters are the following (check detailed descrip
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
-| `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
-| `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
+| `backend`     | string  | [The backend tool](#search-backend-parameter). |
+| `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
+| `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
+| `view`        | string  | [The name of VIEW file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `lifetime`    | string  | [The output files lifetime](#search-lifetime-parameter). |
 | `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
@@ -46,7 +52,6 @@ The list of supported query parameters are the following (check detailed descrip
 | `performance` | boolean | [Flag to report performance metrics](#search-performance-parameter). |
 | `limit`       | int     | [Limit the total number of records reported](#search-limit-parameter). |
 | `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-parameters). |
-| `ep`          | boolean | **Internal** [The error prefix flag](#search-ep-parameter). |
 
 ### Search `query` parameter
 
@@ -257,6 +262,18 @@ In this case all tranformations are combined into transformation chain.
 See [more details](./README.md#post-process-transformations).
 
 
+### Search `backend` parameter
+
+On those ryft-server instances where both `ryftprim` and `ryftx` backends are
+present it is possible to manually select backend tool.
+
+If `backend=ryftprim` options is used, then `ryftprim` tool will be used.
+And `ryftx` tool is used in case of `backend=ryftx`.
+
+If `backend` is empty (by default) then the most appropriate backend
+is selected automatically.
+
+
 ### Search `data` and `index` parameters
 
 By default, all search results are deleted from the Ryft server once they are delivered to user.
@@ -274,6 +291,29 @@ Using the second parameter `index=index.txt` keeps the search index file under `
 NOTE: According to Ryft API documentation, an index file should always have `.txt` extension!
 
 **WARNING:** Provided data or index files will be overriden!
+
+In some cases the output Ryft results can be additionally indexed to the
+so called VIEW file - a binary index cache. This VIEW file allows quick
+search result access at random position. The `view=view.bin` paramter
+will save this VIEW file into `/ryftone/view.bin` file.
+
+All filenames can contain special `{{random}}` keyword to put piece of unique
+data into filename. For example `data=my-data-{{random}}.txt`.
+
+
+### Search `lifetime` parameter
+
+By default all output files should be deleted manually. But it's possible to
+specify output files lifetime with `lifetime=` parameter.
+
+For example, if `lifetime=1h` is provided then output DATA and INDEX files
+will be avialable during one hour and then will be automatically deleted by
+the REST service.
+
+The following suffixes are supported:
+- `h` for hours, for example `lifetime=2h`
+- `m` for minutes, for example `lifetime=20m`
+- `s` for seconds, for example `lifetime=200s`
 
 
 ### Search `delimiter` parameter
@@ -583,9 +623,12 @@ The list of supported query parameters are the following:
 | `cs`          | boolean | [The case sensitive flag](#search-cs-parameter). |
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
-| `data`        | string  | [The name of data file to keep](#search-data-and-index-parameters). |
-| `index`       | string  | [The name of index file to keep](#search-data-and-index-parameters). |
+| `backend`     | string  | [The backend tool](#search-backend-parameter). |
+| `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
+| `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
+| `view`        | string  | [The name of VIEW file to keep](#search-data-and-index-parameters). |
 | `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `lifetime`    | string  | [The output files lifetime](#search-lifetime-parameter). |
 | `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
 | `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
@@ -614,3 +657,74 @@ will report the following output:
   "fabricDataRate": 9.55421
 }
 ```
+
+
+# Show
+
+The GET `/search/show` endpoint is used to access already existing search results.
+The search results should be prepared first with `/count` or `/search&limit=` methods.
+
+See corresponding [demo](../demo/2017-05-18-search-show.md) page.
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](../auth.md) for more details.
+
+There are a few [content types](#search-accept-header) that server can produce:
+- `Accept: application/json` which is used by default
+- `Accept: text/csv`
+- `Accept: application/msgpack` which is used internally in cluster mode
+
+
+## Show query parameters
+
+The list of supported query parameters are almost the same as for `/search` method:
+
+| Parameter     | Type    | Description |
+| ------------- | ------- | ----------- |
+| `offset`      | int     | [The first record index](#show-offset-and-count-parameters). |
+| `count`       | int     | [The total number of records to show](#show-offset-and-count-parameters). |
+| `format`      | string  | [The structured search format](#search-format-parameter). |
+| `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
+| `data`        | string  | [The name of DATA file to read](#show-data-and-index-parameters). |
+| `index`       | string  | [The name of INDEX file to read](#show-data-and-index-parameters). |
+| `view`        | string  | [The name of VIEW file to read](#show-data-and-index-parameters). |
+| `delimiter`   | string  | [The delimiter is used to separate found records](#search-delimiter-parameter). |
+| `session`     | string  | [The session token](#show-session-parameter). |
+| `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
+| `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-parameters). |
+
+
+### Show `offset` and `count` parameters
+
+These two parameters do specify the records range to show. The `offset` specifies
+index of the first record to show. The `count` specifies the total number
+of records to show.
+
+For example, if "page" contains 100 records, then:
+- the first page is `offset=0&count=100`
+- the second page is `offset=100&count=100`
+- and so on...
+
+
+### Show `data` and `index` parameters
+
+For local mode the DATA and INDEX files can be specified directly (for cluster mode
+`session` should be used instead). The `index` specifies path to the INDEX file,
+it should be the same as for `/search?index=`. The `data` specifies path to the DATA
+file, it should be the same as for `/search?data=`.
+
+As an optimization the VIEW file can be specified with `view` parameter.
+This file should be generated by corresponding `/search?view=`.
+
+Note all INDEX, DATA and VIEW file should be consistent, i.e. should be releated
+to the same `/search` or `/count` call as well as `delimiter`.
+Otherwise output is undefined.
+
+
+### Show `session` parameter
+
+The `session` token can be used instead of `data`, `index`, `view` and `delimiter`
+parameters. Session contains all information about previous `/search` or `/count`
+call (session token can be extracted from `stats.extra.session` field).
+
+Moreover, session is the only way to show results in cluster mode.

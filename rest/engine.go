@@ -31,7 +31,11 @@
 package rest
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
@@ -39,6 +43,7 @@ import (
 	"github.com/getryft/ryft-server/search/ryftmux"
 	_ "github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils"
+	"gopkg.in/yaml.v2"
 )
 
 // get search backend with options
@@ -47,7 +52,7 @@ func (s *Server) getSearchEngine(localOnly bool, files []string, authToken, home
 		return s.getClusterSearchEngine(files, authToken, homeDir, userTag)
 	}
 
-	return s.getLocalSearchEngine(homeDir)
+	return s.getLocalSearchEngine(homeDir, "", "")
 }
 
 // get cluster's search engine
@@ -100,7 +105,8 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		// use native search engine for local services!
 		// (no sense to do extra HTTP call)
 		if s.isLocalService(service) {
-			engine, err := s.getLocalSearchEngine(homeDir)
+			engine, err := s.getLocalSearchEngine(homeDir,
+				service.Node, getServiceUrl(service))
 			if err != nil {
 				return nil, err
 			}
@@ -111,16 +117,11 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 		}
 
 		// remote node: use RyftHTTP backend
-		port := service.ServicePort
-		scheme := "http"
-		var url string
-		if port == 0 { // TODO: review the URL building!
-			url = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
-		} else {
-			url = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-		}
-
+		url := getServiceUrl(service)
 		opts := map[string]interface{}{
+			"--cluster-node-name": service.Node,
+			"--cluster-node-addr": url,
+
 			"server-url": url,
 			"auth-token": authToken,
 			"local-only": true,
@@ -130,7 +131,7 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 
 		engine, err := search.NewEngine("ryfthttp", opts)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create HTTP engine: %s", err)
 		}
 		backends = append(backends, engine)
 		nodes = append(nodes, service.Node)
@@ -156,16 +157,23 @@ func (s *Server) getClusterSearchEngine(files []string, authToken, homeDir, user
 
 	// no services from consule, just use local search as a fallback
 	log.Debugf("use local search as fallback")
-	return s.getLocalSearchEngine(homeDir)
+	return s.getLocalSearchEngine(homeDir, "", "")
 }
 
 // get local search engine
-func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
+func (s *Server) getLocalSearchEngine(homeDir string, nodeName, nodeAddr string) (search.Engine, error) {
 	opts := s.getBackendOptions()
+
+	if len(nodeName) != 0 {
+		opts["--cluster-node-name"] = nodeName
+	}
+	if len(nodeAddr) != 0 {
+		opts["--cluster-node-addr"] = nodeAddr
+	}
 
 	// some auto-options
 	switch s.Config.SearchBackend {
-	case "ryftprim", "ryftone":
+	case "ryftprim", "ryftone", "fake":
 		// instance name
 		if _, ok := opts["instance-name"]; !ok {
 			opts["instance-name"] = fmt.Sprintf(".rest-%d", s.listenAddress.Port)
@@ -187,6 +195,12 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 		}
 	}
 
+	userCfg, err := s.getUserConfig(homeDir)
+	if err != nil {
+		return nil, err
+	}
+
+	opts["user-config"] = userCfg
 	backend, err := search.NewEngine(s.Config.SearchBackend, opts)
 	if err != nil {
 		return backend, err
@@ -195,24 +209,68 @@ func (s *Server) getLocalSearchEngine(homeDir string) (search.Engine, error) {
 	return ryftdec.NewEngine(backend, opts)
 }
 
+// deep map clone
+func mapClone(x map[string]interface{}) map[string]interface{} {
+	res := make(map[string]interface{}, len(x))
+	for k, v := range x {
+		if vv, ok := v.(map[string]interface{}); ok {
+			res[k] = mapClone(vv)
+		} else {
+			res[k] = v
+		}
+	}
+	return res
+}
+
 // deep copy of backend options
 func (s *Server) getBackendOptions() map[string]interface{} {
-	opts := make(map[string]interface{})
-	for k, v := range s.Config.BackendOptions {
-		opts[k] = v
+	return mapClone(s.Config.BackendOptions)
+}
+
+// deep copy of user configuration
+func (s *Server) getUserConfig(homeDir string) (map[string]interface{}, error) {
+	userCfg := mapClone(s.Config.DefaultUserConfig)
+	mountPoint, err := s.getMountPoint()
+	if err != nil {
+		return userCfg, fmt.Errorf("failed to get mount point: %s", err)
 	}
-	return opts
+
+	// try to read as YAML
+	if data, err := ioutil.ReadFile(filepath.Join(mountPoint, homeDir, ".ryft-user.yaml")); err == nil {
+		// workaround on YAML decoder: it unmarshals to map[interface{}]interface{}
+		// but we need map[string]interface{}
+		var tmp struct {
+			Queries map[string]interface{} `yaml:"record-queries"`
+		}
+		if err := yaml.Unmarshal(data, &tmp); err != nil {
+			return userCfg, fmt.Errorf("failed to parse YAML user config: %s", err)
+		}
+
+		userCfg["record-queries"] = tmp.Queries
+		// TODO: more user options here
+
+		return userCfg, nil // YAML config!
+	} else if !os.IsNotExist(err) {
+		return userCfg, fmt.Errorf("failed to read YAML user config: %s", err)
+	}
+
+	// try to read as JSON
+	if data, err := ioutil.ReadFile(filepath.Join(mountPoint, homeDir, ".ryft-user.json")); err == nil {
+		if err := json.Unmarshal(data, &userCfg); err != nil {
+			return userCfg, fmt.Errorf("failed to parse JSON user config: %s", err)
+		}
+
+		return userCfg, nil // JSON config!
+	} else if !os.IsNotExist(err) {
+		return userCfg, fmt.Errorf("failed to read JSON user config: %s", err)
+	}
+
+	return userCfg, nil // return default config
 }
 
 // get mount point path from local search engine
-func (s *Server) getMountPoint(homeDir string) (string, error) {
-	engine, err := s.getLocalSearchEngine(homeDir)
-	if err != nil {
-		return "", err
-	}
-
-	opts := engine.Options()
-	return utils.AsString(opts["ryftone-mount"])
+func (s *Server) getMountPoint() (string, error) {
+	return utils.AsString(s.Config.BackendOptions["ryftone-mount"])
 }
 
 // cancels results if not done

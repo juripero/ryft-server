@@ -1,7 +1,9 @@
 package ryftmux
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/getryft/ryft-server/search/testfake"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +21,7 @@ func testSetLogLevel() {
 
 // create new fake engine
 func newFake(records, errors int) *testfake.Engine {
-	engine, _ := testfake.NewEngine("/tmp", "ryft-mux")
+	engine, _ := testfake.NewEngine(fmt.Sprintf("/tmp/ryft-%u", time.Now().UnixNano()), "ryftmux")
 	engine.SearchReportRecords = records
 	engine.SearchReportErrors = errors
 	return engine
@@ -31,10 +33,11 @@ func TestEngineOptions(t *testing.T) {
 
 	assert.EqualValues(t, testLogLevel, GetLogLevel().String())
 
-	engine, err := NewEngine(newFake(1, 0))
+	backend := newFake(1, 0)
+	engine, err := NewEngine(backend)
 	assert.NoError(t, err)
 	if assert.NotNil(t, engine) {
-		assert.EqualValues(t, "ryftmux{backends:[fake{home:/tmp/ryft-mux}]}", engine.String())
+		assert.EqualValues(t, fmt.Sprintf("ryftmux{backends:[fake{home:%s/%s}]}", backend.MountPoint, backend.HomeDir), engine.String())
 		assert.EqualValues(t, map[string]interface{}{
 			"index-host": "",
 		}, engine.Options())

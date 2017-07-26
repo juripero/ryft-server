@@ -1,7 +1,9 @@
 package ryftprim
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,26 +15,27 @@ var (
 	testLogLevel = "error"
 )
 
+// should be formatted with root directory
 const testFakeRyftprimScript3 = `#!/bin/bash
 # test script to emulate ryftprim
 
 # initial delay
 sleep 1s
 
-OD=/tmp/ryft/ryftprim-data.bin
-OI=/tmp/ryft/ryftprim-index.txt
+OD=%[1]s/ryftprim/ryftprim-data.bin
+OI=%[1]s/ryftprim/ryftprim-index.txt
 DELIM=$'\r\n\f'
-mkdir -p /tmp/ryft
+mkdir -p %[1]s/ryftprim
 
 # parse options
 while [[ $# > 0 ]]; do
 	case "$1" in
 	-od)
-		OD="/tmp/$2"
+		OD="%[1]s/$2"
 		shift 2
 		;;
 	-oi)
-		OI="/tmp/$2"
+		OI="%[1]s/$2"
 		shift 2
 		;;
 	*) # unknown option, skip it
@@ -44,7 +47,7 @@ done
 # first record
 echo -n "hello" > "$OD"
 echo -n "$DELIM" >> "$OD"
-echo "/tmp/ryft/1.txt,100,5,0" > "$OI"
+echo "%[1]s/ryftprim/1.txt,100,5,0" > "$OI"
 
 # second record
 echo "2.txt,200,5,n/a" >> "$OI" # FALLBACK to absolute
@@ -56,7 +59,7 @@ echo -n "$DELIM" >> "$OD"
 echo -n "hello" >> "$OD"
 echo -n "$DELIM" >> "$OD"
 sleep 0.1s
-echo -n "/tmp/ryft/" >> "$OI"   # first INDEX part
+echo -n "%[1]s/ryftprim/" >> "$OI"   # first INDEX part
 sleep 0.1s
 echo -n "3.txt,300,5" >> "$OI" # second INDEX part
 sleep 0.1s
@@ -82,22 +85,27 @@ func testWriteScript(path string, script string) error {
 	return nil // OK
 }
 
+// write a script (executable file)
+func testWriteScript3(path string, root string) error {
+	return testWriteScript(path, fmt.Sprintf(testFakeRyftprimScript3, root))
+}
+
 // get files
 func TestEngineFiles(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
-	os.MkdirAll("/tmp/ryft/test/dir", 0755)
-	testWriteScript("/tmp/ryftprim.sh", testFakeRyftprimScript3)
-	defer os.RemoveAll("/tmp/ryft/test/dir")
-	defer os.RemoveAll("/tmp/ryftprim.sh")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	assert.NoError(t, os.MkdirAll(filepath.Join(root, "test/dir"), 0755))
+	assert.NoError(t, testWriteScript(filepath.Join(root, "test/1.txt"), "1111"))
+	defer os.RemoveAll(root)
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
 		"ryftprim-exec":           "/bin/false",
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
-		"ryftone-mount":           "/",
-		"home-dir":                "tmp",
+		"ryftone-mount":           root,
+		"home-dir":                "/test/",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
 	})
@@ -140,13 +148,12 @@ func TestEngineUsual(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	// prepare ryftprim emulation script
-	if err := testWriteScript("/tmp/ryftprim.sh",
-		testFakeRyftprimScript3); !assert.NoError(t, err) {
-		return
-	}
-
-	defer os.RemoveAll("/tmp/ryftprim.sh")
-	defer os.RemoveAll("/tmp/ryft")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	prim := fmt.Sprintf("/tmp/ryftprim-%x.sh", time.Now().UnixNano())
+	assert.NoError(t, testWriteScript3(prim, root))
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(prim)
+	defer os.RemoveAll(root)
 
 	check := func(mode string) {
 		cfg := search.NewConfig("hello", "1.txt", "2.txt")
@@ -163,11 +170,11 @@ func TestEngineUsual(t *testing.T) {
 
 		engine, err := factory(map[string]interface{}{
 			"instance-name":           ".test",
-			"ryftprim-exec":           "/tmp/ryftprim.sh",
+			"ryftprim-exec":           prim,
 			"ryftprim-legacy":         true,
 			"ryftprim-kill-on-cancel": true,
-			"ryftone-mount":           "/tmp",
-			"home-dir":                "ryft",
+			"ryftone-mount":           root,
+			"home-dir":                "ryftprim",
 			"minimize-latency":        true,
 			"index-host":              "hozt",
 		})
@@ -217,9 +224,9 @@ func TestEngineUsual(t *testing.T) {
 
 	check("") // generic
 	check("es")
-	os.RemoveAll("/tmp/ryft/ryftprim-data.bin") // postpone processing
+	os.RemoveAll(filepath.Join(root, "ryfptrim/ryftprim-data.bin")) // postpone processing
 	check("fhs")
-	os.RemoveAll("/tmp/ryft/ryftprim-index.txt") // postpone processing
+	os.RemoveAll(filepath.Join(root, "ryfptrim/ryftprim-index.txt")) // postpone processing
 	check("feds")
 	check("ds")
 	check("ts")
@@ -234,13 +241,12 @@ func TestEngineUsualLimit(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	// prepare ryftprim emulation script
-	if err := testWriteScript("/tmp/ryftprim.sh",
-		testFakeRyftprimScript3); !assert.NoError(t, err) {
-		return
-	}
-
-	defer os.RemoveAll("/tmp/ryftprim.sh")
-	defer os.RemoveAll("/tmp/ryft")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	prim := fmt.Sprintf("/tmp/ryftprim-%x.sh", time.Now().UnixNano())
+	assert.NoError(t, testWriteScript3(prim, root))
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(prim)
+	defer os.RemoveAll(root)
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.KeepIndexAs = "ryftprim-index.txt"
@@ -253,11 +259,11 @@ func TestEngineUsualLimit(t *testing.T) {
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/tmp/ryftprim.sh",
+		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
-		"ryftone-mount":           "/tmp",
-		"home-dir":                "ryft",
+		"ryftone-mount":           root,
+		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
 	})
@@ -301,13 +307,12 @@ func TestEngineUsualNoOutput(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	// prepare ryftprim emulation script
-	if err := testWriteScript("/tmp/ryftprim.sh",
-		testFakeRyftprimScript3); !assert.NoError(t, err) {
-		return
-	}
-
-	defer os.RemoveAll("/tmp/ryftprim.sh")
-	defer os.RemoveAll("/tmp/ryft")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	prim := fmt.Sprintf("/tmp/ryftprim-%x.sh", time.Now().UnixNano())
+	assert.NoError(t, testWriteScript3(prim, root))
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(prim)
+	defer os.RemoveAll(root)
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.Mode = "fhs"
@@ -324,11 +329,11 @@ func TestEngineUsualNoOutput(t *testing.T) {
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/tmp/ryftprim.sh",
+		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
-		"ryftone-mount":           "/tmp",
-		"home-dir":                "ryft",
+		"ryftone-mount":           root,
+		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
 	})
@@ -416,22 +421,23 @@ func TestEngineBadPath(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	// prepare ryftprim emulation script
-	if err := testWriteScript("/tmp/ryftprim.sh",
-		testFakeRyftprimScript3); !assert.NoError(t, err) {
-		return
-	}
-	defer os.RemoveAll("/tmp/ryftprim.sh")
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	prim := fmt.Sprintf("/tmp/ryftprim-%x.sh", time.Now().UnixNano())
+	assert.NoError(t, testWriteScript3(prim, root))
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(prim)
+	defer os.RemoveAll(root)
 
 	cfg := search.NewConfig("hello")
 	cfg.Mode = "fhs"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/tmp/ryftprim.sh",
+		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
-		"ryftone-mount":           "/tmp",
-		"home-dir":                "ryft",
+		"ryftone-mount":           root,
+		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
 	})
@@ -469,21 +475,23 @@ func TestEngineFailedToStartTool(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	// prepare ryftprim emulation script
-	if err := testWriteScript("/tmp/ryftprim.sh",
-		testFakeRyftprimScript3); !assert.NoError(t, err) {
-		return
-	}
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	prim := fmt.Sprintf("/tmp/ryftprim-%x.sh", time.Now().UnixNano())
+	assert.NoError(t, testWriteScript3(prim, root))
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	// defer os.RemoveAll(prim)
+	defer os.RemoveAll(root)
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.Mode = "fhs"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/tmp/ryftprim.sh",
+		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
-		"ryftone-mount":           "/tmp",
-		"home-dir":                "ryft",
+		"ryftone-mount":           root,
+		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
 	})
@@ -491,7 +499,7 @@ func TestEngineFailedToStartTool(t *testing.T) {
 		return
 	}
 
-	os.RemoveAll("/tmp/ryftprim.sh")
+	os.RemoveAll(prim)
 
 	_, err = engine.Search(cfg)
 	if assert.Error(t, err) {
@@ -504,25 +512,29 @@ func TestEngineCancelTool(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	// prepare ryftprim emulation script
-	if err := testWriteScript("/tmp/ryftprim.sh",
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	prim := fmt.Sprintf("/tmp/ryftprim-%x.sh", time.Now().UnixNano())
+	if err := testWriteScript(prim,
 		`#!/bin/bash
 sleep 300s
 `); !assert.NoError(t, err) {
 		return
 	}
+	assert.NoError(t, os.MkdirAll(root, 0755))
 
-	defer os.RemoveAll("/tmp/ryftprim.sh")
+	defer os.RemoveAll(prim)
+	defer os.RemoveAll(root)
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.ReportIndex = true
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/tmp/ryftprim.sh",
+		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
-		"ryftone-mount":           "/tmp",
-		"home-dir":                "ryft",
+		"ryftone-mount":           root,
+		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
 	})
@@ -595,26 +607,29 @@ func TestEngineToolFailed2(t *testing.T) {
 	SetLogLevelString(testLogLevel)
 
 	// prepare ryftprim emulation script
-	if err := testWriteScript("/tmp/ryftprim.sh",
+	root := fmt.Sprintf("/tmp/ryft-%x", time.Now().UnixNano())
+	prim := fmt.Sprintf("/tmp/ryftprim-%x.sh", time.Now().UnixNano())
+	if err := testWriteScript(prim,
 		`#!/bin/bash
 echo "bla bla bla ERROR:  Input data set cannot be empty bla bla bla"
 exit(3)
 `); !assert.NoError(t, err) {
 		return
 	}
-
-	defer os.RemoveAll("/tmp/ryftprim.sh")
+	assert.NoError(t, os.MkdirAll(root, 0755))
+	defer os.RemoveAll(prim)
+	defer os.RemoveAll(root)
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.ReportIndex = true
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/tmp/ryftprim.sh",
+		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
-		"ryftone-mount":           "/tmp",
-		"home-dir":                "ryft",
+		"ryftone-mount":           root,
+		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
 	})

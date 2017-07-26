@@ -47,16 +47,26 @@ var (
 
 // RyftMUX engine uses set of abstract engines as backends.
 type Engine struct {
-	Backends []search.Engine
-
+	Backends  []search.Engine
 	IndexHost string // optional host in cluster mode
+
+	options  map[string]interface{}
+	override map[search.Engine]*search.Config
 }
 
 // NewEngine creates new RyftMUX search engine.
 func NewEngine(backends ...search.Engine) (*Engine, error) {
 	engine := new(Engine)
 	engine.Backends = backends
+	engine.override = make(map[search.Engine]*search.Config)
 	return engine, nil // OK
+}
+
+// AddBackend adds new backend with configuration override.
+// MUX engine should be created with ryftmux.NewEngine() method.
+func (engine *Engine) AddBackend(backend search.Engine, cfg *search.Config) {
+	engine.Backends = append(engine.Backends, backend)
+	engine.override[backend] = cfg
 }
 
 // String gets string representation of the engine.
@@ -67,9 +77,12 @@ func (engine *Engine) String() string {
 
 // Options gets all engine options.
 func (engine *Engine) Options() map[string]interface{} {
-	return map[string]interface{}{
-		"index-host": engine.IndexHost,
+	opts := make(map[string]interface{})
+	for k, v := range engine.options {
+		opts[k] = v
 	}
+	opts["index-host"] = engine.IndexHost
+	return opts
 }
 
 // SetLogLevelString changes global module log level.

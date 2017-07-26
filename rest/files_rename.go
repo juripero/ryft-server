@@ -42,10 +42,18 @@ import (
 	"sync"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
+
+// RenameFileResult contains information related to RENAME operation.
+type RenameFileResult struct {
+	Status map[string]interface{} `json:"details,omitempty"` // list of items renamed and associated status
+	Host   string                 `json:"host,omitempty"`
+	Error  string                 `json:"error,omitempty"`
+}
 
 // RenameFileParams request body struct
 type RenameFileParams struct {
@@ -138,7 +146,7 @@ func (r fileRename) Rename() (string, error) {
 	newPath := filepath.Join(r.mountPoint, r.newPath)
 	// check destination path doesn't exist or is not directory
 	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
-		return r.path, err
+		return r.path, fmt.Errorf("%q already exists", newPath)
 	}
 	if path == newPath {
 		return r.path, nil
@@ -198,7 +206,7 @@ func (r dirRename) Rename() (string, error) {
 	newPath := filepath.Join(r.mountPoint, r.newPath)
 	// check destination path doesn't exist
 	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
-		return r.path, err
+		return r.path, fmt.Errorf("%q already exists", newPath)
 	}
 	if path == newPath {
 		return r.path, nil
@@ -321,7 +329,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	}
 
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	mountPoint, err := server.getMountPoint(homeDir)
+	mountPoint, err := server.getMountPoint()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get mount point"))
@@ -347,8 +355,7 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 	// for each node (with non empty list) call PUT /files passing
 	// list of files whose tags are matched.
 
-	result := make(map[string]interface{})
-
+	results := make([]RenameFileResult, 0, 1)
 	if !params.Local && !server.Config.LocalOnly {
 		files := []string{fileRename.GetPath()}
 		services, tags, err := server.getConsulInfoForFiles(userTag, files)
@@ -356,26 +363,24 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			panic(NewError(http.StatusInternalServerError, err.Error()).
 				WithDetails("failed to map files to tags"))
 		}
+
 		type Node struct {
+			// input
 			IsLocal bool
 			Name    string
 			Address string
 			Params  RenameFileParams
 
-			Result interface{}
-			Error  error
+			// output
+			Results []RenameFileResult
+			Error   error
 		}
+
 		// build list of nodes to call
 		nodes := make([]*Node, len(services))
 		for i, service := range services {
 			node := new(Node)
-			scheme := "http"
-			if port := service.ServicePort; port == 0 { // TODO: review the URL building!
-				node.Address = fmt.Sprintf("%s://%s:8765", scheme, service.Address)
-			} else {
-				node.Address = fmt.Sprintf("%s://%s:%d", scheme, service.Address, port)
-			}
-
+			node.Address = getServiceUrl(service)
 			node.IsLocal = server.isLocalService(service)
 			node.Params = RenameFileParams{
 				File:    params.File,
@@ -393,24 +398,38 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			if node.Params.isEmpty() {
 				continue // nothing to do
 			}
+
 			wg.Add(1)
 			go func(node *Node, path string) {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						log.WithField("error", r).Errorf("[%s]: rename file failed", CORE)
+						if err, ok := r.(error); ok {
+							node.Error = err
+						}
+					}
+				}()
+
 				if node.IsLocal {
-					log.WithField("what", node.Params).Debugf("renaming on local node")
+					log.WithField("what", node.Params).Debugf("[%s]: renaming on local node", CORE)
 					// checks all the inputs are relative to home
 					if err := fileRename.Validate(); err != nil {
 						panic(NewError(http.StatusBadRequest, err.Error()))
 					}
-					// rename local file
-					node.Result, node.Error = server.RenameLocalFile(fileRename), nil
+					status, err := server.renameLocalFile(fileRename)
+					node.Results = append(node.Results, RenameFileResult{
+						Status: status,
+						Host:   server.Config.HostName,
+					})
+					node.Error = err
 				} else {
-					log.WithField("what", node.Params).
-						WithField("node", node.Name).
-						WithField("addr", node.Address).
-						Debugf("renaming on remote node")
-					// rename remote file
-					node.Result, node.Error = server.RenameRemoteFile(node.Address, authToken, node.Params, path)
+					log.WithFields(map[string]interface{}{
+						"what": node.Params,
+						"node": node.Name,
+						"addr": node.Address,
+					}).Debugf("[%s]: renaming on remote node", CORE)
+					node.Results, node.Error = server.renameRemoteFile(node.Address, authToken, node.Params, path)
 				}
 			}(node, ctx.Param("path"))
 		}
@@ -421,12 +440,15 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 			if node.Params.isEmpty() {
 				continue // nothing to do
 			}
-			if node.Error != nil {
-				result[node.Name] = map[string]interface{}{
-					"error": node.Error.Error(),
-				}
+
+			if err := node.Error; err != nil {
+				// failed, no status
+				results = append(results, RenameFileResult{
+					Host:  node.Name,
+					Error: err.Error(),
+				})
 			} else {
-				result[node.Name] = node.Result
+				results = append(results, node.Results...)
 			}
 		}
 	} else {
@@ -434,25 +456,41 @@ func (server *Server) DoRenameFiles(ctx *gin.Context) {
 		if err := fileRename.Validate(); err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()))
 		}
-		result = server.RenameLocalFile(fileRename)
+		status, err := server.renameLocalFile(fileRename)
+		res := RenameFileResult{
+			Host:   server.Config.HostName,
+			Status: status,
+		}
+		if err != nil {
+			res.Error = err.Error()
+		}
+		results = append(results, res)
 	}
-	ctx.JSON(http.StatusOK, result)
+
+	// detect errors (skip in cluster mode)
+	if len(results) == 1 && results[0].Error != "" {
+		panic(NewError(http.StatusInternalServerError, results[0].Error).
+			WithDetails("failed to RENAME files"))
+	}
+
+	ctx.JSON(http.StatusOK, results)
 }
 
-// RenameLocalFile rename local file, directory, catalog
-func (server *Server) RenameLocalFile(fileRename filesRenamer) map[string]interface{} {
+// renameLocalFile rename local file, directory, catalog
+func (server *Server) renameLocalFile(renamer filesRenamer) (map[string]interface{}, error) {
 	res := make(map[string]interface{})
 	// rename
-	if item, err := fileRename.Rename(); err != nil {
+	if item, err := renamer.Rename(); err != nil {
 		res[item] = err.Error()
+		return res, err
 	} else {
 		res[item] = "OK"
 	}
-	return res
+	return res, nil // OK
 }
 
-// RenameRemoteFile rename remote file, directory, catalog
-func (server *Server) RenameRemoteFile(address string, authToken string, params RenameFileParams, path string) (map[string]interface{}, error) {
+// renameRemoteFile rename remote file, directory, catalog
+func (server *Server) renameRemoteFile(address string, authToken string, params RenameFileParams, path string) ([]RenameFileResult, error) {
 	// prepare query
 	u, err := url.Parse(address)
 	if err != nil {
@@ -468,6 +506,7 @@ func (server *Server) RenameRemoteFile(address string, authToken string, params 
 	u.RawQuery = q.Encode()
 	u.Path += "/rename"
 	u.Path = filepath.Join(u.Path, path)
+
 	// prepare request
 	req, err := http.NewRequest("PUT", u.String(), nil)
 	if err != nil {
@@ -489,14 +528,23 @@ func (server *Server) RenameRemoteFile(address string, authToken string, params 
 
 	// check status code
 	if resp.StatusCode != http.StatusOK {
+		// try to decode error response
+		var errorBody map[string]interface{}
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&errorBody); err == nil {
+			if msg, err := utils.AsString(errorBody["message"]); err == nil {
+				return nil, fmt.Errorf("%d: %s", resp.StatusCode, msg)
+			}
+		}
+
 		return nil, fmt.Errorf("invalid HTTP response status: %d (%s)", resp.StatusCode, resp.Status)
 	}
 
-	res := make(map[string]interface{})
+	var results []RenameFileResult
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&res); err != nil {
+	if err := dec.Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %s", err)
 	}
 
-	return res, nil // OK
+	return results, nil // OK
 }

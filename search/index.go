@@ -205,7 +205,7 @@ func (f *IndexFile) Find(offset uint64) int {
 }
 
 // Unwind unwinds the index
-func (f *IndexFile) Unwind(index *Index) (*Index, int) {
+func (f *IndexFile) Unwind(index *Index, width int) (*Index, int, error) {
 	// we should take into account surrounding width.
 	// in common case data are surrounded: [w]data[w]
 	// but at begin or end of file no surrounding
@@ -213,18 +213,18 @@ func (f *IndexFile) Unwind(index *Index) (*Index, int) {
 	// in case of --line option the width is negative
 	// and we should take middle of the data as a reference
 	var n int // base item index
-	if f.Width < 0 {
+	if width < 0 {
 		// middle: [...]data[...]
 		dataMid := index.Offset + index.Length/2
 		n = f.Find(dataMid)
 	} else if index.Offset == 0 {
 		// begin: [0..w]data[w]
-		dataEnd := index.Length - uint64(f.Width+1)
+		dataEnd := index.Length - uint64(width+1)
 		n = f.Find(dataEnd)
 	} else {
 		// middle: [w]data[w]
 		// or end: [w]data[0..w]
-		dataBeg := index.Offset + uint64(f.Width)
+		dataBeg := index.Offset + uint64(width)
 		n = f.Find(dataBeg)
 	}
 
@@ -237,6 +237,10 @@ func (f *IndexFile) Unwind(index *Index) (*Index, int) {
 		beg := index.Offset
 		end := index.Offset + index.Length
 		Len := index.Length
+
+		if end <= baseBeg || baseEnd <= beg {
+			return index, 0, fmt.Errorf("bad base:[%d..%d) for index:[%d..%d)", baseBeg, baseEnd, beg, end)
+		}
 
 		var shift uint64
 		if baseBeg <= beg {
@@ -261,8 +265,8 @@ func (f *IndexFile) Unwind(index *Index) (*Index, int) {
 		res.Fuzziness = index.Fuzziness
 		res.DataPos = index.DataPos
 		res.Host = index.Host
-		return res, int(shift)
+		return res, int(shift), nil // OK
 	}
 
-	return index, 0 // "as is" fallback
+	return index, 0, fmt.Errorf("no base found") // "as is" fallback
 }

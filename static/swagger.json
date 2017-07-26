@@ -3,7 +3,7 @@
   "info": {
     "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "RyftOne REST API",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "paths": {
     "/search": {
@@ -97,16 +97,31 @@
           {
             "in": "query",
             "type": "string",
+            "x-go-name": "Backend",
+            "name": "backend",
+            "description": "Optional backend tool.",
+            "enum": ["ryftprim", "ryftx"]
+          },
+          {
+            "in": "query",
+            "type": "string",
             "x-go-name": "Data",
             "name": "data",
-            "description": "Name of data file to keep. WARNING: file will be overriden!"
+            "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
             "type": "string",
             "name": "index",
             "x-go-name": "Index",
-            "description": "Name of index file to keep. WARNING: file will be overriden!"
+            "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
@@ -114,6 +129,13 @@
             "name": "delimiter",
             "x-go-name": "Delimiter",
             "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "x-go-name": "Lifetime",
+            "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
           },
           {
             "in": "query",
@@ -193,7 +215,7 @@
       "get": {
         "description": "Endpoint for the count. Does the search but returns just statistics.",
         "tags": [
-          "count"
+          "search"
         ],
         "summary": "Count the search matches",
         "operationId": "count",
@@ -261,16 +283,31 @@
           {
             "in": "query",
             "type": "string",
+            "x-go-name": "Backend",
+            "name": "backend",
+            "description": "Optional backend tool.",
+            "enum": ["ryftprim", "ryftx"]
+          },
+          {
+            "in": "query",
+            "type": "string",
             "x-go-name": "Data",
             "name": "data",
-            "description": "Name of data file to keep. WARNING: file will be overriden!"
+            "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
             "type": "string",
             "name": "index",
             "x-go-name": "Index",
-            "description": "Name of index file to keep. WARNING: file will be overriden!"
+            "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
           },
           {
             "in": "query",
@@ -278,6 +315,13 @@
             "name": "delimiter",
             "x-go-name": "Delimiter",
             "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "x-go-name": "Lifetime",
+            "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
           },
           {
             "in": "query",
@@ -328,10 +372,171 @@
         }
       }
     },
+    "/search/show": {
+      "get": {
+        "description": "Endpoint to access search results. Reads already existing search results.",
+        "tags": [
+          "search"
+        ],
+        "produces": [
+          "application/json",
+          "text/csv"
+        ],
+        "summary": "Read search results",
+        "operationId": "searchShow",
+        "parameters": [
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint",
+            "name": "offset",
+            "x-go-name": "Offset",
+            "description": "Offset of first record to report."
+          },
+          {
+            "in": "query",
+            "type": "integer",
+            "format": "uint",
+            "name": "count",
+            "x-go-name": "Count",
+            "description": "Total number of records to report."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "format",
+            "x-go-name": "Format",
+            "description": "Input data format. Parameter is used with structured or RAW text search.",
+            "enum": ["raw", "xml", "json", "utf8", "null"]
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "fields",
+            "x-go-name": "Fields",
+            "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Session",
+            "name": "session",
+            "description": "Session token to access search results."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Data",
+            "name": "data",
+            "description": "Name of DATA file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "index",
+            "x-go-name": "Index",
+            "description": "Name of INDEX file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "view",
+            "x-go-name": "View",
+            "description": "Name of VIEW file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "x-go-name": "Delimiter",
+            "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "x-go-name": "Local",
+            "description": "Perform search only on this cluster member. Default 'false'."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "performance",
+            "x-go-name": "Performance",
+            "description": "Include performance metrics in response. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "schema": {
+              "$ref": "#/definitions/SearchResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/run": {
+      "get": {
+        "tags": [
+          "run"
+        ],
+        "summary": "Run custom command on server side",
+        "description": "Endpoint to run custom command",
+        "operationId": "run",
+        "parameters": [
+          {
+            "name": "image",
+            "type": "string",
+            "description": "The Docker image to run command in.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "name": "command",
+            "type": "string",
+            "description": "Command to run.",
+            "required": false,
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "name": "arg",
+            "description": "Set of arguments.",
+            "collectionFormat": "multi",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "STDOUT and STDERR combined output of the command",
+            "schema":{
+              "type": "string"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/rename": {
       "put": {
         "tags": [
-          "rename"
+          "files"
         ],
         "summary": "Change file/directory/catalog name or file name in catalog",
         "description": "Endpoint for the file renaming",
@@ -388,25 +593,19 @@
         }
       }
     },
-    "/files": {
+    "/file": {
       "get": {
         "tags": [
           "files"
         ],
-        "summary": "List a directory content or download a file",
-        "description": "Endpoint to query node/cluster file system structure or download a file",
-        "operationId": "getFiles",
+        "summary": "Download a file",
+        "description": "Endpoint to download a file",
+        "operationId": "getFile",
         "parameters": [
           {
             "name": "dir",
             "type": "string",
-            "description": "The folder path to return child items of. Default '/'",
-            "in": "query"
-          },
-          {
-            "name": "hidden",
-            "type": "boolean",
-            "description": "Report hidden files",
+            "description": "The folder path where file is located. Default '/'",
             "in": "query"
           },
           {
@@ -430,9 +629,10 @@
         ],
         "responses": {
           "200": {
-            "description": "List of files and directories for node/cluster",
+            "description": "File content",
             "schema": {
-              "$ref": "#/definitions/GetFilesResponse"
+              "type":"string",
+              "format": "byte"
             }
           },
           "default": {
@@ -447,11 +647,10 @@
         "tags": [
           "files"
         ],
-        "summary": "Upload files",
-        "description": "Endpoint to upload files",
-        "operationId": "postFiles",
+        "summary": "Upload a file",
+        "description": "Endpoint to upload a file",
+        "operationId": "postFile",
         "consumes": [
-          "application/octet-stream",
           "multipart/form-data"
         ],
         "parameters": [
@@ -499,7 +698,7 @@
             "in": "query",
             "type": "string",
             "name": "lifetime",
-            "description": "The file or catalog lifetime, for example '2h'."
+            "description": "The file or catalog lifetime, for example \"2h\"."
           },
           {
             "in": "query",
@@ -519,7 +718,57 @@
           "200": {
             "description": "Map of files and directories uploaded",
             "schema": {
-              "$ref": "#/definitions/PostFilesResponse"
+              "$ref": "#/definitions/PostFileResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/files": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "List a directory or catalog content",
+        "description": "Endpoint to query node/cluster file system structure",
+        "operationId": "getFiles",
+        "parameters": [
+          {
+            "name": "dir",
+            "type": "string",
+            "description": "The folder path to return child items of. Default '/'",
+            "in": "query"
+          },
+          {
+            "name": "hidden",
+            "type": "boolean",
+            "description": "Report hidden files",
+            "in": "query"
+          },
+          {
+            "name": "local",
+            "type": "boolean",
+            "description": "Return file structure from local node only or whole cluster",
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The path to catalog to get content of",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of files and directories for node/cluster",
+            "schema": {
+              "$ref": "#/definitions/GetFilesResponse"
             }
           },
           "default": {
@@ -581,6 +830,97 @@
             "description": "Map of files and directories deleted",
             "schema": {
               "$ref": "#/definitions/DeleteFilesResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/raw": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload a RAW octet stream",
+        "description": "Endpoint to upload RAW octet stream",
+        "operationId": "postRawFile",
+        "consumes": [
+          "application/octet-stream"
+        ],
+        "parameters": [
+          {
+            "name": "content",
+            "in": "body",
+             "schema": {
+                "type": "string",
+                "format": "byte"
+            },
+            "description": "Byte content to upload",
+            "required": true
+          },
+          {
+            "name": "file",
+            "type": "string",
+            "description": "The uploading filename. Use {{random}} for random names.",
+            "required": true,
+            "in": "query"
+          },
+          {
+            "name": "catalog",
+            "type": "string",
+            "description": "The catalog to append file to.",
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "description": "The delimiter is used between file parts in catalog."
+          },
+          {
+            "name": "offset",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part offset.",
+            "in": "query"
+          },
+          {
+            "name": "length",
+            "type": "integer",
+            "format": "int64",
+            "description": "The optional file part length.",
+            "in": "query"
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "lifetime",
+            "description": "The file or catalog lifetime, for example \"2h\"."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "share-mode",
+            "x-go-name": "ShareMode",
+            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "description": "Perform action only on this cluster member. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of files and directories uploaded",
+            "schema": {
+              "$ref": "#/definitions/PostFileResponse"
             }
           },
           "default": {
@@ -656,7 +996,7 @@
     "/token/refresh": {
       "get": {
         "tags": [
-          "token_refresh"
+          "login"
         ],
         "summary": "Refresh authentication",
         "description": "Endpoint to refresh existing authentication token",
@@ -702,6 +1042,33 @@
         "totalBytes": {
           "type": "number",
           "format": "int32"
+        },
+        "fabricDuration": {
+          "type": "number",
+          "format": "int32"
+        },
+        "host": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string",
+          "items": {
+            "type": "object",
+            "schema": {
+              "$ref": "#/definitions/CountResponse"
+            }
+          }
+        },
+        "extra": {
+          "type": "object",
+          "properties": {
+            "backend": {
+              "type": "string"
+            },
+            "session": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -734,7 +1101,7 @@
         }
       }
     },
-    "FilesResponse": {
+    "GetFilesResponse": {
       "type": "object",
       "properties": {
         "folders": {
@@ -811,37 +1178,79 @@
       }
     },
     "RenameResponse": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "type": "string"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
-    "PostFilesResponse": {
-      "type": "object",
-      "properties": {
-        "length": {
-          "type": "integer"
-        },
-        "offset": {
-          "type": "integer"
-        },
-        "path": {
-          "type": "string"
+    "PostFileResponse": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "length": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "path": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
     "DeleteFilesResponse": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "type": "string"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
-    },
-    "GetFilesResponse": {
-      "type":"string"
     }
   },
   "securityDefinitions": {
@@ -856,6 +1265,7 @@
   },
   "security": [
     {
+      "basic": [],
       "jwt": []
     }
   ]

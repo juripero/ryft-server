@@ -2,8 +2,9 @@ GOBINDATA = ${GOPATH}/bin/go-bindata
 ASSETS = bindata.go
 BINARIES = ryft-server
 HINT=ryft-server
+APP_VERSION ?= latest
 
-all: $(ASSETS) build
+all: $(ASSETS) build version
 
 ifeq (${VERSION},)
   VERSION=$(shell git describe --tags)
@@ -18,7 +19,7 @@ version:
 	@echo "GitHash: ${GITHASH}"
 
 $(GOBINDATA):
-	go get -u github.com/jteeuwen/go-bindata/...
+	@go get -u github.com/jteeuwen/go-bindata/...
 
 .PHONY: $(ASSETS)
 $(ASSETS): $(GOBINDATA)
@@ -32,21 +33,23 @@ update:
 .PHONY: build
 build:
 	@echo "[${HINT}]: building ryft-server..."
-	@go build -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
+	@go build -ldflags "-s -w -X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
 .PHONY: install
 install: $(ASSETS)
 	@echo "[${HINT}]: installing ryft-server..."
-	@go install -ldflags "-X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
+	@go install -ldflags "-s -w -X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
 .PHONY: debian
 debian: install
 	@make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
 
+# build Debian package using Docker container
 .PHONY: docker-build docker_build
 docker_build: docker-build
 docker-build:
-	docker build -t ryft.build -f docker/Dockerfile.build .
+	@make -C docker build
+
 
 .PHONY: test_cover test-cover test
 test_cover: test-cover
@@ -82,3 +85,14 @@ test:
 clean:
 	rm -f $(ASSETS)
 	rm -f $(BINARIES)
+.PHONY: build_container
+build_container:
+	if [ ! -d ./ryft-docker ]; then git clone git@github.com:getryft/ryft-docker.git; fi
+	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=../../../../ build
+	@make -C ./ryft-docker/ryft-server-cluster VERSION=${APP_VERSION} app
+
+.PHONY: integration_test
+# integration_test: build_container
+integration_test:
+	if [ ! -d ./ryft-integration-test ]; then git clone git@github.com:getryft/ryft-integration-test.git; fi
+	@make -C ./ryft-integration-test APP_VERSION=${APP_VERSION} TEST_TAGS="not ryftx and not compound" all

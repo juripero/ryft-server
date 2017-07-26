@@ -139,10 +139,26 @@ type ServerConfig struct {
 	SettingsPath string `yaml:"settings-path,omitempty"`
 	HostName     string `yaml:"hostname,omitempty"`
 
+	Sessions struct {
+		Algorithm string `yaml:"signing-algorithm,omitempty"`
+		Secret    string `yaml:"secret,omitempty"`
+		secret    []byte `yaml:"-"`
+		// Lifetime  string `yaml:"lifetime,omitempty"`
+	} `yaml:"sessions,omitempty"`
+
 	// post-processing scripts/actions
 	PostProcScripts map[string]struct {
 		ExecPath []string `yaml:"path"`
 	} `yaml:"post-processing-scripts,omitempty"`
+
+	// docker options
+	Docker struct {
+		RunCmd  []string            `yaml:"run"`
+		ExecCmd []string            `yaml:"exec"`
+		Images  map[string][]string `yaml:"images"`
+	} `yaml:"docker,omitempty"`
+
+	DefaultUserConfig map[string]interface{} `yaml:"default-user-config"`
 }
 
 // Server instance
@@ -163,6 +179,8 @@ type Server struct {
 	settings    *ServerSettings
 	gotJobsChan chan int // signal new jobs added
 	// newJobsCount int32    // atomic
+
+	closeCh chan struct{} // close all
 }
 
 // NewServer creates new server instance
@@ -182,8 +200,16 @@ func NewServer() *Server {
 	s.Config.Catalogs.CacheDropTimeout = 10 * time.Second
 	s.Config.Catalogs.CacheDropTimeout_ = NewTimeDuration(&s.Config.Catalogs.CacheDropTimeout)
 	s.Config.SettingsPath = "/var/ryft/server.settings"
+	s.Config.Sessions.Algorithm = "HS256"
+	s.Config.Sessions.Secret = "session-secret-key"
 
+	s.closeCh = make(chan struct{})
 	return s // OK
+}
+
+// Close() closes the server
+func (s *Server) Close() {
+	close(s.closeCh)
 }
 
 // ParseConfig parses server configuration from YML file
@@ -233,6 +259,12 @@ func (s *Server) Prepare() (err error) {
 	_ = os.MkdirAll(settingsDir, 0755)
 	if s.settings, err = OpenSettings(s.Config.SettingsPath); err != nil {
 		return fmt.Errorf("failed to open settings: %s", err)
+	}
+
+	// parse session secret
+	s.Config.Sessions.secret, err = auth.ParseSecret(s.Config.Sessions.Secret)
+	if err != nil {
+		return fmt.Errorf("failed to parse session secret: %s", err)
 	}
 
 	// hostname

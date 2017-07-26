@@ -25,7 +25,7 @@ func TestOptions(t *testing.T) {
 	// get fake options
 	fake := func(name string, val interface{}) map[string]interface{} {
 		opts := map[string]interface{}{
-			"server-url": "http://localhost:12345",
+			"server-url": "http://localhost:8765",
 			"auth-token": "Basic: Login+Password",
 			"local-only": true,
 			"skip-stat":  false,

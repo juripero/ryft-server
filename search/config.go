@@ -33,6 +33,8 @@ package search
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -48,13 +50,17 @@ type Config struct {
 	Dist   uint     // fuzziness distance (FHS, FEDS)
 	Reduce bool     // reduce for FEDS
 	Nodes  uint     // number of hardware nodes to use (0..4)
-	Limit  uint     // limit  the number of records (0 - no limit)
+	Limit  uint     // limit the number of records (0 - no limit)
+	Offset uint     // first record index (/show feature)
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
+	// VIEW file is used to speedup INDEX/DATA access
 	KeepDataAs  string
 	KeepIndexAs string
+	KeepViewAs  string
 	Delimiter   string
+	Lifetime    time.Duration
 
 	// post-processing transformations
 	Transforms []Transform
@@ -65,6 +71,10 @@ type Config struct {
 
 	// upload/search share mode
 	ShareMode utils.ShareMode
+
+	// backend tool, autoselect if empty
+	// should be "ryftprim" or "ryftx"
+	BackendTool string
 
 	// report performance metrics
 	Performance bool
@@ -105,9 +115,98 @@ func (cfg *Config) AddFiles(files []string) {
 
 // String gets the string representation of the configuration.
 func (cfg Config) String() string {
-	return fmt.Sprintf("Config{query:%s, files:%q, mode:%q, width:%d, dist:%d, cs:%t, nodes:%d, limit:%d, keep-data:%q, keep-index:%q, delim:%q, index:%t, data:%t}",
-		cfg.Query, cfg.Files, cfg.Mode, cfg.Width, cfg.Dist, cfg.Case, cfg.Nodes, cfg.Limit,
-		cfg.KeepDataAs, cfg.KeepIndexAs, cfg.Delimiter, cfg.ReportIndex, cfg.ReportData)
+	props := make([]string, 0, 8)
+
+	// query
+	if len(cfg.Query) != 0 {
+		props = append(props, fmt.Sprintf("query:%s", cfg.Query))
+	}
+
+	// files
+	if len(cfg.Files) != 0 {
+		props = append(props, fmt.Sprintf("files:%q", cfg.Files))
+	}
+
+	// mode
+	if len(cfg.Mode) != 0 {
+		props = append(props, fmt.Sprintf("mode:%q", cfg.Mode))
+	}
+
+	// width
+	if cfg.Width != 0 {
+		props = append(props, fmt.Sprintf("width:%d", cfg.Width))
+	}
+
+	// dist
+	if cfg.Dist != 0 {
+		props = append(props, fmt.Sprintf("dist:%d", cfg.Dist))
+	}
+
+	// cs
+	props = append(props, fmt.Sprintf("cs:%t", cfg.Case))
+
+	// nodes
+	if cfg.Nodes != 0 {
+		props = append(props, fmt.Sprintf("nodes:%d", cfg.Nodes))
+	}
+
+	// offset
+	if cfg.Offset != 0 {
+		props = append(props, fmt.Sprintf("offset:%d", cfg.Offset))
+	}
+
+	// limit
+	if cfg.Limit != 0 {
+		props = append(props, fmt.Sprintf("limit:%d", cfg.Limit))
+	}
+
+	// data
+	if len(cfg.KeepDataAs) != 0 {
+		props = append(props, fmt.Sprintf("data:%q", cfg.KeepDataAs))
+	}
+
+	// index
+	if len(cfg.KeepIndexAs) != 0 {
+		props = append(props, fmt.Sprintf("index:%q", cfg.KeepIndexAs))
+	}
+
+	// view
+	if len(cfg.KeepViewAs) != 0 {
+		props = append(props, fmt.Sprintf("view:%q", cfg.KeepViewAs))
+	}
+
+	// delimiter
+	if len(cfg.Delimiter) != 0 {
+		props = append(props, fmt.Sprintf("delim:#%x", cfg.Delimiter))
+	}
+
+	// lifetime
+	if cfg.Lifetime != 0 {
+		props = append(props, fmt.Sprintf("lifetime:%s", cfg.Lifetime))
+	}
+
+	// transformations
+	if len(cfg.Transforms) != 0 {
+		props = append(props, fmt.Sprintf("transforms:%q", cfg.Transforms))
+	}
+
+	// backend
+	if len(cfg.BackendTool) != 0 {
+		props = append(props, fmt.Sprintf("backend:%q", cfg.BackendTool))
+	}
+
+	// flags
+	if cfg.ReportIndex {
+		props = append(props, "I")
+	}
+	if cfg.ReportData {
+		props = append(props, "D")
+	}
+	if cfg.Performance {
+		props = append(props, "P")
+	}
+
+	return fmt.Sprintf("Config{%s}", strings.Join(props, ", "))
 }
 
 // CheckRelativeToHome checks all the input/output filenames are relative to home
@@ -127,6 +226,11 @@ func (cfg *Config) CheckRelativeToHome(home string) error {
 	// output DATA file
 	if len(cfg.KeepDataAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepDataAs)) {
 		return fmt.Errorf("data %q is not relative to home", cfg.KeepDataAs)
+	}
+
+	// output VIEW file
+	if len(cfg.KeepViewAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepViewAs)) {
+		return fmt.Errorf("view %q is not relative to home", cfg.KeepViewAs)
 	}
 
 	return nil // OK

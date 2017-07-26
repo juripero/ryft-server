@@ -19,12 +19,15 @@ func TestSearchUsual(t *testing.T) {
 
 	go func() {
 		err := fs.worker.ListenAndServe()
-		assert.NoError(t, err, "failed to start fake server")
+		assert.NoError(t, err, "failed to serve fake server")
 	}()
-	time.Sleep(100 * time.Millisecond) // wait a bit until server is started
+	time.Sleep(testServerStartTO) // wait a bit until server is started
 	defer func() {
-		fs.worker.Stop(0)
-		time.Sleep(100 * time.Millisecond) // wait a bit until server is stopped
+		//t.Log("stopping the server...")
+		fs.worker.Stop(testServerStopTO)
+		//t.Log("waiting the server...")
+		<-fs.worker.StopChan()
+		//t.Log("server stopped")
 	}()
 
 	// test case
@@ -43,30 +46,31 @@ func TestSearchUsual(t *testing.T) {
 	}
 
 	all := true // false
+	TO := 30 * time.Second
 
 	if all {
-		check("/search1", "", 0, http.StatusNotFound, "page not found")
+		check("/search1", "", TO, http.StatusNotFound, "page not found")
 
-		check("/search", "", 0, http.StatusBadRequest,
+		check("/search", "", TO, http.StatusBadRequest,
 			"Field validation for 'Query' failed on the 'required' tag",
 			"failed to parse request parameters")
 
-		check("/search?query=hello", "", 0, http.StatusBadRequest,
+		check("/search?query=hello", "", TO, http.StatusBadRequest,
 			"no any file or catalog provided")
 
-		check("/search?query=hello&file=*.txt&format=bad", "application/json", 0,
+		check("/search?query=hello&file=*.txt&format=bad", "application/json", TO,
 			http.StatusBadRequest, "is unsupported format", "failed to get transcoder")
 
 		//check("/search?query=hello&file=*.txt", "application/octet-stream",
-		//	0, http.StatusBadRequest, "failed to get encoder")
+		//	TO, http.StatusBadRequest, "failed to get encoder")
 
-		check("/search?query=hello&file=*.txt&surrounding=bad", "", 0,
+		check("/search?query=hello&file=*.txt&surrounding=bad", "", TO,
 			http.StatusBadRequest, "failed to parse surrounding width", "invalid syntax")
 	}
 
 	if oldSearchBackend := fs.server.Config.SearchBackend; all {
 		fs.server.Config.SearchBackend = "bad"
-		check("/search?query=hello&file=*.txt", "application/json", 0,
+		check("/search?query=hello&file=*.txt", "application/json", TO,
 			http.StatusInternalServerError, "failed to get search engine", "unknown search engine")
 		fs.server.Config.SearchBackend = oldSearchBackend
 	}
@@ -74,15 +78,15 @@ func TestSearchUsual(t *testing.T) {
 	if all {
 		fs.server.Config.BackendOptions["search-report-error"] = "simulated-error"
 		check("/search?query=hello&file=*.txt&surrounding=line", "application/json",
-			0, http.StatusInternalServerError, "failed to start search", "simulated-error")
+			TO, http.StatusInternalServerError, "failed to start search", "simulated-error")
 		delete(fs.server.Config.BackendOptions, "search-report-error")
 	}
 
 	if all {
 		fs.server.Config.BackendOptions["search-report-records"] = 0
 		fs.server.Config.BackendOptions["search-report-errors"] = 1
-		check("/search?query=hello&file=*.txt&surrounding=0&ep=true", "application/octet-stream", // should be changed to application/json
-			0, http.StatusOK, `"results":[]`, `"errors":["[node-1]: error-1"]`)
+		check("/search?query=hello&file=*.txt&surrounding=0&--internal-error-prefix=true", "application/octet-stream", // should be changed to application/json
+			TO, http.StatusOK, `"results":[]`, `"errors":["[node-1]: error-1"]`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}
@@ -91,8 +95,8 @@ func TestSearchUsual(t *testing.T) {
 		fs.server.Config.BackendOptions["search-report-records"] = 0
 		fs.server.Config.BackendOptions["search-report-errors"] = 1
 		fs.server.Config.BackendOptions["search-no-stat"] = true
-		check("/search?query=hello&file=*.txt&surrounding=0&ep=true", "",
-			0, http.StatusInternalServerError, `[node-1]: error-1`)
+		check("/search?query=hello&file=*.txt&surrounding=0&--internal-error-prefix=true", "",
+			TO, http.StatusInternalServerError, `[node-1]: error-1`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 		delete(fs.server.Config.BackendOptions, "search-no-stat")
@@ -102,7 +106,7 @@ func TestSearchUsual(t *testing.T) {
 		fs.server.Config.BackendOptions["search-report-records"] = 1
 		fs.server.Config.BackendOptions["search-report-errors"] = 0
 		check("/search?query=hello&file=*.txt&stats=true", "application/json",
-			0, http.StatusOK, `"file":"file-1.txt"`)
+			TO, http.StatusOK, `"file":"file-1.txt"`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}
@@ -110,7 +114,7 @@ func TestSearchUsual(t *testing.T) {
 	if all {
 		fs.server.Config.BackendOptions["search-report-records"] = 100000
 		fs.server.Config.BackendOptions["search-report-errors"] = 100
-		check("/search?query=hello&file=*.txt&stats=true", "application/json", 0, http.StatusOK)
+		check("/search?query=hello&file=*.txt&stats=true", "application/json", TO, http.StatusOK)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}

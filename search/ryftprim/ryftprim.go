@@ -65,7 +65,8 @@ func (engine *Engine) prepare(task *Task) error {
 	// select search mode
 	genericMode := false
 	switch strings.ToLower(cfg.Mode) {
-	case "", "g", "generic":
+	case "", "g", "generic", "g/es", "g/fhs", "g/feds", "g/ds",
+		"g/ts", "g/ns", "g/cs", "g/ipv4", "g/ipv6", "g/pcre2":
 		args = append(args, "-p", "g")
 		genericMode = true
 	case "es", "exact", "exact_search":
@@ -87,6 +88,8 @@ func (engine *Engine) prepare(task *Task) error {
 		args = append(args, "-p", "ipv4")
 	case "ipv6", "ipv6_search":
 		args = append(args, "-p", "ipv6")
+	case "pcre2", "pcre2_search", "regex", "regex_search", "regexp", "regexp_search":
+		args = append(args, "-p", "pcre2")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
@@ -135,12 +138,16 @@ func (engine *Engine) prepare(task *Task) error {
 		}
 
 		if !skip {
-			args = append(args, "-f", engine.relativeToMountPoint(path))
+			args = append(args, "-f", engine.getFilePath(path))
 		}
 	}
 
-	// data separator (should be hex-escaped)
-	args = append(args, "-e", utils.HexEscape([]byte(cfg.Delimiter)))
+	if len(cfg.Delimiter) != 0 {
+		// data separator (should be hex-escaped)
+		args = append(args, "-e", utils.HexEscape([]byte(cfg.Delimiter)))
+	} else {
+		args = append(args, "-en") // NULL delimiter
+	}
 
 	// enable verbose mode to grab statistics
 	args = append(args, "-v")
@@ -174,7 +181,7 @@ func (engine *Engine) prepare(task *Task) error {
 				Warnf("[%s]: index filename was updated to have TXT extension", TAG)
 		}
 
-		args = append(args, "-oi", engine.relativeToMountPoint(task.IndexFileName))
+		args = append(args, "-oi", engine.getFilePath(task.IndexFileName))
 	}
 
 	// DATA output file
@@ -188,7 +195,12 @@ func (engine *Engine) prepare(task *Task) error {
 				engine.Instance, fmt.Sprintf(".dat-%s.bin", task.Identifier))
 		}
 
-		args = append(args, "-od", engine.relativeToMountPoint(task.DataFileName))
+		args = append(args, "-od", engine.getFilePath(task.DataFileName))
+	}
+
+	// VIEW output file
+	if len(cfg.KeepViewAs) != 0 {
+		task.ViewFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)
 	}
 
 	// assign command line
@@ -216,11 +228,20 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
+	var err error
+	task.toolPath, err = engine.getExecPath(task.config)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
+		return fmt.Errorf("failed to find tool: %s", err)
+	} else if task.toolPath == "" {
+		task.log().Warnf("[%s]: no appropriate tool found", TAG)
+		return fmt.Errorf("no tool found: %s", task.toolPath)
+	}
 	task.log().WithFields(map[string]interface{}{
-		"tool": engine.ExecPath,
+		"tool": task.toolPath,
 		"args": task.toolArgs,
 	}).Infof("[%s]: executing tool", TAG)
-	task.toolCmd = exec.Command(engine.ExecPath, task.toolArgs...)
+	task.toolCmd = exec.Command(task.toolPath, task.toolArgs...)
 
 	// prepare combined STDERR&STDOUT output
 	task.toolOut = new(bytes.Buffer)
@@ -228,7 +249,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.toolCmd.Stderr = task.toolOut
 
 	task.toolStartTime = time.Now() // performance metric
-	err := task.toolCmd.Start()
+	err = task.toolCmd.Start()
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to start tool", TAG)
 		return fmt.Errorf("failed to start tool: %s", err)
@@ -244,12 +265,15 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 // Process the `ryftprim` tool output.
 // engine.finish() will be called anyway at the end of processing.
 func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bool) {
+	defer res.ReportUnhandledPanic(log)
 	defer task.log().WithField("result", res).Debugf("[%s]: end TASK", TAG)
 	task.log().Debugf("[%s]: start TASK...", TAG)
 
 	// wait tool for process done
 	doneCh := make(chan error, 1)
 	go func() {
+		defer res.ReportUnhandledPanic(log)
+
 		task.log().Debugf("[%s]: waiting for tool finished...", TAG)
 		defer close(doneCh) // close channel once process is finished
 		doneCh <- task.toolCmd.Wait()
@@ -302,9 +326,11 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// some futher cleanup
 	defer func() {
 		if res.Stat != nil && task.config.Performance {
-			metrics := map[string]interface{}{
-				"prepare":   task.toolStartTime.Sub(task.taskStartTime).String(),
-				"tool-exec": task.toolStopTime.Sub(task.toolStartTime).String(),
+			metrics := make(map[string]interface{})
+
+			if !task.toolStartTime.IsZero() {
+				metrics["prepare"] = task.toolStartTime.Sub(task.taskStartTime).String()
+				metrics["tool-exec"] = task.toolStopTime.Sub(task.toolStartTime).String()
 			}
 
 			if !task.readStartTime.IsZero() {
@@ -314,6 +340,20 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 			res.Stat.AddPerfStat("ryftprim", metrics)
 		}
+
+		if res.Stat != nil {
+			res.Stat.AddSessionData("index", task.config.KeepIndexAs)
+			res.Stat.AddSessionData("data", task.config.KeepDataAs)
+			res.Stat.AddSessionData("view", task.config.KeepViewAs)
+			res.Stat.AddSessionData("delim", task.config.Delimiter)
+			res.Stat.AddSessionData("width", task.config.Width)
+			res.Stat.AddSessionData("matches", res.Stat.Matches)
+
+			// save backend tool used
+			_, tool := filepath.Split(task.toolPath)
+			res.Stat.Extra["backend"] = tool
+		}
+
 		res.ReportDone()
 		res.Close()
 	}()
@@ -322,8 +362,17 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	task.lockInProgress = false
 	task.releaseLockedFiles()
 
+	// notify processing subtasks the tool is finished!
+	// (now it can check attempt limits)
+	if task.results != nil {
+		task.results.finish()
+	}
+
 	// tool output
-	out := task.toolOut.Bytes()
+	var out []byte
+	if task.toolOut != nil {
+		out = task.toolOut.Bytes()
+	}
 	if err != ErrCancelled {
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: tool failed", TAG)
@@ -334,14 +383,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 	}
 
-	// notify processing subtasks the tool is finished!
-	// (now it can check attempt limits)
-	if task.results != nil {
-		task.results.finish()
-	}
-
 	// parse statistics from output
-	if err == nil {
+	if err == nil && !task.isShow {
 		res.Stat, err = ParseStat(out, engine.IndexHost)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
@@ -384,6 +427,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		// at the same time monitor the res.Cancel event!
 		doneCh := make(chan struct{})
 		go func() {
+			defer res.ReportUnhandledPanic(log)
+
 			task.waitProcessingDone()
 			close(doneCh)
 		}()
@@ -406,16 +451,26 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		}
 
 		task.log().Debugf("[%s]: done reading", TAG)
+	} else if !task.isShow {
+		// it's /count, check if we have to create VIEW file
+		if len(task.ViewFileName) != 0 {
+			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter); err != nil {
+				task.log().WithError(err).WithField("path", task.ViewFileName).
+					Warnf("[%s]: failed to create VIEW file", TAG)
+				res.ReportError(fmt.Errorf("failed to create VIEW file: %s", err))
+			}
+			// TODO: report in performance metric
+		}
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing
-	if !engine.KeepResultFiles && !task.KeepIndexFile && len(task.IndexFileName) != 0 {
+	if !task.isShow && !engine.KeepResultFiles && !task.KeepIndexFile && len(task.IndexFileName) != 0 {
 		if err := os.RemoveAll(task.IndexFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove INDEX file", TAG)
 			// WARN: error actually ignored!
 		}
 	}
-	if !engine.KeepResultFiles && !task.KeepDataFile && len(task.DataFileName) != 0 {
+	if !task.isShow && !engine.KeepResultFiles && !task.KeepDataFile && len(task.DataFileName) != 0 {
 		if err := os.RemoveAll(task.DataFileName); err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to remove DATA file", TAG)
 			// WARN: error actually ignored!
@@ -432,4 +487,13 @@ func (engine *Engine) relativeToMountPoint(path string) string {
 	}
 
 	return rel
+}
+
+// get a file path (relative or absolute)
+func (engine *Engine) getFilePath(path string) string {
+	if engine.UseAbsPath {
+		return path
+	}
+
+	return engine.relativeToMountPoint(path)
 }
