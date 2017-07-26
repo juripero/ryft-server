@@ -114,4 +114,9 @@ func TestCountUsual(t *testing.T) {
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}
+
+	if all {
+		check(`/count?query=hello&file=*.txt&backend-option="--rx-shard-size%204M"&backend-option="--rx-max-spawns%205"&backend=ryftx`,
+			"application/json", time.Second, http.StatusOK)
+	}
 }

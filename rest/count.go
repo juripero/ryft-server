@@ -60,12 +60,13 @@ type CountParams struct {
 	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`    // FEDS only
 	Nodes  uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
 
-	Backend     string `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"` // "" | "ryftprim" | "ryftx"
-	KeepDataAs  string `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
-	KeepIndexAs string `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
-	KeepViewAs  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
-	Delimiter   string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
-	Lifetime    string `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
+	Backend        string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                      // "" | "ryftprim" | "ryftx"
+	BackendOptions []string `form:"backend-option" json:"backend-option,omitempty" msgpack:"backend-option,omitempty"` // search engine parameters (useless without "backend")
+	KeepDataAs     string   `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
+	KeepIndexAs    string   `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
+	KeepViewAs     string   `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
+	Delimiter      string   `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
+	Lifetime       string   `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
@@ -136,6 +137,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
 	cfg.BackendTool = params.Backend
+	cfg.BackendOptions = params.BackendOptions
 	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
