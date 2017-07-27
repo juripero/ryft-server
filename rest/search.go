@@ -57,11 +57,11 @@ type SearchParams struct {
 	Catalogs []string `form:"catalog" json:"-" msgpack:"-"` // obsolete: will be deleted
 	Files    []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
 
-	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`          // optional, "" for generic mode
-	Width  string `form:"surrounding" json:"width,omitempty" msgpack:"width,omitempty"` // surrounding width or "line"
-	Dist   uint8  `form:"fuzziness" json:"dist,omitempty" msgpack:"dist,omitempty"`     // fuzziness distance
-	Case   bool   `form:"cs" json:"case,omitempty" msgpack:"case,omitempty"`            // case sensitivity flag, ES, FHS, FEDS
-	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`    // FEDS only
+	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`                      // optional, "" for generic mode
+	Width  string `form:"surrounding" json:"surrounding,omitempty" msgpack:"surrounding,omitempty"` // surrounding width or "line"
+	Dist   uint8  `form:"fuzziness" json:"fuzziness,omitempty" msgpack:"fuzziness,omitempty"`       // fuzziness distance
+	Case   bool   `form:"cs" json:"cs" msgpack:"cs"`                                                // case sensitivity flag, ES, FHS, FEDS
+	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`                // FEDS only
 	Nodes  uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
 
 	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
@@ -74,7 +74,7 @@ type SearchParams struct {
 	Limit       int      `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	// post-process transformations
-	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
+	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
@@ -82,12 +82,12 @@ type SearchParams struct {
 	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 
 	Local       bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
-	ShareMode   string `form:"share-mode" json:"share-mode"` // share mode to use
+	ShareMode   string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
 	Performance bool   `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 
 	// internal parameters
 	InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
-	InternalNoSessionId bool `form:"--internal-no-session-id"`
+	InternalNoSessionId bool `form:"--internal-no-session-id" json:"-" msgpack:"-"`
 }
 
 // Handle /search endpoint.
@@ -103,6 +103,10 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 		Format: format.RAW,
 		Case:   true,
 		Reduce: true,
+	}
+	if err := bindOptionalJson(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request JSON parameters"))
 	}
 	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
