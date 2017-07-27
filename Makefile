@@ -3,6 +3,8 @@ ASSETS = bindata.go
 BINARIES = ryft-server
 HINT=ryft-server
 APP_VERSION ?= latest
+RYFT_DOCKER_BRANCH ?= master
+RYFT_INTEGRATION_TEST ?= develop
 
 all: $(ASSETS) build version
 
@@ -86,19 +88,29 @@ clean:
 	rm -f $(ASSETS)
 	rm -f $(BINARIES)
 
+ryft-docker/.git/HEAD:
+	git clone -b ${RYFT_DOCKER_BRANCH} git@github.com:getryft/ryft-docker.git
+
+.PHONY: clone_ryft_docker
+clone_ryft_docker: ryft-docker/.git/HEAD
+
 .PHONY: pull_ryft_docker
 pull_ryft_docker: ryft-docker/.git/HEAD
-ryft-docker/.git/HEAD:
-	git clone git@github.com:getryft/ryft-docker.git
+	cd ryft-docker && git pull
+
+ryft-integration-test/.git/HEAD:
+	git clone -b ${RYFT_INTEGRATION_TEST} git@github.com:getryft/ryft-integration-test.git
+
+.PHONY: clone_ryft_integration_test
+clone_ryft_integration_test: ryft-integration-test/.git/HEAD
 
 .PHONY: pull_ryft_integration_test
 pull_ryft_integration_test: ryft-integration-test/.git/HEAD
-ryft-integration-test/.git/HEAD:
-	git clone git@github.com:getryft/ryft-integration-test.git;
+	cd ryft-integration-test && git pull
 
 .PHONY: build_container
 build_container: pull_ryft_docker
-	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=../../../../ build
+	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR}/ build
 	@make -C ./ryft-docker/ryft-server-cluster VERSION=${APP_VERSION} app
 
 .PHONY: integration_test
