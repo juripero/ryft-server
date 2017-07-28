@@ -96,7 +96,7 @@ clone_ryft_docker: ryft-docker/.git/HEAD
 
 .PHONY: pull_ryft_docker
 pull_ryft_docker: ryft-docker/.git/HEAD
-	cd ryft-docker && git pull
+	cd ryft-docker && git pull --ff-only
 
 ryft-integration-test/.git/HEAD:
 	git clone -b ${RYFT_INTEGRATION_TEST} git@github.com:getryft/ryft-integration-test.git
@@ -106,7 +106,7 @@ clone_ryft_integration_test: ryft-integration-test/.git/HEAD
 
 .PHONY: pull_ryft_integration_test
 pull_ryft_integration_test: ryft-integration-test/.git/HEAD
-	cd ryft-integration-test && git pull
+	cd ryft-integration-test && git pull --ff-only
 
 .PHONY: build_container
 build_container: pull_ryft_docker
