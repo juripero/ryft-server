@@ -1,7 +1,7 @@
 GOBINDATA = ${GOPATH}/bin/go-bindata
 ASSETS = bindata.go
 BINARIES = ryft-server
-HINT=ryft-server
+HINT = ryft-server
 APP_VERSION ?= latest
 RYFT_DOCKER_BRANCH ?= master
 RYFT_INTEGRATION_TEST ?= develop
@@ -88,35 +88,34 @@ clean:
 	rm -f $(ASSETS)
 	rm -f $(BINARIES)
 
-ryft-docker/.git/HEAD:
-	git clone -b ${RYFT_DOCKER_BRANCH} git@github.com:getryft/ryft-docker.git
 
-.PHONY: clone_ryft_docker
-clone_ryft_docker: ryft-docker/.git/HEAD
+# clone and pull ryft-docker remote repository
+.PHONY: clone_ryft_docker pull_ryft_docker
+clone_ryft_docker:
+	[ -d ryft-docker/.git ] || git clone git@github.com:getryft/ryft-docker.git
+pull_ryft_docker: clone_ryft_docker
+	cd ryft-docker && git fetch && git checkout ${RYFT_DOCKER_BRANCH} && git pull --ff-only
 
-.PHONY: pull_ryft_docker
-pull_ryft_docker: ryft-docker/.git/HEAD
-	cd ryft-docker && git pull --ff-only
+# clone and pull ryft-integration-test remote repostiory
+.PHONY: clone_ryft_integration_test pull_ryft_integration_test
+clone_ryft_integration_test:
+	[ -d ryft-integration-test/.git ] || git clone git@github.com:getryft/ryft-integration-test.git
+pull_ryft_integration_test: clone_ryft_integration_test
+	cd ryft-integration-test && git fetch && git checkout ${RYFT_INTEGRATION_TEST} && git pull --ff-only
 
-ryft-integration-test/.git/HEAD:
-	git clone -b ${RYFT_INTEGRATION_TEST} git@github.com:getryft/ryft-integration-test.git
 
-.PHONY: clone_ryft_integration_test
-clone_ryft_integration_test: ryft-integration-test/.git/HEAD
-
-.PHONY: pull_ryft_integration_test
-pull_ryft_integration_test: ryft-integration-test/.git/HEAD
-	cd ryft-integration-test && git pull --ff-only
-
+# build Docker containers with test environment
 .PHONY: build_container
 build_container: pull_ryft_docker
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR}/ build
 	@make -C ./ryft-docker/ryft-server-cluster VERSION=${APP_VERSION} app
 
+# run integration tests
 .PHONY: integration_test
 integration_test: pull_ryft_integration_test
 	@make -C ./ryft-integration-test APP_VERSION=${APP_VERSION} TEST_TAGS="not ryftx and not compound and not backend_selection" all
 
+# run unit tests
 .PHONY: unit_test
 unit_test: pull_ryft_docker
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} unit_test
