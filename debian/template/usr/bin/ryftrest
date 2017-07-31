@@ -37,9 +37,7 @@ Search specific:
 -ov|--view=<file>  Used to keep a view results file. To speed up /search/show.
 --lifetime=<T>     Used to automatically cleanup results files. Examples: 1h, 1m, 20s.
 --backend=<X>      Used to select "ryftprim" or "ryftx" backend.
---backend-opts=<list> Comma separated list of strings.
-                   Used to send additional arguments to the search backend.
-                   Depends on --backend parameter.
+--backend-option=<opt> Additional backend option. Depends on selected --backend.
 
 REST specific:
 -a|--address=<addr> Specifies the ryft-server address.
@@ -315,11 +313,11 @@ while [[ $# > 0 ]]; do
         BACKEND="$2"
         shift 2
         ;;
-    --backend-opts=*)
+    --backend-option=*|--backend-opt=*)
         BACKEND_OPTS=("${BACKEND_OPTS[@]}" "${1#*=}")
         shift
         ;;
-    --backend-opts)
+    --backend-option|--backend-opt)
         BACKEND_OPTS=("${BACKEND_OPTS[@]}" "$2")
         shift 2
         ;;
@@ -496,8 +494,8 @@ done
 [[ ! -z "$VIEW" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "view=$VIEW")
 [[ ! -z "$LIFETIME" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "lifetime=$LIFETIME")
 [[ ! -z "$BACKEND" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "backend=$BACKEND")
-for backend_option in "${BACKEND_OPTS[@]}"; do
-    [[ ! -z $backend_option ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "backend-option=$backend_option")
+for opt in "${BACKEND_OPTS[@]}"; do
+    [[ ! -z $opt ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "backend-option=$opt")
 done
 [[ ! -z "$FORMAT" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "format=$FORMAT")
 [[ ! -z "$FIELDS" ]] && URL_DATA=("${URL_DATA[@]}" --data-urlencode "fields=$FIELDS")
