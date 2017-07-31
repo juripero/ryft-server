@@ -40,6 +40,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `backend`     | string  | [The backend tool](#search-backend-parameter). |
+| `backend-option`| string | [The backend tool parameter](#search-backend-option-parameter). |
 | `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
 | `view`        | string  | [The name of VIEW file to keep](#search-data-and-index-parameters). |
@@ -273,7 +274,20 @@ And `ryftx` tool is used in case of `backend=ryftx`.
 If `backend` is empty (by default) then the most appropriate backend
 is selected automatically.
 
+### Search `backend-option` parameter
 
+It is possible to send multible optional flags with search backend.
+e.g. ryftrest query
+
+    ryftrest  --backend=ryftx --backend-opts="---rx-max-spawns 14" --backend-opts="--rx-shard-size 64M" ...
+
+turns into
+
+    ryftx --rx-max-spawns 14 --rx-shard-size 64M ...
+
+NOTE: `backend` parameter is required in order to prevent automatic selection of search backend.
+
+ 
 ### Search `data` and `index` parameters
 
 By default, all search results are deleted from the Ryft server once they are delivered to user.
