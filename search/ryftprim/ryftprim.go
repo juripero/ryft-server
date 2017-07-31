@@ -198,14 +198,14 @@ func (engine *Engine) prepare(task *Task) error {
 		args = append(args, "-od", engine.getFilePath(task.DataFileName))
 	}
 
-	// backend options
-	if len(cfg.BackendOptions) != 0 {
-		args = append(args, cfg.BackendOptions...)
-	}
-
 	// VIEW output file
 	if len(cfg.KeepViewAs) != 0 {
 		task.ViewFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)
+	}
+
+	// backend options (should be added to the END)
+	if len(cfg.BackendOpts) != 0 {
+		args = append(args, cfg.BackendOpts...)
 	}
 
 	// assign command line
