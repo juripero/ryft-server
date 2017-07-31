@@ -128,6 +128,11 @@ func TestSearchUsual(t *testing.T) {
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}
+
+	if all {
+		check(`/search?query=hello&file=*.txt&backend-option=--rx-shard-size&backend-option=4M&backend-option=--rx-max-spawns&backend-option=5&backend=ryftx`,
+			"application/json", time.Second, http.StatusOK)
+	}
 }
 
 // delimiter unescaping

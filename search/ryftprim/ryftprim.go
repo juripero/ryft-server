@@ -203,6 +203,11 @@ func (engine *Engine) prepare(task *Task) error {
 		task.ViewFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)
 	}
 
+	// backend options (should be added to the END)
+	if len(cfg.BackendOpts) != 0 {
+		args = append(args, cfg.BackendOpts...)
+	}
+
 	// assign command line
 	task.toolArgs = args
 	return nil // OK

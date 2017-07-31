@@ -76,6 +76,10 @@ type Config struct {
 	// should be "ryftprim" or "ryftx"
 	BackendTool string
 
+	// additional backend options
+	// addeded to the end of args
+	BackendOpts []string
+
 	// report performance metrics
 	Performance bool
 }
@@ -193,6 +197,11 @@ func (cfg Config) String() string {
 	// backend
 	if len(cfg.BackendTool) != 0 {
 		props = append(props, fmt.Sprintf("backend:%q", cfg.BackendTool))
+	}
+
+	// backend-options
+	if len(cfg.BackendOpts) != 0 {
+		props = append(props, fmt.Sprintf("backend-options:%q", cfg.BackendOpts))
 	}
 
 	// flags
