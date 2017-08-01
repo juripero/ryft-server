@@ -45,6 +45,7 @@ import (
 	"github.com/getryft/ryft-server/rest/format"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/aggs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -75,6 +76,9 @@ type SearchParams struct {
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
+
+	// aggregations
+	Aggregations map[string]map[string]map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
@@ -198,6 +202,15 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			WithDetails("failed to parse transformations"))
 	}
 
+	// aggregations
+	aggsMap, aggsEng, err := aggs.MakeAggs(params.Aggregations)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
+	}
+	cfg.Aggregations = aggsEng
+	_ = aggsMap
+
 	// session preparation
 	session, err := NewSession(server.Config.Sessions.Algorithm)
 	if err != nil {
@@ -267,6 +280,14 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			}
 			log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
 			res.Stat.Extra["session"] = token
+		}
+
+		if len(aggsMap) != 0 {
+			out := make(map[string]interface{})
+			for name, f := range aggsMap {
+				out[name] = f.ToJson(true)
+			}
+			res.Stat.Extra["aggregations"] = out
 		}
 
 		xstat := tcode.FromStat(res.Stat)
