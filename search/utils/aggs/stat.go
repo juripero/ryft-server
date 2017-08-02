@@ -84,7 +84,7 @@ func (s *Stat) Add(data interface{}) error {
 	}
 
 	// maximum
-	if (s.flags & StatMin) != 0 {
+	if (s.flags & StatMax) != 0 {
 		if s.Count == 0 || fval > s.Max {
 			s.Max = fval
 		}
