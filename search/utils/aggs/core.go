@@ -48,6 +48,32 @@ type Function struct {
 	engine Engine // engine
 }
 
+// Aggregations combined
+type Aggregations struct {
+	functions map[string]Function
+	engines   []Engine
+}
+
+// ToJson saves all aggregations to JSON
+func (a *Aggregations) ToJson(final bool) map[string]interface{} {
+	res := make(map[string]interface{})
+	for name, f := range a.functions {
+		res[name] = f.ToJson(final)
+	}
+	return res
+}
+
+// Add adds new DATA record to all engines
+func (a *Aggregations) Add(data interface{}) error {
+	for _, engine := range a.engines {
+		if err := engine.Add(data); err != nil {
+			return err
+		}
+	}
+
+	return nil // OK
+}
+
 // ToJson saves aggregation to JSON
 func (f *Function) ToJson(final bool) interface{} {
 	switch f.Type {
@@ -106,14 +132,14 @@ func (f *Function) ToJson(final bool) interface{} {
 }
 
 // MakeAggs makes set of aggregation engines
-func MakeAggs(params map[string]map[string]map[string]interface{}) (map[string]Function, []Engine, error) {
+func MakeAggs(params map[string]map[string]map[string]interface{}) (*Aggregations, error) {
 	res := make(map[string]Function)
 	out := make([]Engine, 0, len(params))
 
 	// name: {type: {opts}}
 	for name, agg := range params {
 		if len(agg) != 1 {
-			return nil, nil, fmt.Errorf("%q contains invalid aggregation object", name)
+			return nil, fmt.Errorf("%q contains invalid aggregation object", name)
 		}
 
 		// type: {opts}
@@ -121,7 +147,7 @@ func MakeAggs(params map[string]map[string]map[string]interface{}) (map[string]F
 			// find corresponding engine
 			exists, engine, err := getEngine(t, opts, out)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			if !exists {
 				out = append(out, engine)
@@ -134,7 +160,10 @@ func MakeAggs(params map[string]map[string]map[string]interface{}) (map[string]F
 		}
 	}
 
-	return res, out, nil // OK
+	return &Aggregations{
+		functions: res,
+		engines:   out,
+	}, nil // OK
 }
 
 // get existing or create new Engine

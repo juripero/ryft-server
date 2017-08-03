@@ -56,22 +56,17 @@ func TestApplyAggregations(t *testing.T) {
 
 	// do positive and negative tests
 	check := func(indexPath, dataPath, format string, aggregations map[string]map[string]map[string]interface{}, expected string) {
-		aggsFunc, aggsEng, err := aggs.MakeAggs(aggregations)
+		Aggs, err := aggs.MakeAggs(aggregations)
 		if err != nil {
 			assert.Contains(t, err.Error(), expected)
 			return
 		}
 
-		err = ApplyAggregations(indexPath, dataPath, "\n", format, aggsEng)
+		err = ApplyAggregations(indexPath, dataPath, "\n", format, Aggs)
 		if err != nil {
 			assert.Contains(t, err.Error(), expected)
 		} else {
-			out := make(map[string]interface{})
-			for name, f := range aggsFunc {
-				out[name] = f.ToJson(true)
-			}
-
-			outJson, err := json.Marshal(out)
+			outJson, err := json.Marshal(Aggs.ToJson(true))
 			assert.NoError(t, err)
 
 			assert.JSONEq(t, expected, string(outJson))

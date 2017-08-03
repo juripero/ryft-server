@@ -44,7 +44,7 @@ import (
 )
 
 // Apply aggregations
-func ApplyAggregations(indexPath, dataPath string, delimiter string, format string, aggregations []aggs.Engine) error {
+func ApplyAggregations(indexPath, dataPath string, delimiter string, format string, aggregations *aggs.Aggregations) error {
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
 
@@ -152,10 +152,8 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 		}
 
 		// apply aggregations
-		for _, agg := range aggregations {
-			if err := agg.Add(parsedData); err != nil {
-				return fmt.Errorf("failed to apply aggregation: %s", err)
-			}
+		if err := aggregations.Add(parsedData); err != nil {
+			return fmt.Errorf("failed to apply aggregation: %s", err)
 		}
 
 		index.Release()

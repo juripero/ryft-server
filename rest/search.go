@@ -203,13 +203,11 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	}
 
 	// aggregations
-	aggsMap, aggsEng, err := aggs.MakeAggs(params.Aggregations)
+	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to prepare aggregations"))
 	}
-	cfg.Aggregations = aggsEng
-	_ = aggsMap
 
 	// session preparation
 	session, err := NewSession(server.Config.Sessions.Algorithm)
@@ -282,12 +280,8 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			res.Stat.Extra["session"] = token
 		}
 
-		if len(aggsMap) != 0 {
-			out := make(map[string]interface{})
-			for name, f := range aggsMap {
-				out[name] = f.ToJson(true)
-			}
-			res.Stat.Extra["aggregations"] = out
+		if cfg.Aggregations != nil {
+			res.Stat.Extra["aggregations"] = cfg.Aggregations.ToJson(true)
 		}
 
 		xstat := tcode.FromStat(res.Stat)

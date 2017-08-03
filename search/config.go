@@ -67,7 +67,7 @@ type Config struct {
 	Transforms []Transform
 
 	// set of aggregations engines
-	Aggregations []aggs.Engine
+	Aggregations *aggs.Aggregations
 
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)
