@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/getryft/ryft-server/search/utils/query"
 )
@@ -325,6 +326,16 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
 				return
 			}
+
+			if cfg.Aggregations != nil {
+				// TODO: move this code to final results, becase there is no transformation applied yet
+				if err := ryftprim.ApplyAggregations(opts.atHome(out.IndexFile), opts.atHome(out.DataFile),
+					out.Delimiter, cfg.DataFormat, cfg.Aggregations); err != nil {
+					task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
+					mux.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
+					return
+				}
+			}
 		}
 
 		drainStart := time.Now()
@@ -405,6 +416,7 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 	cfg.KeepViewAs = ""
 	cfg.ReportIndex = false
 	cfg.ReportData = false
+	cfg.Aggregations = nil // disable
 
 	task.log().WithFields(map[string]interface{}{
 		"query": cfg.Query,
