@@ -160,6 +160,10 @@ func MakeAggs(params map[string]map[string]map[string]interface{}) (*Aggregation
 		}
 	}
 
+	if len(res) == 0 {
+		return nil, nil // no aggregations
+	}
+
 	return &Aggregations{
 		functions: res,
 		engines:   out,

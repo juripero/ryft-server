@@ -68,6 +68,7 @@ type Config struct {
 
 	// set of aggregations engines
 	Aggregations *aggs.Aggregations
+	DataFormat   string // used for aggregations
 
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)

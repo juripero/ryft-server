@@ -90,8 +90,9 @@ type SearchParams struct {
 	Performance bool   `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 
 	// internal parameters
-	InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
-	InternalNoSessionId bool `form:"--internal-no-session-id" json:"-" msgpack:"-"`
+	InternalErrorPrefix bool   `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
+	InternalNoSessionId bool   `form:"--internal-no-session-id" json:"-" msgpack:"-"`
+	InternalFormat      string `form:"--internal-format" json:"-" msgpack:"-"` // override in cluster mode
 }
 
 // Handle /search endpoint.
@@ -207,6 +208,11 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to prepare aggregations"))
+	}
+	if len(params.InternalFormat) != 0 {
+		cfg.DataFormat = params.InternalFormat
+	} else {
+		cfg.DataFormat = params.Format
 	}
 
 	// session preparation

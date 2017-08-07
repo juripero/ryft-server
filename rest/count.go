@@ -42,6 +42,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/aggs"
 	"github.com/getryft/ryft-server/search/utils/query"
 
 	"github.com/gin-gonic/gin"
@@ -73,6 +74,11 @@ type CountParams struct {
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
 
+	// aggregations
+	Aggregations map[string]map[string]map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+
+	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
+
 	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
 	ShareMode string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
 
@@ -80,7 +86,8 @@ type CountParams struct {
 
 	// internal parameters
 	//InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
-	InternalNoSessionId bool `form:"--internal-no-session-id" json:"-" msgpack:"-"`
+	InternalNoSessionId bool   `form:"--internal-no-session-id" json:"-" msgpack:"-"`
+	InternalFormat      string `form:"--internal-format" json:"-" msgpack:"-"` // override in cluster mode
 }
 
 // Handle /count endpoint.
@@ -169,6 +176,18 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse transformations"))
+	}
+
+	// aggregations
+	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
+	}
+	if len(params.InternalFormat) != 0 {
+		cfg.DataFormat = params.InternalFormat
+	} else {
+		cfg.DataFormat = params.Format
 	}
 
 	// session preparation
@@ -273,6 +292,10 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					}
 					log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
 					res.Stat.Extra["session"] = token
+				}
+
+				if cfg.Aggregations != nil {
+					res.Stat.Extra["aggregations"] = cfg.Aggregations.ToJson(true)
 				}
 
 				xstat := format.FromStat(res.Stat)
