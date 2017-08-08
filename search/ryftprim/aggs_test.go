@@ -54,6 +54,17 @@ func TestApplyAggregations(t *testing.T) {
 2.txt,2,3,0
 3.txt,3,3,0`), 0644))
 
+	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "data.geo.xml"),
+		[]byte(`
+		<rec><Latitude>10.000000000</Latitude><Longitude>10.000000000</Longitude><Location>"(10.000000000, 10.000000000)"</Location></rec>
+		<rec><Latitude>30.000000000</Latitude><Longitude>-20.000000000</Longitude><Location>"(30.000000000, -20.000000000)"</Location></rec>
+		<rec><Latitude>40.000000000</Latitude><Longitude>-30.000000000</Longitude><Location>"(40.000000000, -30.000000000)"</Location></rec>
+`), 0644))
+	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "data.geo.xml.txt"),
+		[]byte(`1.txt,1,30,0
+2.txt,2,30,0,
+3.txt,3,30,0`), 0644))
+
 	// do positive and negative tests
 	check := func(indexPath, dataPath, format string, aggregations map[string]map[string]map[string]interface{}, expected string) {
 		Aggs, err := aggs.MakeAggs(aggregations)
@@ -71,6 +82,18 @@ func TestApplyAggregations(t *testing.T) {
 
 			assert.JSONEq(t, expected, string(outJson))
 		}
+	}
+
+	if true {
+		check(filepath.Join(root, "data.geo.xml.txt"), filepath.Join(root, "data.xml"), "xml",
+			map[string]map[string]map[string]interface{}{
+				"my": map[string]map[string]interface{}{
+					"geo_bounds": map[string]interface{}{
+						"field": "rec",
+					},
+				},
+			}, `{"my": {"geo_bounds": {"top_left": {"lat": 0.0, "lon": 0.0}, "bottom_right": {"lat": 0.0, "lon": 0.0}}}}`)
+
 	}
 
 	// check JSON data

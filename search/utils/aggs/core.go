@@ -126,6 +126,35 @@ func (f *Function) ToJson(final bool) interface{} {
 		}
 
 		//case "extended_stats":
+
+	case "geo_bounds":
+		if geo, ok := f.engine.(*Geo); ok {
+			return map[string]map[string]map[string]interface{}{
+				"geo_bounds": {
+					"top_left": {
+						"lat": geo.Bounds.TopLeft.Lat,
+						"lon": geo.Bounds.TopLeft.Lon,
+					},
+					"bottom_right": {
+						"lat": geo.Bounds.BottomRight.Lat,
+						"lon": geo.Bounds.BottomRight.Lon,
+					},
+				},
+			}
+		}
+
+	case "centroid":
+		if geo, ok := f.engine.(*Geo); ok {
+			return map[string]map[string]interface{}{
+				"centroid": {
+					"location": {
+						"lat": geo.Centroid.Lat,
+						"lon": geo.Centroid.Lon,
+					},
+					"count": geo.Count,
+				},
+			}
+		}
 	}
 
 	return nil
