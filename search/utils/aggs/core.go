@@ -38,8 +38,14 @@ import (
 
 // Engine is abstract aggregation engine
 type Engine interface {
+	Name() string
+	ToJson() interface{}
+
 	// add data to the aggregation
 	Add(data interface{}) error
+
+	// merge another aggregation
+	Merge(data interface{}) error
 }
 
 // Function
@@ -52,14 +58,23 @@ type Function struct {
 type Aggregations struct {
 	functions map[string]Function
 	engines   []Engine
+	options   interface{}
 }
 
 // ToJson saves all aggregations to JSON
 func (a *Aggregations) ToJson(final bool) map[string]interface{} {
 	res := make(map[string]interface{})
-	for name, f := range a.functions {
-		res[name] = f.ToJson(final)
+
+	if final {
+		for name, f := range a.functions {
+			res[name] = f.ToJson()
+		}
+	} else {
+		for _, engine := range a.engines {
+			res[engine.Name()] = engine.ToJson()
+		}
 	}
+
 	return res
 }
 
@@ -74,8 +89,32 @@ func (a *Aggregations) Add(data interface{}) error {
 	return nil // OK
 }
 
+// get aggregation options
+func (a *Aggregations) GetOpts() interface{} {
+	return a.options
+}
+
+// merge another intermediate Aggregations
+func (a *Aggregations) Merge(d interface{}) error {
+	if im, ok := d.(map[string]interface{}); ok {
+		for _, engine := range a.engines {
+			if imEngine, ok := im[engine.Name()]; ok {
+				if err := engine.Merge(imEngine); err != nil {
+					return fmt.Errorf("failed to merge intermediate aggregation: %s", err)
+				}
+			} else { // else intermediate engine is missing
+				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
+			}
+		}
+	} else {
+		return fmt.Errorf("data is not a map")
+	}
+
+	return nil // OK
+}
+
 // ToJson saves aggregation to JSON
-func (f *Function) ToJson(final bool) interface{} {
+func (f *Function) ToJson() interface{} {
 	switch f.Type {
 	case "avg":
 		if stat, ok := f.engine.(*Stat); ok {
@@ -167,6 +206,7 @@ func MakeAggs(params map[string]map[string]map[string]interface{}) (*Aggregation
 	return &Aggregations{
 		functions: res,
 		engines:   out,
+		options:   params,
 	}, nil // OK
 }
 

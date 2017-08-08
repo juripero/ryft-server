@@ -165,8 +165,9 @@ func (stat *Stat) Combine(other *Stat) {
 }
 
 const (
-	ExtraPerformance = "performance"
-	ExtraSessionData = "session-data"
+	ExtraPerformance  = "performance"
+	ExtraSessionData  = "session-data"
+	ExtraAggregations = "aggregations"
 )
 
 // AddPerfStat ands extra performance metrics.

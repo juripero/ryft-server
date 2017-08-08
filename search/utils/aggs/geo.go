@@ -31,6 +31,8 @@
 package aggs
 
 import (
+	"fmt"
+
 	"github.com/getryft/ryft-server/search/utils"
 )
 
@@ -47,6 +49,16 @@ type Geo struct {
 	// TODO: bounds and sum of points
 
 	Count uint64 `json:"count" msgpack:"count"` // number of points
+}
+
+// get engine name/identifier
+func (g *Geo) Name() string {
+	return fmt.Sprintf("geo(%s)", g.Field)
+}
+
+// get JSON object
+func (g *Geo) ToJson() interface{} {
+	return g
 }
 
 // add data to the aggregation
@@ -68,6 +80,18 @@ func (g *Geo) Add(data interface{}) error {
 
 	// count
 	g.Count += 1
+
+	return nil // OK
+}
+
+// merge another intermediate aggregation
+func (g *Geo) Merge(data interface{}) error {
+	im, ok := data.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("no valid data")
+	}
+
+	_ = im
 
 	return nil // OK
 }

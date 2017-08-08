@@ -295,7 +295,10 @@ func (server *Server) DoCount(ctx *gin.Context) {
 				}
 
 				if cfg.Aggregations != nil {
-					res.Stat.Extra["aggregations"] = cfg.Aggregations.ToJson(true)
+					if err := updateAggregations(cfg.Aggregations, res.Stat); err != nil {
+						panic(NewError(http.StatusInternalServerError, "failed to merge aggregations").WithDetails(err.Error()))
+					}
+					res.Stat.Extra[search.ExtraAggregations] = cfg.Aggregations.ToJson(!params.InternalNoSessionId)
 				}
 
 				xstat := format.FromStat(res.Stat)
