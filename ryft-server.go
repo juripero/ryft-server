@@ -299,6 +299,12 @@ func main() {
 	private.GET("/cluster/members", server.DoClusterMembers)
 	private.GET("/run", server.DoRun)
 
+	// POST & PUT aliases for requests with JSON body
+	private.POST("/search", server.DoSearch)
+	private.POST("/count", server.DoCount)
+	private.PUT("/search", server.DoSearch)
+	private.PUT("/count", server.DoCount)
+
 	// need to provide both URLs to disable redirecting
 	private.GET("/files", server.DoGetFiles)
 	private.GET("/files/*path", server.DoGetFiles)
