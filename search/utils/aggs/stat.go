@@ -45,7 +45,8 @@ const (
 
 // Stat contains main statistics
 type Stat struct {
-	flags int `json:"-"`
+	flags int     `json:"-"`
+	sigma float64 `json:"-"` // for extended stats
 
 	Field string  `json:"field" msgpack:"field"` // field path
 	Sum   float64 `json:"sum" msgpack:"sum"`     // sum of values

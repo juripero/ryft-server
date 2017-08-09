@@ -32,6 +32,7 @@ package aggs
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -152,7 +153,7 @@ func (f *Function) ToJson() interface{} {
 			}
 		}
 
-	case "stat":
+	case "stats":
 		if stat, ok := f.engine.(*Stat); ok {
 			avg := stat.Sum / float64(stat.Count)
 			return map[string]interface{}{
@@ -164,7 +165,26 @@ func (f *Function) ToJson() interface{} {
 			}
 		}
 
-		//case "extended_stats":
+	case "extended_stats":
+		if stat, ok := f.engine.(*Stat); ok {
+			avg := stat.Sum / float64(stat.Count)
+			Var := stat.Sum2/float64(stat.Count) - avg*avg
+			stdev := math.Sqrt(Var)
+			return map[string]interface{}{
+				"avg":            avg,
+				"sum":            stat.Sum,
+				"min":            stat.Min,
+				"max":            stat.Max,
+				"count":          stat.Count,
+				"sum_of_squares": stat.Sum2,
+				"variance":       Var,
+				"std_deviation":  stdev,
+				"std_deviation_bounds": map[string]interface{}{
+					"upper": avg + stat.sigma*stdev,
+					"lower": avg - stat.sigma*stdev,
+				},
+			}
+		}
 	}
 
 	return nil
@@ -225,7 +245,7 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 		statFlags = StatMax
 	case "value_count", "count":
 		statFlags = 0
-	case "stat":
+	case "stats":
 		statFlags = StatSum | StatMin | StatMax
 	case "extended_stats":
 		statFlags = StatSum | StatSum2 | StatMin | StatMax
@@ -249,6 +269,7 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 			return false, &Stat{
 				Field: field,
 				flags: statFlags,
+				sigma: 2.0,
 			}, nil // OK, new one
 		} else {
 			return false, nil, fmt.Errorf(`no "field" option found`)
