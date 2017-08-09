@@ -41,14 +41,17 @@ const (
 	GeoCentroid
 )
 
+// NewGeo constructs Geo engine
 func NewGeo(field string, flags int) *Geo {
 	return &Geo{
 		Field:              field,
 		flags:              flags,
 		coordsLatLonRegexp: regexp.MustCompile(`([\d\.])+`),
 		sum:                &pointEuclidean{},
-		Bounds:             newBounds(newPoint(0, 0), newPoint(0, 0)),
-		Centroid:           newPoint(0, 0),
+		Bounds: newBounds(
+			newPoint(math.Inf(-1), math.Inf(1)),
+			newPoint(math.Inf(1), math.Inf(-1))),
+		Centroid: newPoint(0, 0),
 	}
 }
 
@@ -137,7 +140,7 @@ func (b *Bounds) updateTopLeft(p *Point) {
 
 func (b *Bounds) updateBottomRight(p *Point) {
 	b.BottomRight.Lat = math.Min(b.BottomRight.Lat, p.Lat)
-	b.BottomRight.Lat = math.Max(b.BottomRight.Lon, p.Lon)
+	b.BottomRight.Lon = math.Max(b.BottomRight.Lon, p.Lon)
 }
 
 // UpdateBounds extends bounds of rectangle which contains all points

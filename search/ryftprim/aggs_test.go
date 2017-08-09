@@ -91,7 +91,7 @@ func TestApplyAggregations(t *testing.T) {
 						"field": "Location",
 					},
 				},
-			}, `{"my": {"bounds": {"top_left": {"lat": 40.0, "lon": 0.0}, "bottom_right": {"lat": 30.0, "lon": 0.0}}}}`)
+			}, `{"my": {"bounds": {"top_left": {"lat": 40.0, "lon": 10.0}, "bottom_right": {"lat": 10.0, "lon": 30.0}}}}`)
 
 		check(filepath.Join(root, "datageo.xml.txt"), filepath.Join(root, "datageo.xml"), "xml",
 			map[string]map[string]map[string]interface{}{
