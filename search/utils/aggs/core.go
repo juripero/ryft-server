@@ -32,6 +32,8 @@ package aggs
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -251,24 +253,42 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 
 	if geoFlags >= 0 {
 		// TODO: "missing" field
-
-		if v, ok := opts["field"]; ok {
-			field, err := utils.AsString(v)
-			if err != nil {
-				return false, nil, fmt.Errorf(`bad "field" option found: %s`, err)
-			}
-
+		if field, err := getField("field", opts); err == nil {
 			if s := findGeoEngine(engines, field); s != nil {
 				s.flags |= geoFlags
 				return true, s, nil // OK, already exists
 			}
-
 			return false, NewGeo(field, geoFlags), nil // OK, new one
-		} else {
-			return false, nil, fmt.Errorf(`no "field" option found`)
 		}
+		lat, err := getField("latitude", opts)
+		if err != nil {
+			return false, nil, err
+		}
+		lon, err := getField("longitude", opts)
+		if err != nil {
+			return false, nil, err
+		}
+		fields := []string{lat, lon}
+		sort.Strings(fields)
+		field := strings.Join(fields, ",")
+		if s := findGeoEngine(engines, field); s != nil {
+			s.flags |= geoFlags
+			return true, s, nil // OK, already exists
+		}
+		return false, NewGeoLatLon(lat, lon, geoFlags), nil // OK, new one
 	}
 	return false, nil, fmt.Errorf("%q is unknown aggregation type", t)
+}
+
+func getField(field string, opts map[string]interface{}) (string, error) {
+	if v, ok := opts[field]; ok {
+		field, err := utils.AsString(v)
+		if err != nil {
+			return "", fmt.Errorf(`bad "field" option found: %s`, err)
+		}
+		return field, nil
+	}
+	return "", fmt.Errorf(`no "%s" option found`, field)
 }
 
 // find Stat aggregation, nil if not found

@@ -84,6 +84,7 @@ func TestApplyAggregations(t *testing.T) {
 	}
 
 	if true {
+		// coordinates in (lat, lon) format
 		check(filepath.Join(root, "datageo.xml.txt"), filepath.Join(root, "datageo.xml"), "xml",
 			map[string]map[string]map[string]interface{}{
 				"my": map[string]map[string]interface{}{
@@ -91,7 +92,7 @@ func TestApplyAggregations(t *testing.T) {
 						"field": "Location",
 					},
 				},
-			}, `{"my": {"bounds": {"top_left": {"lat": 40.0, "lon": 10.0}, "bottom_right": {"lat": 10.0, "lon": 30.0}}}}`)
+			}, `{"my": {"bounds": {"top_left": {"lat": 40.0, "lon": -30.0}, "bottom_right": {"lat": 10.0, "lon": 10.0}}}}`)
 
 		check(filepath.Join(root, "datageo.xml.txt"), filepath.Join(root, "datageo.xml"), "xml",
 			map[string]map[string]map[string]interface{}{
@@ -100,8 +101,28 @@ func TestApplyAggregations(t *testing.T) {
 						"field": "Location",
 					},
 				},
-			}, `{"my": {"centroid": {"location": {"lat": 19.159786217622237, "lon": 26.93818045604784}, "count": 3}}}`)
+			}, `{"my": {"centroid": {"location": {"lat": -11.732526868567064, "lon": 27.77700025896041}, "count": 3}}}`)
 
+		// coordinates in "longitude" and "latitude" fields
+		check(filepath.Join(root, "datageo.xml.txt"), filepath.Join(root, "datageo.xml"), "xml",
+			map[string]map[string]map[string]interface{}{
+				"my": map[string]map[string]interface{}{
+					"geo_bounds": map[string]interface{}{
+						"longitude": "Longitude",
+						"latitude":  "Latitude",
+					},
+				},
+			}, `{"my": {"bounds": {"top_left": {"lat": 40.0, "lon": -30.0}, "bottom_right": {"lat": 10.0, "lon": 10.0}}}}`)
+
+		check(filepath.Join(root, "datageo.xml.txt"), filepath.Join(root, "datageo.xml"), "xml",
+			map[string]map[string]map[string]interface{}{
+				"my": map[string]map[string]interface{}{
+					"geo_centroid": map[string]interface{}{
+						"longitude": "Longitude",
+						"latitude":  "Latitude",
+					},
+				},
+			}, `{"my": {"centroid": {"location": {"lat": -11.732526868567064, "lon": 27.77700025896041}, "count": 3}}}`)
 	}
 
 	// check JSON data
