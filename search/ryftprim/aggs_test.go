@@ -54,16 +54,15 @@ func TestApplyAggregations(t *testing.T) {
 2.txt,2,3,0
 3.txt,3,3,0`), 0644))
 
-	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "data.geo.xml"),
-		[]byte(`
-		<rec><Latitude>10.000000000</Latitude><Longitude>10.000000000</Longitude><Location>"(10.000000000, 10.000000000)"</Location></rec>
-		<rec><Latitude>30.000000000</Latitude><Longitude>-20.000000000</Longitude><Location>"(30.000000000, -20.000000000)"</Location></rec>
-		<rec><Latitude>40.000000000</Latitude><Longitude>-30.000000000</Longitude><Location>"(40.000000000, -30.000000000)"</Location></rec>
+	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "datageo.xml"),
+		[]byte(`<rec><Latitude>10.000000000</Latitude><Longitude>10.000000000</Longitude><Location>"(10.000000000, 10.000000000)"</Location></rec>
+<rec><Latitude>30.000000000</Latitude><Longitude>-20.000000000</Longitude><Location>"(30.000000000, -20.000000000)"</Location></rec>
+<rec><Latitude>40.000000000</Latitude><Longitude>-30.000000000</Longitude><Location>"(40.000000000, -30.000000000)"</Location></rec>
 `), 0644))
-	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "data.geo.xml.txt"),
-		[]byte(`1.txt,1,30,0
-2.txt,2,30,0,
-3.txt,3,30,0`), 0644))
+	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "datageo.xml.txt"),
+		[]byte(`1.txt,1,130,0
+2.txt,2,132,0
+3.txt,3,132,0`), 0644))
 
 	// do positive and negative tests
 	check := func(indexPath, dataPath, format string, aggregations map[string]map[string]map[string]interface{}, expected string) {
@@ -85,14 +84,23 @@ func TestApplyAggregations(t *testing.T) {
 	}
 
 	if true {
-		check(filepath.Join(root, "data.geo.xml.txt"), filepath.Join(root, "data.xml"), "xml",
+		check(filepath.Join(root, "datageo.xml.txt"), filepath.Join(root, "datageo.xml"), "xml",
 			map[string]map[string]map[string]interface{}{
 				"my": map[string]map[string]interface{}{
 					"geo_bounds": map[string]interface{}{
-						"field": "rec",
+						"field": "Location",
 					},
 				},
-			}, `{"my": {"geo_bounds": {"top_left": {"lat": 0.0, "lon": 0.0}, "bottom_right": {"lat": 0.0, "lon": 0.0}}}}`)
+			}, `{"my": {"bounds": {"top_left": {"lat": 40.0, "lon": 0.0}, "bottom_right": {"lat": 30.0, "lon": 0.0}}}}`)
+
+		check(filepath.Join(root, "datageo.xml.txt"), filepath.Join(root, "datageo.xml"), "xml",
+			map[string]map[string]map[string]interface{}{
+				"my": map[string]map[string]interface{}{
+					"geo_centroid": map[string]interface{}{
+						"field": "Location",
+					},
+				},
+			}, `{"my": {"centroid": {"location": {"lat": 19.159786217622237, "lon": 26.93818045604784}, "count": 3}}}`)
 
 	}
 

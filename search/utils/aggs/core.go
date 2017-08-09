@@ -70,7 +70,6 @@ func (a *Aggregations) Add(data interface{}) error {
 			return err
 		}
 	}
-
 	return nil // OK
 }
 
@@ -127,10 +126,10 @@ func (f *Function) ToJson(final bool) interface{} {
 
 		//case "extended_stats":
 
-	case "geo_bounds":
+	case "geo_bounds", "bounds":
 		if geo, ok := f.engine.(*Geo); ok {
 			return map[string]map[string]map[string]interface{}{
-				"geo_bounds": {
+				"bounds": {
 					"top_left": {
 						"lat": geo.Bounds.TopLeft.Lat,
 						"lon": geo.Bounds.TopLeft.Lon,
@@ -143,17 +142,18 @@ func (f *Function) ToJson(final bool) interface{} {
 			}
 		}
 
-	case "centroid":
+	case "geo_centroid", "centroid":
 		if geo, ok := f.engine.(*Geo); ok {
-			return map[string]map[string]interface{}{
+			centroid := map[string]map[string]interface{}{
 				"centroid": {
-					"location": {
-						"lat": geo.Centroid.Lat,
-						"lon": geo.Centroid.Lon,
-					},
 					"count": geo.Count,
 				},
 			}
+			centroid["centroid"]["location"] = map[string]interface{}{
+				"lat": geo.Centroid.Lat,
+				"lon": geo.Centroid.Lon,
+			}
+			return centroid
 		}
 	}
 
@@ -202,6 +202,7 @@ func MakeAggs(params map[string]map[string]map[string]interface{}) (*Aggregation
 // get existing or create new Engine
 func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, Engine, error) {
 	statFlags := -1 // -1 - ignore
+	geoFlags := -1  // -1 ignore
 
 	switch t {
 	case "avg":
@@ -218,6 +219,10 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 		statFlags = StatSum | StatMin | StatMax
 	case "extended_stats":
 		statFlags = StatSum | StatSum2 | StatMin | StatMax
+	case "geo_bounds", "bounds":
+		geoFlags = GeoBounds
+	case "geo_centroid", "centroid":
+		geoFlags = GeoCentroid
 	}
 
 	// Stat engine
@@ -244,6 +249,25 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 		}
 	}
 
+	if geoFlags >= 0 {
+		// TODO: "missing" field
+
+		if v, ok := opts["field"]; ok {
+			field, err := utils.AsString(v)
+			if err != nil {
+				return false, nil, fmt.Errorf(`bad "field" option found: %s`, err)
+			}
+
+			if s := findGeoEngine(engines, field); s != nil {
+				s.flags |= geoFlags
+				return true, s, nil // OK, already exists
+			}
+
+			return false, NewGeo(field, geoFlags), nil // OK, new one
+		} else {
+			return false, nil, fmt.Errorf(`no "field" option found`)
+		}
+	}
 	return false, nil, fmt.Errorf("%q is unknown aggregation type", t)
 }
 
@@ -253,6 +277,17 @@ func findStatEngine(engines []Engine, field string) *Stat {
 	for _, engine := range engines {
 		if stat, ok := engine.(*Stat); ok && stat.Field == field {
 			return stat
+		}
+	}
+
+	return nil // not found
+}
+
+func findGeoEngine(engines []Engine, field string) *Geo {
+	// check all engines
+	for _, engine := range engines {
+		if geo, ok := engine.(*Geo); ok && geo.Field == field {
+			return geo
 		}
 	}
 

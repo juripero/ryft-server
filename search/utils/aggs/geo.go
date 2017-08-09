@@ -31,7 +31,7 @@ package aggs
 import (
 	"fmt"
 	"math"
-	"strings"
+	"regexp"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -41,15 +41,27 @@ const (
 	GeoCentroid
 )
 
+func NewGeo(field string, flags int) *Geo {
+	return &Geo{
+		Field:              field,
+		flags:              flags,
+		coordsLatLonRegexp: regexp.MustCompile(`([\d\.])+`),
+		sum:                &pointEuclidean{},
+		Bounds:             newBounds(newPoint(0, 0), newPoint(0, 0)),
+		Centroid:           newPoint(0, 0),
+	}
+}
+
 // Geo contains main geo functions
 type Geo struct {
-	flags int `json:"-"`
+	flags              int
+	coordsLatLonRegexp *regexp.Regexp
+	sum                *pointEuclidean // sum of coordinates of all points in Euclidean system
 
-	coordsXYZ *pointEuclidean
-	Field     string  `json:"field" msgpack:"field"`   // field path
-	Count     uint64  `json:"count" msgpack:"count"`   // number of points
-	Bounds    *Bounds `json:"bounds" msgpack:"bounds"` // bounds of the rectangle that contains all points
-	Centroid  *Point
+	Field    string  `json:"field" msgpack:"field"`   // field path
+	Count    uint64  `json:"count" msgpack:"count"`   // number of points
+	Bounds   *Bounds `json:"bounds" msgpack:"bounds"` // bounds of the rectangle that contains all points
+	Centroid *Point  `json:"centroid" msgpack:"centroid"`
 }
 
 // add data to the aggregation
@@ -65,12 +77,10 @@ func (g *Geo) Add(data interface{}) error {
 	if err != nil {
 		return err
 	}
-
-	coords := strings.Split(coordinates, ",")
+	coords := g.coordsLatLonRegexp.FindAllString(coordinates, -1)
 	if len(coords) != 2 {
-		return fmt.Errorf("%q is not a string of coordinates", coords)
+		return fmt.Errorf("%q is not a string of coordinates", coordinates)
 	}
-
 	// get latitude as float
 	lat, err := utils.AsFloat64(coords[0])
 	if err != nil {
@@ -83,9 +93,9 @@ func (g *Geo) Add(data interface{}) error {
 	}
 
 	// count need to be incremented before updates
-	g.Count += 1
+	g.Count++
 
-	p := NewPoint(lat, lon)
+	p := newPoint(lat, lon)
 	g.UpdateBounds(p)
 	g.UpdateCentroid(p)
 	return nil // OK
@@ -97,16 +107,25 @@ type Point struct {
 	Lon float64 `json:"longitude" msgpack:"longitude"`
 }
 
+// pountEuclidean handles coordinates of Euclidean geometry
 type pointEuclidean struct{ x, y, z float64 }
 
-// NewPoint creates new Point
-func NewPoint(lat float64, lon float64) *Point {
+// newPoint creates new Point
+func newPoint(lat float64, lon float64) *Point {
 	return &Point{
 		Lat: lat,
 		Lon: lon,
 	}
 }
 
+func newBounds(topLeft *Point, bottimRight *Point) *Bounds {
+	return &Bounds{
+		TopLeft:     topLeft,
+		BottomRight: bottimRight,
+	}
+}
+
+// Bounds represents rectangle that contains all points
 type Bounds struct {
 	TopLeft, BottomRight *Point
 }
@@ -121,6 +140,7 @@ func (b *Bounds) updateBottomRight(p *Point) {
 	b.BottomRight.Lat = math.Max(b.BottomRight.Lon, p.Lon)
 }
 
+// UpdateBounds extends bounds of rectangle which contains all points
 func (g *Geo) UpdateBounds(p *Point) {
 	g.Bounds.updateTopLeft(p)
 	g.Bounds.updateBottomRight(p)
@@ -134,20 +154,21 @@ func rad2deg(value float64) float64 {
 	return value * 180 / math.Pi
 }
 
+// UpdateCentroid recalculates centroid Point
 func (g *Geo) UpdateCentroid(p *Point) {
 	lonSin, lonCos := math.Sincos(deg2rad(p.Lon))
 	latSin, latCos := math.Sincos(deg2rad(p.Lat))
-	g.coordsXYZ.x += latCos * lonCos
-	g.coordsXYZ.y += latCos * lonSin
-	g.coordsXYZ.z += latSin
+	g.sum.x += latCos * lonCos
+	g.sum.y += latCos * lonSin
+	g.sum.z += latSin
 
-	x, y, z := g.coordsXYZ.x, g.coordsXYZ.y, g.coordsXYZ.z
+	x, y, z := g.sum.x, g.sum.y, g.sum.z
 	count := float64(g.Count)
 	x /= count
 	y /= count
 	z /= count
 
-	g.Centroid = NewPoint(
+	g.Centroid = newPoint(
 		rad2deg(math.Atan2(y, x)),
 		rad2deg(math.Atan2(z, math.Sqrt(x*x+y*y))),
 	)
