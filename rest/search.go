@@ -287,7 +287,10 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 		}
 
 		if cfg.Aggregations != nil {
-			res.Stat.Extra["aggregations"] = cfg.Aggregations.ToJson(true)
+			if err := updateAggregations(cfg.Aggregations, res.Stat); err != nil {
+				panic(NewError(http.StatusInternalServerError, "failed to merge aggregations").WithDetails(err.Error()))
+			}
+			res.Stat.Extra[search.ExtraAggregations] = cfg.Aggregations.ToJson(!params.InternalNoSessionId)
 		}
 
 		xstat := tcode.FromStat(res.Stat)
@@ -516,6 +519,25 @@ func updateSession(session *Session, stat *search.Stat) {
 
 	session.SetData("info", data)
 	stat.ClearSessionData(true)
+}
+
+// update aggregations in cluster mode
+func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) error {
+	// get aggregations from details
+	for _, dstat := range stat.Details {
+		if d := dstat.Extra[search.ExtraAggregations]; d != nil {
+			log.Debugf("merging %v aggregations", d)
+			if err := aggregations.Merge(d); err != nil {
+				return err
+			}
+
+			// cleanup intermediate aggergations
+			delete(dstat.Extra, search.ExtraAggregations)
+		}
+	}
+	log.Debugf("merged %v", aggregations.ToJson(true))
+
+	return nil // OK
 }
 
 // mark output files to delete later

@@ -80,6 +80,16 @@ type Geo struct {
 	Centroid           Point          `json:"centroid" msgpack:"centroid"`
 }
 
+// get engine name/identifier
+func (g *Geo) Name() string {
+	return fmt.Sprintf("geo(%s)", g.Field)
+}
+
+// get JSON object
+func (g *Geo) ToJson() interface{} {
+	return g
+}
+
 // Add data to the aggregation
 func (g *Geo) Add(data interface{}) error {
 	var lat, lon float64
@@ -155,8 +165,8 @@ func newPoint(lat float64, lon float64) Point {
 	return Point{
 		Lat: lat,
 		Lon: lon,
-	}
-}
+
+
 
 func newBounds(topLeft, bottimRight Point) Bounds {
 	return Bounds{
@@ -212,4 +222,16 @@ func (g *Geo) updateCentroid(p Point) {
 		rad2deg(math.Atan2(y, x)),
 		rad2deg(math.Atan2(z, math.Sqrt(x*x+y*y))),
 	)
+}
+
+// merge another intermediate aggregation
+func (g *Geo) Merge(data interface{}) error {
+	im, ok := data.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("no valid data")
+	}
+
+	_ = im
+
+	return nil // OK
 }

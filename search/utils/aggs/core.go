@@ -34,14 +34,21 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"math"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
 
 // Engine is abstract aggregation engine
 type Engine interface {
+	Name() string
+	ToJson() interface{}
+
 	// add data to the aggregation
 	Add(data interface{}) error
+
+	// merge another aggregation
+	Merge(data interface{}) error
 }
 
 // Function
@@ -54,14 +61,23 @@ type Function struct {
 type Aggregations struct {
 	functions map[string]Function
 	engines   []Engine
+	options   interface{}
 }
 
 // ToJson saves all aggregations to JSON
 func (a *Aggregations) ToJson(final bool) map[string]interface{} {
 	res := make(map[string]interface{})
-	for name, f := range a.functions {
-		res[name] = f.ToJson(final)
+
+	if final {
+		for name, f := range a.functions {
+			res[name] = f.ToJson()
+		}
+	} else {
+		for _, engine := range a.engines {
+			res[engine.Name()] = engine.ToJson()
+		}
 	}
+
 	return res
 }
 
@@ -75,8 +91,32 @@ func (a *Aggregations) Add(data interface{}) error {
 	return nil // OK
 }
 
+// get aggregation options
+func (a *Aggregations) GetOpts() interface{} {
+	return a.options
+}
+
+// merge another intermediate Aggregations
+func (a *Aggregations) Merge(d interface{}) error {
+	if im, ok := d.(map[string]interface{}); ok {
+		for _, engine := range a.engines {
+			if imEngine, ok := im[engine.Name()]; ok {
+				if err := engine.Merge(imEngine); err != nil {
+					return fmt.Errorf("failed to merge intermediate aggregation: %s", err)
+				}
+			} else { // else intermediate engine is missing
+				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
+			}
+		}
+	} else {
+		return fmt.Errorf("data is not a map")
+	}
+
+	return nil // OK
+}
+
 // ToJson saves aggregation to JSON
-func (f *Function) ToJson(final bool) interface{} {
+func (f *Function) ToJson() interface{} {
 	switch f.Type {
 	case "avg":
 		if stat, ok := f.engine.(*Stat); ok {
@@ -114,7 +154,7 @@ func (f *Function) ToJson(final bool) interface{} {
 			}
 		}
 
-	case "stat":
+	case "stats":
 		if stat, ok := f.engine.(*Stat); ok {
 			avg := stat.Sum / float64(stat.Count)
 			return map[string]interface{}{
@@ -125,9 +165,27 @@ func (f *Function) ToJson(final bool) interface{} {
 				"count": stat.Count,
 			}
 		}
-
-		//case "extended_stats":
-
+	case "extended_stats":
+		if stat, ok := f.engine.(*Stat); ok {
+			avg := stat.Sum / float64(stat.Count)
+			Var := stat.Sum2/float64(stat.Count) - avg*avg
+			stdev := math.Sqrt(Var)
+			return map[string]interface{}{
+				"avg":            avg,
+				"sum":            stat.Sum,
+				"min":            stat.Min,
+				"max":            stat.Max,
+				"count":          stat.Count,
+				"sum_of_squares": stat.Sum2,
+				"variance":       Var,
+				"std_deviation":  stdev,
+				"std_deviation_bounds": map[string]interface{}{
+					"upper": avg + stat.sigma*stdev,
+					"lower": avg - stat.sigma*stdev,
+				},
+			}
+		}
+	}
 	case "geo_bounds", "bounds":
 		if geo, ok := f.engine.(*Geo); ok {
 			return map[string]map[string]map[string]interface{}{
@@ -157,7 +215,6 @@ func (f *Function) ToJson(final bool) interface{} {
 			}
 			return centroid
 		}
-	}
 
 	return nil
 }
@@ -198,6 +255,7 @@ func MakeAggs(params map[string]map[string]map[string]interface{}) (*Aggregation
 	return &Aggregations{
 		functions: res,
 		engines:   out,
+		options:   params,
 	}, nil // OK
 }
 
@@ -217,7 +275,7 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 		statFlags = StatMax
 	case "value_count", "count":
 		statFlags = 0
-	case "stat":
+	case "stats":
 		statFlags = StatSum | StatMin | StatMax
 	case "extended_stats":
 		statFlags = StatSum | StatSum2 | StatMin | StatMax
@@ -245,6 +303,7 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 			return false, &Stat{
 				Field: field,
 				flags: statFlags,
+				sigma: 2.0,
 			}, nil // OK, new one
 		} else {
 			return false, nil, fmt.Errorf(`no "field" option found`)

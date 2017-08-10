@@ -31,6 +31,8 @@
 package aggs
 
 import (
+	"fmt"
+
 	"github.com/getryft/ryft-server/search/utils"
 )
 
@@ -43,7 +45,8 @@ const (
 
 // Stat contains main statistics
 type Stat struct {
-	flags int `json:"-"`
+	flags int     `json:"-"`
+	sigma float64 `json:"-"` // for extended stats
 
 	Field string  `json:"field" msgpack:"field"` // field path
 	Sum   float64 `json:"sum" msgpack:"sum"`     // sum of values
@@ -51,6 +54,16 @@ type Stat struct {
 	Min   float64 `json:"min" msgpack:"min"`     // Minimum value
 	Max   float64 `json:"max" msgpack:"max"`     // Maximum value
 	Count uint64  `json:"count" msgpack:"count"` // number of values
+}
+
+// get engine name/identifier
+func (s *Stat) Name() string {
+	return fmt.Sprintf("stat.%s", s.Field)
+}
+
+// get JSON object
+func (s *Stat) ToJson() interface{} {
+	return s
 }
 
 // add data to the aggregation
@@ -92,6 +105,70 @@ func (s *Stat) Add(data interface{}) error {
 
 	// count
 	s.Count += 1
+
+	return nil // OK
+}
+
+// merge another intermediate aggregation
+func (s *Stat) Merge(data interface{}) error {
+	im, ok := data.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("no valid data")
+	}
+
+	// count is important
+	count, err := utils.AsUint64(im["count"])
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return nil // nothing to merge
+	}
+
+	// sum and sum of squared
+	if (s.flags & StatSum) != 0 {
+		sum, err := utils.AsFloat64(im["sum"])
+		if err != nil {
+			return err
+		}
+
+		s.Sum += sum
+	}
+	if (s.flags & StatSum2) != 0 {
+		sum2, err := utils.AsFloat64(im["sum2"])
+		if err != nil {
+			return err
+		}
+
+		s.Sum2 += sum2
+	}
+
+	// minimum
+	if (s.flags & StatMin) != 0 {
+		min, err := utils.AsFloat64(im["min"])
+		if err != nil {
+			return err
+		}
+
+		if s.Count == 0 || min < s.Min {
+			s.Min = min
+		}
+	}
+
+	// maximum
+	if (s.flags & StatMax) != 0 {
+		max, err := utils.AsFloat64(im["max"])
+		if err != nil {
+			return err
+		}
+
+		if s.Count == 0 || max > s.Max {
+			s.Max = max
+		}
+	}
+
+	// count
+	s.Count += count
 
 	return nil // OK
 }
