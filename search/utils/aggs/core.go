@@ -32,9 +32,9 @@ package aggs
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
-	"math"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -165,6 +165,7 @@ func (f *Function) ToJson() interface{} {
 				"count": stat.Count,
 			}
 		}
+
 	case "extended_stats":
 		if stat, ok := f.engine.(*Stat); ok {
 			avg := stat.Sum / float64(stat.Count)
@@ -185,7 +186,7 @@ func (f *Function) ToJson() interface{} {
 				},
 			}
 		}
-	}
+
 	case "geo_bounds", "bounds":
 		if geo, ok := f.engine.(*Geo); ok {
 			return map[string]map[string]map[string]interface{}{
@@ -215,7 +216,7 @@ func (f *Function) ToJson() interface{} {
 			}
 			return centroid
 		}
-
+	}
 	return nil
 }
 

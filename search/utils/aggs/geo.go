@@ -43,28 +43,30 @@ const (
 
 // NewGeo constructs Geo engine
 func NewGeo(field string, flags int) *Geo {
-	return &Geo{
+	geo := &Geo{
 		Field:              field,
 		flags:              flags,
 		coordsLatLonRegexp: regexp.MustCompile(`([\d\.\-])+`),
-		Bounds: newBounds(
-			newPoint(math.Inf(-1), math.Inf(1)),
-			newPoint(math.Inf(1), math.Inf(-1))),
-		Centroid: newPoint(0, 0),
 	}
+
+	if (flags & GeoBounds) != 0 {
+		geo.InitBounds()
+	}
+	return geo
 }
 
 // NewGeoLatLon constructs Geo engine with Latitude and Longitude fields passed explicitly
 func NewGeoLatLon(lat, lon string, flags int) *Geo {
-	return &Geo{
+	geo := &Geo{
 		Lat:   lat,
 		Lon:   lon,
 		flags: flags,
-		Bounds: newBounds(
-			newPoint(math.Inf(-1), math.Inf(1)),
-			newPoint(math.Inf(1), math.Inf(-1))),
-		Centroid: newPoint(0, 0),
 	}
+
+	if (flags & GeoBounds) != 0 {
+		geo.InitBounds()
+	}
+	return geo
 }
 
 // Geo contains main geo functions
@@ -78,6 +80,12 @@ type Geo struct {
 	Count              uint64         `json:"count" msgpack:"count"`                     // number of points
 	Bounds             Bounds         `json:"bounds" msgpack:"bounds"`                   // bounds of the rectangle that contains all points
 	Centroid           Point          `json:"centroid" msgpack:"centroid"`
+}
+
+func (g *Geo) InitBounds() {
+	g.Bounds = newBounds(
+		newPoint(math.Inf(-1), math.Inf(1)),
+		newPoint(math.Inf(1), math.Inf(-1)))
 }
 
 // get engine name/identifier
@@ -165,8 +173,8 @@ func newPoint(lat float64, lon float64) Point {
 	return Point{
 		Lat: lat,
 		Lon: lon,
-
-
+	}
+}
 
 func newBounds(topLeft, bottimRight Point) Bounds {
 	return Bounds{
@@ -177,7 +185,8 @@ func newBounds(topLeft, bottimRight Point) Bounds {
 
 // Bounds represents rectangle that contains all points
 type Bounds struct {
-	TopLeft, BottomRight Point
+	TopLeft     Point `json:"top_left" msgpack:"top_left"`
+	BottomRight Point `json:"bottom_right" msgpack:"bottom_right"`
 }
 
 func (b *Bounds) updateTopLeft(p Point) {
