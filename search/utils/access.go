@@ -38,7 +38,7 @@ import (
 
 var (
 	// Requested name is missed
-	ErrMissed = errors.New("Requested name is missed")
+	ErrMissed = errors.New("requested name is missed")
 )
 
 // AccessValue gets the nested value on map[string]interface{}
@@ -56,9 +56,17 @@ func AccessValue(data interface{}, field string) (interface{}, error) {
 	if name != "" {
 		switch v := data.(type) {
 		case map[string]interface{}:
-			data = v[name]
+			if d, ok := v[name]; !ok {
+				return nil, ErrMissed
+			} else {
+				data = d
+			}
 		case map[interface{}]interface{}:
-			data = v[name]
+			if d, ok := v[name]; !ok {
+				return nil, ErrMissed
+			} else {
+				data = d
+			}
 		default:
 			return nil, fmt.Errorf("bad data type: %T", data)
 		}

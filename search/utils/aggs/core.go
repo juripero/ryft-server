@@ -47,7 +47,7 @@ type Engine interface {
 	// add data to the aggregation
 	Add(data interface{}) error
 
-	// merge another aggregation
+	// merge another aggregation engine
 	Merge(data interface{}) error
 }
 
@@ -57,14 +57,21 @@ type Function struct {
 	engine Engine // engine
 }
 
-// Aggregations combined
+// Aggregations is set of functions and related engines.
 type Aggregations struct {
 	functions map[string]Function
 	engines   []Engine
-	options   interface{}
+	options   interface{} // source options
+}
+
+// GetOpts gets aggregation options
+func (a *Aggregations) GetOpts() interface{} {
+	return a.options
 }
 
 // ToJson saves all aggregations to JSON
+// if final is true then all functions are reported
+// otherwise the all engines are reported (cluster mode).
 func (a *Aggregations) ToJson(final bool) map[string]interface{} {
 	res := make(map[string]interface{})
 
@@ -88,15 +95,11 @@ func (a *Aggregations) Add(data interface{}) error {
 			return err
 		}
 	}
+
 	return nil // OK
 }
 
-// get aggregation options
-func (a *Aggregations) GetOpts() interface{} {
-	return a.options
-}
-
-// merge another intermediate Aggregations
+// merge another (intermediate) aggregation engines
 func (a *Aggregations) Merge(d interface{}) error {
 	if im, ok := d.(map[string]interface{}); ok {
 		for _, engine := range a.engines {
@@ -104,7 +107,7 @@ func (a *Aggregations) Merge(d interface{}) error {
 				if err := engine.Merge(imEngine); err != nil {
 					return fmt.Errorf("failed to merge intermediate aggregation: %s", err)
 				}
-			} else { // else intermediate engine is missing
+			} else {
 				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
 			}
 		}
@@ -171,6 +174,7 @@ func (f *Function) ToJson() interface{} {
 			avg := stat.Sum / float64(stat.Count)
 			Var := stat.Sum2/float64(stat.Count) - avg*avg
 			stdev := math.Sqrt(Var)
+			sigma := 2.0
 			return map[string]interface{}{
 				"avg":            avg,
 				"sum":            stat.Sum,
@@ -181,8 +185,8 @@ func (f *Function) ToJson() interface{} {
 				"variance":       Var,
 				"std_deviation":  stdev,
 				"std_deviation_bounds": map[string]interface{}{
-					"upper": avg + stat.sigma*stdev,
-					"lower": avg - stat.sigma*stdev,
+					"upper": avg + sigma*stdev,
+					"lower": avg - sigma*stdev,
 				},
 			}
 		}
@@ -220,44 +224,60 @@ func (f *Function) ToJson() interface{} {
 	return nil
 }
 
+// add aggregation function
+func (a *Aggregations) addFunction(aggName, aggType string, opts map[string]interface{}) error {
+	// find corresponding engine
+	exists, engine, err := getEngine(aggType, opts, a.engines)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		a.engines = append(a.engines, engine)
+	}
+
+	a.functions[aggName] = Function{
+		Type:   aggType,
+		engine: engine,
+	}
+
+	return nil // OK
+}
+
 // MakeAggs makes set of aggregation engines
-func MakeAggs(params map[string]map[string]map[string]interface{}) (*Aggregations, error) {
-	res := make(map[string]Function)
-	out := make([]Engine, 0, len(params))
+func MakeAggs(params map[string]interface{}) (*Aggregations, error) {
+	a := &Aggregations{
+		options: params,
+	}
 
 	// name: {type: {opts}}
-	for name, agg := range params {
+	for name, agg_ := range params {
+		agg, ok := agg_.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("bad type of aggregation object: %T", agg_)
+		}
 		if len(agg) != 1 {
 			return nil, fmt.Errorf("%q contains invalid aggregation object", name)
 		}
 
 		// type: {opts}
-		for t, opts := range agg {
-			// find corresponding engine
-			exists, engine, err := getEngine(t, opts, out)
-			if err != nil {
-				return nil, err
-			}
-			if !exists {
-				out = append(out, engine)
+		for t, opts_ := range agg {
+			opts, ok := opts_.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("bad type of aggregation options: %T", opts_)
 			}
 
-			res[name] = Function{
-				Type:   t,
-				engine: engine,
+			// parse and add function and corresponding engine
+			if err := a.addFunction(name, t, opts); err != nil {
+				return nil, err
 			}
 		}
 	}
 
-	if len(res) == 0 {
+	if len(a.engines) == 0 {
 		return nil, nil // no aggregations
 	}
 
-	return &Aggregations{
-		functions: res,
-		engines:   out,
-		options:   params,
-	}, nil // OK
+	return a, nil // OK
 }
 
 // get existing or create new Engine
@@ -304,7 +324,6 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 			return false, &Stat{
 				Field: field,
 				flags: statFlags,
-				sigma: 2.0,
 			}, nil // OK, new one
 		} else {
 			return false, nil, fmt.Errorf(`no "field" option found`)
@@ -340,6 +359,7 @@ func getEngine(t string, opts map[string]interface{}, engines []Engine) (bool, E
 	return false, nil, fmt.Errorf("%q is unknown aggregation type", t)
 }
 
+// TODO: remove this, use getStringOpt instead
 func getField(field string, opts map[string]interface{}) (string, error) {
 	if v, ok := opts[field]; ok {
 		field, err := utils.AsString(v)
@@ -349,6 +369,20 @@ func getField(field string, opts map[string]interface{}) (string, error) {
 		return field, nil
 	}
 	return "", fmt.Errorf(`no "%s" option found`, field)
+}
+
+// get string option
+func getStringOpt(name string, opts map[string]interface{}) (string, error) {
+	if v, ok := opts[name]; ok {
+		opt, err := utils.AsString(v)
+		if err != nil {
+			return "", fmt.Errorf(`bad "%s" option found: %s`, name, err)
+		}
+
+		return opt, nil // OK
+	}
+
+	return "", fmt.Errorf(`no "%s" option found`, name)
 }
 
 // find Stat aggregation, nil if not found

@@ -32,6 +32,7 @@ package aggs
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -43,21 +44,27 @@ const (
 	StatMax
 )
 
-// Stat contains main statistics
+// Stat is main statistics engine
+// is used to calculate: avg, sum, min, max, value_count, stats and extended_stats
 type Stat struct {
-	flags int     `json:"-"`
-	sigma float64 `json:"-"` // for extended stats
+	flags int `json:"-"msgpack:"-"` // StatSum|StatSum2|StatMin|StatMax
 
-	Field string  `json:"field" msgpack:"field"` // field path
+	Field   string      `json:"-" msgpack:"-"` // field path
+	Missing interface{} `json:"-" msgpack:"-"` // missing value
+
+	Count uint64  `json:"count" msgpack:"count"` // number of values
 	Sum   float64 `json:"sum" msgpack:"sum"`     // sum of values
 	Sum2  float64 `json:"sum2" msgpack:"sum2"`   // sum of squared values
-	Min   float64 `json:"min" msgpack:"min"`     // Minimum value
-	Max   float64 `json:"max" msgpack:"max"`     // Maximum value
-	Count uint64  `json:"count" msgpack:"count"` // number of values
+	Min   float64 `json:"min" msgpack:"min"`     // minimum value
+	Max   float64 `json:"max" msgpack:"max"`     // maximum value
 }
 
 // get engine name/identifier
 func (s *Stat) Name() string {
+	if s.Missing != nil {
+		return fmt.Sprintf("stat.%s/%v", s.Field, s.Missing)
+	}
+
 	return fmt.Sprintf("stat.%s", s.Field)
 }
 
@@ -69,37 +76,43 @@ func (s *Stat) ToJson() interface{} {
 // add data to the aggregation
 func (s *Stat) Add(data interface{}) error {
 	// extract field
-	val, err := utils.AccessValue(data, s.Field)
+	val_, err := utils.AccessValue(data, s.Field)
 	if err != nil {
-		return err
+		if err == utils.ErrMissed {
+			val_ = s.Missing // use provided value
+		} else {
+			return err
+		}
 	}
-	// TODO: case when field is missing
+	if val_ == nil {
+		return nil // do nothing if there is no value
+	}
 
 	// get it as float
-	fval, err := utils.AsFloat64(val)
+	val, err := utils.AsFloat64(val_)
 	if err != nil {
 		return err
 	}
 
-	// sum and sum of squared
+	// sum and sum of squared values
 	if (s.flags & StatSum) != 0 {
-		s.Sum += fval
+		s.Sum += val
 	}
 	if (s.flags & StatSum2) != 0 {
-		s.Sum2 += fval * fval
+		s.Sum2 += val * val
 	}
 
 	// minimum
 	if (s.flags & StatMin) != 0 {
-		if s.Count == 0 || fval < s.Min {
-			s.Min = fval
+		if s.Count == 0 || val < s.Min {
+			s.Min = val
 		}
 	}
 
 	// maximum
 	if (s.flags & StatMax) != 0 {
-		if s.Count == 0 || fval > s.Max {
-			s.Max = fval
+		if s.Count == 0 || val > s.Max {
+			s.Max = val
 		}
 	}
 
@@ -110,14 +123,14 @@ func (s *Stat) Add(data interface{}) error {
 }
 
 // merge another intermediate aggregation
-func (s *Stat) Merge(data interface{}) error {
-	im, ok := data.(map[string]interface{})
+func (s *Stat) Merge(data_ interface{}) error {
+	data, ok := data_.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("no valid data")
 	}
 
 	// count is important
-	count, err := utils.AsUint64(im["count"])
+	count, err := utils.AsUint64(data["count"])
 	if err != nil {
 		return err
 	}
@@ -125,17 +138,19 @@ func (s *Stat) Merge(data interface{}) error {
 		return nil // nothing to merge
 	}
 
-	// sum and sum of squared
+	// sum
 	if (s.flags & StatSum) != 0 {
-		sum, err := utils.AsFloat64(im["sum"])
+		sum, err := utils.AsFloat64(data["sum"])
 		if err != nil {
 			return err
 		}
 
 		s.Sum += sum
 	}
+
+	// sum of squared values
 	if (s.flags & StatSum2) != 0 {
-		sum2, err := utils.AsFloat64(im["sum2"])
+		sum2, err := utils.AsFloat64(data["sum2"])
 		if err != nil {
 			return err
 		}
@@ -145,7 +160,7 @@ func (s *Stat) Merge(data interface{}) error {
 
 	// minimum
 	if (s.flags & StatMin) != 0 {
-		min, err := utils.AsFloat64(im["min"])
+		min, err := utils.AsFloat64(data["min"])
 		if err != nil {
 			return err
 		}
@@ -157,7 +172,7 @@ func (s *Stat) Merge(data interface{}) error {
 
 	// maximum
 	if (s.flags & StatMax) != 0 {
-		max, err := utils.AsFloat64(im["max"])
+		max, err := utils.AsFloat64(data["max"])
 		if err != nil {
 			return err
 		}
@@ -171,4 +186,222 @@ func (s *Stat) Merge(data interface{}) error {
 	s.Count += count
 
 	return nil // OK
+}
+
+// "sum" aggregation function
+type sumFunc struct {
+	engine *Stat
+}
+
+// make new "sum" aggregation
+func newSumFunc(opts map[string]interface{}) (*sumFunc, error) {
+	if field, err := getStringOpt("field", opts); err != nil {
+		return nil, err
+	} else {
+		return &sumFunc{
+			engine: &Stat{
+				flags:   StatSum,
+				Field:   field,
+				Missing: opts["missing"],
+			},
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *sumFunc) ToJson() interface{} {
+	return map[string]interface{}{
+		"value": f.engine.Sum,
+	}
+}
+
+// "min" aggregation function
+type minFunc struct {
+	engine *Stat
+}
+
+// make new "min" aggregation
+func newMinFunc(opts map[string]interface{}) (*minFunc, error) {
+	if field, err := getStringOpt("field", opts); err != nil {
+		return nil, err
+	} else {
+		return &minFunc{
+			engine: &Stat{
+				flags:   StatMin,
+				Field:   field,
+				Missing: opts["missing"],
+			},
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *minFunc) ToJson() interface{} {
+	return map[string]interface{}{
+		"value": f.engine.Min,
+	}
+}
+
+// "max" aggregation function
+type maxFunc struct {
+	engine *Stat
+}
+
+// make new "max" aggregation
+func newMaxFunc(opts map[string]interface{}) (*maxFunc, error) {
+	if field, err := getStringOpt("field", opts); err != nil {
+		return nil, err
+	} else {
+		return &maxFunc{
+			engine: &Stat{
+				flags:   StatMax,
+				Field:   field,
+				Missing: opts["missing"],
+			},
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *maxFunc) ToJson() interface{} {
+	return map[string]interface{}{
+		"value": f.engine.Max,
+	}
+}
+
+// "value_count" or "count" aggregation function
+type countFunc struct {
+	engine *Stat
+}
+
+// make new "count" aggregation
+func newCountFunc(opts map[string]interface{}) (*countFunc, error) {
+	if field, err := getStringOpt("field", opts); err != nil {
+		return nil, err
+	} else {
+		return &countFunc{
+			engine: &Stat{
+				// flags:   0,
+				Field: field,
+			},
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *countFunc) ToJson() interface{} {
+	return map[string]interface{}{
+		"value": f.engine.Count,
+	}
+}
+
+// "avg" aggregation function
+type avgFunc struct {
+	engine *Stat
+}
+
+// make new "avg" aggregation
+func newAvgFunc(opts map[string]interface{}) (*avgFunc, error) {
+	if field, err := getStringOpt("field", opts); err != nil {
+		return nil, err
+	} else {
+		return &avgFunc{
+			engine: &Stat{
+				flags:   StatSum,
+				Field:   field,
+				Missing: opts["missing"],
+			},
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *avgFunc) ToJson() interface{} {
+	return map[string]interface{}{
+		"value": f.engine.Sum / float64(f.engine.Count), // might be Inf or NaN
+	}
+}
+
+// "stats" aggregation function
+type statsFunc struct {
+	engine *Stat
+}
+
+// make new "stats" aggregation
+func newStatsFunc(opts map[string]interface{}) (*statsFunc, error) {
+	if field, err := getStringOpt("field", opts); err != nil {
+		return nil, err
+	} else {
+		return &statsFunc{
+			engine: &Stat{
+				flags:   StatSum | StatMin | StatMax,
+				Field:   field,
+				Missing: opts["missing"],
+			},
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *statsFunc) ToJson() interface{} {
+	return map[string]interface{}{
+		"avg":   f.engine.Sum / float64(f.engine.Count), // might be Inf or NaN
+		"sum":   f.engine.Sum,
+		"min":   f.engine.Min,
+		"max":   f.engine.Max,
+		"count": f.engine.Count,
+	}
+}
+
+// "extended_stats" aggregation function
+type extendedStatsFunc struct {
+	engine *Stat
+	sigma  float64
+}
+
+// make new "extended_stats" aggregation
+func newExtendedStatsFunc(opts map[string]interface{}) (*extendedStatsFunc, error) {
+	if field, err := getStringOpt("field", opts); err != nil {
+		return nil, err
+	} else {
+		sigma := 2.0 // by default
+		if v, ok := opts["sigma"]; ok {
+			if sigma, err = utils.AsFloat64(v); err != nil {
+				return nil, fmt.Errorf(`bad "sigma" option: %s`, err)
+			} else if sigma < 0.0 {
+				return nil, fmt.Errorf(`bad "sigma" option: %s`, "cannot be negative")
+			}
+		}
+
+		return &extendedStatsFunc{
+			engine: &Stat{
+				flags:   StatSum | StatSum2 | StatMin | StatMax,
+				Field:   field,
+				Missing: opts["missing"],
+			},
+			sigma: sigma,
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *extendedStatsFunc) ToJson() interface{} {
+	Avg := f.engine.Sum / float64(f.engine.Count)
+	Var := f.engine.Sum2/float64(f.engine.Count) - Avg*Avg
+	Stdev := math.Sqrt(Var)
+
+	return map[string]interface{}{
+		"avg":            Avg,
+		"sum":            f.engine.Sum,
+		"min":            f.engine.Min,
+		"max":            f.engine.Max,
+		"count":          f.engine.Count,
+		"sum_of_squares": f.engine.Sum2,
+		"variance":       Var,
+		"std_deviation":  Stdev,
+		"std_deviation_bounds": map[string]interface{}{
+			"upper": Avg + f.sigma*Stdev,
+			"lower": Avg - f.sigma*Stdev,
+		},
+	}
 }

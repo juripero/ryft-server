@@ -75,7 +75,7 @@ type CountParams struct {
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
 
 	// aggregations
-	Aggregations map[string]map[string]map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 
