@@ -96,6 +96,6 @@ func TestGeoCentroidFunc(t *testing.T) {
 
 	check(`{"no-field":"foo"}`, `no "lat" option found`)
 
-	check(`{"field":"Location"}`, `{"centroid": {"count":3, "location":{"lat":-11.732526868567062, "lon":27.777000258960406}}}`)
-	check(`{"lat":"Latitude","lon":"Longitude"}`, `{"centroid": {"count":3, "location":{"lat":-11.732526868567062, "lon":27.777000258960406}}}`)
+	check(`{"field":"Location"}`, `{"centroid": {"count":3, "location":{"lat":27.777000258960406, "lon":-11.732526868567062}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude"}`, `{"centroid": {"count":3, "location":{"lat":27.777000258960406, "lon":-11.732526868567062}}}`)
 }

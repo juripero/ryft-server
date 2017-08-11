@@ -329,8 +329,8 @@ func (g *Geo) getCentroid() Point {
 	z := g.CentroidSum.Z / N
 
 	return Point{
-		Lat: rad2deg(math.Atan2(y, x)),
-		Lon: rad2deg(math.Atan2(z, math.Sqrt(x*x+y*y))),
+		Lon: rad2deg(math.Atan2(y, x)),
+		Lat: rad2deg(math.Atan2(z, math.Sqrt(x*x+y*y))),
 	}
 }
 
