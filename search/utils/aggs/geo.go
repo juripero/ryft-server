@@ -41,56 +41,51 @@ const (
 	GeoCentroid
 )
 
-// NewGeo constructs Geo engine
-func NewGeo(field string, flags int) *Geo {
-	geo := &Geo{
-		Field:              field,
-		flags:              flags,
-		coordsLatLonRegexp: regexp.MustCompile(`([\d\.\-])+`),
-	}
+var (
+	geoLocationRegexp *regexp.Regexp = regexp.MustCompile(`([\d\.\-])+`) // TODO: make () optional!, suuport for '+'
+)
 
-	if (flags & GeoBounds) != 0 {
-		geo.InitBounds()
-	}
-	return geo
-}
-
-// NewGeoLatLon constructs Geo engine with Latitude and Longitude fields passed explicitly
-func NewGeoLatLon(lat, lon string, flags int) *Geo {
-	geo := &Geo{
-		Lat:   lat,
-		Lon:   lon,
-		flags: flags,
-	}
-
-	if (flags & GeoBounds) != 0 {
-		geo.InitBounds()
-	}
-	return geo
-}
-
-// Geo contains main geo functions
+// Geo is aggregation engine related to geo functions
 type Geo struct {
-	flags              int
-	coordsLatLonRegexp *regexp.Regexp
-	sum                pointEuclidean // sum of coordinates of all points in Euclidean system
-	Lon                string         `json:"longitude,omitempty" msgpack:"longitude,omitempty"`
-	Lat                string         `json:"latitude,omitempty" msgpack:"latitude,omitempty"`
-	Field              string         `json:"field,omitempty" msgpack:"field,omitempty"` // field path
-	Count              uint64         `json:"count" msgpack:"count"`                     // number of points
-	Bounds             Bounds         `json:"bounds" msgpack:"bounds"`                   // bounds of the rectangle that contains all points
-	Centroid           Point          `json:"centroid" msgpack:"centroid"`
+	flags int `json:"-", msgpack:"-"` // GeoBounds|GeoCentroid
+
+	// the following formats are supported:
+	// - "location": "<lat>,<lon>" or "location":"(<lat>,<lon>)"
+	// "lat": <lat>, "lon": <lon>
+	LocField string `json:"-" msgpack:"-"` // "location" field
+	LonField string `json:"-" msgpack:"-"` // "latitude" field
+	LatField string `json:"-" msgpack:"-"` // "longitude" field
+
+	Count       uint64  `json:"count" msgpack:"count"` // number of points
+	TopLeft     Point   `json:"top_left" msgpack:"top_left"`
+	BottomRight Point   `json:"bottom_right" msgpack:"bottom_right"`
+	CentroidSum Point3D `json:"centroid_sum", msgpack:"centroid_sum"`
 }
 
-func (g *Geo) InitBounds() {
-	g.Bounds = newBounds(
-		newPoint(math.Inf(-1), math.Inf(1)),
-		newPoint(math.Inf(1), math.Inf(-1)))
+// Point represents a physical point in geographic notation [lat, lon].
+type Point struct {
+	Lat float64 `json:"lat" msgpack:"lat"`
+	Lon float64 `json:"lon" msgpack:"lon"`
+}
+
+// Point3D handles coordinates of Euclidean geometry
+type Point3D struct {
+	X float64 `json:"x" msgpack:"x"`
+	Y float64 `json:"y" msgpack:"y"`
+	Z float64 `json:"z" msgpack:"z"`
 }
 
 // get engine name/identifier
 func (g *Geo) Name() string {
-	return fmt.Sprintf("geo(%s)", g.Field)
+	return fmt.Sprintf("geo.%s", g.LocField)
+}
+
+// join another engine
+func (g *Geo) Join(other Engine) {
+	if gg, ok := other.(*Geo); ok {
+		g.flags |= gg.flags
+		// Field should be the same!
+	}
 }
 
 // get JSON object
@@ -101,146 +96,334 @@ func (g *Geo) ToJson() interface{} {
 // Add data to the aggregation
 func (g *Geo) Add(data interface{}) error {
 	var lat, lon float64
-	if len(g.Field) > 0 {
-		// extract field
-		val, err := utils.AccessValue(data, g.Field)
+
+	if len(g.LonField) > 0 && len(g.LatField) > 0 {
+		// get "lat" and "lon" separated
+
+		// latitude
+		val, err := utils.AccessValue(data, g.LatField)
 		if err != nil {
+			if err == utils.ErrMissed {
+				return nil // do nothing if there is no value
+			}
 			return err
 		}
-		// TODO: case when field is missing
-		coordinates, err := utils.AsString(val)
-		if err != nil {
-			return err
-		}
-		coords := g.coordsLatLonRegexp.FindAllString(coordinates, -1)
-		if len(coords) != 2 {
-			return fmt.Errorf("%q is not a string of coordinates", coordinates)
-		}
-		// get latitude as float
-		lat, err = utils.AsFloat64(coords[0])
-		if err != nil {
-			return err
-		}
-		// get longtitude as float
-		lon, err = utils.AsFloat64(coords[1])
-		if err != nil {
-			return err
-		}
-	} else if len(g.Lon) > 0 && len(g.Lat) > 0 {
-		val, err := utils.AccessValue(data, g.Lat)
-		if err != nil {
-			return err
-		}
+
 		lat, err = utils.AsFloat64(val)
 		if err != nil {
 			return err
 		}
 
-		val, err = utils.AccessValue(data, g.Lon)
+		// longitude
+		val, err = utils.AccessValue(data, g.LonField)
 		if err != nil {
+			if err == utils.ErrMissed {
+				return nil // do nothing if there is no value
+			}
 			return err
 		}
+
 		lon, err = utils.AsFloat64(val)
 		if err != nil {
 			return err
 		}
 	} else {
-		return fmt.Errorf(`no "field", "longitude" or "latitude" is set`)
+		// get "location" combined
+
+		val, err := utils.AccessValue(data, g.LocField)
+		if err != nil {
+			if err == utils.ErrMissed {
+				return nil // do nothing if there is no value
+			}
+			return err
+		}
+
+		// parse "location"
+		loc_, err := utils.AsString(val)
+		if err != nil {
+			return err
+		}
+		loc := geoLocationRegexp.FindAllString(loc_, -1)
+		if len(loc) != 2 {
+			return fmt.Errorf("%q is not a valid location", loc_)
+		}
+
+		// get latitude as float
+		lat, err = utils.AsFloat64(loc[0])
+		if err != nil {
+			return err
+		}
+
+		// get longtitude as float
+		lon, err = utils.AsFloat64(loc[1])
+		if err != nil {
+			return err
+		}
 	}
-	// count need to be incremented before updates
-	g.Count++
-	p := newPoint(lat, lon)
+
+	// update bounds
 	if (g.flags & GeoBounds) != 0 {
-		g.updateBounds(p)
+		g.updateBounds(lat, lon)
 	}
+
+	// update centroid
 	if (g.flags & GeoCentroid) != 0 {
-		g.updateCentroid(p)
+		g.updateCentroid(lat, lon)
 	}
+
+	g.Count++
+
 	return nil // OK
 }
 
-// Point represents a physical point in geographic notation [lat, lng].
-type Point struct {
-	Lat float64 `json:"latitude" msgpack:"latitude"`
-	Lon float64 `json:"longitude" msgpack:"longitude"`
-}
-
-// pountEuclidean handles coordinates of Euclidean geometry
-type pointEuclidean struct{ x, y, z float64 }
-
-// newPoint creates new Point
-func newPoint(lat float64, lon float64) Point {
-	return Point{
-		Lat: lat,
-		Lon: lon,
-	}
-}
-
-func newBounds(topLeft, bottimRight Point) Bounds {
-	return Bounds{
-		TopLeft:     topLeft,
-		BottomRight: bottimRight,
-	}
-}
-
-// Bounds represents rectangle that contains all points
-type Bounds struct {
-	TopLeft     Point `json:"top_left" msgpack:"top_left"`
-	BottomRight Point `json:"bottom_right" msgpack:"bottom_right"`
-}
-
-func (b *Bounds) updateTopLeft(p Point) {
-	b.TopLeft.Lat = math.Max(b.TopLeft.Lat, p.Lat)
-	b.TopLeft.Lon = math.Min(b.TopLeft.Lon, p.Lon)
-}
-
-func (b *Bounds) updateBottomRight(p Point) {
-	b.BottomRight.Lat = math.Min(b.BottomRight.Lat, p.Lat)
-	b.BottomRight.Lon = math.Max(b.BottomRight.Lon, p.Lon)
-}
-
-// updateBounds extends bounds of rectangle which contains all points
-func (g *Geo) updateBounds(p Point) {
-	g.Bounds.updateTopLeft(p)
-	g.Bounds.updateBottomRight(p)
-}
-
-func deg2rad(value float64) float64 {
-	return math.Pi * value / 180
-}
-
-func rad2deg(value float64) float64 {
-	return value * 180 / math.Pi
-}
-
-// updateCentroid recalculates centroid Point
-func (g *Geo) updateCentroid(p Point) {
-	lonSin, lonCos := math.Sincos(deg2rad(p.Lon))
-	latSin, latCos := math.Sincos(deg2rad(p.Lat))
-	g.sum.x += latCos * lonCos
-	g.sum.y += latCos * lonSin
-	g.sum.z += latSin
-
-	x, y, z := g.sum.x, g.sum.y, g.sum.z
-	count := float64(g.Count)
-	x /= count
-	y /= count
-	z /= count
-
-	g.Centroid = newPoint(
-		rad2deg(math.Atan2(y, x)),
-		rad2deg(math.Atan2(z, math.Sqrt(x*x+y*y))),
-	)
-}
-
 // merge another intermediate aggregation
-func (g *Geo) Merge(data interface{}) error {
-	im, ok := data.(map[string]interface{})
+func (g *Geo) Merge(data_ interface{}) error {
+	data, ok := data_.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("no valid data")
 	}
 
-	_ = im
+	// count is important
+	count, err := utils.AsUint64(data["count"])
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return nil // nothing to merge
+	}
+
+	// geo_bounds
+	if (g.flags & GeoBounds) != 0 {
+		// get point
+		getPoint := func(data map[string]interface{}, name string) (lat, lon float64, err error) {
+			if pt_, ok := data[name]; ok {
+				if pt, ok := pt_.(map[string]interface{}); ok {
+					lat, err = utils.AsFloat64(pt["lat"])
+					if err != nil {
+						return
+					}
+
+					lon, err = utils.AsFloat64(pt["lon"])
+					if err != nil {
+						return
+					}
+				} else {
+					err = fmt.Errorf("bad %q data found", name)
+				}
+			} else {
+				err = fmt.Errorf("no %q data found", name)
+			}
+
+			return
+		}
+
+		// top_left
+		lat, lon, err := getPoint(data, "top_left")
+		if err != nil {
+			return err
+		}
+		g.updateBounds(lat, lon)
+
+		// bottom_right
+		lat, lon, err = getPoint(data, "bottom_right")
+		if err != nil {
+			return err
+		}
+		g.updateBounds(lat, lon)
+	}
+
+	// geo_centroid
+	if (g.flags & GeoCentroid) != 0 {
+		// get point3D
+		getPoint := func(data map[string]interface{}, name string) (x, y, z float64, err error) {
+			if pt_, ok := data[name]; ok {
+				if pt, ok := pt_.(map[string]interface{}); ok {
+					x, err = utils.AsFloat64(pt["x"])
+					if err != nil {
+						return
+					}
+
+					y, err = utils.AsFloat64(pt["y"])
+					if err != nil {
+						return
+					}
+
+					z, err = utils.AsFloat64(pt["z"])
+					if err != nil {
+						return
+					}
+				} else {
+					err = fmt.Errorf("bad %q data found", name)
+				}
+			} else {
+				err = fmt.Errorf("no %q data found", name)
+			}
+
+			return
+		}
+
+		x, y, z, err := getPoint(data, "centroid_sum")
+		if err != nil {
+			return err
+		}
+		g.CentroidSum.X += x
+		g.CentroidSum.Y += y
+		g.CentroidSum.Z += z
+	}
+
+	// count
+	g.Count += count
 
 	return nil // OK
+}
+
+// updateBounds extends bounds of rectangle which contains all points
+func (g *Geo) updateBounds(lat, lon float64) {
+	// g.TopLeft.Lat = math.Max(g.TopLeft.Lat, lat)
+	if g.Count == 0 || lat > g.TopLeft.Lat {
+		g.TopLeft.Lat = lat
+	}
+
+	// g.TopLeft.Lon = math.Min(g.TopLeft.Lon, lon)
+	if g.Count == 0 || lon < g.TopLeft.Lon {
+		g.TopLeft.Lon = lon
+	}
+
+	// g.BottomRight.Lat = math.Min(g.BottomRight.Lat, lat)
+	if g.Count == 0 || lat < g.BottomRight.Lat {
+		g.BottomRight.Lat = lat
+	}
+
+	// g.BottomRight.Lon = math.Max(g.BottomRight.Lon, lon)
+	if g.Count == 0 || lon > g.BottomRight.Lon {
+		g.BottomRight.Lon = lon
+	}
+
+	// TODO: check wrap of coordinates!!!
+}
+
+// convert degrees to radians
+func deg2rad(value float64) float64 {
+	return value * (math.Pi / 180)
+}
+
+//convert radians to degrees
+func rad2deg(value float64) float64 {
+	return value * (180 / math.Pi)
+}
+
+// updateCentroid recalculates centroid Point
+func (g *Geo) updateCentroid(lat, lon float64) {
+	latSin, latCos := math.Sincos(deg2rad(lat))
+	lonSin, lonCos := math.Sincos(deg2rad(lon))
+	g.CentroidSum.X += latCos * lonCos
+	g.CentroidSum.Y += latCos * lonSin
+	g.CentroidSum.Z += latSin
+}
+
+// get centroid location
+func (g *Geo) getCentroid() Point {
+	N := float64(g.Count)
+	x := g.CentroidSum.X / N
+	y := g.CentroidSum.Y / N
+	z := g.CentroidSum.Z / N
+
+	return Point{
+		Lat: rad2deg(math.Atan2(y, x)),
+		Lon: rad2deg(math.Atan2(z, math.Sqrt(x*x+y*y))),
+	}
+}
+
+// parse "field" or "lat"/"lon" fields
+func parseGeoOpts(opts map[string]interface{}) (field string, lat, lon string, err error) {
+	if _, ok := opts["field"]; ok {
+		field, err = getStringOpt("field", opts)
+	} else {
+		// fallback to "lat" and "lon" fields
+		lat, err = getStringOpt("lat", opts)
+		if err != nil {
+			return
+		}
+		lon, err = getStringOpt("lon", opts)
+		if err != nil {
+			return
+		}
+
+		field = fmt.Sprintf("%s/%s", lat, lon)
+	}
+
+	return
+}
+
+// "geo_bounds" aggregation function
+type geoBoundsFunc struct {
+	engine *Geo
+}
+
+// make new "geo_bounds" aggregation
+func newGeoBoundsFunc(opts map[string]interface{}) (*geoBoundsFunc, error) {
+	if field, lat, lon, err := parseGeoOpts(opts); err != nil {
+		return nil, err
+	} else {
+		return &geoBoundsFunc{
+			engine: &Geo{
+				flags:    GeoBounds,
+				LocField: field,
+				LatField: lat,
+				LonField: lon,
+			},
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *geoBoundsFunc) ToJson() interface{} {
+	bounds := f.engine
+	return map[string]interface{}{
+		"bounds": map[string]interface{}{
+			"top_left": map[string]interface{}{
+				"lat": bounds.TopLeft.Lat,
+				"lon": bounds.TopLeft.Lon,
+			},
+			"bottom_right": map[string]interface{}{
+				"lat": bounds.BottomRight.Lat,
+				"lon": bounds.BottomRight.Lon,
+			},
+		},
+	}
+}
+
+// "geo_centroid" aggregation function
+type geoCentroidFunc struct {
+	engine *Geo
+}
+
+// make new "geo_centroid" aggregation
+func newGeoCentroidFunc(opts map[string]interface{}) (*geoCentroidFunc, error) {
+	if field, lat, lon, err := parseGeoOpts(opts); err != nil {
+		return nil, err
+	} else {
+		return &geoCentroidFunc{
+			engine: &Geo{
+				flags:    GeoCentroid,
+				LocField: field,
+				LatField: lat,
+				LonField: lon,
+			},
+		}, nil // OK
+	}
+}
+
+// ToJson gets function as JSON
+func (f *geoCentroidFunc) ToJson() interface{} {
+	location := f.engine.getCentroid()
+	return map[string]interface{}{
+		"centroid": map[string]interface{}{
+			"count": f.engine.Count,
+			"location": map[string]interface{}{
+				"lat": location.Lat,
+				"lon": location.Lon,
+			},
+		},
+	}
 }

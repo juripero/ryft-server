@@ -68,6 +68,14 @@ func (s *Stat) Name() string {
 	return fmt.Sprintf("stat.%s", s.Field)
 }
 
+// join another engine
+func (s *Stat) Join(other Engine) {
+	if ss, ok := other.(*Stat); ok {
+		s.flags |= ss.flags
+		// Field & Missing should be the same!
+	}
+}
+
 // get JSON object
 func (s *Stat) ToJson() interface{} {
 	return s
