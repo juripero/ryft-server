@@ -476,8 +476,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	if task.config.Aggregations != nil {
 		task.aggsStartTime = time.Now()
 		err := ApplyAggregations(task.IndexFileName, task.DataFileName,
-			task.config.Delimiter, task.config.DataFormat,
-			task.config.Aggregations)
+			task.config.Delimiter, task.config.DataFormat, task.config.Aggregations,
+			func() bool { return res.IsCancelled() })
 		if err != nil {
 			task.log().WithError(err).
 				Warnf("[%s]: failed to apply aggregations", TAG)

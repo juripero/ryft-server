@@ -330,7 +330,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			if cfg.Aggregations != nil {
 				// TODO: move this code to final results, becase there is no transformation applied yet
 				if err := ryftprim.ApplyAggregations(opts.atHome(out.IndexFile), opts.atHome(out.DataFile),
-					out.Delimiter, cfg.DataFormat, cfg.Aggregations); err != nil {
+					out.Delimiter, cfg.DataFormat, cfg.Aggregations,
+					func() bool { return mux.IsCancelled() }); err != nil {
 					task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
 					mux.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
 					return

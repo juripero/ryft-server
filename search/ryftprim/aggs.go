@@ -44,7 +44,8 @@ import (
 )
 
 // Apply aggregations
-func ApplyAggregations(indexPath, dataPath string, delimiter string, format string, aggregations *aggs.Aggregations) error {
+func ApplyAggregations(indexPath, dataPath string, delimiter string, format string,
+	aggregations *aggs.Aggregations, cancelFunc func() bool) error {
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
 
@@ -158,13 +159,10 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 
 		index.Release()
 
-		// TODO
-		/*
-			if rr.isCancelled() != 0 {
-				rr.log().Debugf("[%s/reader]: cancelled***", TAG)
-			} else {
-				continue // go to next INDEX ASAP
-			}
-		*/
+		// check "cancel" channel
+		if cancelFunc != nil && cancelFunc() {
+			log.Debugf("[%s/aggs]: cancelled", TAG)
+			return nil // cancelled
+		}
 	}
 }
