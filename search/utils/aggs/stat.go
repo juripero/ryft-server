@@ -196,9 +196,21 @@ func (s *Stat) Merge(data_ interface{}) error {
 	return nil // OK
 }
 
+// base function
+type statFunc struct {
+	engine *Stat
+}
+
+// bind to another engine
+func (f *statFunc) bind(e Engine) {
+	if s, ok := e.(*Stat); ok {
+		f.engine = s
+	}
+}
+
 // "sum" aggregation function
 type sumFunc struct {
-	engine *Stat
+	statFunc
 }
 
 // make new "sum" aggregation
@@ -206,13 +218,13 @@ func newSumFunc(opts map[string]interface{}) (*sumFunc, error) {
 	if field, err := getStringOpt("field", opts); err != nil {
 		return nil, err
 	} else {
-		return &sumFunc{
+		return &sumFunc{statFunc{
 			engine: &Stat{
 				flags:   StatSum,
 				Field:   field,
 				Missing: opts["missing"],
 			},
-		}, nil // OK
+		}}, nil // OK
 	}
 }
 
@@ -225,7 +237,7 @@ func (f *sumFunc) ToJson() interface{} {
 
 // "min" aggregation function
 type minFunc struct {
-	engine *Stat
+	statFunc
 }
 
 // make new "min" aggregation
@@ -233,13 +245,13 @@ func newMinFunc(opts map[string]interface{}) (*minFunc, error) {
 	if field, err := getStringOpt("field", opts); err != nil {
 		return nil, err
 	} else {
-		return &minFunc{
+		return &minFunc{statFunc{
 			engine: &Stat{
 				flags:   StatMin,
 				Field:   field,
 				Missing: opts["missing"],
 			},
-		}, nil // OK
+		}}, nil // OK
 	}
 }
 
@@ -252,7 +264,7 @@ func (f *minFunc) ToJson() interface{} {
 
 // "max" aggregation function
 type maxFunc struct {
-	engine *Stat
+	statFunc
 }
 
 // make new "max" aggregation
@@ -260,13 +272,13 @@ func newMaxFunc(opts map[string]interface{}) (*maxFunc, error) {
 	if field, err := getStringOpt("field", opts); err != nil {
 		return nil, err
 	} else {
-		return &maxFunc{
+		return &maxFunc{statFunc{
 			engine: &Stat{
 				flags:   StatMax,
 				Field:   field,
 				Missing: opts["missing"],
 			},
-		}, nil // OK
+		}}, nil // OK
 	}
 }
 
@@ -279,7 +291,7 @@ func (f *maxFunc) ToJson() interface{} {
 
 // "value_count" or "count" aggregation function
 type countFunc struct {
-	engine *Stat
+	statFunc
 }
 
 // make new "count" aggregation
@@ -287,12 +299,12 @@ func newCountFunc(opts map[string]interface{}) (*countFunc, error) {
 	if field, err := getStringOpt("field", opts); err != nil {
 		return nil, err
 	} else {
-		return &countFunc{
+		return &countFunc{statFunc{
 			engine: &Stat{
 				// flags:   0,
 				Field: field,
 			},
-		}, nil // OK
+		}}, nil // OK
 	}
 }
 
@@ -305,7 +317,7 @@ func (f *countFunc) ToJson() interface{} {
 
 // "avg" aggregation function
 type avgFunc struct {
-	engine *Stat
+	statFunc
 }
 
 // make new "avg" aggregation
@@ -313,13 +325,13 @@ func newAvgFunc(opts map[string]interface{}) (*avgFunc, error) {
 	if field, err := getStringOpt("field", opts); err != nil {
 		return nil, err
 	} else {
-		return &avgFunc{
+		return &avgFunc{statFunc{
 			engine: &Stat{
 				flags:   StatSum,
 				Field:   field,
 				Missing: opts["missing"],
 			},
-		}, nil // OK
+		}}, nil // OK
 	}
 }
 
@@ -332,7 +344,7 @@ func (f *avgFunc) ToJson() interface{} {
 
 // "stats" aggregation function
 type statsFunc struct {
-	engine *Stat
+	statFunc
 }
 
 // make new "stats" aggregation
@@ -340,13 +352,13 @@ func newStatsFunc(opts map[string]interface{}) (*statsFunc, error) {
 	if field, err := getStringOpt("field", opts); err != nil {
 		return nil, err
 	} else {
-		return &statsFunc{
+		return &statsFunc{statFunc{
 			engine: &Stat{
 				flags:   StatSum | StatMin | StatMax,
 				Field:   field,
 				Missing: opts["missing"],
 			},
-		}, nil // OK
+		}}, nil // OK
 	}
 }
 
@@ -363,8 +375,8 @@ func (f *statsFunc) ToJson() interface{} {
 
 // "extended_stats" aggregation function
 type extendedStatsFunc struct {
-	engine *Stat
-	sigma  float64
+	statFunc
+	sigma float64
 }
 
 // make new "extended_stats" aggregation
@@ -381,12 +393,12 @@ func newExtendedStatsFunc(opts map[string]interface{}) (*extendedStatsFunc, erro
 			}
 		}
 
-		return &extendedStatsFunc{
+		return &extendedStatsFunc{statFunc: statFunc{
 			engine: &Stat{
 				flags:   StatSum | StatSum2 | StatMin | StatMax,
 				Field:   field,
 				Missing: opts["missing"],
-			},
+			}},
 			sigma: sigma,
 		}, nil // OK
 	}

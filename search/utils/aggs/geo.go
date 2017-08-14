@@ -355,9 +355,21 @@ func parseGeoOpts(opts map[string]interface{}) (field string, lat, lon string, e
 	return
 }
 
+// "geo" base function
+type geoFunc struct {
+	engine *Geo
+}
+
+// bind to another engine
+func (f *geoFunc) bind(e Engine) {
+	if g, ok := e.(*Geo); ok {
+		f.engine = g
+	}
+}
+
 // "geo_bounds" aggregation function
 type geoBoundsFunc struct {
-	engine *Geo
+	geoFunc
 }
 
 // make new "geo_bounds" aggregation
@@ -365,14 +377,14 @@ func newGeoBoundsFunc(opts map[string]interface{}) (*geoBoundsFunc, error) {
 	if field, lat, lon, err := parseGeoOpts(opts); err != nil {
 		return nil, err
 	} else {
-		return &geoBoundsFunc{
+		return &geoBoundsFunc{geoFunc{
 			engine: &Geo{
 				flags:    GeoBounds,
 				LocField: field,
 				LatField: lat,
 				LonField: lon,
 			},
-		}, nil // OK
+		}}, nil // OK
 	}
 }
 
@@ -395,7 +407,7 @@ func (f *geoBoundsFunc) ToJson() interface{} {
 
 // "geo_centroid" aggregation function
 type geoCentroidFunc struct {
-	engine *Geo
+	geoFunc
 }
 
 // make new "geo_centroid" aggregation
@@ -403,14 +415,14 @@ func newGeoCentroidFunc(opts map[string]interface{}) (*geoCentroidFunc, error) {
 	if field, lat, lon, err := parseGeoOpts(opts); err != nil {
 		return nil, err
 	} else {
-		return &geoCentroidFunc{
+		return &geoCentroidFunc{geoFunc{
 			engine: &Geo{
 				flags:    GeoCentroid,
 				LocField: field,
 				LatField: lat,
 				LonField: lon,
 			},
-		}, nil // OK
+		}}, nil // OK
 	}
 }
 

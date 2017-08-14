@@ -55,6 +55,9 @@ type Engine interface {
 type Function interface {
 	// get object that can be serialized to JSON
 	ToJson() interface{}
+
+	// bind to another engine
+	bind(e Engine)
 }
 
 // Aggregations is a set of functions and related engines.
@@ -181,6 +184,7 @@ func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interfac
 	// check existing engine
 	if ee, ok := a.engines[e.Name()]; ok {
 		ee.Join(e) // join existing engine
+		f.bind(ee) // replace engine
 	} else {
 		a.engines[e.Name()] = e // add new engine
 	}
