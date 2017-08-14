@@ -99,3 +99,88 @@ func TestGeoCentroidFunc(t *testing.T) {
 	check(`{"field":"Location"}`, `{"centroid": {"count":3, "location":{"lat":27.777000258960406, "lon":-11.732526868567062}}}`)
 	check(`{"lat":"Latitude","lon":"Longitude"}`, `{"centroid": {"count":3, "location":{"lat":27.777000258960406, "lon":-11.732526868567062}}}`)
 }
+
+// check data with elastic
+func TestGeoElastic(t *testing.T) {
+	dataStr := `[
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.835674,2.335311)"},
+{"pos":"(48.844444,2.324444)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.322222)"},
+{"pos":"(48.843633,2.328888)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.861234,2.333333)"},
+{"pos":"(48.8534421,2.339999)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.838888,2.337311)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"},
+{"pos":"(48.860000,2.327000)"}
+	]`
+
+	var data []map[string]interface{}
+	if !assert.NoError(t, json.Unmarshal([]byte(dataStr), &data)) {
+		return
+	}
+
+	c, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos"})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	b, err := newGeoBoundsFunc(map[string]interface{}{"field": "pos"})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	c.engine.Join(b.engine)
+	b.engine = c.engine
+
+	// put data to engine
+	for _, d := range data {
+		if !assert.NoError(t, c.engine.Add(d)) {
+			return
+		}
+	}
+
+	// compare two JSONs
+	check := func(jsonObj interface{}, expected string) {
+		data, err := json.Marshal(jsonObj)
+		if assert.NoError(t, err) {
+			assert.JSONEq(t, expected, string(data))
+		}
+	}
+
+	// top left: 48.86123391799629,2.322221864014864
+	// bottom right: 48.83567397482693,2.3399988748133183
+	check(b.ToJson(), `{"bounds":{"bottom_right":{"lat":48.835674, "lon":2.339999}, "top_left":{"lat":48.861234, "lon":2.322222}}}`)
+
+	// centroid: 48.8578796479851,2.3278330452740192
+	check(c.ToJson(), `{"centroid":{"count":39, "location":{"lat":48.85787991766815, "lon":2.3278337533208258}}}`)
+}
