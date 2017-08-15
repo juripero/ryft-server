@@ -491,8 +491,8 @@ case "$ACCEPT" in
         fail "'$ACCEPT' is unknown accept mode, run '$0 --help' for help"
 esac
 
-[[ -z "$QUERY" ]] && fail "no search query provided, run '$0 --help' for help"
-[[ -z "${FILES[@]}" && -z "${CATALOGS[@]}" ]] && fail "no file or catalog provided, run '$0 --help' for help"
+[[ -z "$QUERY" && -z "$BODY" ]] && fail "no search query provided, run '$0 --help' for help"
+[[ -z "${FILES[@]}" && -z "${CATALOGS[@]}" && -z "$BODY" ]] && fail "no file or catalog provided, run '$0 --help' for help"
 
 # build the URL
 CURL_OPTS=(--compressed)
