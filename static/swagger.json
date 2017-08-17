@@ -1447,12 +1447,12 @@
           "x-go-name": "Query",
           "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")"
         },
-        "file": {
+        "files": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "x-go-name": "File",
+          "x-go-name": "Files",
           "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt"
         },
         "mode": {
