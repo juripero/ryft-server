@@ -226,7 +226,7 @@ func newFunc(aggType string, opts map[string]interface{}) (Function, Engine, err
 			return nil, nil, err // failed
 		}
 
-	case "avg":
+	case "average", "avg":
 		if f, err := newAvgFunc(opts); err == nil {
 			return f, f.engine, nil // OK
 		} else {
@@ -240,21 +240,21 @@ func newFunc(aggType string, opts map[string]interface{}) (Function, Engine, err
 			return nil, nil, err // failed
 		}
 
-	case "extended_stats":
+	case "extended_stats", "extended-stats", "e-stats":
 		if f, err := newExtendedStatsFunc(opts); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
-	case "geo_bounds":
+	case "geo_bounds", "geo-bounds":
 		if f, err := newGeoBoundsFunc(opts); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
-	case "geo_centroid":
+	case "geo_centroid", "geo-centroid":
 		if f, err := newGeoCentroidFunc(opts); err == nil {
 			return f, f.engine, nil // OK
 		} else {
