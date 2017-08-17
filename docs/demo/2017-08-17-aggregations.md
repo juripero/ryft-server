@@ -148,12 +148,12 @@ object which is reported to user.
 
 The following list of aggregations are supported by ryft-server:
 
-- [Min](../aggs.md#min-aggregation)
-- [Max](../aggs.md#max-aggregation)
-- [Sum](../aggs.md#sum-aggregation)
-- [Value Count](../aggs.md#value-count-aggregation)
-- [Avg](../aggs.md#avg-aggregation)
-- [Stats](../aggs.md#stats-aggregation)
-- [Extended Stats](../aggs.md#extended-stats-aggregation)
-- [Geo Bounds](../aggs.md#geo-bounds-aggregation)
-- [Geo Centroid](../aggs.md#geo-centroid-aggregation)
+- [Min](../rest/aggs.md#min-aggregation)
+- [Max](../rest/aggs.md#max-aggregation)
+- [Sum](../rest/aggs.md#sum-aggregation)
+- [Value Count](../rest/aggs.md#value-count-aggregation)
+- [Avg](../rest/aggs.md#avg-aggregation)
+- [Stats](../rest/aggs.md#stats-aggregation)
+- [Extended Stats](../rest/aggs.md#extended-stats-aggregation)
+- [Geo Bounds](../rest/aggs.md#geo-bounds-aggregation)
+- [Geo Centroid](../rest/aggs.md#geo-centroid-aggregation)
