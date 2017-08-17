@@ -220,7 +220,7 @@
           "text/csv"
         ],
         "summary": "Text or structured search",
-        "operationId": "search",
+        "operationId": "search_post",
         "parameters": [
           {
             "in": "query",
@@ -580,7 +580,7 @@
           "search"
         ],
         "summary": "Count the search matches",
-        "operationId": "count",
+        "operationId": "count_post",
         "parameters": [
           {
             "in": "query",
