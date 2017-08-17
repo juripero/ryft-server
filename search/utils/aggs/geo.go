@@ -95,42 +95,33 @@ func (g *Geo) ToJson() interface{} {
 
 // Add data to the aggregation
 func (g *Geo) Add(data interface{}) error {
-	var lat, lon float64
+	var err error
 
+	var lat_, lon_ interface{}
 	if len(g.LonField) > 0 && len(g.LatField) > 0 {
 		// get "lat" and "lon" separated
 
 		// latitude
-		val, err := utils.AccessValue(data, g.LatField)
+		lat_, err = utils.AccessValue(data, g.LatField)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
 			}
-			return err
-		}
-
-		lat, err = utils.AsFloat64(val)
-		if err != nil {
 			return err
 		}
 
 		// longitude
-		val, err = utils.AccessValue(data, g.LonField)
+		lon_, err = utils.AccessValue(data, g.LonField)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
 			}
-			return err
-		}
-
-		lon, err = utils.AsFloat64(val)
-		if err != nil {
 			return err
 		}
 	} else {
 		// get "location" combined
 
-		val, err := utils.AccessValue(data, g.LocField)
+		latlon_, err := utils.AccessValue(data, g.LocField)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
@@ -138,27 +129,38 @@ func (g *Geo) Add(data interface{}) error {
 			return err
 		}
 
-		// parse "location"
-		loc_, err := utils.AsString(val)
-		if err != nil {
-			return err
-		}
-		loc := geoLocationRegexp.FindAllString(loc_, -1)
-		if len(loc) != 2 {
-			return fmt.Errorf("%q is not a valid location", loc_)
-		}
+		if arr, ok := latlon_.([]interface{}); ok { // parse [lon,lat]
+			if len(arr) != 2 {
+				return fmt.Errorf("%q is not a valid location", arr)
+			}
 
-		// get latitude as float
-		lat, err = utils.AsFloat64(loc[0])
-		if err != nil {
-			return err
-		}
+			lat_, lon_ = arr[1], arr[0] // NOTE inverse order: [lon,lat]!
+		} else if obj, ok := latlon_.(map[string]interface{}); ok { // parse { "lat": ..., "lon": ...
+			lat_, lon_ = obj["lat"], obj["lon"]
+		} else { // parse "lat,lon"
+			loc_, err := utils.AsString(latlon_)
+			if err != nil {
+				return err
+			}
+			loc := geoLocationRegexp.FindAllString(loc_, -1)
+			if len(loc) != 2 {
+				return fmt.Errorf("%q is not a valid location", loc_)
+			}
 
-		// get longtitude as float
-		lon, err = utils.AsFloat64(loc[1])
-		if err != nil {
-			return err
+			lat_, lon_ = loc[0], loc[1]
 		}
+	}
+
+	// parse latitude
+	lat, err := utils.AsFloat64(lat_)
+	if err != nil {
+		return err
+	}
+
+	// parse longitude
+	lon, err := utils.AsFloat64(lon_)
+	if err != nil {
+		return err
 	}
 
 	// update bounds

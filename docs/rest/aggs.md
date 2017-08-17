@@ -317,6 +317,16 @@ fields for latitude and longitude:
 {"aggs" : {"viewport" : {"geo_bounds" : {"lat":"latitude", "lon":"longitude"}} }}
 ```
 
+## Geo Data format
+
+The Geo position can be in the following formats:
+
+- string containing `"<lat>,<lon>"`
+- array of two values `[<lon>, <lat>]` (Note the order!)
+- object `{"lat": <lat>, "lon": <lon>}`
+
+Where `<lat>` and `<lon>` are valid floating point numbers.
+
 
 # Geo Centroid aggregation
 
@@ -354,3 +364,5 @@ fields for latitude and longitude:
 ```{.json}
 {"aggs" : {"center" : {"geo_centroid" : {"lat":"latitude", "lon":"longitude"}} }}
 ```
+
+See [Geo Data format](#geo-data-format) for the list of supported coordinates formats.
