@@ -42,8 +42,17 @@ const (
 )
 
 var (
-	geoLocationRegexp *regexp.Regexp = regexp.MustCompile(`([\d\.\-])+`) // TODO: make () optional!, suuport for '+'
+	// geoLocationRegexp *regexp.Regexp = regexp.MustCompile(`([\d\.\-])+`)
+	findFloats = prepareFindFloats()
 )
+
+// MatchFloats searches for float numbers in string
+func prepareFindFloats() func(string) []string {
+	var geoLocationRegexp = regexp.MustCompile(`[+-]?([0-9]*[.])?[0-9]+`)
+	return func(input string) []string {
+		return geoLocationRegexp.FindAllString(input, -1)
+	}
+}
 
 // Geo is aggregation engine related to geo functions
 type Geo struct {
@@ -142,7 +151,7 @@ func (g *Geo) Add(data interface{}) error {
 			if err != nil {
 				return err
 			}
-			loc := geoLocationRegexp.FindAllString(loc_, -1)
+			loc := findFloats(loc_)
 			if len(loc) != 2 {
 				return fmt.Errorf("%q is not a valid location", loc_)
 			}

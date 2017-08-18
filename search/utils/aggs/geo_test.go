@@ -7,6 +7,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestFindFloats(t *testing.T) {
+	// prepare function with precompiled regexp
+	findFloats := prepareFindFloats()
+	check := func(data string, expected []string) {
+		result := findFloats(data)
+		assert.Equal(t, result, expected)
+	}
+	testData := []struct {
+		input    string
+		expected []string
+	}{
+		{"1.1, 1.1", []string{"1.1", "1.1"}},
+		{"-1.1, -1.1", []string{"-1.1", "-1.1"}},
+		{"(-1.1, -1.1)", []string{"-1.1", "-1.1"}},
+		{"(+1.1, +1.1)", []string{"+1.1", "+1.1"}},
+		{"(+1.1,1.1)", []string{"+1.1", "1.1"}},
+		{"1.1,    1.1)))", []string{"1.1", "1.1"}},
+		{"1.1, .3)))", []string{"1.1", ".3"}},
+		{"1., 0.3)))", []string{"1", "0.3"}},
+		{"1., 1.3.4)))", []string{"1", "1.3", ".4"}},
+	}
+
+	for _, row := range testData {
+		check(row.input, row.expected)
+	}
+}
+
 // populate engine with geo data
 func testGeoPopulate(t *testing.T, engine Engine) {
 	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(10.0, 10.0)", "Latitude": 10.0, "Longitude": 10.0}))
