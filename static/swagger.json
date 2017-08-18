@@ -36,6 +36,7 @@
             "name": "file",
             "x-go-name": "File",
             "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
+            "collectionFormat": "multi",
             "required": true
           },
           {
@@ -189,6 +190,7 @@
             "items": {
               "type": "string"
             },
+            "collectionFormat": "multi",
             "name": "transform",
             "description": "Additional data transformation. Could be match(\"^.*$\"), replace(\"^(.*)apple(.*)$\", \"$1orange$2\") or script(\"filter_position\")"
           }
