@@ -100,6 +100,8 @@ func TestGeoBoundsFunc(t *testing.T) {
 
 	check(`{"field":"Location"}`, `{"bounds": {"top_left":{"lat":40,"lon":-30}, "bottom_right":{"lat":10,"lon":10}}}`)
 	check(`{"lat":"Latitude","lon":"Longitude"}`, `{"bounds": {"top_left":{"lat":40,"lon":-30}, "bottom_right":{"lat":10,"lon":10}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": true}`, `{"bounds": {"top_left":{"lat":40,"lon":-30}, "bottom_right":{"lat":10,"lon":10}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": false}`, `{"bounds": {"top_left":{"lat":40,"lon":-30}, "bottom_right":{"lat":10,"lon":10}}}`)
 }
 
 // check "geo_centroid"

@@ -61,9 +61,10 @@ type Geo struct {
 	// the following formats are supported:
 	// - "location": "<lat>,<lon>" or "location":"(<lat>,<lon>)"
 	// "lat": <lat>, "lon": <lon>
-	LocField string `json:"-" msgpack:"-"` // "location" field
-	LonField string `json:"-" msgpack:"-"` // "latitude" field
-	LatField string `json:"-" msgpack:"-"` // "longitude" field
+	LocField     string `json:"-" msgpack:"-"` // "location" field
+	LonField     string `json:"-" msgpack:"-"` // "latitude" field
+	LatField     string `json:"-" msgpack:"-"` // "longitude" field
+	WrapLonField bool   `json:"-" msgpack:"-"` // "wrap_longitude" field
 
 	Count       uint64  `json:"count" msgpack:"count"` // number of points
 	TopLeft     Point   `json:"top_left" msgpack:"top_left"`
@@ -345,6 +346,19 @@ func (g *Geo) getCentroid() Point {
 	}
 }
 
+func parseGeoBoundsOpts(opts map[string]interface{}) (field, lat, lon string, wrapLon bool, err error) {
+	field, lat, lon, err = parseGeoOpts(opts)
+	if err != nil {
+		return
+	}
+	if wrapLon_, ok := opts["wrap_longitude"]; ok {
+		wrapLon, err = utils.AsBool(wrapLon_)
+	} else {
+		wrapLon = true
+	}
+	return
+}
+
 // parse "field" or "lat"/"lon" fields
 func parseGeoOpts(opts map[string]interface{}) (field string, lat, lon string, err error) {
 	if _, ok := opts["field"]; ok {
@@ -385,18 +399,19 @@ type geoBoundsFunc struct {
 
 // make new "geo_bounds" aggregation
 func newGeoBoundsFunc(opts map[string]interface{}) (*geoBoundsFunc, error) {
-	if field, lat, lon, err := parseGeoOpts(opts); err != nil {
+	field, lat, lon, wrapLon, err := parseGeoBoundsOpts(opts)
+	if err != nil {
 		return nil, err
-	} else {
-		return &geoBoundsFunc{geoFunc{
-			engine: &Geo{
-				flags:    GeoBounds,
-				LocField: field,
-				LatField: lat,
-				LonField: lon,
-			},
-		}}, nil // OK
 	}
+	return &geoBoundsFunc{geoFunc{
+		engine: &Geo{
+			flags:        GeoBounds,
+			LocField:     field,
+			LatField:     lat,
+			LonField:     lon,
+			WrapLonField: wrapLon,
+		},
+	}}, nil // OK
 }
 
 // ToJson gets function as JSON
