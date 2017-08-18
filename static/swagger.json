@@ -24,7 +24,8 @@
             "type": "string",
             "name": "query",
             "x-go-name": "Query",
-            "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")"
+            "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")",
+            "required": true
           },
           {
             "in": "query",
@@ -34,7 +35,8 @@
             },
             "name": "file",
             "x-go-name": "File",
-            "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt"
+            "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
+            "required": true
           },
           {
             "in": "query",
