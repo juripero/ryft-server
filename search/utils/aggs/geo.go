@@ -42,8 +42,16 @@ const (
 )
 
 var (
-	geoLocationRegexp *regexp.Regexp = regexp.MustCompile(`([\d\.\-])+`) // TODO: make () optional!, suuport for '+'
+	findFloats = prepareFindFloats()
 )
+
+// MatchFloats searches for float numbers in string
+func prepareFindFloats() func(string) []string {
+	var geoLocationRegexp = regexp.MustCompile(`[+-]?([0-9]*[.])?[0-9]+`)
+	return func(input string) []string {
+		return geoLocationRegexp.FindAllString(input, -1)
+	}
+}
 
 // Geo is aggregation engine related to geo functions
 type Geo struct {
@@ -52,14 +60,17 @@ type Geo struct {
 	// the following formats are supported:
 	// - "location": "<lat>,<lon>" or "location":"(<lat>,<lon>)"
 	// "lat": <lat>, "lon": <lon>
-	LocField string `json:"-" msgpack:"-"` // "location" field
-	LonField string `json:"-" msgpack:"-"` // "latitude" field
-	LatField string `json:"-" msgpack:"-"` // "longitude" field
+	LocField     string `json:"-" msgpack:"-"` // "location" field
+	LonField     string `json:"-" msgpack:"-"` // "latitude" field
+	LatField     string `json:"-" msgpack:"-"` // "longitude" field
+	WrapLonField bool   `json:"-" msgpack:"-"` // "wrap_longitude" field
 
 	Count       uint64  `json:"count" msgpack:"count"` // number of points
 	TopLeft     Point   `json:"top_left" msgpack:"top_left"`
 	BottomRight Point   `json:"bottom_right" msgpack:"bottom_right"`
-	CentroidSum Point3D `json:"centroid_sum", msgpack:"centroid_sum"`
+	CentroidSum Point3D `json:"centroid_sum" msgpack:"centroid_sum"`
+
+	posLeft, negLeft, posRight, negRight float64
 }
 
 // Point represents a physical point in geographic notation [lat, lon].
@@ -142,7 +153,7 @@ func (g *Geo) Add(data interface{}) error {
 			if err != nil {
 				return err
 			}
-			loc := geoLocationRegexp.FindAllString(loc_, -1)
+			loc := findFloats(loc_)
 			if len(loc) != 2 {
 				return fmt.Errorf("%q is not a valid location", loc_)
 			}
@@ -285,23 +296,44 @@ func (g *Geo) updateBounds(lat, lon float64) {
 	if g.Count == 0 || lat > g.TopLeft.Lat {
 		g.TopLeft.Lat = lat
 	}
-
-	// g.TopLeft.Lon = math.Min(g.TopLeft.Lon, lon)
-	if g.Count == 0 || lon < g.TopLeft.Lon {
-		g.TopLeft.Lon = lon
-	}
-
 	// g.BottomRight.Lat = math.Min(g.BottomRight.Lat, lat)
 	if g.Count == 0 || lat < g.BottomRight.Lat {
 		g.BottomRight.Lat = lat
 	}
 
-	// g.BottomRight.Lon = math.Max(g.BottomRight.Lon, lon)
-	if g.Count == 0 || lon > g.BottomRight.Lon {
-		g.BottomRight.Lon = lon
-	}
+	if g.WrapLonField == true {
+		if lon >= 0 && lon < g.posLeft {
+			g.posLeft = lon
+		}
+		if lon >= 0 && lon > g.posRight {
+			g.posRight = lon
+		}
+		if lon < 0 && lon < g.negLeft {
+			g.negLeft = lon
+		}
+		if lon < 0 && lon > g.negRight {
+			g.negRight = lon
+		}
+		unwrappedWidth := g.posRight - g.negLeft
+		wrappedWidth := (180 - g.posLeft) - (-180 - g.negRight)
+		if unwrappedWidth <= wrappedWidth {
+			g.TopLeft.Lon = g.negLeft
+			g.BottomRight.Lon = g.posRight
+		} else {
+			g.TopLeft.Lon = g.posLeft
+			g.BottomRight.Lon = g.negRight
+		}
+	} else {
+		// g.TopLeft.Lon = math.Min(g.TopLeft.Lon, lon)
+		if g.Count == 0 || lon < g.TopLeft.Lon {
+			g.TopLeft.Lon = lon
+		}
 
-	// TODO: check wrap of coordinates!!!
+		// g.BottomRight.Lon = math.Max(g.BottomRight.Lon, lon)
+		if g.Count == 0 || lon > g.BottomRight.Lon {
+			g.BottomRight.Lon = lon
+		}
+	}
 }
 
 // convert degrees to radians
@@ -334,6 +366,20 @@ func (g *Geo) getCentroid() Point {
 		Lon: rad2deg(math.Atan2(y, x)),
 		Lat: rad2deg(math.Atan2(z, math.Sqrt(x*x+y*y))),
 	}
+}
+
+// parse "wrap_longitude" in additional to other Geo options
+func parseGeoBoundsOpts(opts map[string]interface{}) (field, lat, lon string, wrapLon bool, err error) {
+	field, lat, lon, err = parseGeoOpts(opts)
+	if err != nil {
+		return
+	}
+	if wrapLon_, ok := opts["wrap_longitude"]; ok {
+		wrapLon, err = utils.AsBool(wrapLon_)
+	} else {
+		wrapLon = true
+	}
+	return
 }
 
 // parse "field" or "lat"/"lon" fields
@@ -376,18 +422,23 @@ type geoBoundsFunc struct {
 
 // make new "geo_bounds" aggregation
 func newGeoBoundsFunc(opts map[string]interface{}) (*geoBoundsFunc, error) {
-	if field, lat, lon, err := parseGeoOpts(opts); err != nil {
+	field, lat, lon, wrapLon, err := parseGeoBoundsOpts(opts)
+	if err != nil {
 		return nil, err
-	} else {
-		return &geoBoundsFunc{geoFunc{
-			engine: &Geo{
-				flags:    GeoBounds,
-				LocField: field,
-				LatField: lat,
-				LonField: lon,
-			},
-		}}, nil // OK
 	}
+	return &geoBoundsFunc{geoFunc{
+		engine: &Geo{
+			flags:        GeoBounds,
+			LocField:     field,
+			LatField:     lat,
+			LonField:     lon,
+			WrapLonField: wrapLon,
+			posLeft:      math.Inf(1),
+			negLeft:      math.Inf(1),
+			posRight:     math.Inf(-1),
+			negRight:     math.Inf(-1),
+		},
+	}}, nil // OK
 }
 
 // ToJson gets function as JSON
