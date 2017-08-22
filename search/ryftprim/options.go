@@ -160,13 +160,57 @@ func (engine *Engine) Options() map[string]interface{} {
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	engine.options = opts // base
-
+	log.Debugf("%q\n", opts)
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)
 		if err != nil {
 			return fmt.Errorf(`failed to parse "instance-name": %s`, err)
 		}
+	}
+
+	// default options for all engines
+	if v, ok := opts["ryft-all-opts"]; ok {
+		if vv, err := utils.AsStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "ryft-all-opts" with error: %s`, err)
+		} else {
+			engine.RyftAllOpts = vv
+		}
+	} else {
+		engine.RyftAllOpts = []string{}
+	}
+
+	// `ryftprim` options
+	if v, ok := opts["ryftprim-opts"]; ok {
+		if vv, err := utils.AsStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "ryftprim-opts" with error: %s`, err)
+		} else {
+			engine.RyftprimOpts = vv
+		}
+	} else {
+		engine.RyftprimOpts = []string{}
+	}
+
+	// `ryftx` options
+	if v, ok := opts["ryftx-opts"]; ok {
+		if vv, err := utils.AsStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "ryftx-opts" with error: %s`, err)
+		} else {
+			engine.RyftxOpts = vv
+		}
+	} else {
+		engine.RyftxOpts = []string{}
+	}
+
+	// `ryftpcre2` options
+	if v, ok := opts["ryftpcre2-opts"]; ok {
+		if vv, err := utils.AsStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "ryftpcre2-opts" with error: %s`, err)
+		} else {
+			engine.Ryftpcre2Opts = vv
+		}
+	} else {
+		engine.Ryftpcre2Opts = []string{}
 	}
 
 	// `ryftprim` executable path

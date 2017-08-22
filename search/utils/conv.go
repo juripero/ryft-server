@@ -153,3 +153,51 @@ func AsBool(opt interface{}) (bool, error) {
 
 	return false, fmt.Errorf("%v is not a bool", opt)
 }
+
+// AsStringSlice get value as string slice
+func AsStringSlice(v interface{}) ([]string, error) {
+	switch vv := v.(type) {
+	case nil:
+		return nil, nil // empty
+
+	case []string:
+		return vv, nil // OK
+
+	case []interface{}:
+		res := make([]string, 0, len(vv))
+		for _, s := range vv {
+			if ss, err := AsString(s); err != nil {
+				return nil, fmt.Errorf("not a string: %s", err)
+			} else {
+				res = append(res, ss)
+			}
+		}
+		return res, nil // OK
+	}
+
+	return nil, fmt.Errorf("not a []string (but %T)", v)
+}
+
+// AsStringMap get value as map[string]interface{}
+func AsStringMap(v interface{}) (map[string]interface{}, error) {
+	switch vv := v.(type) {
+	case nil:
+		return nil, nil // empty
+
+	case map[string]interface{}:
+		return vv, nil // OK
+
+	case map[interface{}]interface{}:
+		res := make(map[string]interface{}, len(vv))
+		for k, v := range vv {
+			if kk, err := AsString(k); err != nil {
+				return nil, fmt.Errorf("bad key: %s", err)
+			} else {
+				res[kk] = v
+			}
+		}
+		return res, nil // OK
+	}
+
+	return nil, fmt.Errorf("not a map[string]interface{} (but %T)", v)
+}
