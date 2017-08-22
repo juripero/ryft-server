@@ -1211,10 +1211,12 @@
             "type": "object",
             "properties": {
               "length": {
-                "type": "integer"
+                "type": "integer",
+                "format": "int64"
               },
               "offset": {
-                "type": "integer"
+                "type": "integer",
+                "format": "int64"
               },
               "path": {
                 "type": "string"
