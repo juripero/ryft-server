@@ -241,9 +241,13 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 
 	// backend options (should be added to the END)
 	// define them here because need to know which engine will be used
-	backendOpts := mergeOpts(engine.RyftAllOpts, engineOpts)
-	if len(task.config.BackendOpts) != 0 {
-		backendOpts = mergeOpts(backendOpts, task.config.BackendOpts)
+	var backendOpts []string
+	if len(task.config.BackendOpts) > 0 { // options from request
+		backendOpts = task.config.BackendOpts
+	} else if len(engineOpts) > 0 { // engine default options
+		backendOpts = engineOpts
+	} else {
+		backendOpts = engine.RyftAllOpts // default options for all engines
 	}
 	// assign command line
 	task.toolArgs = append(task.toolArgs, backendOpts...)

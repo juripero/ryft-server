@@ -41,30 +41,6 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
-func mergeOpts(arrs ...[]string) []string {
-	kv := make(map[string]string)
-	for _, a := range arrs {
-		l := len(a)
-		for i := 0; i < l; i++ {
-			if strings.HasPrefix(a[i], "-") {
-				if i+1 < l && !strings.HasPrefix(a[i+1], "-") {
-					kv[a[i]] = a[i+1]
-				} else {
-					kv[a[i]] = ""
-				}
-			}
-		}
-	}
-	opts := []string{}
-	for opt, val := range kv {
-		opts = append(opts, opt)
-		if val != "" {
-			opts = append(opts, val)
-		}
-	}
-	return opts
-}
-
 // getExecPath get backend path (ryftprim, ryftx or pcre2) and its options
 func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) {
 	// if backend tool is specified use it
