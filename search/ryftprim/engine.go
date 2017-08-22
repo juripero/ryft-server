@@ -71,6 +71,11 @@ type Engine struct {
 
 	IndexHost string // optional host (cluster mode)
 
+	RyftxOpts     []string // options for ryftx backend
+	RyftprimOpts  []string // options for ryftprim backendg
+	Ryftpcre2Opts []string // options for pcre2 backend
+	RyftAllOpts   []string // common options for all backends
+
 	options map[string]interface{}
 }
 

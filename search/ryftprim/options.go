@@ -41,24 +41,48 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
-// get backend path (ryftprim or ryftx)
-func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
+func mergeOpts(arrs ...[]string) []string {
+	kv := make(map[string]string)
+	for _, a := range arrs {
+		l := len(a)
+		for i := 0; i < l; i++ {
+			if strings.HasPrefix(a[i], "-") {
+				if i+1 < l && !strings.HasPrefix(a[i+1], "-") {
+					kv[a[i]] = a[i+1]
+				} else {
+					kv[a[i]] = ""
+				}
+			}
+		}
+	}
+	opts := []string{}
+	for opt, val := range kv {
+		opts = append(opts, opt)
+		if val != "" {
+			opts = append(opts, val)
+		}
+	}
+	return opts
+}
+
+// getExecPath get backend path (ryftprim, ryftx or pcre2) and its options
+func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) {
 	// if backend tool is specified use it
 	switch strings.ToLower(cfg.BackendTool) {
 	case "ryftprim", "prim", "1":
-		return engine.RyftprimExec, nil
+		return engine.RyftprimExec, engine.RyftprimOpts, nil
 
 	case "ryftx", "x":
-		return engine.RyftxExec, nil
+		return engine.RyftxExec, engine.RyftxOpts, nil
 
 	case "pcre2", "regexp", "regex", "re":
-		return engine.Ryftpcre2Exec, nil
+		return engine.Ryftpcre2Exec, engine.Ryftpcre2Opts, nil
 
 	case "":
 		break // auto-select, see below
 
 	default:
-		return "", fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
+		return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
 	}
 
 	// if both tools are provided
@@ -67,42 +91,42 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, error) {
 		// select backend based on search type
 		switch strings.ToLower(cfg.Mode) {
 		case "g/es", "es":
-			return engine.RyftxExec, nil
+			return engine.RyftxExec, engine.RyftxOpts, nil
 		case "g/ds", "ds":
-			return engine.RyftxExec, nil
+			return engine.RyftxExec, engine.RyftxOpts, nil
 		case "g/ts", "ts":
-			return engine.RyftxExec, nil
+			return engine.RyftxExec, engine.RyftxOpts, nil
 		case "g/ns", "ns":
-			return engine.RyftxExec, nil
+			return engine.RyftxExec, engine.RyftxOpts, nil
 		case "g/cs", "cs":
-			return engine.RyftxExec, nil
+			return engine.RyftxExec, engine.RyftxOpts, nil
 		case "g/ipv4", "ipv4":
-			return engine.RyftxExec, nil
+			return engine.RyftxExec, engine.RyftxOpts, nil
 		case "g/ipv6", "ipv6":
-			return engine.RyftxExec, nil
+			return engine.RyftxExec, engine.RyftxOpts, nil
 
 		case "g/fhs", "fhs":
 			if cfg.Dist > 1 {
-				return engine.RyftprimExec, nil
+				return engine.RyftprimExec, engine.RyftprimOpts, nil
 			} else {
-				return engine.RyftxExec, nil
+				return engine.RyftxExec, engine.RyftxOpts, nil
 			}
 
 		case "g/feds", "feds":
-			return engine.RyftprimExec, nil
+			return engine.RyftprimExec, engine.RyftprimOpts, nil
 
 		case "g/pcre2", "pcre2":
-			return engine.Ryftpcre2Exec, nil
+			return engine.Ryftpcre2Exec, engine.Ryftpcre2Opts, nil
 		}
 
-		return engine.RyftprimExec, nil // use ryftprim as fallback
+		return engine.RyftprimExec, engine.RyftprimOpts, nil // use ryftprim as fallback
 	} else if engine.RyftprimExec != "" {
-		return engine.RyftprimExec, nil
+		return engine.RyftprimExec, engine.RyftprimOpts, nil
 	} else if engine.RyftxExec != "" {
-		return engine.RyftxExec, nil
+		return engine.RyftxExec, engine.RyftxOpts, nil
 	}
 
-	return "", fmt.Errorf("no any backend found") // should be impossible
+	return "", nil, fmt.Errorf("no any backend found") // should be impossible
 }
 
 // Options gets all engine options.
@@ -126,6 +150,10 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["keep-files"] = engine.KeepResultFiles
 	opts["minimize-latency"] = engine.MinimizeLatency
 	opts["index-host"] = engine.IndexHost
+	opts["ryftx-opts"] = engine.RyftxOpts
+	opts["ryftprim-opts"] = engine.RyftprimOpts
+	opts["ryftpcre2-opts"] = engine.Ryftpcre2Opts
+	opts["ryft-all-opts"] = engine.RyftAllOpts
 	return opts
 }
 
