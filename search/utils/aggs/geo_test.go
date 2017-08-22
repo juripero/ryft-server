@@ -45,6 +45,11 @@ func testGeoPopulate(t *testing.T, engine Engine) {
 	// TODO: wrap around zeros or 180 degrees
 }
 
+func testGeoPopulateWrapLongitude(t *testing.T, engine Engine) {
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(+40.0, -175.0)", "Latitude": +40.0, "Longitude": -175.0}))
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(-40.0, 175.0)", "Latitude": -40.0, "Longitude": 175.0}))
+}
+
 // check Geo aggregation engine
 func TestGeoEngine(t *testing.T) {
 	check := func(geo *Geo, expected string) {
@@ -88,6 +93,8 @@ func TestGeoBoundsFunc(t *testing.T) {
 			} else {
 				testGeoPopulate(t, f.engine)
 
+				testGeoPopulateWrapLongitude(t, f.engine)
+
 				data, err := json.Marshal(f.ToJson())
 				if assert.NoError(t, err) {
 					assert.JSONEq(t, expected, string(data))
@@ -98,10 +105,10 @@ func TestGeoBoundsFunc(t *testing.T) {
 
 	check(`{"no-field":"foo"}`, `no "lat" option found`)
 
-	check(`{"field":"Location"}`, `{"bounds": {"top_left":{"lat":40,"lon":-30}, "bottom_right":{"lat":10,"lon":10}}}`)
-	check(`{"lat":"Latitude","lon":"Longitude"}`, `{"bounds": {"top_left":{"lat":40,"lon":-30}, "bottom_right":{"lat":10,"lon":10}}}`)
-	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": true}`, `{"bounds": {"top_left":{"lat":40,"lon":-30}, "bottom_right":{"lat":10,"lon":10}}}`)
-	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": false}`, `{"bounds": {"top_left":{"lat":40,"lon":-30}, "bottom_right":{"lat":10,"lon":10}}}`)
+	check(`{"field":"Location"}`, `{"bounds": {"top_left":{"lat":40,"lon":10}, "bottom_right":{"lat":-40,"lon":-20}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude"}`, `{"bounds": {"top_left":{"lat":40,"lon":10}, "bottom_right":{"lat":-40,"lon":-20}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": true}`, `{"bounds": {"top_left":{"lat":40,"lon":10}, "bottom_right":{"lat":-40,"lon":-20}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": false}`, `{"bounds": {"top_left":{"lat":40,"lon":-175}, "bottom_right":{"lat":-40,"lon":175}}}`)
 }
 
 // check "geo_centroid"

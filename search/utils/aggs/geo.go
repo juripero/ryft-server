@@ -69,7 +69,9 @@ type Geo struct {
 	Count       uint64  `json:"count" msgpack:"count"` // number of points
 	TopLeft     Point   `json:"top_left" msgpack:"top_left"`
 	BottomRight Point   `json:"bottom_right" msgpack:"bottom_right"`
-	CentroidSum Point3D `json:"centroid_sum", msgpack:"centroid_sum"`
+	CentroidSum Point3D `json:"centroid_sum" msgpack:"centroid_sum"`
+
+	posLeft, negLeft, posRight, negRight float64
 }
 
 // Point represents a physical point in geographic notation [lat, lon].
@@ -295,23 +297,44 @@ func (g *Geo) updateBounds(lat, lon float64) {
 	if g.Count == 0 || lat > g.TopLeft.Lat {
 		g.TopLeft.Lat = lat
 	}
-
-	// g.TopLeft.Lon = math.Min(g.TopLeft.Lon, lon)
-	if g.Count == 0 || lon < g.TopLeft.Lon {
-		g.TopLeft.Lon = lon
-	}
-
 	// g.BottomRight.Lat = math.Min(g.BottomRight.Lat, lat)
 	if g.Count == 0 || lat < g.BottomRight.Lat {
 		g.BottomRight.Lat = lat
 	}
 
-	// g.BottomRight.Lon = math.Max(g.BottomRight.Lon, lon)
-	if g.Count == 0 || lon > g.BottomRight.Lon {
-		g.BottomRight.Lon = lon
-	}
+	if g.WrapLonField == true {
+		if lon >= 0 && lon < g.posLeft {
+			g.posLeft = lon
+		}
+		if lon >= 0 && lon > g.posRight {
+			g.posRight = lon
+		}
+		if lon < 0 && lon < g.negLeft {
+			g.negLeft = lon
+		}
+		if lon < 0 && lon > g.negRight {
+			g.negRight = lon
+		}
+		unwrappedWidth := g.posRight - g.negLeft
+		wrappedWidth := (180 - g.posLeft) - (-180 - g.negRight)
+		if unwrappedWidth <= wrappedWidth {
+			g.TopLeft.Lon = g.negLeft
+			g.BottomRight.Lon = g.posRight
+		} else {
+			g.TopLeft.Lon = g.posLeft
+			g.BottomRight.Lon = g.negRight
+		}
+	} else {
+		// g.TopLeft.Lon = math.Min(g.TopLeft.Lon, lon)
+		if g.Count == 0 || lon < g.TopLeft.Lon {
+			g.TopLeft.Lon = lon
+		}
 
-	// TODO: check wrap of coordinates!!!
+		// g.BottomRight.Lon = math.Max(g.BottomRight.Lon, lon)
+		if g.Count == 0 || lon > g.BottomRight.Lon {
+			g.BottomRight.Lon = lon
+		}
+	}
 }
 
 // convert degrees to radians
@@ -346,6 +369,7 @@ func (g *Geo) getCentroid() Point {
 	}
 }
 
+// parse "wrap_longitude" in additional to other Geo options
 func parseGeoBoundsOpts(opts map[string]interface{}) (field, lat, lon string, wrapLon bool, err error) {
 	field, lat, lon, err = parseGeoOpts(opts)
 	if err != nil {
@@ -410,6 +434,10 @@ func newGeoBoundsFunc(opts map[string]interface{}) (*geoBoundsFunc, error) {
 			LatField:     lat,
 			LonField:     lon,
 			WrapLonField: wrapLon,
+			posLeft:      math.Inf(1),
+			negLeft:      math.Inf(1),
+			posRight:     math.Inf(-1),
+			negRight:     math.Inf(-1),
 		},
 	}}, nil // OK
 }
