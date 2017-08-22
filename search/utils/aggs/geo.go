@@ -42,7 +42,6 @@ const (
 )
 
 var (
-	// geoLocationRegexp *regexp.Regexp = regexp.MustCompile(`([\d\.\-])+`)
 	findFloats = prepareFindFloats()
 )
 
