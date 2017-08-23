@@ -35,6 +35,20 @@ search uses the following options by default:
 - "." for the `DECIMAL` option
 
 
+# Aggregation functions
+
+The limited set of [aggregation functions](./aggs.md) are supported:
+- [Min](./aggs.md#min-aggregation)
+- [Max](./aggs.md#max-aggregation)
+- [Sum](./aggs.md#sum-aggregation)
+- [Value Count](./aggs.md#value-count-aggregation)
+- [Avg](./aggs.md#avg-aggregation)
+- [Stats](./aggs.md#stats-aggregation)
+- [Extended Stats](./aggs.md#extended-stats-aggregation)
+- [Geo Bounds](./aggs.md#geo-bounds-aggregation)
+- [Geo Centroid](./aggs.md#geo-centroid-aggregation)
+
+
 # Post-process transformations
 
 The output data can be transformed on the server side just before

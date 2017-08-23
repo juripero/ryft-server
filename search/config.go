@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/aggs"
 )
 
 // Config is a search configuration.
@@ -64,6 +65,10 @@ type Config struct {
 
 	// post-processing transformations
 	Transforms []Transform
+
+	// set of aggregations engines
+	Aggregations *aggs.Aggregations
+	DataFormat   string // used for aggregations
 
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)
