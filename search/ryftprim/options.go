@@ -136,7 +136,6 @@ func (engine *Engine) Options() map[string]interface{} {
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	engine.options = opts // base
-	log.Debugf("%q\n", opts)
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)
