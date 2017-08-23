@@ -153,3 +153,40 @@ func AsBool(opt interface{}) (bool, error) {
 
 	return false, fmt.Errorf("%v is not a bool", opt)
 }
+
+// AsFloat64 converts custom value to float64.
+func AsFloat64(opt interface{}) (float64, error) {
+	switch v := opt.(type) {
+	// TODO: other types to float64?
+	case nil:
+		return 0.0, nil
+	case uint:
+		return float64(v), nil
+	case int:
+		return float64(v), nil
+	case uint64:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case uint32:
+		return float64(v), nil
+	case int32:
+		return float64(v), nil
+	case uint16:
+		return float64(v), nil
+	case int16:
+		return float64(v), nil
+	case uint8:
+		return float64(v), nil
+	case int8:
+		return float64(v), nil
+	case float64:
+		return float64(v), nil
+	case float32:
+		return float64(v), nil
+	case string:
+		return strconv.ParseFloat(v, 64)
+	}
+
+	return 0, fmt.Errorf("%v is not a float64", opt)
+}

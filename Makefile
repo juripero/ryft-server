@@ -119,3 +119,7 @@ integration_test: pull_ryft_integration_test
 .PHONY: unit_test
 unit_test: pull_ryft_docker
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} unit_test
+
+.PHONY: cli
+cli:
+	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} cli

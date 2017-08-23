@@ -31,6 +31,8 @@
 package rest
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -40,6 +42,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/aggs"
 	"github.com/getryft/ryft-server/search/utils/query"
 
 	"github.com/gin-gonic/gin"
@@ -53,11 +56,11 @@ type CountParams struct {
 	Catalogs []string `form:"catalog" json:"-" msgpack:"-"` // obsolete: will be deleted
 	Files    []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
 
-	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`          // optional, "" for generic mode
-	Width  string `form:"surrounding" json:"width,omitempty" msgpack:"width,omitempty"` // surrounding width or "line"
-	Dist   uint8  `form:"fuzziness" json:"dist,omitempty" msgpack:"dist,omitempty"`     // fuzziness distance
-	Case   bool   `form:"cs" json:"case,omitempty" msgpack:"case,omitempty"`            // case sensitivity flag, ES, FHS, FEDS
-	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`    // FEDS only
+	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`                      // optional, "" for generic mode
+	Width  string `form:"surrounding" json:"surrounding,omitempty" msgpack:"surrounding,omitempty"` // surrounding width or "line"
+	Dist   uint8  `form:"fuzziness" json:"fuzziness,omitempty" msgpack:"fuzziness,omitempty"`       // fuzziness distance
+	Case   bool   `form:"cs" json:"cs" msgpack:"cs"`                                                // case sensitivity flag, ES, FHS, FEDS
+	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`                // FEDS only
 	Nodes  uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
 
 	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
@@ -69,16 +72,22 @@ type CountParams struct {
 	Lifetime    string   `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
 
 	// post-process transformations
-	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
+	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
+
+	// aggregations
+	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+
+	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 
 	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
-	ShareMode string `form:"share-mode" json:"share-mode"` // share mode to use
+	ShareMode string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
 
 	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 
 	// internal parameters
 	//InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
-	InternalNoSessionId bool `form:"--internal-no-session-id"`
+	InternalNoSessionId bool   `form:"--internal-no-session-id" json:"-" msgpack:"-"`
+	InternalFormat      string `form:"--internal-format" json:"-" msgpack:"-"` // override in cluster mode
 }
 
 // Handle /count endpoint.
@@ -93,6 +102,10 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	params := CountParams{
 		Case:   true,
 		Reduce: true,
+	}
+	if err := bindOptionalJson(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request JSON parameters"))
 	}
 	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
@@ -163,6 +176,18 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse transformations"))
+	}
+
+	// aggregations
+	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
+	}
+	if len(params.InternalFormat) != 0 {
+		cfg.DataFormat = params.InternalFormat
+	} else {
+		cfg.DataFormat = params.Format
 	}
 
 	// session preparation
@@ -269,6 +294,13 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					res.Stat.Extra["session"] = token
 				}
 
+				if cfg.Aggregations != nil {
+					if err := updateAggregations(cfg.Aggregations, res.Stat); err != nil {
+						panic(NewError(http.StatusInternalServerError, "failed to merge aggregations").WithDetails(err.Error()))
+					}
+					res.Stat.Extra[search.ExtraAggregations] = cfg.Aggregations.ToJson(!params.InternalNoSessionId)
+				}
+
 				xstat := format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)
 			} else {
@@ -290,7 +322,12 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 
 	// parse request parameters
 	params := CountParams{
-		Case: true,
+		Case:   true,
+		Reduce: true,
+	}
+	if err := bindOptionalJson(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request JSON parameters"))
 	}
 	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
@@ -482,4 +519,16 @@ func optionsToJson(opts query.Options) map[string]interface{} {
 	}
 
 	return info
+}
+
+// bind parameters from optional JSON body
+func bindOptionalJson(req *http.Request, obj interface{}) error {
+	decoder := json.NewDecoder(req.Body)
+	if err := decoder.Decode(obj); err != nil {
+		if err != io.EOF { // EOF is ignored
+			return err
+		}
+	}
+
+	return nil // OK
 }

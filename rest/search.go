@@ -45,6 +45,7 @@ import (
 	"github.com/getryft/ryft-server/rest/format"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/aggs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -57,11 +58,11 @@ type SearchParams struct {
 	Catalogs []string `form:"catalog" json:"-" msgpack:"-"` // obsolete: will be deleted
 	Files    []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
 
-	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`          // optional, "" for generic mode
-	Width  string `form:"surrounding" json:"width,omitempty" msgpack:"width,omitempty"` // surrounding width or "line"
-	Dist   uint8  `form:"fuzziness" json:"dist,omitempty" msgpack:"dist,omitempty"`     // fuzziness distance
-	Case   bool   `form:"cs" json:"case,omitempty" msgpack:"case,omitempty"`            // case sensitivity flag, ES, FHS, FEDS
-	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`    // FEDS only
+	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`                      // optional, "" for generic mode
+	Width  string `form:"surrounding" json:"surrounding,omitempty" msgpack:"surrounding,omitempty"` // surrounding width or "line"
+	Dist   uint8  `form:"fuzziness" json:"fuzziness,omitempty" msgpack:"fuzziness,omitempty"`       // fuzziness distance
+	Case   bool   `form:"cs" json:"cs" msgpack:"cs"`                                                // case sensitivity flag, ES, FHS, FEDS
+	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`                // FEDS only
 	Nodes  uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
 
 	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
@@ -74,7 +75,10 @@ type SearchParams struct {
 	Limit       int      `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	// post-process transformations
-	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
+	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
+
+	// aggregations
+	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
@@ -82,12 +86,13 @@ type SearchParams struct {
 	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 
 	Local       bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
-	ShareMode   string `form:"share-mode" json:"share-mode"` // share mode to use
+	ShareMode   string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
 	Performance bool   `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 
 	// internal parameters
-	InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
-	InternalNoSessionId bool `form:"--internal-no-session-id"`
+	InternalErrorPrefix bool   `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
+	InternalNoSessionId bool   `form:"--internal-no-session-id" json:"-" msgpack:"-"`
+	InternalFormat      string `form:"--internal-format" json:"-" msgpack:"-"` // override in cluster mode
 }
 
 // Handle /search endpoint.
@@ -103,6 +108,10 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 		Format: format.RAW,
 		Case:   true,
 		Reduce: true,
+	}
+	if err := bindOptionalJson(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request JSON parameters"))
 	}
 	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
@@ -194,6 +203,18 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			WithDetails("failed to parse transformations"))
 	}
 
+	// aggregations
+	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
+	}
+	if len(params.InternalFormat) != 0 {
+		cfg.DataFormat = params.InternalFormat
+	} else {
+		cfg.DataFormat = params.Format
+	}
+
 	// session preparation
 	session, err := NewSession(server.Config.Sessions.Algorithm)
 	if err != nil {
@@ -263,6 +284,13 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			}
 			log.WithField("session-data", session.AllData()).Debugf("[%s]: session data reported", CORE)
 			res.Stat.Extra["session"] = token
+		}
+
+		if cfg.Aggregations != nil {
+			if err := updateAggregations(cfg.Aggregations, res.Stat); err != nil {
+				panic(NewError(http.StatusInternalServerError, "failed to merge aggregations").WithDetails(err.Error()))
+			}
+			res.Stat.Extra[search.ExtraAggregations] = cfg.Aggregations.ToJson(!params.InternalNoSessionId)
 		}
 
 		xstat := tcode.FromStat(res.Stat)
@@ -491,6 +519,25 @@ func updateSession(session *Session, stat *search.Stat) {
 
 	session.SetData("info", data)
 	stat.ClearSessionData(true)
+}
+
+// update aggregations in cluster mode
+func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) error {
+	// get aggregations from details
+	for _, dstat := range stat.Details {
+		if d := dstat.Extra[search.ExtraAggregations]; d != nil {
+			log.Debugf("merging %v aggregations", d)
+			if err := aggregations.Merge(d); err != nil {
+				return err
+			}
+
+			// cleanup intermediate aggergations
+			delete(dstat.Extra, search.ExtraAggregations)
+		}
+	}
+	log.Debugf("merged %v", aggregations.ToJson(true))
+
+	return nil // OK
 }
 
 // mark output files to delete later
