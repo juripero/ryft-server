@@ -203,11 +203,6 @@ func (engine *Engine) prepare(task *Task) error {
 		task.ViewFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)
 	}
 
-	// backend options (should be added to the END)
-	if len(cfg.BackendOpts) != 0 {
-		args = append(args, cfg.BackendOpts...)
-	}
-
 	// assign command line
 	task.toolArgs = args
 	return nil // OK
@@ -234,7 +229,8 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	}
 
 	var err error
-	task.toolPath, err = engine.getExecPath(task.config)
+	var engineOpts []string
+	task.toolPath, engineOpts, err = engine.getExecPath(task.config)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
 		return fmt.Errorf("failed to find tool: %s", err)
@@ -242,6 +238,20 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		task.log().Warnf("[%s]: no appropriate tool found", TAG)
 		return fmt.Errorf("no tool found: %s", task.toolPath)
 	}
+
+	// backend options (should be added to the END)
+	// define them here because need to know which engine will be used
+	var backendOpts []string
+	if len(task.config.BackendOpts) > 0 { // options from request
+		backendOpts = task.config.BackendOpts
+	} else if len(engineOpts) > 0 { // engine default options
+		backendOpts = engineOpts
+	} else {
+		backendOpts = engine.RyftAllOpts // default options for all engines
+	}
+	// assign command line
+	task.toolArgs = append(task.toolArgs, backendOpts...)
+
 	task.log().WithFields(map[string]interface{}{
 		"tool": task.toolPath,
 		"args": task.toolArgs,
