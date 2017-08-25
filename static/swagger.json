@@ -209,9 +209,48 @@
             }
           }
         }
+      },
+      "post": {
+        "description": "Endpoint for the search. Does the text or structured search.",
+        "tags": [
+          "search"
+        ],
+        "produces": [
+          "application/json",
+          "text/csv"
+        ],
+        "summary": "Text or structured search",
+        "operationId": "search_post",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "schema": {
+              "$ref": "#/definitions/SearchParameters"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "schema": {
+              "$ref": "#/definitions/SearchResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
       }
     },
     "/count": {
+      "produces": [
+        "application/json",
+        "text/csv"
+      ],
       "get": {
         "description": "Endpoint for the count. Does the search but returns just statistics.",
         "tags": [
@@ -354,6 +393,37 @@
             "name": "performance",
             "x-go-name": "Performance",
             "description": "Include performance metrics in response. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "schema": {
+              "$ref": "#/definitions/CountResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Endpoint for the count. Does the search but returns just statistics.",
+        "tags": [
+          "search"
+        ],
+        "summary": "Count the search matches",
+        "operationId": "count_post",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "schema": {
+              "$ref": "#/definitions/SearchParameters"
+            }
           }
         ],
         "responses": {
@@ -1064,6 +1134,10 @@
             },
             "session": {
               "type": "string"
+            },
+            "aggregations": {
+              "type": "object",
+              "additionalProperties": {}
             }
           }
         }
@@ -1248,6 +1322,138 @@
               }
             }
           }
+        }
+      }
+    },
+    "SearchParameters": {
+      "type": "object",
+        "properties": {
+        "query": {
+          "type": "string",
+          "x-go-name": "Query",
+          "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Files",
+          "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt"
+        },
+        "mode": {
+          "type": "string",
+          "x-go-name": "Mode",
+          "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6)",
+          "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6"]
+        },
+        "surrounding": {
+          "type": "string",
+          "x-go-name": "Surrounding",
+          "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
+        },
+        "fuzziness": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "x-go-name": "Fuzziness",
+          "description": "Fuzziness of the search. Measured as the maximum Hamming distance for \"fhs\" mode or edit distance for \"feds\" mode."
+        },
+        "format": {
+          "type": "string",
+          "x-go-name": "Format",
+          "description": "Input data format. Parameter is used with structured or RAW text search.",
+          "enum": ["raw", "xml", "json", "utf8", "null"]
+        },
+        "cs": {
+          "type": "boolean",
+          "x-go-name": "CaseSensitive",
+          "description": "Case sensitive flag"
+        },
+        "reduce": {
+          "type": "boolean",
+          "default": true,
+          "x-go-name": "Reduce",
+          "description": "Reduce flag for fuzzy edit distance search"
+        },
+        "fields": {
+          "type": "string",
+          "x-go-name": "Fields",
+          "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
+        },
+        "backend": {
+          "type": "string",
+          "x-go-name": "Backend",
+          "description": "Optional backend tool.",
+          "enum": ["ryftprim", "ryftx"]
+        },
+        "data": {
+          "type": "string",
+          "x-go-name": "Data",
+          "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+        },
+        "index": {
+          "type": "string",
+          "x-go-name": "Index",
+          "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+        },
+        "view": {
+          "type": "string",
+          "x-go-name": "View",
+          "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
+        },
+        "delimiter": {
+          "type": "string",
+          "x-go-name": "Delimiter",
+          "description": "The delimiter is used between found records in DATA file."
+        },
+        "lifetime": {
+          "type": "string",
+          "x-go-name": "Lifetime",
+          "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
+        },
+        "share-mode": {
+          "type": "string",
+          "x-go-name": "ShareMode",
+          "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
+        },
+        "nodes": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 4,
+          "minimum": 0,
+          "x-go-name": "Nodes",
+          "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
+          "enum": [1, 2, 3, 4]
+        },
+        "local": {
+          "type": "boolean",
+          "x-go-name": "Local",
+          "description": "Perform search only on this cluster member. Default 'false'."
+        },
+        "stats": {
+          "type": "boolean",
+          "x-go-name": "Stats",
+          "description": "Include search statistics in response. Default 'false'."
+        },
+        "performance": {
+          "type": "boolean",
+          "x-go-name": "Performance",
+          "description": "Include performance metrics in response. Default 'false'."
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "x-go-name": "Limit",
+          "description": "Limit the total number of records reported."
+        },
+        "transform": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional data transformation. Could be match(\"^.*$\"), replace(\"^(.*)apple(.*)$\", \"$1orange$2\") or script(\"filter_position\")"
         }
       }
     }
