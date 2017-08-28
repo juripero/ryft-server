@@ -45,9 +45,26 @@ func testGeoPopulate(t *testing.T, engine Engine) {
 	// TODO: wrap around zeros or 180 degrees
 }
 
+// populate engine with geo data that gives different results depends on wrap_longitude value
 func testGeoPopulateWrapLongitude(t *testing.T, engine Engine) {
 	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(+40.0, -175.0)", "Latitude": +40.0, "Longitude": -175.0}))
 	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(-40.0, 175.0)", "Latitude": -40.0, "Longitude": 175.0}))
+}
+
+// populate engine with geo data (all points have negative longitude)
+func testGeoPopulateAllNegativeLon(t *testing.T, engine Engine) {
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(-2.0, -1.0)", "Latitude": -2.0, "Longitude": -1.0}))
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(2.0, -2.0)", "Latitude": 2.0, "Longitude": -2.0}))
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(-100.0, -3.0)", "Latitude": -100.0, "Longitude": -3.0}))
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(80.0, -4.0)", "Latitude": 80.0, "Longitude": -4.0}))
+}
+
+// populate engine with geo data (all points have positive longitude)
+func testGeoPopulateAllPositiveLon(t *testing.T, engine Engine) {
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(-2.0, 1.0)", "Latitude": -2.0, "Longitude": 1.0}))
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(2.0, 2.0)", "Latitude": 2.0, "Longitude": 2.0}))
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(-100.0, 3.0)", "Latitude": -100.0, "Longitude": 3.0}))
+	assert.NoError(t, engine.Add(map[string]interface{}{"Location": "(80.0, 4.0)", "Latitude": 80.0, "Longitude": 4.0}))
 }
 
 // check Geo aggregation engine
@@ -83,7 +100,7 @@ func TestGeoEngine(t *testing.T) {
 }
 
 // check "geo_bounds"
-func TestGeoBoundsFunc(t *testing.T) {
+func TestGeoBoundsWrapLongitudeFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
@@ -109,6 +126,50 @@ func TestGeoBoundsFunc(t *testing.T) {
 	check(`{"lat":"Latitude","lon":"Longitude"}`, `{"bounds": {"top_left":{"lat":40,"lon":10}, "bottom_right":{"lat":-40,"lon":-20}}}`)
 	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": true}`, `{"bounds": {"top_left":{"lat":40,"lon":10}, "bottom_right":{"lat":-40,"lon":-20}}}`)
 	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": false}`, `{"bounds": {"top_left":{"lat":40,"lon":-175}, "bottom_right":{"lat":-40,"lon":175}}}`)
+}
+
+func TestGeoBoundsNegativeLonFunc(t *testing.T) {
+	check := func(jsonOpts string, expected string) {
+		var opts map[string]interface{}
+		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
+			f, err := newGeoBoundsFunc(opts)
+			if err != nil {
+				assert.Contains(t, err.Error(), expected)
+			} else {
+				testGeoPopulateAllNegativeLon(t, f.engine)
+
+				data, err := json.Marshal(f.ToJson())
+				if assert.NoError(t, err) {
+					assert.JSONEq(t, expected, string(data))
+				}
+			}
+		}
+	}
+
+	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": false}`, `{"bounds": {"top_left":{"lat": 80,"lon":-4}, "bottom_right":{"lat":-100,"lon":-1}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": true}`, `{"bounds": {"top_left":{"lat": 80,"lon":-4}, "bottom_right":{"lat":-100,"lon":-1}}}`)
+}
+
+func TestGeoBoundsPositiveLonFunc(t *testing.T) {
+	check := func(jsonOpts string, expected string) {
+		var opts map[string]interface{}
+		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
+			f, err := newGeoBoundsFunc(opts)
+			if err != nil {
+				assert.Contains(t, err.Error(), expected)
+			} else {
+				testGeoPopulateAllPositiveLon(t, f.engine)
+
+				data, err := json.Marshal(f.ToJson())
+				if assert.NoError(t, err) {
+					assert.JSONEq(t, expected, string(data))
+				}
+			}
+		}
+	}
+
+	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": false}`, `{"bounds": {"top_left":{"lat":80,"lon":1}, "bottom_right":{"lat":-100,"lon":4}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude", "wrap_longitude": true}`, `{"bounds": {"top_left":{"lat":80,"lon":1}, "bottom_right":{"lat":-100,"lon":4}}}`)
 }
 
 // check "geo_centroid"
