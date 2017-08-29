@@ -72,7 +72,7 @@ type SearchParams struct {
 	KeepViewAs  string   `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string   `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 	Lifetime    string   `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
-	Limit       int      `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
+	Limit       int64    `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
@@ -108,6 +108,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 		Format: format.RAW,
 		Case:   true,
 		Reduce: true,
+		Limit:  -1, // no limit!
 	}
 	if err := bindOptionalJson(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
@@ -185,10 +186,10 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 				WithDetails("failed to parse lifetime"))
 		}
 	}
-	cfg.ReportIndex = true // /search
-	cfg.ReportData = !format.IsNull(params.Format)
+	cfg.ReportIndex = params.Limit != 0 // -1 or >0
+	cfg.ReportData = params.Limit != 0 && !format.IsNull(params.Format)
 	cfg.Offset = 0
-	cfg.Limit = uint(params.Limit)
+	cfg.Limit = params.Limit
 	cfg.Performance = params.Performance
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	if err != nil {

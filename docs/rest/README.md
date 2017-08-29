@@ -34,6 +34,9 @@ search uses the following options by default:
 - "," for the `SEPARATOR` option
 - "." for the `DECIMAL` option
 
+Since `0.13.0` the [limit] parameter has default value `-1` which means "no limit".
+The `limit=0` means do not report any found records.
+
 
 # Aggregation functions
 

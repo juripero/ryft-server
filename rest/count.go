@@ -163,7 +163,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	}
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
-	// cfg.Limit = 0
+	cfg.Limit = 0
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	cfg.Performance = params.Performance
 	if err != nil {
@@ -378,7 +378,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
-	// cfg.Limit = 0
+	cfg.Limit = 0
 
 	// parse post-process transformations
 	cfg.Transforms, err = parseTransforms(params.Transforms, server.Config)

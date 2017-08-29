@@ -51,8 +51,8 @@ type Config struct {
 	Dist   uint     // fuzziness distance (FHS, FEDS)
 	Reduce bool     // reduce for FEDS
 	Nodes  uint     // number of hardware nodes to use (0..4)
-	Limit  uint     // limit the number of records (0 - no limit)
-	Offset uint     // first record index (/show feature)
+	Limit  int64    // limit the number of records (-1 - no limit)
+	Offset int64    // first record index (/show feature)
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
@@ -93,6 +93,7 @@ type Config struct {
 func NewEmptyConfig() *Config {
 	cfg := new(Config)
 	cfg.Case = true // by default
+	cfg.Limit = -1  // no limit
 	return cfg
 }
 
@@ -102,6 +103,7 @@ func NewConfig(query string, files ...string) *Config {
 	cfg.Query = query
 	cfg.Files = files
 	cfg.Case = true
+	cfg.Limit = -1 // no limit
 	return cfg
 }
 
@@ -165,7 +167,7 @@ func (cfg Config) String() string {
 	}
 
 	// limit
-	if cfg.Limit != 0 {
+	if cfg.Limit >= 0 {
 		props = append(props, fmt.Sprintf("limit:%d", cfg.Limit))
 	}
 

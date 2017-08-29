@@ -631,7 +631,7 @@ BuildItems:
 			})
 
 			// apply limit options here
-			if task.config.Limit != 0 && uint(len(items)) >= task.config.Limit {
+			if task.config.Limit >= 0 && int64(len(items)) >= task.config.Limit {
 				break BuildItems
 			}
 		}

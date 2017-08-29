@@ -54,10 +54,10 @@ type ResultsReader struct {
 	Delimiter string // DATA delimiter string
 
 	// options
-	Offset   uint64 // start from the record
-	Limit    uint64 // limit the total number of records
-	ReadData bool   // if `false` only indexes will be reported
-	MakeView bool   // if `false` do not create VIEW file
+	Offset   int64 // start from the record
+	Limit    int64 // limit the total number of records
+	ReadData bool  // if `false` only indexes will be reported
+	MakeView bool  // if `false` do not create VIEW file
 
 	RelativeToHome string // report filepath relative to home
 	UpdateHostTo   string // update index's host
@@ -88,6 +88,7 @@ func NewResultsReader(task *Task, dataPath, indexPath, viewPath string, delimite
 	rr.DataPath = dataPath
 	rr.ViewPath = viewPath
 	rr.Delimiter = delimiter
+	rr.Limit = -1 // no limit
 
 	rr.IntrusiveMode = true
 
@@ -281,7 +282,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 				recId += 1
 
 				// skip requested number of records
-				if recId <= rr.Offset {
+				if recId <= uint64(rr.Offset) {
 					if rr.ReadData {
 						if datRd == nil {
 							// try to open DATA file
@@ -394,7 +395,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 				// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
 				res.ReportRecord(rec)
-				if rr.Limit > 0 && res.RecordsReported() >= rr.Limit {
+				if rr.Limit >= 0 && res.RecordsReported() >= uint64(rr.Limit) {
 					rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 					return // done
 				}
@@ -497,13 +498,13 @@ func (rr *ResultsReader) show(res *search.Result) {
 
 	// adjust count: if zero - get rest of records
 	if old, n := rr.Limit, viewRd.Count(); true {
-		if rr.Limit == 0 {
-			rr.Limit = n
+		if rr.Limit < 0 {
+			rr.Limit = int64(n)
 		}
 
 		// limit count to available number of items
-		if rr.Offset+rr.Limit > n {
-			rr.Limit = n - rr.Offset
+		if uint64(rr.Offset+rr.Limit) > n {
+			rr.Limit = int64(n) - rr.Offset
 		}
 
 		if old != rr.Limit {
@@ -514,9 +515,9 @@ func (rr *ResultsReader) show(res *search.Result) {
 		}
 	}
 
-	var i uint64
+	var i int64
 	for i = 0; i < rr.Limit; i++ {
-		indexBeg, indexEnd, dataBeg, dataEnd, err := viewRd.Get(int64(i + rr.Offset))
+		indexBeg, indexEnd, dataBeg, dataEnd, err := viewRd.Get(i + rr.Offset)
 		if err != nil {
 			rr.log().WithError(err).Warnf("[%s/reader]: failed to read VIEW at %d", TAG, i)
 			res.ReportError(fmt.Errorf("failed to read VIEW: %s", err))
@@ -668,7 +669,7 @@ func (rr *ResultsReader) show(res *search.Result) {
 		// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
 		res.ReportRecord(rec)
-		if rr.Limit > 0 && res.RecordsReported() >= rr.Limit {
+		if rr.Limit >= 0 && res.RecordsReported() >= uint64(rr.Limit) {
 			rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 			return // done
 		}
