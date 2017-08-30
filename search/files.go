@@ -134,7 +134,7 @@ func IsRelativeToHome(home string, path string) bool {
 	// path = filepath.Clean(path)
 	if relPath, err := filepath.Rel(home, path); err != nil {
 		return false
-	} else if strings.Contains(relPath, "..") {
+	} else if relPath == ".." || strings.HasPrefix(relPath, "../") {
 		return false
 	}
 
