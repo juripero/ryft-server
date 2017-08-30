@@ -29,7 +29,7 @@ package-content: control
 	@echo "/etc/ryft-users.yaml" >> "${DESTDIR}/DEBIAN/conffiles"
 	@rm "${DESTDIR}/var/log/ryft/.keep"
 	@rm "${DESTDIR}/var/ryft/.keep"
-	@echo "Installed-Size: $$(du -k -s ${DESTDIR} | awk '{print 1024*$$1}')" >> "${CONTROLFILE}"
+	@echo "Installed-Size: $$(du -k -s ${DESTDIR} | awk '{print $$1}')" >> "${CONTROLFILE}"
 # chown -R ryftuser.ryftuser "${DESTDIR}"
 
 package: package-content
