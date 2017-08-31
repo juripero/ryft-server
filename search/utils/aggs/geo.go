@@ -301,19 +301,28 @@ func (g *Geo) updateBounds(lat, lon float64) {
 		g.BottomRight.Lat = lat
 	}
 
-	if g.WrapLonField == true {
-		if lon >= 0 && lon < g.posLeft {
-			g.posLeft = lon
-		}
-		if lon >= 0 && lon > g.posRight {
-			g.posRight = lon
-		}
-		if lon < 0 && lon < g.negLeft {
-			g.negLeft = lon
-		}
-		if lon < 0 && lon > g.negRight {
-			g.negRight = lon
-		}
+	if lon >= 0 && lon < g.posLeft {
+		g.posLeft = lon
+	}
+	if lon >= 0 && lon > g.posRight {
+		g.posRight = lon
+	}
+	if lon < 0 && lon < g.negLeft {
+		g.negLeft = lon
+	}
+	if lon < 0 && lon > g.negRight {
+		g.negRight = lon
+	}
+
+	// use same implementation as in ElasticSearch
+	// https://github.com/elastic/elasticsearch/blob/ad8f359deb87745239712ecec89570a295bb8cc7/core/src/main/java/org/elasticsearch/search/aggregations/metrics/geobounds/InternalGeoBounds.java#L214
+	if (math.IsInf(g.posLeft, 1)) == true {
+		g.TopLeft.Lon = g.negLeft
+		g.BottomRight.Lon = g.negRight
+	} else if (math.IsInf(g.negLeft, 1)) == true {
+		g.TopLeft.Lon = g.posLeft
+		g.BottomRight.Lon = g.posRight
+	} else if g.WrapLonField == true {
 		unwrappedWidth := g.posRight - g.negLeft
 		wrappedWidth := (180 - g.posLeft) - (-180 - g.negRight)
 		if unwrappedWidth <= wrappedWidth {
