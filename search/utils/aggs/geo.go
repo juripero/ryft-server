@@ -443,6 +443,10 @@ func newGeoBoundsFunc(opts map[string]interface{}) (*geoBoundsFunc, error) {
 
 // ToJson gets function as JSON
 func (f *geoBoundsFunc) ToJson() interface{} {
+	if f.engine.Count == 0 {
+		return map[string]interface{}{} // empty
+	}
+
 	bounds := f.engine
 	return map[string]interface{}{
 		"bounds": map[string]interface{}{
@@ -481,6 +485,10 @@ func newGeoCentroidFunc(opts map[string]interface{}) (*geoCentroidFunc, error) {
 
 // ToJson gets function as JSON
 func (f *geoCentroidFunc) ToJson() interface{} {
+	if f.engine.Count == 0 {
+		return map[string]interface{}{} // empty
+	}
+
 	location := f.engine.getCentroid()
 	return map[string]interface{}{
 		"centroid": map[string]interface{}{

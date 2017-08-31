@@ -257,6 +257,12 @@ func newMinFunc(opts map[string]interface{}) (*minFunc, error) {
 
 // ToJson gets function as JSON
 func (f *minFunc) ToJson() interface{} {
+	if f.engine.Count == 0 {
+		return map[string]interface{}{
+			"value": nil,
+		}
+	}
+
 	return map[string]interface{}{
 		"value": f.engine.Min,
 	}
@@ -284,6 +290,12 @@ func newMaxFunc(opts map[string]interface{}) (*maxFunc, error) {
 
 // ToJson gets function as JSON
 func (f *maxFunc) ToJson() interface{} {
+	if f.engine.Count == 0 {
+		return map[string]interface{}{
+			"value": nil,
+		}
+	}
+
 	return map[string]interface{}{
 		"value": f.engine.Max,
 	}
@@ -337,8 +349,14 @@ func newAvgFunc(opts map[string]interface{}) (*avgFunc, error) {
 
 // ToJson gets function as JSON
 func (f *avgFunc) ToJson() interface{} {
+	if f.engine.Count == 0 {
+		return map[string]interface{}{
+			"value": nil,
+		}
+	}
+
 	return map[string]interface{}{
-		"value": f.engine.Sum / float64(f.engine.Count), // might be Inf or NaN
+		"value": f.engine.Sum / float64(f.engine.Count),
 	}
 }
 
@@ -364,8 +382,18 @@ func newStatsFunc(opts map[string]interface{}) (*statsFunc, error) {
 
 // ToJson gets function as JSON
 func (f *statsFunc) ToJson() interface{} {
+	if f.engine.Count == 0 {
+		return map[string]interface{}{
+			"avg":   nil,
+			"sum":   f.engine.Sum,
+			"min":   nil,
+			"max":   nil,
+			"count": f.engine.Count,
+		}
+	}
+
 	return map[string]interface{}{
-		"avg":   f.engine.Sum / float64(f.engine.Count), // might be Inf or NaN
+		"avg":   f.engine.Sum / float64(f.engine.Count),
 		"sum":   f.engine.Sum,
 		"min":   f.engine.Min,
 		"max":   f.engine.Max,
@@ -406,6 +434,23 @@ func newExtendedStatsFunc(opts map[string]interface{}) (*extendedStatsFunc, erro
 
 // ToJson gets function as JSON
 func (f *extendedStatsFunc) ToJson() interface{} {
+	if f.engine.Count == 0 {
+		return map[string]interface{}{
+			"avg":            nil,
+			"sum":            f.engine.Sum,
+			"min":            nil,
+			"max":            nil,
+			"count":          f.engine.Count,
+			"sum_of_squares": f.engine.Sum2,
+			"variance":       nil,
+			"std_deviation":  nil,
+			"std_deviation_bounds": map[string]interface{}{
+				"upper": nil,
+				"lower": nil,
+			},
+		}
+	}
+
 	Avg := f.engine.Sum / float64(f.engine.Count)
 	Var := f.engine.Sum2/float64(f.engine.Count) - Avg*Avg
 	Stdev := math.Sqrt(Var)
