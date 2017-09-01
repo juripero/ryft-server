@@ -6,10 +6,32 @@
 
 
 #
+# get ryftone?
+#
+test -e /dev/smca
+if [ $? == 0 ]
+then
+	ryftone=1
+else
+	ryftone=0
+fi
+
+#
+# get OSVersion{Major,Minor}
+#
+OSVersionMajor=`lsb_release -a 2>/dev/null|grep Release|cut -d':' -f2-|sed 's/^\s*//'g|cut -d'.' -f1`
+OSVersionMinor=`lsb_release -a 2>/dev/null|grep Release|cut -d':' -f2-|sed 's/^\s*//'g|cut -d'.' -f2`
+
+#
 # constants
 #
 ryftsudo=""
-initctl show-config ssh >>/dev/null 2>&1 
+if [ $OSVersionMajor == 14 ]
+then
+	initctl show-config ssh >>/dev/null 2>&1 
+else
+	systemctl status ssh >>/dev/null 2>&1 
+fi
 if [ $? -ne 0 ]
 then
 	ryftsudo="sudo"
@@ -104,10 +126,12 @@ ryft_boot_enabled() {
 	local returnValue=0
 	local i=$1
 
-	$ryftsudo initctl show-config $i >>/dev/null 2>&1 
+	#$ryftsudo initctl show-config $i >>/dev/null 2>&1 
+	os_service_detect $i
 	if [ $? = 0 ]
 	then
-		x=`$ryftsudo initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
+		#x=`$ryftsudo initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
+		x=`os_boot_status $i`
 		#echo "x=$x"
 		if [ $x = "boot_on" ]
 		then
@@ -117,6 +141,44 @@ ryft_boot_enabled() {
 	echo $returnValue
 }
 
+function os_service_running() {
+	if [ $OSVersionMajor == 14 ]
+	then
+		echo "$1"|grep process
+	else
+		echo "$1"|grep "(running)"
+	fi
+}
+
+function os_service_status() {
+	if [ $OSVersionMajor == 14 ]
+	then
+		$ryftsudo service $i status|cut -d' ' -f2-
+	else
+		#$ryftsudo systemctl status $i|grep Active|cut -d':' -f2-|cut -d' ' -f2-
+        #$ryftsudo systemctl status $i 2>/dev/null|egrep -o "^\s+(\s+Active.*)|PID.*)"|xargs echo
+        #$ryftsudo systemctl status $i 2>/dev/null|egrep -o "^\s+(\s+Active.*)"|xargs echo
+        $ryftsudo systemctl is-active $i
+	fi
+}
+function os_service_detect() {
+	if [ $OSVersionMajor == 14 ]
+	then
+		$ryftsudo initctl show-config $1 >>/dev/null 2>&1 
+	else
+		$ryftsudo systemctl status $1 2>/dev/null|egrep "^(\s+Loaded: loaded.*|PID.*)" >/dev/null 2>&1 
+	fi
+}
+
+function os_boot_status() {
+	if [ $ryftone == 1 ]
+	then
+		$ryftsudo initctl show-config $1 | grep -q "^  start on" && echo -n boot_on || echo -n boot_off
+	else
+		$ryftsudo systemctl is-enabled $1 | grep -q "^enabled" && echo -n boot_on || echo -n boot_off
+	fi
+}
+
 function ryft_boot_status() {
 	echo
 	printf "%-15s" "SERVICE" "BOOT_STATUS" "RUNNING_STATUS" 
@@ -124,11 +186,13 @@ function ryft_boot_status() {
 	for i in ryft-server-d ryftwebapidemo ryftodbcd consul consul-alerts elasticsearch
 	do
 		printf "%-15s" $i
-		$ryftsudo initctl show-config $i >>/dev/null 2>&1 
+		#$ryftsudo initctl show-config $i >>/dev/null 2>&1 
+		os_service_detect $i
 		if [ $? = 0 ]
 		then
 			# running processes must be newer than override file to be visible
-			x=`$ryftsudo initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
+			#x=`$ryftsudo initctl show-config $i | grep -q "^  start on" && echo -n boot_on || echo -n boot_off`
+			x=`os_boot_status $i`
 			#echo "x=$x"
 			if [ $x = "boot_on" ]
 			then
@@ -140,13 +204,15 @@ function ryft_boot_status() {
 			# sensing file instead
 			#printf "%-15s" `cat /etc/init/$i.*| grep -q "^manual" && echo -n boot_off || echo -n boot_on`
 	
-			x=`$ryftsudo service $i status|cut -d' ' -f2-`
-			y=`echo "$x"| grep process`
+			#x=`$ryftsudo service $i status|cut -d' ' -f2-`
+			x=`os_service_status $1`
+			#y=`echo "$x"| grep process`
+			#y=`os_service_status "$x"`
 			if [ $? = 0 ]
 			then
-				printf "${greenAttributeON}%-15s${attributesOFF}" $x
+				printf "${greenAttributeON}%-15s${attributesOFF}" "$x"
 			else
-				printf "${redAttributeON}%-15s${attributesOFF}" $x
+				printf "${redAttributeON}%-15s${attributesOFF}" "$x"
 			fi
 			echo
 		else
@@ -309,6 +375,49 @@ function ryft_menu()
 }
 
 #################################
+function os_start
+{
+	if [ $OSVersionMajor == 14 ]
+	then
+		# start process if not already running
+		# ryft_showCommand
+		echo -e "${greenAttributeON}service ${1} status | grep process${attributesOFF}"
+		$ryftsudo service ${1} status|grep process
+		if [ $? != 0 ]
+		then
+	    	    ryft_showCommand "sudo service ${1} start"
+		fi
+	else
+		ryft_showCommand "sudo systemctl start ${1}.service"
+	fi
+}
+function os_stop
+{
+	if [ $OSVersionMajor == 14 ]
+	then
+		# stop process if running 
+		# ryft_showCommand
+		echo -e "${greenAttributeON}service ${1} status | grep process${attributesOFF}"
+		$ryftsudo service ${1} status|grep process
+		if [ $? = 0 ]
+		then
+	    	    ryft_showCommand "sudo service ${1} stop"
+		fi
+	else
+		ryft_showCommand "sudo systemctl stop ${1}.service"
+	fi
+}
+
+function os_restart
+{
+	if [ $OSVersionMajor == 14 ]
+	then
+		ryft_showCommand "sudo service ${1} restart"
+	else
+		ryft_showCommand "sudo systemctl restart ${1}.service"
+	fi
+}
+
 
 function ryft_start
 {
@@ -316,14 +425,7 @@ function ryft_start
     local service
     for service in `echo $serviceList`
     do
-	# start process if not already running
-	# ryft_showCommand
-	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
-	$ryftsudo service $service status|grep process
-	if [ $? != 0 ]
-	then
-    	    ryft_showCommand "sudo service $service start"
-	fi
+	os_start $service
 	echo
     done
 }
@@ -365,14 +467,7 @@ function ryft_stop
     local service
     for service in `echo $serviceList`
     do
-	# stop process if running 
-	# ryft_showCommand
-	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
-	$ryftsudo service $service status|grep process
-	if [ $? = 0 ]
-	then
-    	    ryft_showCommand "sudo service $service stop"
-	fi
+	os_stop $service
 	echo
     done
 }
@@ -414,7 +509,7 @@ function ryft_restart
     local service
     for service in `echo $serviceList`
     do
-    	ryft_showCommand "sudo service $service restart"
+    	os_restart $service
     done
 }
 function ryft_restart_menu
@@ -447,6 +542,46 @@ function ryft_restart_menu
 }
 
 #######################################0
+function os_boot_off
+{
+	if [ $OSVersionMajor == 14 ]
+	then
+		f=/etc/init/${1}.override
+		# ryft_showCommand
+		echo -e "${greenAttributeON}echo \"manual\" | sudo tee ${f}${attributesOFF}"
+		echo "manual"|sudo tee ${f}
+
+		# restart process if running	
+		# ryft_showCommand
+		echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
+		$ryftsudo service ${1} status|grep process
+		if [ $? = 0 ]
+		then
+	    		ryft_showCommand "sudo service $service restart"
+		fi
+	else
+    		ryft_showCommand "sudo systemctl disable ${1}.service"
+	fi
+}
+function os_boot_on
+{
+	if [ $OSVersionMajor == 14 ]
+	then
+		f=/etc/init/${service}.override
+	        ryft_showCommand "sudo rm -f ${f}"
+
+		# restart process if running
+		# ryft_showCommand
+		echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
+		$ryftsudo service $service status|grep process
+		if [ $? = 0 ]
+		then
+	    		ryft_showCommand "sudo service $service restart"
+		fi
+	else
+    		ryft_showCommand "sudo systemctl enable ${1}.service"
+	fi
+}
 
 function ryft_boot_off
 {
@@ -457,19 +592,7 @@ function ryft_boot_off
     do
 	# disable start at boot
     	echo "boot_off $service"
-	f=/etc/init/${service}.override
-	# ryft_showCommand
-	echo -e "${greenAttributeON}echo \"manual\" | sudo tee ${f}${attributesOFF}"
-	echo "manual"|sudo tee ${f}
-
-	# restart process if running	
-	# ryft_showCommand
-	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
-	$ryftsudo service $service status|grep process
-	if [ $? = 0 ]
-	then
-    		ryft_showCommand "sudo service $service restart"
-	fi
+	os_boot_off ${service}
 	echo
     done
 }
@@ -483,17 +606,7 @@ function ryft_boot_on
     do
 	# enable start at boot
     	echo "boot_on $service"
-	f=/etc/init/${service}.override
-        ryft_showCommand "sudo rm -f ${f}"
-
-	# restart process if running
-	# ryft_showCommand
-	echo -e "${greenAttributeON}service $service status | grep process${attributesOFF}"
-	$ryftsudo service $service status|grep process
-	if [ $? = 0 ]
-	then
-    		ryft_showCommand "sudo service $service restart"
-	fi
+	os_boot_on $service
 	echo
     done
 }
@@ -1002,7 +1115,18 @@ ryft_status_filename=/tmp/ryft_status_$$
 ryft_status_verbose=/tmp/ryft_status_verbose_$$
 ryft_ryftone_files=/tmp/ryft_ryftone_files_$$
 detect_process() {
-	returnValue=`cat $ryft_ps_filename|egrep "$1"|wc -l`
+	if [ $ryftone == 0 -a "$1" == "rhfsd" ]
+	then
+		returnValue=1
+	elif [ $ryftone == 0 -a "$1" == "tlogd" ]
+	then
+		returnValue=1
+	elif [ $ryftone == 0 -a "$1" == "ccc_mgr" ]
+	then
+		returnValue=1
+	else
+		returnValue=`cat $ryft_ps_filename|egrep "$1"|wc -l`
+	fi
 	echo $returnValue
 }
 
@@ -1155,8 +1279,14 @@ fi
 ryftServer_boot=`ryft_boot_enabled ryft-server-d`
 ryftServer_status=0
 ryftServer_error=0
-ryftServer_startCommand="sudo service ryft-server-d start"
-ryftServer_stopCommand="sudo service ryft-server-d stop"
+if [ $OSVersionMajor == 14 ]
+then
+    ryftServer_startCommand="sudo service ryft-server-d start"
+    ryftServer_stopCommand="sudo service ryft-server-d stop"
+else
+    ryftServer_startCommand="sudo systemctl start ryft-server-d"
+    ryftServer_stopCommand="sudo systemctl stop ryft-server-d"
+fi
 ryftServer_start() {
 	echo "--------------------"
 	echo "starting ryft-server-d with $ryftServer_startCommand"
@@ -1195,13 +1325,19 @@ then
 fi
 ryft1_odbcd_status=0
 ryft1_odbcd_error=0
-ryft1_odbcd_startCommand="sudo service ryftodbcd start"
+if [ $OSVersionMajor == 14 ]
+then
+    ryft1_odbcd_startCommand="sudo service ryftodbcd start"
+    ryft1_odbcd_stopCommand="sudo service ryftodbcd stop"
+else
+    ryft1_odbcd_startCommand="sudo systemctl start ryftodbcd"
+    ryft1_odbcd_stopCommand="sudo systemctl stop ryftodbcd"
+fi
 ryft1_odbcd_start() {
 	echo "--------------------"
 	echo "starting ryft1_odbcd with $ryft1_odbcd_startCommand"
 	${ryft1_odbcd_startCommand}
 }
-ryft1_odbcd_stopCommand="sudo service ryftodbcd stop"
 ryft1_odbcd_stop() {
 	echo "--------------------"
 	echo "stoppng ryft1_odbcd with $ryft1_odbcd_stopCommand"
@@ -1230,13 +1366,20 @@ fi
 consul_boot=`ryft_boot_enabled consul`
 consul_status=0
 consul_error=0
-consul_startCommand="sudo service consul start"
+if [ $OSVersionMajor == 14 ]
+then
+    consul_startCommand="sudo service consul start"
+    consul_stopCommand="sudo service consul stop"
+else
+    consul_startCommand="sudo systemctl start consul"
+    consul_stopCommand="sudo systemctl stop consul"
+fi
+
 consul_start() {
 	echo "--------------------"
 	echo "starting consul with $consul_startCommand"
 	${consul_startCommand}
 }
-consul_stopCommand="sudo service consul stop"
 consul_stop() {
 	echo "--------------------"
 	echo "stopping consul with $consul_stopCommand"
@@ -1262,13 +1405,19 @@ fi
 consulAlerts_boot=`ryft_boot_enabled consul-alerts`
 consulAlerts_status=0
 consulAlerts_error=0
-consulAlerts_startCommand="sudo service consul-alerts start"
+if [ $OSVersionMajor == 14 ]
+then
+    consulAlerts_startCommand="sudo service consul-alerts start"
+    consulAlerts_stopCommand="sudo service consul-alerts stop"
+else
+    consulAlerts_startCommand="sudo systemctl start consul-alerts"
+    consulAlerts_stopCommand="sudo systemctl stop consul-alerts"
+fi
 consulAlerts_start() {
 	echo "--------------------"
 	echo "starting consul-alerts with $consulAlerts_startCommand"
 	${consulAlerts_startCommand}
 }
-consulAlerts_stopCommand="sudo service consul-alerts stop"
 consulAlerts_stop() {
 	echo "--------------------"
 	echo "stopping consul-alerts with $consulAlerts_stopCommand"
@@ -1295,13 +1444,19 @@ fi
 apidemo_boot=`ryft_boot_enabled ryftwebapidemo`
 apidemo_status=0
 apidemo_error=0
-apidemo_startCommand="sudo service ryftwebapidemo start"
+if [ $OSVersionMajor == 14 ]
+then
+    apidemo_startCommand="sudo service ryftwebapidemo start"
+    apidemo_stopCommand="sudo service ryftwebapidemo stop"
+else
+    apidemo_startCommand="sudo systemctl start ryftwebapidemo"
+    apidemo_stopCommand="sudo systemctl stop ryftwebapidemo"
+fi
 apidemo_start() {
 	echo "--------------------"
 	echo "starting apidemo with $apidemo_startCommand"
 	${apidemo_startCommand}
 }
-apidemo_stopCommand="sudo service ryftwebapidemo stop"
 apidemo_stop() {
 	echo "--------------------"
 	echo "stopping apidemo with $apidemo_stopCommand"
@@ -1327,7 +1482,14 @@ fi
 elasticsearch_boot=`ryft_boot_enabled elasticsearch`
 elasticsearch_status=0
 elasticsearch_error=0
-elasticsearch_startCommand="sudo service elasticsearch start"
+if [ $OSVersionMajor == 14 ]
+then
+    elasticsearch_startCommand="sudo service elasticsearch start"
+    elasticsearch_stopCommand="sudo service elasticsearch stop"
+else
+    elasticsearch_startCommand="sudo systemctl start elasticsearch"
+    elasticsearch_stopCommand="sudo systemctl stop elasticsearch"
+fi
 elasticsearch_start() {
 	echo "--------------------"
 	echo "starting elasticsearch with $elasticsearch_startCommand"
@@ -1517,11 +1679,11 @@ ryft_statusX() {
 	#
 	#echo
 	(echo "$hostname Filesystem" `date` 
-	df -h /storage/* /ryftone >$ryft_status_filename
+	df -h /storage/* /ryftone >$ryft_status_filename 2>/dev/null
 	cat $ryft_status_filename
 	)>>$ryft_status_verbose
 	ryftoneMounted=`cat $ryft_status_filename|grep "/ryftone"|grep "/dev/fuse"|wc -l`
-	if [ $ryftoneMounted != 1 ]
+	if [ $ryftone == 1 -a $ryftoneMounted != 1 ]
 	then
 		filesystem_error=1
 		status=$((status+1))
