@@ -37,10 +37,21 @@ then
 	ryftsudo="sudo"
 fi
 tailLines="-40"
-ryftoneLog=/var/log/ryft/ryftone.log
+if [ $ryftone == 1 ]
+then
+    ryftoneLog=/var/log/ryft/ryftone.log
+    ryftoneLogPattern="/var/log/ryft/ryftone.log*"
+else
+    # f1 && x86 aws
+    ryftoneLog=/var/log/ryft/ryft.log
+    ryftoneLogPattern=/var/log/ryft/ryft.log
+fi
 ryft_server_dLog=/var/log/ryft/server.log
+ryft_server_dLogPattern=/var/log/ryft/server.log
 ryftwebapidemoLog=/var/log/ryft/ryft-demo.log
-ryftodbcdLog=/usr/local/ryft/bin/x8664/ryftone_server.log
+ryftwebapidemoLogPattern=/var/log/ryft/ryft-demo.log
+ryftodbcdLog=/var/log/ryft/ryftone_server.log
+ryftodbcdLogPattern="/var/log/ryft/ryftone_server*.log"
 consulLog=/var/log/consul
 consulAlertsLog=/var/log/consul-alerts
 
@@ -85,13 +96,14 @@ function usage() {
 ryft_app_logs() {
 	local dateHandle=`date '+%Y%m%d_%H%M'`
 	local hostHandle=`hostname`
-	local tarFile=./${hostHandle}_${dateHandle}_app_logs.tar
-	local tarList=./${hostHandle}_${dateHandle}_app_logs_list.txt_$$
+	local tarFile=/tmp/${hostHandle}_${dateHandle}_app_logs.tar
+	local tarList=/tmp/${hostHandle}_${dateHandle}_app_logs_list.txt_$$
 	local i
 	
 	# generate a list of log files
 	rm -f $tarList
-	for i in /var/log/ryft/ryftone.log /var/log/ryft/server.log /var/log/ryft/ryft-demo.log /usr/local/ryft/bin/x8664/ryftone_server.log /usr/local/ryft/bin/x8664/ryftone_server*.log /var/log/consul /looney/balooney
+	echo "here's the log file list:" ${ryftoneLogPattern} ${ryft_server_dLogPatern} ${ryftwebapidemoLogPattern} ${ryftodbcdLogPattern} /var/log/consul
+	for i in ${ryftoneLogPattern} ${ryft_server_dLogPatern} ${ryftwebapidemoLogPattern} ${ryftodbcdLogPattern} /var/log/consul
 	do
 		if [ -e $i ] 
 		then
@@ -967,34 +979,70 @@ function getNode
     fi
 }
 
+function menu_select_next
+{
+    # needs sequencing beyond 0..9       
+    next=$(($1 + 1))
+    echo $next
+}
+
 function ryft_logs_menu
 {
     
     local LOGS_MENU_TITLE="Ryft Logs Menu"
+    local -a menu_select
 
     local -a LOGS_MENU_TEXT
-    LOGS_MENU_TEXT[0]="Exit"
-    LOGS_MENU_TEXT[1]="RyftOne log              (tail ${tailLines} $ryftoneLog)"
-    LOGS_MENU_TEXT[2]="ryft-server-d log        (tail ${tailLines} $ryft_server_dLog)"
-    LOGS_MENU_TEXT[3]="ryftwebapidemo log       (tail ${tailLines} $ryftwebapidemoLog)"
-    LOGS_MENU_TEXT[4]="ryftodbcd log            (tail ${tailLines} $ryftodbcdLog)"
-    LOGS_MENU_TEXT[5]="consul log               (tail ${tailLines} $consulLog)"
-    LOGS_MENU_TEXT[6]="consul-alerts log        (tail ${tailLines} $consulAlertsLog)"
-    LOGS_MENU_TEXT[7]="RyftOne diagnostic dump  (sudo ryft_diagnostics_dump)"
-    LOGS_MENU_TEXT[8]="RyftOne clean log        (from Admin Guide - TroubleShooting Section)"
-    LOGS_MENU_TEXT[9]="RyftOne App Logs dump    (tar all application logs, menu selection #1,2,3,4,5)"
+    menu_select=0
+    LOGS_MENU_TEXT[${menu_select}]="Exit"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_TEXT[${menu_select}]="RyftOne log              (tail ${tailLines} $ryftoneLog)"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_TEXT[${menu_select}]="ryft-server-d log        (tail ${tailLines} $ryft_server_dLog)"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_TEXT[${menu_select}]="ryftwebapidemo log       (tail ${tailLines} $ryftwebapidemoLog)"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_TEXT[${menu_select}]="ryftodbcd log            (tail ${tailLines} $ryftodbcdLog)"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_TEXT[${menu_select}]="consul log               (tail ${tailLines} $consulLog)"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_TEXT[${menu_select}]="consul-alerts log        (tail ${tailLines} $consulAlertsLog)"
+    menu_select=`menu_select_next $menu_select`
+    if [ $ryftone == 1 ]
+    then
+        LOGS_MENU_TEXT[${menu_select}]="RyftOne diagnostic dump  (sudo ryft_diagnostics_dump)"
+        menu_select=`menu_select_next $menu_select`
+        LOGS_MENU_TEXT[${menu_select}]="RyftOne clean log        (from Admin Guide - TroubleShooting Section)"
+        menu_select=`menu_select_next $menu_select`
+    fi
+    LOGS_MENU_TEXT[${menu_select}]="RyftOne App Logs dump    (tar all application logs, menu selection #1,2,3,4,5)"
+    menu_select=`menu_select_next $menu_select`
     
     local -a LOGS_MENU_ACTIONS
-    LOGS_MENU_ACTIONS[0]="exit"
-    LOGS_MENU_ACTIONS[1]="ryft_separator; tail ${tailLines} $ryftoneLog; ryft_separator"
-    LOGS_MENU_ACTIONS[2]="ryft_separator; tail ${tailLines} $ryft_server_dLog; ryft_separator"
-    LOGS_MENU_ACTIONS[3]="ryft_separator; tail ${tailLines} $ryftwebapidemoLog; ryft_separator"
-    LOGS_MENU_ACTIONS[4]="ryft_separator; tail ${tailLines} $ryftodbcdLog; ryft_separator"
-    LOGS_MENU_ACTIONS[5]="ryft_separator; tail ${tailLines} $consulLog; ryft_separator"
-    LOGS_MENU_ACTIONS[6]="ryft_separator; tail ${tailLines} $consulAlertsLog; ryft_separator"
-    LOGS_MENU_ACTIONS[7]="ryft_separator; ryft_showCommand \"sudo ryft_diagnostics_dump\" && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
-    LOGS_MENU_ACTIONS[8]="ryft_ays \"Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.\" && ryft_separator && ryftone_clean_logs && ryft_separator"
-    LOGS_MENU_ACTIONS[9]="ryft_separator; ryft_app_logs; ryft_separator; echo -n \" App Logs dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
+    menu_select=0
+    LOGS_MENU_ACTIONS[${menu_select}]="exit"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; tail ${tailLines} $ryftoneLog; ryft_separator"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; tail ${tailLines} $ryft_server_dLog; ryft_separator"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; tail ${tailLines} $ryftwebapidemoLog; ryft_separator"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; tail ${tailLines} $ryftodbcdLog; ryft_separator"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; tail ${tailLines} $consulLog; ryft_separator"
+    menu_select=`menu_select_next $menu_select`
+    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; tail ${tailLines} $consulAlertsLog; ryft_separator"
+    menu_select=`menu_select_next $menu_select`
+    if [ $ryftone == 1 ]
+    then
+	    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; ryft_showCommand \"sudo ryft_diagnostics_dump\" && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
+	    menu_select=`menu_select_next $menu_select`
+	    LOGS_MENU_ACTIONS[${menu_select}]="ryft_ays \"Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.\" && ryft_separator && ryftone_clean_logs && ryft_separator"
+	    menu_select=`menu_select_next $menu_select`
+    fi
+    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; ryft_app_logs; ryft_separator; echo -n \" App Logs dump filename is:\" && ls -t /tmp/*app_logs.tar.bz2|head -1; ryft_separator"
+    menu_select=`menu_select_next $menu_select`
 
     local LOGS_MENU_COMMAND="ryft_boot_status; ryft_status;"
 
