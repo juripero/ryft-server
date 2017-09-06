@@ -884,7 +884,7 @@ function ryft_ryftone_maintenance_menu
     menu_select=0
     MAINTENANCE_MENU_TEXT[$menu_select]="Exit"
     menu_select=`menu_select_next $menu_select`
-    MAINTENANCE_MENU_TEXT[$menu_select]="ryft-versions            (ryft-versions)"
+    MAINTENANCE_MENU_TEXT[$menu_select]="Ryft Versions            (ryft-versions)"
     menu_select=`menu_select_next $menu_select`
     MAINTENANCE_MENU_TEXT[$menu_select]="Reboot                   (sudo shutdown -rf now)"
     menu_select=`menu_select_next $menu_select`
@@ -899,16 +899,14 @@ function ryft_ryftone_maintenance_menu
     then
         MAINTENANCE_MENU_TEXT[$menu_select]="Cpc                      (~ryftuser/regression/util/cpc)"
         menu_select=`menu_select_next $menu_select`
-	MAINTENANCE_MENU_TEXT[$menu_select]="Recycle                  (~ryftuser/regression/util/recycle)"
-	menu_select=`menu_select_next $menu_select`
-	MAINTENANCE_MENU_TEXT[$menu_select]="File system check/repair (sudo fsck_rhfs -y -Y)"
-	menu_select=`menu_select_next $menu_select`
-	MAINTENANCE_MENU_TEXT[$menu_select]="Hardware reset rhfs ccc  (sudo ~ryftuser/regression/util/hw_reset_rhfs_ccc.sh)"
-	menu_select=`menu_select_next $menu_select`
-	MAINTENANCE_MENU_TEXT[$menu_select]="Poweroff                 (sudo poweroff)"
-	menu_select=`menu_select_next $menu_select`
-	MAINTENANCE_MENU_TEXT[$menu_select]="IPMI Menu"
-	menu_select=`menu_select_next $menu_select`
+		MAINTENANCE_MENU_TEXT[$menu_select]="Recycle                  (~ryftuser/regression/util/recycle)"
+		menu_select=`menu_select_next $menu_select`
+		MAINTENANCE_MENU_TEXT[$menu_select]="File system check/repair (sudo fsck_rhfs -y -Y)"
+		menu_select=`menu_select_next $menu_select`
+		MAINTENANCE_MENU_TEXT[$menu_select]="Hardware reset rhfs ccc  (sudo ~ryftuser/regression/util/hw_reset_rhfs_ccc.sh)"
+		menu_select=`menu_select_next $menu_select`
+		MAINTENANCE_MENU_TEXT[$menu_select]="IPMI Menu"
+		menu_select=`menu_select_next $menu_select`
     fi
 
     local -a MAINTENANCE_MENU_ACTIONS
@@ -917,10 +915,16 @@ function ryft_ryftone_maintenance_menu
     menu_select=`menu_select_next $menu_select`
     MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_separator; ryft-versions; ryft_separator"
     menu_select=`menu_select_next $menu_select`
-    MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays \"Requested action will reboot the ryftone.\" && sudo shutdown -rf now || echo \"not sure\""
+    MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action will reboot the ryftone.' && sudo shutdown -rf now || echo 'not sure'"
     menu_select=`menu_select_next $menu_select`
-    MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays \"Requested action will power down the ryftone.\" && sudo poweroff || echo \"not sure\""
-    menu_select=`menu_select_next $menu_select`
+    if [ $ryftone == 1 ]
+    then
+        MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action will power down the ryftone.' && ryft_ays 'Double checking...' && sudo poweroff || echo 'not sure'"
+        menu_select=`menu_select_next $menu_select`
+    else
+        MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action will terminate the ryftone.' && ryft_ays 'Double checking...' && sudo poweroff || echo 'not sure'"
+        menu_select=`menu_select_next $menu_select`
+    fi
     if [ "$smokePath" != "" ]
     then
         MAINTENANCE_MENU_ACTIONS[$menu_select]="$smokePath"
@@ -928,21 +932,17 @@ function ryft_ryftone_maintenance_menu
     fi
     if [ $ryftone == 1 ]
     then
-	MAINTENANCE_MENU_ACTIONS[$menu_select]="~ryftuser/ryft/regression/util/cpc"
-	menu_select=`menu_select_next $menu_select`
-
-	MAINTENANCE_MENU_ACTIONS[$menu_select]="~ryftuser/ryft/regression/util/cpc"
-	menu_select=`menu_select_next $menu_select`
-    
-	MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.' && ~ryftuser/ryft/regression/util/recycle"
-	menu_select=`menu_select_next $menu_select`
-
-	MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action performs /ryftone file system check/repair' && sudo fsck_rhfs -y -Y"
-	menu_select=`menu_select_next $menu_select`
-	MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action permanently removes all /ryftone filesystem data.' && ryft_ays 'Double checking...' && sudo ~ryftuser/ryft/regression/util/hw_reset_rhfs_ccc.sh || echo 'not sure'"
-	menu_select=`menu_select_next $menu_select`
-	MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ipmi_menu"
-	menu_select=`menu_select_next $menu_select`
+		MAINTENANCE_MENU_ACTIONS[$menu_select]="~ryftuser/ryft/regression/util/cpc"
+		menu_select=`menu_select_next $menu_select`
+		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.' && ~ryftuser/ryft/regression/util/recycle"
+		menu_select=`menu_select_next $menu_select`
+		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action performs /ryftone file system check/repair' && sudo fsck_rhfs -y -Y"
+		menu_select=`menu_select_next $menu_select`
+	
+		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action permanently removes all /ryftone filesystem data.' && ryft_ays 'Double checking...' && sudo ~ryftuser/ryft/regression/util/hw_reset_rhfs_ccc.sh || echo 'not sure'"
+		menu_select=`menu_select_next $menu_select`
+		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ipmi_menu"
+		menu_select=`menu_select_next $menu_select`
     fi
 
     local MAINTENANCE_MENU_COMMAND="ryft_boot_status; ryft_status;"
@@ -1241,6 +1241,8 @@ function ryft_main_menu
     menu_select=`menu_select_next $menu_select`
     MAIN_MENU_TEXT[$menu_select]="Ryft logs Menu"
     menu_select=`menu_select_next $menu_select`
+    MAIN_MENU_TEXT[$menu_select]="Ryft Versions"
+    menu_select=`menu_select_next $menu_select`
     
     local -a MAIN_MENU_ACTIONS
     menu_select=0
@@ -1259,6 +1261,8 @@ function ryft_main_menu
     MAIN_MENU_ACTIONS[$menu_select]="ryft_maintenance_menu"
     menu_select=`menu_select_next $menu_select`
     MAIN_MENU_ACTIONS[$menu_select]="ryft_logs_menu"
+    menu_select=`menu_select_next $menu_select`
+    MAIN_MENU_ACTIONS[$menu_select]="ryft_separator; ryft-versions; ryft_separator;"
     menu_select=`menu_select_next $menu_select`
 
     local MAIN_MENU_COMMAND="ryft_boot_status; ryft_status;"
