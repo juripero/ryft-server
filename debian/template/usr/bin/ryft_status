@@ -25,7 +25,7 @@ OSVersionMinor=`lsb_release -a 2>/dev/null|grep Release|cut -d':' -f2-|sed 's/^\
 #
 # is there a smoke test?
 #
-smokePath=~ryftuser/regression/util/smoke.sh
+smokePath=~ryftuser/ryft/regression/util/smoke.sh
 test -e $smokePath
 if [ $? != 0 ]
 then
