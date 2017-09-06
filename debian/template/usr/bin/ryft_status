@@ -172,6 +172,14 @@ else
     elasticsearch_bootOffCommand="sudo systemctl disable $x.service"
 fi
 
+test -e /usr/bin/ryft-versions
+if [ $? == 0 ]
+then
+    ryftVersionsPresent=1
+else
+    ryftVersionsPresent=0
+fi
+
 #
 # initial state 
 #
@@ -884,8 +892,11 @@ function ryft_ryftone_maintenance_menu
     menu_select=0
     MAINTENANCE_MENU_TEXT[$menu_select]="Exit"
     menu_select=`menu_select_next $menu_select`
-    MAINTENANCE_MENU_TEXT[$menu_select]="Ryft Versions            (ryft-versions)"
-    menu_select=`menu_select_next $menu_select`
+    if [ $ryftVersionsPresent == 1 ]
+    then
+        MAINTENANCE_MENU_TEXT[$menu_select]="Ryft Versions            (ryft-versions)"
+        menu_select=`menu_select_next $menu_select`
+    fi            
     MAINTENANCE_MENU_TEXT[$menu_select]="Reboot                   (sudo shutdown -rf now)"
     menu_select=`menu_select_next $menu_select`
     MAINTENANCE_MENU_TEXT[$menu_select]="Poweroff                 (sudo poweroff)"
@@ -913,8 +924,11 @@ function ryft_ryftone_maintenance_menu
     menu_select=0
     MAINTENANCE_MENU_ACTIONS[$menu_select]="exit"
     menu_select=`menu_select_next $menu_select`
-    MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_separator; ryft-versions; ryft_separator"
-    menu_select=`menu_select_next $menu_select`
+    if [ $ryftVersionsPresent == 1 ]
+    then
+        MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_separator; ryft-versions; ryft_separator"
+        menu_select=`menu_select_next $menu_select`
+    fi            
     MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action will reboot the ryftone.' && sudo shutdown -rf now || echo 'not sure'"
     menu_select=`menu_select_next $menu_select`
     if [ $ryftone == 1 ]
@@ -1001,6 +1015,9 @@ function ryft_consul_maintenance_menu
     MAINTENANCE_MENU_TEXT[6]="$processName log               (tail ${tailLines} $consulLog)"
     MAINTENANCE_MENU_TEXT[7]="$processName members           ($processName members)"
     MAINTENANCE_MENU_TEXT[8]="$processName force-leave Node  ($processName force-leave Node)"
+    MAINTENANCE_MENU_TEXT[9]="$processName remove bootstrap_expect  (sudo sed -i 's/bootstrap_expect.*//' /etc/consul.conf)"
+    MAINTENANCE_MENU_TEXT[9]="$processName add bootstrap: true      ($processName force-leave Node)"
+    MAINTENANCE_MENU_TEXT[9]="$processName add bootstrap_expect     ($processName force-leave Node)"
     
     local -a MAINTENANCE_MENU_ACTIONS
     MAINTENANCE_MENU_ACTIONS[0]="exit"
@@ -1241,9 +1258,12 @@ function ryft_main_menu
     menu_select=`menu_select_next $menu_select`
     MAIN_MENU_TEXT[$menu_select]="Ryft logs Menu"
     menu_select=`menu_select_next $menu_select`
-    MAIN_MENU_TEXT[$menu_select]="Ryft Versions"
-    menu_select=`menu_select_next $menu_select`
-    
+    if [ $ryftVersionsPresent == 1 ]
+    then
+        MAIN_MENU_TEXT[$menu_select]="Ryft Versions"
+        menu_select=`menu_select_next $menu_select`
+    fi
+
     local -a MAIN_MENU_ACTIONS
     menu_select=0
     MAIN_MENU_ACTIONS[$menu_select]="exit"
@@ -1262,8 +1282,11 @@ function ryft_main_menu
     menu_select=`menu_select_next $menu_select`
     MAIN_MENU_ACTIONS[$menu_select]="ryft_logs_menu"
     menu_select=`menu_select_next $menu_select`
-    MAIN_MENU_ACTIONS[$menu_select]="ryft_separator; ryft-versions; ryft_separator;"
-    menu_select=`menu_select_next $menu_select`
+    if [ $ryftVersionsPresent == 1 ]
+    then
+        MAIN_MENU_ACTIONS[$menu_select]="ryft_separator; ryft-versions; ryft_separator;"
+        menu_select=`menu_select_next $menu_select`
+    fi
 
     local MAIN_MENU_COMMAND="ryft_boot_status; ryft_status;"
 
