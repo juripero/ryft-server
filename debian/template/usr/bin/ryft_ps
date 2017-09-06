@@ -4,4 +4,6 @@
 
 # ryft process list
 ps -fC "tlogd rhfsd ccc_mgr ryft-server ryft1_odbcd java consul consul-alerts" |\
-egrep "tlogd|rhfsd|ccc_mgr|ryft-server|ryft1_odbcd|java\s+.*com.metasys.ryft.DemoApp|/opt/consul/bin/consul agent|/opt/consul/bin/consul-alerts start|/usr/lib/jvm/java-1.8.0.*/opt/elasticsearch" 
+egrep "tlogd|rhfsd|ccc_mgr|ryft-server|ryft1_odbcd|java\s+.*com.metasys.ryft.DemoApp|/opt/consul/bin/consul
+agent|/opt/consul/bin/consul-alerts start|(/usr/lib/jvm/java-1.8.0|/usr/bin/java).*-cp
+(/opt/elasticsearch|/usr/share/elasticsearch)" 
