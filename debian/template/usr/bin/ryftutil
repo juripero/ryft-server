@@ -480,7 +480,7 @@ checkCurlOutput() {
 	#
 	# check errors
 	#
-	cat "${searchOutput}" | jq .error >${apiErrorMessage}
+	cat "${searchOutput}" | jq '.[0]|.error' >${apiErrorMessage}
         if [ -s "${apiErrorMessage}" ]
 	then
 		error=`cat ${apiErrorMessage}|sed 's/\s*//g'`
@@ -519,35 +519,17 @@ checkRyftrestOutput() {
 		
 	fi
 
-	errors=`cat ${searchOutput}|jq .errors|sed 's/\r//g'`
-	resultsCount=`cat ${searchOutput}|jq ".results|length"|sed 's/\r//g'`
-	stats=`cat ${searchOutput}|jq .stats|sed 's/\r//g'`
-	matches=`cat ${searchOutput}|jq .stats.matches|sed 's/\r//g'`
-	if [ "${debug}" -ne 0 ]; then
-		(
-		echo "REMOVE_ME resultsCount=${resultsCount}"
-		echo "REMOVE_ME matches=${matches}"
-		) >&2
-	fi
-
-	validResults=0
-
-	pat='^[0-9]+$'
-	if [[ "${resultsCount}" =~ $pat ]]; then
-		validResults=1
-	fi
+	errors=`cat ${searchOutput}|jq '.[0]|.errors'|sed 's/\r//g'`
 
 	#
 	# check api error messages
 	#
-	errors=`cat ${searchOutput}|jq .errors|sed 's/\r//g'`
+	errors=`cat ${searchOutput}|jq '.[0]|.errors'|sed 's/\r//g'`
 	if [ "${errors}" != "null" ]; then
 		(
 			echo -e "${RED}error detected: ryftrest error=$errors ${NO_COLOR}"
 		) >&2
-		if [ "${validResults}" -eq 0 ]; then
-			errorExit 5
-		fi
+		errorExit 5
 	fi
 }
 
@@ -896,8 +878,8 @@ ryftCOPY() {
 			errorExit 7
 		fi
 	
-		size=`cat ${uploadCounterFile}|jq  ".length"|jq -s .|jq "add"|sed 's/\r//g'`
-		filecount=`cat ${uploadCounterFile}|jq  ".length"|jq -s .|jq "length"|sed 's/\r//g'`
+		size=`cat ${uploadCounterFile}|jq  ".[0]|.details|.length"|jq -s .|jq "add"|sed 's/\r//g'`
+		filecount=`cat ${uploadCounterFile}|jq  ".[0]|.details|.length"|jq -s .|jq "length"|sed 's/\r//g'`
 		(
 		echo
 		echo -e "${BLUE}Pushed ${filecount} file(s), ${size} bytes.${NO_COLOR}"
