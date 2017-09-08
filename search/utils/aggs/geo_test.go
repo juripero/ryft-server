@@ -78,25 +78,25 @@ func TestGeoEngine(t *testing.T) {
 		}
 	}
 
-	check(&Geo{LocField: "Location", flags: GeoCentroid},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_sum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
-	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoCentroid},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_sum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
+	check(&Geo{LocField: "Location", flags: GeoCentroidW},
+		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
+	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoCentroidW},
+		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
 
 	check(&Geo{LocField: "Location", flags: GeoBounds},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_sum":{"x":0, "y":0, "z":0}}`)
+		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0}}`)
 	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoBounds},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_sum":{"x":0, "y":0, "z":0}}`)
+		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0}}`)
 
-	check(&Geo{LocField: "Location", flags: GeoBounds | GeoCentroid},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_sum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
-	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoBounds | GeoCentroid},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_sum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
+	check(&Geo{LocField: "Location", flags: GeoBounds | GeoCentroidW},
+		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
+	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoBounds | GeoCentroidW},
+		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
 
-	check(&Geo{LocField: "miss-Location", flags: GeoBounds | GeoCentroid},
-		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_sum":{"x":0, "y":0, "z":0}}`)
-	check(&Geo{LatField: "miss-Latitude", LonField: "miss-Longitude", flags: GeoBounds | GeoCentroid},
-		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_sum":{"x":0, "y":0, "z":0}}`)
+	check(&Geo{LocField: "miss-Location", flags: GeoBounds | GeoCentroidW},
+		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0}}`)
+	check(&Geo{LatField: "miss-Latitude", LonField: "miss-Longitude", flags: GeoBounds | GeoCentroidW},
+		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0}}`)
 }
 
 // check "geo_bounds"

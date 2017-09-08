@@ -37,8 +37,8 @@ import (
 )
 
 const (
-	GeoBounds = 1 << iota
-	GeoCentroid
+	GeoBounds    = 1 << iota
+	GeoCentroidW // weighted
 )
 
 var (
@@ -65,10 +65,10 @@ type Geo struct {
 	LatField     string `json:"-" msgpack:"-"` // "longitude" field
 	WrapLonField bool   `json:"-" msgpack:"-"` // "wrap_longitude" field
 
-	Count       uint64  `json:"count" msgpack:"count"` // number of points
-	TopLeft     Point   `json:"top_left" msgpack:"top_left"`
-	BottomRight Point   `json:"bottom_right" msgpack:"bottom_right"`
-	CentroidSum Point3D `json:"centroid_sum" msgpack:"centroid_sum"`
+	Count        uint64  `json:"count" msgpack:"count"` // number of points
+	TopLeft      Point   `json:"top_left" msgpack:"top_left"`
+	BottomRight  Point   `json:"bottom_right" msgpack:"bottom_right"`
+	CentroidSumW Point3D `json:"centroid_wsum" msgpack:"centroid_wsum"`
 
 	posLeft, negLeft, posRight, negRight float64
 }
@@ -179,9 +179,9 @@ func (g *Geo) Add(data interface{}) error {
 		g.updateBounds(lat, lon)
 	}
 
-	// update centroid
-	if (g.flags & GeoCentroid) != 0 {
-		g.updateCentroid(lat, lon)
+	// update centroid weighted
+	if (g.flags & GeoCentroidW) != 0 {
+		g.updateCentroidW(lat, lon)
 	}
 
 	g.Count++
@@ -245,8 +245,8 @@ func (g *Geo) Merge(data_ interface{}) error {
 		g.updateBounds(lat, lon)
 	}
 
-	// geo_centroid
-	if (g.flags & GeoCentroid) != 0 {
+	// geo_centroid weighted
+	if (g.flags & GeoCentroidW) != 0 {
 		// get point3D
 		getPoint := func(data map[string]interface{}, name string) (x, y, z float64, err error) {
 			if pt_, ok := data[name]; ok {
@@ -275,13 +275,13 @@ func (g *Geo) Merge(data_ interface{}) error {
 			return
 		}
 
-		x, y, z, err := getPoint(data, "centroid_sum")
+		x, y, z, err := getPoint(data, "centroid_wsum")
 		if err != nil {
 			return err
 		}
-		g.CentroidSum.X += x
-		g.CentroidSum.Y += y
-		g.CentroidSum.Z += z
+		g.CentroidSumW.X += x
+		g.CentroidSumW.Y += y
+		g.CentroidSumW.Z += z
 	}
 
 	// count
@@ -355,21 +355,21 @@ func rad2deg(value float64) float64 {
 	return value * (180 / math.Pi)
 }
 
-// updateCentroid recalculates centroid Point
-func (g *Geo) updateCentroid(lat, lon float64) {
+// updateCentroidW recalculates weighted centroid
+func (g *Geo) updateCentroidW(lat, lon float64) {
 	latSin, latCos := math.Sincos(deg2rad(lat))
 	lonSin, lonCos := math.Sincos(deg2rad(lon))
-	g.CentroidSum.X += latCos * lonCos
-	g.CentroidSum.Y += latCos * lonSin
-	g.CentroidSum.Z += latSin
+	g.CentroidSumW.X += latCos * lonCos
+	g.CentroidSumW.Y += latCos * lonSin
+	g.CentroidSumW.Z += latSin
 }
 
-// get centroid location
-func (g *Geo) getCentroid() Point {
+// get weighted centroid location
+func (g *Geo) getCentroidW() Point {
 	N := float64(g.Count)
-	x := g.CentroidSum.X / N
-	y := g.CentroidSum.Y / N
-	z := g.CentroidSum.Z / N
+	x := g.CentroidSumW.X / N
+	y := g.CentroidSumW.Y / N
+	z := g.CentroidSumW.Z / N
 
 	return Point{
 		Lon: rad2deg(math.Atan2(y, x)),
@@ -483,7 +483,7 @@ func newGeoCentroidFunc(opts map[string]interface{}) (*geoCentroidFunc, error) {
 	} else {
 		return &geoCentroidFunc{geoFunc{
 			engine: &Geo{
-				flags:    GeoCentroid,
+				flags:    GeoCentroidW,
 				LocField: field,
 				LatField: lat,
 				LonField: lon,
@@ -498,7 +498,7 @@ func (f *geoCentroidFunc) ToJson() interface{} {
 		return map[string]interface{}{} // empty
 	}
 
-	location := f.engine.getCentroid()
+	location := f.engine.getCentroidW()
 	return map[string]interface{}{
 		"centroid": map[string]interface{}{
 			"count": f.engine.Count,
