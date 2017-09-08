@@ -79,24 +79,29 @@ func TestGeoEngine(t *testing.T) {
 	}
 
 	check(&Geo{LocField: "Location", flags: GeoCentroidW},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
+		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
 	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoCentroidW},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
+		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
+
+	check(&Geo{LocField: "Location", flags: GeoCentroid},
+		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
+	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoCentroid},
+		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
 
 	check(&Geo{LocField: "Location", flags: GeoBounds},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0}}`)
+		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoBounds},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0}}`)
+		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 
-	check(&Geo{LocField: "Location", flags: GeoBounds | GeoCentroidW},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
-	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoBounds | GeoCentroidW},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698}}`)
+	check(&Geo{LocField: "Location", flags: GeoBounds | GeoCentroidW | GeoCentroid},
+		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
+	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoBounds | GeoCentroidW | GeoCentroid},
+		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
 
 	check(&Geo{LocField: "miss-Location", flags: GeoBounds | GeoCentroidW},
-		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0}}`)
+		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 	check(&Geo{LatField: "miss-Latitude", LonField: "miss-Longitude", flags: GeoBounds | GeoCentroidW},
-		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0}}`)
+		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 }
 
 // check "geo_bounds"
@@ -193,8 +198,13 @@ func TestGeoCentroidFunc(t *testing.T) {
 
 	check(`{"no-field":"foo"}`, `no "lat" option found`)
 
-	check(`{"field":"Location"}`, `{"centroid": {"count":3, "location":{"lat":27.777000258960406, "lon":-11.732526868567062}}}`)
-	check(`{"lat":"Latitude","lon":"Longitude"}`, `{"centroid": {"count":3, "location":{"lat":27.777000258960406, "lon":-11.732526868567062}}}`)
+	// weighted
+	check(`{"field":"Location", "weighted":true}`, `{"centroid": {"count":3, "location":{"lat":27.777000258960406, "lon":-11.732526868567062}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude", "weighted":true}`, `{"centroid": {"count":3, "location":{"lat":27.777000258960406, "lon":-11.732526868567062}}}`)
+
+	// simple (note, the test values are not appropriate for centroid)
+	check(`{"field":"Location"}`, `{"centroid": {"count":3, "location":{"lat":26.666666666666668, "lon":-13.333333333333334}}}`)
+	check(`{"lat":"Latitude","lon":"Longitude" }`, `{"centroid": {"count":3, "location":{"lat":26.666666666666668, "lon":-13.333333333333334}}}`)
 }
 
 // check data with elastic
@@ -246,7 +256,12 @@ func TestGeoElastic(t *testing.T) {
 		return
 	}
 
-	c, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos"})
+	c1, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": true})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	c2, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": false})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -256,12 +271,14 @@ func TestGeoElastic(t *testing.T) {
 		return
 	}
 
-	c.engine.Join(b.engine)
-	b.engine = c.engine
+	b.engine.Join(c1.engine)
+	b.engine.Join(c2.engine)
+	c1.engine = b.engine
+	c2.engine = b.engine
 
 	// put data to engine
 	for _, d := range data {
-		if !assert.NoError(t, c.engine.Add(d)) {
+		if !assert.NoError(t, b.engine.Add(d)) {
 			return
 		}
 	}
@@ -279,5 +296,6 @@ func TestGeoElastic(t *testing.T) {
 	check(b.ToJson(), `{"bounds":{"bottom_right":{"lat":48.835674, "lon":2.339999}, "top_left":{"lat":48.861234, "lon":2.322222}}}`)
 
 	// centroid: 48.8578796479851,2.3278330452740192
-	check(c.ToJson(), `{"centroid":{"count":39, "location":{"lat":48.85787991766815, "lon":2.3278337533208258}}}`)
+	check(c1.ToJson(), `{"centroid":{"count":39, "location":{"lat":48.85787991766815, "lon":2.3278337533208258}}}`)
+	check(c2.ToJson(), `{"centroid":{"count":39, "location":{"lat":48.857879874358936, "lon":2.3278335384615376}}}`)
 }
