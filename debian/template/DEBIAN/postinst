@@ -26,7 +26,6 @@ fixUIDGID /usr/bin/ryftutil
 fixUIDGID /usr/bin/ryft-versions
 
 # configurations
-chown "$target_uid:$target_gid" -f /etc/init/ryft-server-d.conf
 chown "$target_uid:$target_gid" -f /etc/ryft-server.conf
 chown "$target_uid:$target_gid" -f /etc/ryft-users.yaml
 
@@ -44,12 +43,9 @@ if [ -z `which systemctl` ]; then
 	# yes upstart
 	chown "$target_uid:$target_gid" -f /etc/init/ryft-server-d.conf
 	chown "$target_uid:$target_gid" -f /etc/init/rhfsdTrigger.conf
+
 	# no systemd
 	rm -f /etc/systemd/system/ryft-server-d.service
-
-	# remove upstart rhfsdTrigger
-	chown "$target_uid:$target_gid" -f /etc/init/rhfsdTrigger.conf
-	rm -f /etc/init/rhfsdTrigger.conf
 
 	# start service
 	service $NAME start
@@ -57,9 +53,11 @@ else
 	# yes systemd 
 	chown root:root -f /etc/systemd/system/ryft-server-d.service
         systemctl enable ryft-server-d
+
 	# no upstart
 	rm -f /etc/init/ryft-server-d.conf
 	rm -f /etc/init/rhfsdTrigger.conf
+
 	# start service
 	systemctl start $NAME
 fi
