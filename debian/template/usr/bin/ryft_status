@@ -1009,15 +1009,12 @@ function ryft_consul_maintenance_menu
     MAINTENANCE_MENU_TEXT[0]="Exit"
     MAINTENANCE_MENU_TEXT[1]="$processName restart           ($consul_restartCommand)"
     MAINTENANCE_MENU_TEXT[2]="$processName stop              ($consul_stopCommand)"
-    MAINTENANCE_MENU_TEXT[3]="$processName boot_on           ($consul_bootOnCommand)("
+    MAINTENANCE_MENU_TEXT[3]="$processName boot_on           ($consul_bootOnCommand)"
     MAINTENANCE_MENU_TEXT[4]="$processName boot_off          ($consul_bootOffCommand)"
     MAINTENANCE_MENU_TEXT[5]="$processName configuration     (cat $configFile)"
     MAINTENANCE_MENU_TEXT[6]="$processName log               (tail ${tailLines} $consulLog)"
     MAINTENANCE_MENU_TEXT[7]="$processName members           ($processName members)"
     MAINTENANCE_MENU_TEXT[8]="$processName force-leave Node  ($processName force-leave Node)"
-    MAINTENANCE_MENU_TEXT[9]="$processName remove bootstrap_expect  (sudo sed -i 's/bootstrap_expect.*//' /etc/consul.conf)"
-    MAINTENANCE_MENU_TEXT[9]="$processName add bootstrap: true      ($processName force-leave Node)"
-    MAINTENANCE_MENU_TEXT[9]="$processName add bootstrap_expect     ($processName force-leave Node)"
     
     local -a MAINTENANCE_MENU_ACTIONS
     MAINTENANCE_MENU_ACTIONS[0]="exit"
