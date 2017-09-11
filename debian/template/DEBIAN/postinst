@@ -23,6 +23,7 @@ fixUIDGID /usr/bin/ryft_status
 fixUIDGID /usr/bin/ryft-server
 fixUIDGID /usr/bin/ryftrest
 fixUIDGID /usr/bin/ryftutil
+fixUIDGID /usr/bin/ryft-versions
 
 # configurations
 chown "$target_uid:$target_gid" -f /etc/init/ryft-server-d.conf
@@ -43,5 +44,6 @@ echo $NAME starting...
 if [ -z `which systemctl` ]; then
 	service $NAME start
 else
+	rm -f /etc/init/ryft-server-d.conf
 	systemctl start $NAME
 fi
