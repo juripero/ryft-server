@@ -37,8 +37,9 @@ import (
 )
 
 const (
-	GeoBounds = 1 << iota
-	GeoCentroid
+	GeoBounds    = 1 << iota
+	GeoCentroidW // weighted
+	GeoCentroid  // simple
 )
 
 var (
@@ -65,10 +66,11 @@ type Geo struct {
 	LatField     string `json:"-" msgpack:"-"` // "longitude" field
 	WrapLonField bool   `json:"-" msgpack:"-"` // "wrap_longitude" field
 
-	Count       uint64  `json:"count" msgpack:"count"` // number of points
-	TopLeft     Point   `json:"top_left" msgpack:"top_left"`
-	BottomRight Point   `json:"bottom_right" msgpack:"bottom_right"`
-	CentroidSum Point3D `json:"centroid_sum" msgpack:"centroid_sum"`
+	Count        uint64  `json:"count" msgpack:"count"` // number of points
+	TopLeft      Point   `json:"top_left" msgpack:"top_left"`
+	BottomRight  Point   `json:"bottom_right" msgpack:"bottom_right"`
+	CentroidSumW Point3D `json:"centroid_wsum" msgpack:"centroid_wsum"`
+	CentroidSum  Point   `json:"centroid_sum" msgpack:"centroid_sum"`
 
 	posLeft, negLeft, posRight, negRight float64
 }
@@ -179,7 +181,12 @@ func (g *Geo) Add(data interface{}) error {
 		g.updateBounds(lat, lon)
 	}
 
-	// update centroid
+	// update centroid weighted
+	if (g.flags & GeoCentroidW) != 0 {
+		g.updateCentroidW(lat, lon)
+	}
+
+	// update centroid simple
 	if (g.flags & GeoCentroid) != 0 {
 		g.updateCentroid(lat, lon)
 	}
@@ -205,31 +212,59 @@ func (g *Geo) Merge(data_ interface{}) error {
 		return nil // nothing to merge
 	}
 
-	// geo_bounds
-	if (g.flags & GeoBounds) != 0 {
-		// get point
-		getPoint := func(data map[string]interface{}, name string) (lat, lon float64, err error) {
-			if pt_, ok := data[name]; ok {
-				if pt, ok := pt_.(map[string]interface{}); ok {
-					lat, err = utils.AsFloat64(pt["lat"])
-					if err != nil {
-						return
-					}
+	// get point
+	getPoint := func(data map[string]interface{}, name string) (lat, lon float64, err error) {
+		if pt_, ok := data[name]; ok {
+			if pt, ok := pt_.(map[string]interface{}); ok {
+				lat, err = utils.AsFloat64(pt["lat"])
+				if err != nil {
+					return
+				}
 
-					lon, err = utils.AsFloat64(pt["lon"])
-					if err != nil {
-						return
-					}
-				} else {
-					err = fmt.Errorf("bad %q data found", name)
+				lon, err = utils.AsFloat64(pt["lon"])
+				if err != nil {
+					return
 				}
 			} else {
-				err = fmt.Errorf("no %q data found", name)
+				err = fmt.Errorf("bad %q data found", name)
 			}
-
-			return
+		} else {
+			err = fmt.Errorf("no %q data found", name)
 		}
 
+		return
+	}
+
+	// get point3D
+	getPoint3D := func(data map[string]interface{}, name string) (x, y, z float64, err error) {
+		if pt_, ok := data[name]; ok {
+			if pt, ok := pt_.(map[string]interface{}); ok {
+				x, err = utils.AsFloat64(pt["x"])
+				if err != nil {
+					return
+				}
+
+				y, err = utils.AsFloat64(pt["y"])
+				if err != nil {
+					return
+				}
+
+				z, err = utils.AsFloat64(pt["z"])
+				if err != nil {
+					return
+				}
+			} else {
+				err = fmt.Errorf("bad %q data found", name)
+			}
+		} else {
+			err = fmt.Errorf("no %q data found", name)
+		}
+
+		return
+	}
+
+	// geo_bounds
+	if (g.flags & GeoBounds) != 0 {
 		// top_left
 		lat, lon, err := getPoint(data, "top_left")
 		if err != nil {
@@ -245,43 +280,27 @@ func (g *Geo) Merge(data_ interface{}) error {
 		g.updateBounds(lat, lon)
 	}
 
-	// geo_centroid
-	if (g.flags & GeoCentroid) != 0 {
-		// get point3D
-		getPoint := func(data map[string]interface{}, name string) (x, y, z float64, err error) {
-			if pt_, ok := data[name]; ok {
-				if pt, ok := pt_.(map[string]interface{}); ok {
-					x, err = utils.AsFloat64(pt["x"])
-					if err != nil {
-						return
-					}
-
-					y, err = utils.AsFloat64(pt["y"])
-					if err != nil {
-						return
-					}
-
-					z, err = utils.AsFloat64(pt["z"])
-					if err != nil {
-						return
-					}
-				} else {
-					err = fmt.Errorf("bad %q data found", name)
-				}
-			} else {
-				err = fmt.Errorf("no %q data found", name)
-			}
-
-			return
-		}
-
-		x, y, z, err := getPoint(data, "centroid_sum")
+	// geo_centroid weighted
+	if (g.flags & GeoCentroidW) != 0 {
+		// weighted sum
+		x, y, z, err := getPoint3D(data, "centroid_wsum")
 		if err != nil {
 			return err
 		}
-		g.CentroidSum.X += x
-		g.CentroidSum.Y += y
-		g.CentroidSum.Z += z
+		g.CentroidSumW.X += x
+		g.CentroidSumW.Y += y
+		g.CentroidSumW.Z += z
+	}
+
+	// geo_centroid simple
+	if (g.flags & GeoCentroid) != 0 {
+		// simple sum
+		lat, lon, err := getPoint(data, "centroid_sum")
+		if err != nil {
+			return err
+		}
+		g.CentroidSum.Lat += lat
+		g.CentroidSum.Lon += lon
 	}
 
 	// count
@@ -355,25 +374,40 @@ func rad2deg(value float64) float64 {
 	return value * (180 / math.Pi)
 }
 
-// updateCentroid recalculates centroid Point
-func (g *Geo) updateCentroid(lat, lon float64) {
+// updateCentroidW recalculates weighted centroid
+func (g *Geo) updateCentroidW(lat, lon float64) {
 	latSin, latCos := math.Sincos(deg2rad(lat))
 	lonSin, lonCos := math.Sincos(deg2rad(lon))
-	g.CentroidSum.X += latCos * lonCos
-	g.CentroidSum.Y += latCos * lonSin
-	g.CentroidSum.Z += latSin
+	g.CentroidSumW.X += latCos * lonCos
+	g.CentroidSumW.Y += latCos * lonSin
+	g.CentroidSumW.Z += latSin
 }
 
-// get centroid location
-func (g *Geo) getCentroid() Point {
+// get weighted centroid location
+func (g *Geo) getCentroidW() Point {
 	N := float64(g.Count)
-	x := g.CentroidSum.X / N
-	y := g.CentroidSum.Y / N
-	z := g.CentroidSum.Z / N
+	x := g.CentroidSumW.X / N
+	y := g.CentroidSumW.Y / N
+	z := g.CentroidSumW.Z / N
 
 	return Point{
 		Lon: rad2deg(math.Atan2(y, x)),
 		Lat: rad2deg(math.Atan2(z, math.Sqrt(x*x+y*y))),
+	}
+}
+
+// updateCentroid recalculates simple centroid
+func (g *Geo) updateCentroid(lat, lon float64) {
+	g.CentroidSum.Lat += lat
+	g.CentroidSum.Lon += lon
+}
+
+// get simple centroid location
+func (g *Geo) getCentroid() Point {
+	N := float64(g.Count)
+	return Point{
+		Lat: g.CentroidSum.Lat / N,
+		Lon: g.CentroidSum.Lon / N,
 	}
 }
 
@@ -474,6 +508,7 @@ func (f *geoBoundsFunc) ToJson() interface{} {
 // "geo_centroid" aggregation function
 type geoCentroidFunc struct {
 	geoFunc
+	weighted bool
 }
 
 // make new "geo_centroid" aggregation
@@ -481,14 +516,33 @@ func newGeoCentroidFunc(opts map[string]interface{}) (*geoCentroidFunc, error) {
 	if field, lat, lon, err := parseGeoOpts(opts); err != nil {
 		return nil, err
 	} else {
-		return &geoCentroidFunc{geoFunc{
-			engine: &Geo{
-				flags:    GeoCentroid,
-				LocField: field,
-				LatField: lat,
-				LonField: lon,
+		weighted := false // by default
+		if weighted_, ok := opts["weighted"]; ok {
+			weighted, err = utils.AsBool(weighted_)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// engine flags
+		var flags int
+		if weighted {
+			flags = GeoCentroidW
+		} else {
+			flags = GeoCentroid
+		}
+
+		return &geoCentroidFunc{
+			geoFunc: geoFunc{
+				engine: &Geo{
+					flags:    flags,
+					LocField: field,
+					LatField: lat,
+					LonField: lon,
+				},
 			},
-		}}, nil // OK
+			weighted: weighted,
+		}, nil // OK
 	}
 }
 
@@ -498,7 +552,13 @@ func (f *geoCentroidFunc) ToJson() interface{} {
 		return map[string]interface{}{} // empty
 	}
 
-	location := f.engine.getCentroid()
+	var location Point
+	if f.weighted {
+		location = f.engine.getCentroidW()
+	} else {
+		location = f.engine.getCentroid()
+	}
+
 	return map[string]interface{}{
 		"centroid": map[string]interface{}{
 			"count": f.engine.Count,

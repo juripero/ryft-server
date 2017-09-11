@@ -330,12 +330,12 @@ Where `<lat>` and `<lon>` are valid floating point numbers.
 
 # Geo Centroid aggregation
 
-This aggregation calculates the weighted centeroid over a set of found records.
+This aggregation calculates the simple or weighted centeroid over a set of found records.
 The coordinates can be extracted from specific field in the record, for
 example "location" or "foo.bar".
 
 ```{.json}
-{"aggs" : {"center" : {"geo_centroid" : {"field":"pos"}} }}
+{"aggs" : {"center" : {"geo_centroid" : {"field":"pos", "weighted": true}} }}
 ```
 
 Response:
@@ -366,3 +366,12 @@ fields for latitude and longitude:
 ```
 
 See [Geo Data format](#geo-data-format) for the list of supported coordinates formats.
+
+The additional `weighted` option specifies centroid calculation algorithm.
+If `weighted` is `false` (by default) then the simple average is used as centroid point.
+
+If `weighted` is `true` then weighted average is used instead: all points are
+converted to 3D space and then averaged. Averaged point is converted back
+to latitude/longitude to get centroid point.
+This algorithm consumes CPU resources since we need to
+calculate a lot of `sin/cos` values, but the centroid point is more precisely.
