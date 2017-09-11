@@ -29,7 +29,7 @@ smokePath=~ryftuser/ryft/regression/util/smoke.sh
 test -e $smokePath
 if [ $? != 0 ]
 then
-    smokePath=~ryftuser/bin/smoke.missing
+    smokePath=~ryftuser/bin/smoke
     test -e $smokePath
 fi
 if [ $? != 0 ]
