@@ -104,6 +104,20 @@ fi
 # Get web demo version. ls format:
 #     lrwxrwxrwx  1 root     root       27 Apr 26 04:52 ryft-demo -> /opt/web-ui/ryft-demo-0.4.3
 webApiDemoVersion=`ls -al /opt/ryft-demo 2>/dev/null | sed -e 's#.*->.*ryft-demo-\([0-9.]*\).*#\1#'`
+
+webApiDemoVersion="Not Installed"
+test -e /opt/ryft-demo
+if [ $? == 0 ]
+then
+    test -L /opt/ryft-demo
+    if [ $? == 0 ]
+    then
+        webApiDemoVersion=`ls -al /opt/ryft-demo 2>/dev/null | sed -e 's#.*->.*ryft-demo-\([0-9.]*\).*#\1#'`
+    else
+        webApiDemoVersion=`dpkg -l|grep ryft-webui|awk '{print $3}'`
+    fi
+fi
+
 if [ "${webApiDemoVersion}" == "" ]; then
     webApiDemoVersion="Not Installed"
 fi
