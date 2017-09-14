@@ -124,7 +124,7 @@ func (stat *Stat) Merge(other *Stat) {
 
 	// just sum all data rates
 	stat.FabricDataRate += other.FabricDataRate
-	stat.DataRate += other.DataRate
+	stat.updateDataRate() // stat.DataRate += other.DataRate
 
 	// save details
 	stat.Details = append(stat.Details, other)
@@ -145,6 +145,15 @@ func (stat *Stat) Combine(other *Stat) {
 	stat.FabricDuration += other.FabricDuration
 
 	// update data rates (including TotalBytes/0=+Inf protection)
+	stat.updateFabricDataRate()
+	stat.updateDataRate()
+
+	// save details
+	stat.Details = append(stat.Details, other)
+}
+
+// update fabric data rate
+func (stat *Stat) updateFabricDataRate() {
 	if stat.FabricDuration > 0 {
 		mb := float64(stat.TotalBytes) / 1024 / 1024
 		sec := float64(stat.FabricDuration) / 1000
@@ -152,6 +161,10 @@ func (stat *Stat) Combine(other *Stat) {
 	} else {
 		stat.FabricDataRate = 0.0
 	}
+}
+
+// update data rate
+func (stat *Stat) updateDataRate() {
 	if stat.Duration > 0 {
 		mb := float64(stat.TotalBytes) / 1024 / 1024
 		sec := float64(stat.Duration) / 1000
@@ -159,9 +172,6 @@ func (stat *Stat) Combine(other *Stat) {
 	} else {
 		stat.DataRate = 0.0
 	}
-
-	// save details
-	stat.Details = append(stat.Details, other)
 }
 
 const (
