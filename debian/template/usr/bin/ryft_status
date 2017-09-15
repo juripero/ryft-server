@@ -1465,6 +1465,13 @@ show_filesystem_filecount_error() {
 #
 filesystem_status=0
 filesystem_error=0
+smoke_error=0
+show_smoke_error () {
+	problemCounter=$((problemCounter+1))
+	echo -e "${redAttributeON}*${problemCounter}* smoke test failed.${attributesOFF}"
+	echo "Follow corrective actions in smoke test response"
+    echo
+}
 show_filesystem_error () {
 	#echo "*** /ryftone filesystem is not mounted.  To correct, try commands: '~/ryft/regression/util/cpc; ~/ryft/regression/util/recycle'  ***"
 	problemCounter=$((problemCounter+1))
@@ -1491,7 +1498,6 @@ show_filesystem_error () {
 	echo
 	#echo "         1         2         3         4         5         6         7         8"
 	#echo "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
-
 }
 
 
@@ -1873,6 +1879,7 @@ ryft_statusX() {
 
 	filesystem_status=0
 	filesystem_error=0
+    smoke_error=0
 
 	tlogd_status_reset
 
@@ -2086,7 +2093,8 @@ ryft_statusX() {
 		if [ $faildetect != 0 -o $passdetect = 0 ]
 		then
 			echo "*** smoke.sh failed ***"
-			filesystem_error=1
+            smoke_error=1
+            filesystem_error=1
 			status=$((status+1))
 		fi
 	fi
@@ -2116,10 +2124,14 @@ ryft_statusX() {
 		then
 			show_filesystem_filecount_error
 		else
-			if [ $filesystem_error != 0 ]
+			if [ $ryftone == 1 -a $filesystem_error != 0 ]
 			then
 				show_filesystem_error
 			fi
+            if [ $ryftone == 0 -a $smoke_error != 0 ]
+            then
+                show_smoke_error
+            fi
 			if [ $rhfsd_error != 0 ]
 			then
 				show_rhfsd_error
@@ -2234,7 +2246,7 @@ then
 	#
 	# fix case where /ryftone will not mount due to files present 
 	#
-	if [ $filesystem_filecount != 1 -a $filesystem_error != 0 -a $rhfsd_error != 0 ] 
+	if [ $ryftone == 1 -a $filesystem_filecount != 1 -a $filesystem_error != 0 -a $rhfsd_error != 0 ] 
 	then
 		filesystem_filecount_fix
 
