@@ -39,7 +39,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	json_codec "github.com/getryft/ryft-server/rest/codec/json"
 	codec "github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
@@ -72,13 +71,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
-	if cfg.ReportIndex {
-		// we expect MSGPACK format for streaming
-		req.Header.Set("Accept", codec.MIME)
-	} else {
-		// we expect JSON format, no streaming required
-		req.Header.Set("Accept", json_codec.MIME)
-	}
+	// we expect MSGPACK format for streaming (for /search and /count)
+	req.Header.Set("Accept", codec.MIME)
 
 	// authorization
 	if len(engine.AuthToken) != 0 {
@@ -86,11 +80,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	res := search.NewResult()
-	if cfg.ReportIndex {
-		go engine.doSearch(task, req, res)
-	} else {
-		go engine.doCount(task, req, res)
-	}
+	go engine.doSearch(task, req, res)
 
 	return res, nil // OK for now
 }
@@ -252,8 +242,8 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 	}
 }
 
-// do /count processing
-func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result) {
+// do /count processing [COMPATIBILITY, NOT USED YET]
+func (engine *Engine) doCount0(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup
 	defer func() {
 		res.ReportUnhandledPanic(log)

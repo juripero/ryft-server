@@ -38,7 +38,8 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/rest/codec"
-	format "github.com/getryft/ryft-server/rest/format/raw"
+	"github.com/getryft/ryft-server/rest/format"
+	raw_format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/getryft/ryft-server/search/utils"
@@ -79,10 +80,9 @@ type CountParams struct {
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 
-	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
-	ShareMode string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
-
-	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
+	Local       bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	ShareMode   string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
+	Performance bool   `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 
 	// internal parameters
 	//InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
@@ -92,6 +92,17 @@ type CountParams struct {
 
 // Handle /count endpoint.
 func (server *Server) DoCount(ctx *gin.Context) {
+	server.doSearch(ctx, SearchParams{
+		Format: format.NULL,
+		Case:   true,
+		Reduce: true,
+		Limit:  0,    // no records
+		Stats:  true, // need stats!
+	})
+}
+
+// Handle /count endpoint. [COMPATIBILITY MODE, not used yet]
+func (server *Server) DoCount0(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
@@ -301,7 +312,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					res.Stat.Extra[search.ExtraAggregations] = cfg.Aggregations.ToJson(!params.InternalNoSessionId)
 				}
 
-				xstat := format.FromStat(res.Stat)
+				xstat := raw_format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)
 			} else {
 				panic(NewError(http.StatusInternalServerError,
@@ -321,7 +332,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := CountParams{
+	params := SearchParams{
 		Case:   true,
 		Reduce: true,
 	}
@@ -378,7 +389,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
-	cfg.Limit = 0
+	cfg.Limit = params.Limit
 
 	// parse post-process transformations
 	cfg.Transforms, err = parseTransforms(params.Transforms, server.Config)

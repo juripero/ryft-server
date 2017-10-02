@@ -97,6 +97,17 @@ type SearchParams struct {
 
 // Handle /search endpoint.
 func (server *Server) DoSearch(ctx *gin.Context) {
+	server.doSearch(ctx, SearchParams{
+		Format: format.RAW,
+		Case:   true,
+		Reduce: true,
+		Limit:  -1, // no limit
+		Stats:  false,
+	})
+}
+
+// Handle /search endpoint.
+func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
@@ -104,12 +115,6 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := SearchParams{
-		Format: format.RAW,
-		Case:   true,
-		Reduce: true,
-		Limit:  -1, // no limit!
-	}
 	if err := bindOptionalJson(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request JSON parameters"))
