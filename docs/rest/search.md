@@ -634,6 +634,8 @@ The GET `/count` endpoint is also used to search data on Ryft boxes.
 However, it does not transfer all found data, it will just print
 the number of matches and associated performance numbers.
 
+The `/count` is equivalent to `/search?limit=0`.
+
 Note, this endpoint is protected and user should provide valid credentials.
 See [authentication](../auth.md) for more details.
 
@@ -663,7 +665,7 @@ The list of supported query parameters are the following:
 | `local`       | boolean | [The local/cluster search flag](#search-local-parameter). |
 | `performance` | boolean | [Flag to report performance metrics](#search-performance-parameter). |
 
-NOTE: Most of the `/count` parameters are absolutely the same as `/search` parameters.
+NOTE: The `/count` parameters are absolutely the same as `/search` parameters.
 Please check corresponding `/search` related sections.
 
 
@@ -678,13 +680,13 @@ The following request:
 will report the following output:
 
 ```{.json}
-{
+{"stats": {
   "matches": 10015,
   "totalBytes": 6902619,
   "duration": 689,
   "dataRate": 9.554209660722487,
   "fabricDataRate": 9.55421
-}
+}}
 ```
 
 
