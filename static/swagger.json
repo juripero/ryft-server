@@ -197,7 +197,7 @@
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "description": "Search result contains all found records and search statistics.",
             "schema": {
               "$ref": "#/definitions/SearchResponse"
             }
@@ -232,7 +232,7 @@
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "description": "Search result contains all found records and search statistics.",
             "schema": {
               "$ref": "#/definitions/SearchResponse"
             }
@@ -397,9 +397,9 @@
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "description": "Search result contains search statistics only.",
             "schema": {
-              "$ref": "#/definitions/CountResponse"
+              "$ref": "#/definitions/SearchResponse"
             }
           },
           "default": {
@@ -428,9 +428,9 @@
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "description": "Search result contains search statistics only.",
             "schema": {
-              "$ref": "#/definitions/CountResponse"
+              "$ref": "#/definitions/SearchResponse"
             }
           },
           "default": {
@@ -1096,43 +1096,54 @@
       ],
       "properties": {
         "dataRate": {
+          "description": "Data rate, MB/s",
           "type": "string"
         },
         "duration": {
+          "description": "Duration, milliseconds",
           "type": "number",
-          "format": "int32"
+          "format": "int64"
         },
         "fabricDataRate": {
+          "description": "Fabric data rate, MB/s",
           "type": "string"
         },
         "matches": {
+          "description": "Total number of records found",
           "type": "number",
-          "format": "int32"
+          "format": "int64"
         },
         "totalBytes": {
+          "description": "Total number of bytes processed",
           "type": "number",
-          "format": "int32"
+          "format": "int64"
         },
         "fabricDuration": {
+          "description": "Fabric duration, milliseconds",
           "type": "number",
-          "format": "int32"
+          "format": "int64"
         },
         "host": {
+          "description": "Cluster node name",
           "type": "string"
         },
         "details": {
+          "description": "Processing details",
           "type": "array",
           "items": {
             "$ref": "#/definitions/CountResponse"
           }
         },
         "extra": {
+          "description": "Extra information",
           "type": "object",
           "properties": {
             "backend": {
+              "description": "Backend tool used",
               "type": "string"
             },
             "session": {
+              "description": "Session identifier",
               "type": "string"
             },
             "aggregations": {
@@ -1153,6 +1164,7 @@
       ],
       "properties": {
         "results": {
+          "description": "Set of found records",
           "type": "array",
           "items": {
             "type": "object",
@@ -1162,12 +1174,14 @@
           }
         },
         "errors": {
+          "description": "Set of errors",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "stats": {
+          "description": "Search statistics",
           "$ref": "#/definitions/CountResponse"
         }
       }
