@@ -409,6 +409,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
 			err = fmt.Errorf("failed to parse statistics: %s", err)
 		} else {
+			if task.config.DebugInternals {
+				res.Stat.AddDebugData("tool", task.toolPath)
+				res.Stat.AddDebugData("args", task.toolArgs)
+			}
 			task.log().WithField("stat", res.Stat).
 				Infof("[%s]: parsed statistics", TAG)
 		}

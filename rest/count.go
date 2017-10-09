@@ -143,6 +143,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
+	cfg.DebugInternals = server.Config.DebugInternals
 	cfg.Mode = params.Mode
 	cfg.Width = mustParseWidth(params.Width)
 	cfg.Dist = uint(params.Dist)

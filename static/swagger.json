@@ -1138,6 +1138,10 @@
             "aggregations": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "debug": {
+              "type": "object",
+              "additionalProperties": {}
             }
           }
         }

@@ -87,6 +87,9 @@ type Config struct {
 
 	// report performance metrics
 	Performance bool
+
+	// report debug internal info
+	DebugInternals bool
 }
 
 // NewEmptyConfig creates new empty search configuration.
