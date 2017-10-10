@@ -253,7 +253,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 								if len(cfg.KeepViewAs) != 0 {
 									log.WithField("path", filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)).Infof("[fake]: saving VIEW to...")
 									err := ryftprim.CreateViewFile(filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepIndexAs),
-										filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs), cfg.Delimiter)
+										filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs), cfg.Delimiter, false)
 									if err != nil {
 										log.WithError(err).Errorf("failed to create VIEW file")
 									}
@@ -268,8 +268,16 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 						if err == nil {
 							log.WithField("path", f.Name()).Infof("[fake]: saving DATA to...")
 							datWr = bufio.NewWriter(f)
+							if engine.SearchIsJsonArray {
+								datWr.Write([]byte("[\n"))
+							}
 							defer f.Close()
-							defer datWr.Flush()
+							defer func() {
+								if engine.SearchIsJsonArray {
+									datWr.Write([]byte("\n]"))
+								}
+								datWr.Flush()
+							}()
 						} else {
 							log.WithError(err).Errorf("[fake]: failed to save DATA")
 						}
@@ -278,6 +286,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 						idxWr.WriteString(fmt.Sprintf("%s,%d,%d,%d\n", idx.File, idx.Offset, idx.Length, idx.Fuzziness))
 					}
 					if datWr != nil {
+						if engine.SearchIsJsonArray && res.Stat.Matches > 1 {
+							datWr.Write([]byte(",\n"))
+						}
 						datWr.Write(rec.RawData)
 						datWr.WriteString(cfg.Delimiter)
 					}

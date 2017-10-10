@@ -88,13 +88,26 @@ type ResultsReader struct {
 	totalDataLength  uint64 // total DATA length expected, sum of all index.Length and delimiters
 }
 
-// IsJsonArrayFile checks if file is in JSON array format
-func IsJsonArrayFile(f *bufio.Reader) bool {
+// IsJsonArray checks if file is in JSON array format
+func IsJsonArray(f *bufio.Reader) (bool, error) {
 	if d, err := f.Peek(1); err == nil {
-		return d[0] == '['
+		return d[0] == '[', nil // OK
+	} else {
+		return false, err // not an JSON array
 	}
+}
 
-	return false // not an JSON array
+// IsJsonArrayFile checks if file is in JSON array format
+func IsJsonArrayFile(filepath string) (bool, error) {
+	// try to open DATA file
+	f, err := os.Open(filepath)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close() // close at the end
+
+	rd := bufio.NewReader(f)
+	return IsJsonArray(rd)
 }
 
 // NewResultsReader creates new reader
@@ -243,8 +256,13 @@ func (rr *ResultsReader) process(res *search.Result) {
 
 		defer f.Close() // close at the end
 		datRd = bufio.NewReaderSize(f, 256*1024)
-		if rr.CheckJsonArray && IsJsonArrayFile(datRd) {
-			dataSkip = JsonArraySkip // JSON array marker
+		if rr.CheckJsonArray {
+			if jarr, err := IsJsonArray(datRd); err != nil {
+				res.ReportError(fmt.Errorf("failed to check JSON array: %s", err))
+				return // failed
+			} else if jarr {
+				dataSkip = JsonArraySkip // JSON array marker
+			}
 		}
 	}
 

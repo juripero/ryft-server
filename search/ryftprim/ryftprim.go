@@ -474,7 +474,13 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		// it's /count, check if we have to create VIEW file
 		if len(task.ViewFileName) != 0 {
 			isJsonArray := false
-			// TODO: check output data file
+			if task.config.IsRecord && len(task.DataFileName) != 0 {
+				if jarr, err := IsJsonArrayFile(task.DataFileName); err != nil {
+					res.ReportError(fmt.Errorf("failed to check JSON array: %s", err))
+				} else {
+					isJsonArray = jarr
+				}
+			}
 
 			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter, isJsonArray); err != nil {
 				task.log().WithError(err).WithField("path", task.ViewFileName).

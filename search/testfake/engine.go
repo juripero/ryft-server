@@ -62,6 +62,7 @@ type Engine struct {
 	SearchNoStat        bool
 	SearchReportLatency time.Duration
 	SearchCfgLogTrace   []search.Config
+	SearchIsJsonArray   bool
 
 	// report to /files
 	FilesReportError error

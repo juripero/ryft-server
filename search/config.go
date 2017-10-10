@@ -73,6 +73,7 @@ type Config struct {
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)
 	ReportData  bool // if false, just indexes will be read (format=null)
+	IsRecord    bool // if true, then the record search is used
 
 	// upload/search share mode
 	ShareMode utils.ShareMode
