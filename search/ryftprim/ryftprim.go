@@ -473,7 +473,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	} else if !task.isShow {
 		// it's /count, check if we have to create VIEW file
 		if len(task.ViewFileName) != 0 {
-			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter); err != nil {
+			isJsonArray := false
+			// TODO: check output data file
+
+			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter, isJsonArray); err != nil {
 				task.log().WithError(err).WithField("path", task.ViewFileName).
 					Warnf("[%s]: failed to create VIEW file", TAG)
 				res.ReportError(fmt.Errorf("failed to create VIEW file: %s", err))

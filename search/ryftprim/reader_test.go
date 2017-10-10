@@ -41,6 +41,40 @@ func testFakeRyftprim3(od, oi *os.File, delim string) {
 	//oi.Flush()
 }
 
+// generate fake ryftprim content (3 records) JSON array
+func testFakeRyftprim3j(od, oi *os.File, delim string) {
+	od.WriteString("[\n") // start of JSON array
+
+	// first record
+	od.WriteString(`{"text":"hello"}`)
+	od.WriteString(delim)
+	//od.Flush()
+	oi.WriteString("/ryftone/1.txt,100,16,0\n")
+	//oi.Flush()
+	od.WriteString(",\n")
+
+	// second record
+	oi.WriteString("2.txt,200,16,n/a\n") // FALLBACK to absolute
+	//oi.Flush()
+	time.Sleep(100 * time.Millisecond) // emulate "no data"
+	od.WriteString(`{"text":"hello"}`)
+	od.WriteString(delim)
+	od.WriteString(",\n")
+	//od.Flush()
+
+	// third record
+	od.WriteString(`{"text":"hello"}`)
+	od.WriteString(delim)
+	//od.Flush()
+	time.Sleep(100 * time.Millisecond)
+	oi.WriteString("/ryftone/3.txt,300,16") // first INDEX part
+	//oi.Flush()
+	time.Sleep(100 * time.Millisecond)
+	oi.WriteString(",1\n") // second INDEX part
+	//oi.Flush()
+	od.WriteString("\n]") // end of JSON array
+}
+
 // get reader's fake paths
 func testReaderFake() (index, data, delim string) {
 	index = fmt.Sprintf("/tmp/ryftprim-%x-index.txt", time.Now().UnixNano())
@@ -112,6 +146,74 @@ func TestReaderUsual(t *testing.T) {
 		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
 			assert.EqualValues(t, "{3.txt#300, len:5, d:1}", rec.Index.String())
 			assert.EqualValues(t, "hello", rec.RawData)
+		}
+	}
+}
+
+// valid results (JSON results)
+func TestReaderJsonArrayUsual(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+
+	indexPath, dataPath, delimiter := testReaderFake()
+	defer os.RemoveAll(indexPath)
+	defer os.RemoveAll(dataPath)
+
+	rr := NewResultsReader(NewTask(nil, false), dataPath, indexPath, "", delimiter)
+	rr.CheckJsonArray = true
+	rr.RelativeToHome = "/ryftone"
+	rr.OpenFilePollTimeout = 50 * time.Millisecond
+	rr.ReadFilePollTimeout = 50 * time.Millisecond
+	rr.ReadFilePollLimit = 20
+	rr.ReadData = true
+
+	var wg sync.WaitGroup
+
+	// emulate ryftprim work:
+	// write fake INDEX/DATA files
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(200 * time.Millisecond) // initial delay
+
+		od, _ := os.Create(dataPath)
+		oi, _ := os.Create(indexPath)
+		assert.NotNil(t, od)
+		assert.NotNil(t, oi)
+		defer od.Close()
+		defer oi.Close()
+
+		testFakeRyftprim3j(od, oi, delimiter)
+
+		// soft stop
+		time.Sleep(100 * time.Millisecond)
+		rr.stop()
+	}()
+
+	res := search.NewResult()
+	rr.process(res)
+	wg.Wait()
+
+	// log.Debugf("done, check results read")
+	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
+		assert.EqualValues(t, 3, res.RecordsReported()) {
+		assert.EqualValues(t, 3*(2+16+len(delimiter))+2, rr.totalDataLength)
+
+		// check first record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{1.txt#100, len:16, d:0}", rec.Index.String())
+			assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+		}
+
+		// check second record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{2.txt#200, len:16, d:-1}", rec.Index.String())
+			assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+		}
+
+		// check third record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{3.txt#300, len:16, d:1}", rec.Index.String())
+			assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
 		}
 	}
 }
@@ -306,6 +408,204 @@ func TestReaderView(t *testing.T) {
 			/*if rec := <-res.RecordChan; assert.NotNil(t, rec) {
 				assert.EqualValues(t, "{3.txt#300, len:5, d:1}", rec.Index.String())
 				assert.EqualValues(t, "hello", rec.RawData)
+			}*/
+		}
+	}
+}
+
+// valid results + VIEW file (JSON array format)
+func TestReaderJsonArrayView(t *testing.T) {
+	SetLogLevelString(testLogLevel)
+
+	indexPath := "/tmp/ryftprim-index-ja.txt"
+	dataPath := "/tmp/ryfptrim-data-ja.bin"
+	viewPath := "/tmp/ryfptrim-view-ja.bin"
+	delimiter := "\r\n\f"
+
+	//	defer os.RemoveAll(indexPath)
+	//	defer os.RemoveAll(dataPath)
+	//	defer os.RemoveAll(viewPath)
+
+	rr := NewResultsReader(NewTask(nil, true), dataPath, indexPath, viewPath, delimiter)
+	rr.CheckJsonArray = true
+	rr.RelativeToHome = "/ryftone"
+	rr.OpenFilePollTimeout = 50 * time.Millisecond
+	rr.ReadFilePollTimeout = 50 * time.Millisecond
+	rr.ReadFilePollLimit = 20
+	rr.ReadData = true
+	rr.MakeView = true
+
+	var wg sync.WaitGroup
+
+	// emulate ryftprim work:
+	// write fake INDEX/DATA files
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(200 * time.Millisecond) // initial delay
+
+		od, _ := os.Create(dataPath)
+		oi, _ := os.Create(indexPath)
+		assert.NotNil(t, od)
+		assert.NotNil(t, oi)
+		defer od.Close()
+		defer oi.Close()
+
+		testFakeRyftprim3j(od, oi, delimiter)
+
+		// soft stop
+		time.Sleep(100 * time.Millisecond)
+		rr.stop()
+	}()
+
+	res := search.NewResult()
+	rr.process(res)
+	wg.Wait()
+
+	// log.Debugf("done, check results read")
+	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
+		assert.EqualValues(t, 3, res.RecordsReported()) {
+		assert.EqualValues(t, 3*(16+2+len(delimiter))+2, rr.totalDataLength)
+
+		// check first record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{1.txt#100, len:16, d:0}", rec.Index.String())
+			assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+		}
+
+		// check second record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{2.txt#200, len:16, d:-1}", rec.Index.String())
+			assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+		}
+
+		// check third record
+		if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+			assert.EqualValues(t, "{3.txt#300, len:16, d:1}", rec.Index.String())
+			assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+		}
+	}
+
+	// check the VIEW file created
+	if vf, err := view.Open(viewPath); assert.NoError(t, err) {
+		if assert.EqualValues(t, 3, vf.Count()) {
+			// first record
+			if iBeg, iEnd, dBeg, dEnd, err := vf.Get(0); assert.NoError(t, err) {
+				assert.EqualValues(t, []int64{0, 24, 2, 18}, []int64{iBeg, iEnd, dBeg, dEnd})
+			}
+
+			// second record
+			if iBeg, iEnd, dBeg, dEnd, err := vf.Get(1); assert.NoError(t, err) {
+				assert.EqualValues(t, []int64{24, 41, 23, 39}, []int64{iBeg, iEnd, dBeg, dEnd})
+			}
+
+			// third record
+			if iBeg, iEnd, dBeg, dEnd, err := vf.Get(2); assert.NoError(t, err) {
+				assert.EqualValues(t, []int64{41, 65, 44, 60}, []int64{iBeg, iEnd, dBeg, dEnd})
+			}
+
+			// failed
+			if iBeg, iEnd, dBeg, dEnd, err := vf.Get(3); assert.Error(t, err) {
+				assert.EqualValues(t, []int64{-1, -1, -1, -1}, []int64{iBeg, iEnd, dBeg, dEnd})
+				assert.Contains(t, err.Error(), "VIEW out of range")
+			}
+		}
+	}
+
+	// read with VIEW file
+	if true {
+		rr := NewResultsReader(NewTask(nil, true), dataPath, indexPath, viewPath, delimiter)
+		rr.CheckJsonArray = true
+		rr.RelativeToHome = "/ryftone"
+		rr.OpenFilePollTimeout = 50 * time.Millisecond
+		rr.ReadFilePollTimeout = 50 * time.Millisecond
+		rr.ReadFilePollLimit = 20
+		rr.ReadData = true
+		rr.MakeView = false
+
+		// emulate work:
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// soft stop
+			time.Sleep(100 * time.Millisecond)
+			rr.stop()
+		}()
+
+		res := search.NewResult()
+		rr.process(res)
+		wg.Wait()
+
+		if assert.EqualValues(t, 0, res.ErrorsReported()) &&
+			assert.EqualValues(t, 3, res.RecordsReported()) {
+
+			// check first record
+			if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{1.txt#100, len:16, d:0}", rec.Index.String())
+				assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+			}
+
+			// check second record
+			if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{2.txt#200, len:16, d:-1}", rec.Index.String())
+				assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+			}
+
+			// check third record
+			if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{3.txt#300, len:16, d:1}", rec.Index.String())
+				assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+			}
+		}
+	}
+
+	// read with VIEW file
+	if true {
+		rr := NewResultsReader(NewTask(nil, true), dataPath, indexPath, viewPath, delimiter)
+		rr.RelativeToHome = "/ryftone"
+		rr.CheckJsonArray = true
+		rr.OpenFilePollTimeout = 50 * time.Millisecond
+		rr.ReadFilePollTimeout = 50 * time.Millisecond
+		rr.ReadFilePollLimit = 20
+		rr.ReadData = true
+		rr.MakeView = false
+		rr.Offset = 1
+		rr.Limit = 1
+
+		// emulate work:
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// soft stop
+			time.Sleep(100 * time.Millisecond)
+			rr.stop()
+		}()
+
+		res := search.NewResult()
+		rr.process(res)
+		wg.Wait()
+
+		if assert.EqualValues(t, 0, res.ErrorsReported()) &&
+			assert.EqualValues(t, 1, res.RecordsReported()) {
+
+			// check first record
+			/*if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{1.txt#100, len:16, d:0}", rec.Index.String())
+				assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+			}*/
+
+			// check second record
+			if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{2.txt#200, len:16, d:-1}", rec.Index.String())
+				assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
+			}
+
+			// check third record
+			/*if rec := <-res.RecordChan; assert.NotNil(t, rec) {
+				assert.EqualValues(t, "{3.txt#300, len:16, d:1}", rec.Index.String())
+				assert.EqualValues(t, `{"text":"hello"}`, rec.RawData)
 			}*/
 		}
 	}
@@ -579,8 +879,8 @@ func TestReaderCancelToOpenIndex(t *testing.T) {
 	// log.Debugf("done, check results read")
 	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
 		assert.EqualValues(t, 0, res.RecordsReported()) {
-		assert.True(t, rr.isCancelled() != 0)
-		assert.True(t, rr.isStopped() != 0)
+		assert.True(t, rr.isCancelled())
+		assert.True(t, rr.isStopped())
 	}
 }
 
@@ -681,8 +981,8 @@ func TestReaderCancelToReadIndex(t *testing.T) {
 	// log.Debugf("done, check results read")
 	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
 		assert.EqualValues(t, 0, res.RecordsReported()) {
-		assert.True(t, rr.isCancelled() != 0)
-		assert.True(t, rr.isStopped() != 0)
+		assert.True(t, rr.isCancelled())
+		assert.True(t, rr.isStopped())
 	}
 }
 
@@ -731,8 +1031,8 @@ func TestReaderCancelToOpenData(t *testing.T) {
 	// log.Debugf("done, check results read")
 	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
 		assert.EqualValues(t, 0, res.RecordsReported()) {
-		assert.True(t, rr.isCancelled() != 0)
-		assert.True(t, rr.isStopped() != 0)
+		assert.True(t, rr.isCancelled())
+		assert.True(t, rr.isStopped())
 	}
 }
 
@@ -898,8 +1198,8 @@ func TestReaderCancelToReadData(t *testing.T) {
 	// log.Debugf("done, check results read")
 	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
 		assert.EqualValues(t, 0, res.RecordsReported()) {
-		assert.True(t, rr.isCancelled() != 0)
-		assert.True(t, rr.isStopped() != 0)
+		assert.True(t, rr.isCancelled())
+		assert.True(t, rr.isStopped())
 	}
 }
 
@@ -1061,7 +1361,7 @@ func TestReaderCancelToReadDelim(t *testing.T) {
 	// log.Debugf("done, check results read")
 	if assert.EqualValues(t, 0, res.ErrorsReported()) &&
 		assert.EqualValues(t, 0, res.RecordsReported()) {
-		assert.True(t, rr.isCancelled() != 0)
-		assert.True(t, rr.isStopped() != 0)
+		assert.True(t, rr.isCancelled())
+		assert.True(t, rr.isStopped())
 	}
 }
