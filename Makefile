@@ -5,6 +5,7 @@ HINT = ryft-server
 APP_VERSION ?= latest
 RYFT_DOCKER_BRANCH ?= master
 RYFT_INTEGRATION_TEST ?= develop
+BUILDER_VERSION ?= latest
 
 all: $(ASSETS) build version
 
@@ -122,4 +123,4 @@ unit_test: pull_ryft_docker
 
 .PHONY: cli
 cli:
-	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} cli
+	@make -C ./ryft-docker/ryft-server-cluster VERSION=${BUILDER_VERSION} SOURCE_PATH=${CURDIR} cli
