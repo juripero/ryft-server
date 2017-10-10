@@ -32,6 +32,18 @@ func TestApplyAggregations(t *testing.T) {
 2.json,2,23,0
 3.json,3,21,0`), 0644))
 
+	// JSON data (JSON array format)
+	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "data.jarr"),
+		[]byte(`[
+{"foo": {"bar": 100.0}} ,
+{"foo": {"bar": "200"}} ,
+{"foo": {"bar": 3e2}}
+]`), 0644))
+	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "data.jarr.txt"),
+		[]byte(`1.json,1,23,0
+2.json,2,23,0
+3.json,3,21,0`), 0644))
+
 	// XML data
 	assert.NoError(t, ioutil.WriteFile(filepath.Join(root, "data.xml"),
 		[]byte(`<rec><foo><bar>100.0</bar></foo></rec>
@@ -66,7 +78,7 @@ func TestApplyAggregations(t *testing.T) {
 			return
 		}
 
-		err = ApplyAggregations(indexPath, dataPath, "\n", format, Aggs, nil)
+		err = ApplyAggregations(indexPath, dataPath, "\n", format, Aggs, true, nil)
 		if err != nil {
 			assert.Contains(t, err.Error(), expected)
 		} else {
@@ -77,8 +89,10 @@ func TestApplyAggregations(t *testing.T) {
 		}
 	}
 
+	all := true
+
 	// check JSON data
-	if true {
+	if all {
 		check(filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
 			`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
 		check(filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
@@ -93,8 +107,24 @@ func TestApplyAggregations(t *testing.T) {
 			`{ "my": { "stats": { "field": "foo.bar" } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
 	}
 
+	// check JSON data (JSON array format)
+	if all {
+		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+			`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
+		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+			`{ "my": { "sum": { "field": "foo.bar" } } }`, `{"my": {"value": 600}}`)
+		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+			`{ "my": { "min": { "field": "foo.bar" } } }`, `{"my": {"value": 100}}`)
+		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+			`{ "my": { "max": { "field": "foo.bar" } } }`, `{"my": {"value": 300}}`)
+		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+			`{ "my": { "value_count": { "field": "foo.bar" } } }`, `{"my": {"value": 3}}`)
+		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+			`{ "my": { "stats": { "field": "foo.bar" } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
+	}
+
 	// check XML data
-	if true {
+	if all {
 		check(filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
 			`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
 		check(filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
@@ -110,7 +140,7 @@ func TestApplyAggregations(t *testing.T) {
 	}
 
 	// check UTF8 data
-	if true {
+	if all {
 		check(filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
 			`{ "my": { "avg": { "field": "." } } }`, `{"my": {"value": 200}}`)
 
