@@ -108,7 +108,7 @@ pull_ryft_integration_test: clone_ryft_integration_test
 # build Docker containers with test environment
 .PHONY: build_container
 build_container: pull_ryft_docker
-	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR}/ build
+	@make -C ./ryft-docker/ryft-server-cluster VERSION=${BUILDER_VERSION} SOURCE_PATH=${CURDIR}/ build
 	@make -C ./ryft-docker/ryft-server-cluster VERSION=${APP_VERSION} app
 
 # run integration tests
