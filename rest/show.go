@@ -89,6 +89,12 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 			WithDetails("failed to parse request parameters"))
 	}
 
+	// error prefix
+	var errorPrefix string
+	if params.InternalErrorPrefix {
+		errorPrefix = server.Config.HostName
+	}
+
 	var sessionInfo []interface{}
 	if len(params.Session) != 0 {
 		session, err := ParseSession(server.Config.Sessions.secret, params.Session)
@@ -171,6 +177,9 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	searchStartTime := time.Now() // performance metric
 	res, err := engine.Show(cfg)
 	if err != nil {
+		if len(errorPrefix) != 0 {
+			err = fmt.Errorf("[%s]: %s", errorPrefix, err)
+		}
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to start search/show"))
 	}
@@ -180,12 +189,6 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	// we need to cancel search request
 	// to prevent resource leaks
 	defer cancelIfNotDone(res)
-
-	// error prefix
-	var errorPrefix string
-	if params.InternalErrorPrefix {
-		errorPrefix = server.Config.HostName
-	}
 
 	// drain all results
 	transferStartTime := time.Now() // performance metric

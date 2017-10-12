@@ -124,6 +124,12 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 			WithDetails("failed to parse request parameters"))
 	}
 
+	// error prefix
+	var errorPrefix string
+	if params.InternalErrorPrefix {
+		errorPrefix = server.Config.HostName
+	}
+
 	// backward compatibility old files and catalogs (just aliases)
 	params.Files = append(params.Files, params.OldFiles...)
 	params.OldFiles = nil // reset
@@ -238,6 +244,9 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	searchStartTime := time.Now() // performance metric
 	res, err := engine.Search(cfg)
 	if err != nil {
+		if len(errorPrefix) != 0 {
+			err = fmt.Errorf("[%s]: %s", errorPrefix, err)
+		}
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to start search"))
 	}
@@ -250,12 +259,6 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 
 	server.onSearchStarted(cfg)
 	defer server.onSearchStopped(cfg)
-
-	// error prefix
-	var errorPrefix string
-	if params.InternalErrorPrefix {
-		errorPrefix = server.Config.HostName
-	}
 
 	// drain all results
 	transferStartTime := time.Now() // performance metric
