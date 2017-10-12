@@ -180,12 +180,12 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 
 	// user configuration
 	if userCfg_, ok := opts["user-config"]; ok {
-		if userCfg, err := asStringMap(userCfg_); err != nil {
+		if userCfg, err := utils.AsStringMap(userCfg_); err != nil {
 			return fmt.Errorf(`failed to get "user-config": %s`, err)
 		} else {
 			// record-queries options
 			if recOpts_, ok := userCfg["record-queries"]; ok {
-				if recOpts, err := asStringMap(recOpts_); err != nil {
+				if recOpts, err := utils.AsStringMap(recOpts_); err != nil {
 					return fmt.Errorf(`failed to get "record-queries": %s`, err)
 				} else {
 					// parse record-queries options
@@ -213,7 +213,7 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 
 	// parse SKIP patterns
 	if v, ok := opts["skip"]; ok {
-		if vv, err := asStringSlice(v); err != nil {
+		if vv, err := utils.AsStringSlice(v); err != nil {
 			return fmt.Errorf(`failed to parse "user-config.record-queries.skip" option: %s`, err)
 		} else {
 			engine.skipPatterns = vv
@@ -222,7 +222,7 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 
 	// parse JSON patterns
 	if v, ok := opts["json"]; ok {
-		if vv, err := asStringSlice(v); err != nil {
+		if vv, err := utils.AsStringSlice(v); err != nil {
 			return fmt.Errorf(`failed to parse "user-config.record-queries.json" option: %s`, err)
 		} else {
 			engine.jsonPatterns = vv
@@ -231,7 +231,7 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 
 	// parse XML patterns
 	if v, ok := opts["xml"]; ok {
-		if vv, err := asStringSlice(v); err != nil {
+		if vv, err := utils.AsStringSlice(v); err != nil {
 			return fmt.Errorf(`failed to parse "user-config.record-queries.xml" option: %s`, err)
 		} else {
 			engine.xmlPatterns = vv
@@ -240,7 +240,7 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 
 	// parse CSV patterns
 	if v, ok := opts["csv"]; ok {
-		if vv, err := asStringSlice(v); err != nil {
+		if vv, err := utils.AsStringSlice(v); err != nil {
 			return fmt.Errorf(`failed to parse "user-config.record-queries.csv" option: %s`, err)
 		} else {
 			engine.csvPatterns = vv
@@ -248,54 +248,6 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 	}
 
 	return nil // OK
-}
-
-// get value as string slice
-func asStringSlice(v interface{}) ([]string, error) {
-	switch vv := v.(type) {
-	case nil:
-		return nil, nil // empty
-
-	case []string:
-		return vv, nil // OK
-
-	case []interface{}:
-		res := make([]string, 0, len(vv))
-		for _, s := range vv {
-			if ss, err := utils.AsString(s); err != nil {
-				return nil, fmt.Errorf("not a string: %s", err)
-			} else {
-				res = append(res, ss)
-			}
-		}
-		return res, nil // OK
-	}
-
-	return nil, fmt.Errorf("not a []string (but %T)", v)
-}
-
-// get value as map[string]interface{}
-func asStringMap(v interface{}) (map[string]interface{}, error) {
-	switch vv := v.(type) {
-	case nil:
-		return nil, nil // empty
-
-	case map[string]interface{}:
-		return vv, nil // OK
-
-	case map[interface{}]interface{}:
-		res := make(map[string]interface{}, len(vv))
-		for k, v := range vv {
-			if kk, err := utils.AsString(k); err != nil {
-				return nil, fmt.Errorf("bad key: %s", err)
-			} else {
-				res[kk] = v
-			}
-		}
-		return res, nil // OK
-	}
-
-	return nil, fmt.Errorf("not a map[string]interface{} (but %T)", v)
 }
 
 // Show starts asynchronous "/search/show" operation.

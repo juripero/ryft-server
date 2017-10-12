@@ -504,3 +504,25 @@ To view logs in real-time:
 ```{.sh}
 tail -f /var/log/ryft/server.log
 ```
+
+
+## Default backend options
+
+You can specify default options for search backends using `<engine>-opts` fields of `backend-options` section. Such fields accept list of backend parameters.
+
+    ryftprim-opts: []  // default options for `ryftprim` backend
+    ryftx-opts: []     // default options for `ryftx` backend
+    ryftpcre2-opts: [] // default options for `pcre2` backend
+    ryft-all-opts: []  // default options for all engines in case if one of them omitted
+
+
+Note that `<engine>-opts` always overrides `ryft-all-opts` if it is presented.
+If ryft-server accepted list of `backend-option` parameters they fully replace default options.
+
+It works with replace but not merge strategy because otherwise it would be impossible to disable flags without value like "-v", "--list", etc.
+
+Example:
+
+    ryftprim-opts: ["-v"]
+    ryftx-opts: ["--rx-shard-size", "64M", "--rx-max-spawns", "14"]
+

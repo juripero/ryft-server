@@ -74,6 +74,25 @@ func (cat *Catalog) checkScheme() (bool, error) {
 	return version >= dbSchemeVersion, nil // OK
 }
 
+// Updates database journal mode (synchronized).
+func (cat *Catalog) updateJournalModeSync() error {
+	cat.mutex.Lock()
+	defer cat.mutex.Unlock()
+
+	return cat.updateJournalMode()
+}
+
+// Updates database journal mode (unsynchronized).
+func (cat *Catalog) updateJournalMode() error {
+	_, err := cat.db.Exec("PRAGMA synchronous=NORMAL; PRAGMA journal_mode=WAL;")
+	if err != nil {
+		// cat.log().WithError(err).Warnf("[%s]: failed to set journal mode", TAG)
+		return fmt.Errorf("failed to set journal mode: %s", err)
+	}
+
+	return nil // OK
+}
+
 // Updates database scheme (synchronized).
 func (cat *Catalog) updateSchemeSync() error {
 	cat.mutex.Lock()

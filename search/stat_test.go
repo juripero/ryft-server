@@ -75,7 +75,7 @@ func TestStatMerge(t *testing.T) {
 	assert.EqualValues(t, 1+2, stat.Matches)
 	assert.EqualValues(t, 1000+2000, stat.TotalBytes)
 	assert.EqualValues(t, 200, stat.Duration) // maximum
-	assert.InDelta(t, 11.1+22.2, stat.DataRate, 0.01)
+	assert.InDelta(t, (1000+2000)/200e3, stat.DataRate, 0.01)
 	assert.EqualValues(t, 20, stat.FabricDuration) // maximum
 	assert.InDelta(t, 111.1+222.2, stat.FabricDataRate, 0.01)
 	assert.EqualValues(t, []*Stat{s1, s2}, stat.Details)

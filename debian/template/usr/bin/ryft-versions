@@ -1,0 +1,217 @@
+#!/bin/bash
+
+#
+# Shell script to return Ryft product versions
+#
+
+scriptVersion="08-02-2017 10:00:00"
+
+test -e /dev/smca
+if [ $? == 0 ]
+then 
+    ryftone=1
+else
+    ryftone=0
+fi
+
+#
+# Variables for handling AWS Instance data
+#    (non-public local URL for getting instance info
+#
+AWSCommand="wget -q -O - http://169.254.169.254/latest/meta-data"
+AWSInstance="false"
+
+# Get AWS instance ID, returns empty string if not AWS instance
+#
+if [ $ryftone == 0 ]
+then
+    serialNo=`${AWSCommand}/instance-id`
+    if [ ${#serialNo} -gt 5 -a "${serialNo:0:2}" == "i-" ]; then
+        AWSInstance="true"
+    fi
+fi
+
+hostName=`hostname`
+
+# Pull information from the "vers" command if available and other sources if not.
+
+if [ -f "/usr/bin/vers" ]; then
+    versText=`vers`
+    Repository=`echo -e ${versText} | sed -e "s/.*\(repository Revision: \)\([0-9]*\).*/\2/"`
+    if [ ${#Repository} -gt 30 ]; then
+        Repository="Not Available"
+    fi
+
+    Firmware=`echo -e ${versText} | sed -e "s/.*\(primitive firmware: \)\([_A-Z0-9]*\).*/\2/"`
+    tempServerRev=`echo -e ${versText} | sed -e "s/.*\(ryft-server \)\([.0-9]*\).*/\2/"`
+    if [ "${AWSInstance}" == "false" ]; then
+    	serialNo=`echo -e ${versText} | sed -e "s#.*\(S/N: \)\([0-9]*\).*#\2#"`
+    fi
+else
+    if [ -f "/home/ryftuser/bin/vers" ]; then
+		versText=`sudo /home/ryftuser/bin/vers`
+    	Repository=`echo -e ${versText} | sed -e "s/.*\(repository Revision: \)\([0-9]*\).*/\2/"`
+		myTest=`echo -e ${versText} | sed -e  "s/.*\(Ryft AWS F1\).*/\1/"`
+    	if [ ${#Repository} -gt 30 ]; then
+        	Repository="Not Available"
+    	fi
+    	Firmware=`echo -e ${versText} | sed -e "s/.*\(primitive firmware: \)\([_A-Z0-9]*\).*/\2/"`
+    else
+        Repository="Not Installed"
+    	Firmware="Not Installed"
+    fi
+    tempServerRev="Not Available"
+fi
+
+# If firmware version is not available on F1 instance, use ryftprim version.
+
+if [ "${Firmware}" == "Not Installed" -o ${#Firmware} -gt 21 ]; then
+    #ryftprim is versioned by date as YYYYMMDD: 20170329
+    if [ -f "/usr/bin/ryftprim" ]; then
+    	Firmware=`ryftprim --version | tr -d '\n\r' |sed -e "s/.*\(YYYYMMDD: \)\([_A-Z0-9]*\).*/\2/"`
+    fi
+fi
+
+# Serial number is known for RyftONE box, but try to give some identification on
+# and AWS instance.
+
+if [ "${AWSInstance}" == "true" ]; then
+    AWSType=`${AWSCommand}/instance-type`
+    serialNo="AWS ${AWSType} Instance ${serialNo}"
+    AMIId=`${AWSCommand}/ami-id`
+    if [ "${AWSType:0:2}" == "f1" ]; then
+        fpgaVersion=`sudo fpga-describe-local-image -S 0`
+        AFIId=`echo -e ${fpgaVersion} | cut -d' ' -f3`
+        AFIShell=`echo -e ${fpgaVersion} | cut -d' ' -f8`
+    fi
+fi
+
+# Get running ryft-server version number, but fall back to "vers" command if not running
+
+serverRev=`curl -s http://localhost:8765/version | sed -e "s/.*\(\"version\":\"\)\([^\"]*\).*/\2/"`
+if [ "${serverRev}" == "" ]; then
+   serverRev="${tempServerRev}"
+fi
+
+# Get ODBC version
+
+if [ -f "/usr/local/ryft/bin/x8664/ryft1_odbcctl" ]; then
+    ODBCVersion=`/usr/local/ryft/bin/x8664/ryft1_odbcctl -v`
+else
+    ODBCVersion="Not Installed"
+fi
+
+# Get web demo version. ls format:
+#     lrwxrwxrwx  1 root     root       27 Apr 26 04:52 ryft-demo -> /opt/web-ui/ryft-demo-0.4.3
+webApiDemoVersion=`ls -al /opt/ryft-demo 2>/dev/null | sed -e 's#.*->.*ryft-demo-\([0-9.]*\).*#\1#'`
+
+webApiDemoVersion="Not Installed"
+test -e /opt/ryft-demo
+if [ $? == 0 ]
+then
+    test -L /opt/ryft-demo
+    if [ $? == 0 ]
+    then
+        webApiDemoVersion=`ls -al /opt/ryft-demo 2>/dev/null | sed -e 's#.*->.*ryft-demo-\([0-9.]*\).*#\1#'`
+    else
+        webApiDemoVersion=`dpkg -l|grep ryft-webui|awk '{print $3}'`
+    fi
+fi
+
+if [ "${webApiDemoVersion}" == "" ]; then
+    webApiDemoVersion="Not Installed"
+fi
+
+tmpRyftxVersion=`ryftx --version 2>/dev/null`
+if [ "${tmpRyftxVersion}" == "" ]; then
+    ryftxVersion="Not Installed"
+else
+    ryftxVersion=`echo -e ${tmpRyftxVersion} | sed -e "s/.*\(Systems, Inc[^_0-9]*\)\([_0-9]*\).*/\2/"`
+fi
+
+tmpRyftpcre2Version=`ryftpcre2 --version 2>/dev/null`
+if [ "${tmpRyftpcre2Version}" == "" ]; then
+    ryftpcre2Version="Not Installed"
+else
+    # ryftprim is versioned by date as YYYYMMDD: 20170605
+    ryftpcre2Version=`echo -e ${tmpRyftpcre2Version} | sed -e "s/.*\(YYYYMMDD: \)\([_0-9]*\).*/\2/"`
+    if [ ${#ryftpcre2Version} -gt 10 ]; then
+	ryftpcre2Version="Not Installed"
+    fi
+fi
+
+cVersAlerts=`/opt/consul/bin/consul-alerts --version 2>/dev/null`
+if [ "${cVersAlerts}" == "" ]; then
+    consulAlertsVersion="Not Installed"
+else
+    consulAlertsVersion=`echo -e ${cVersAlerts} | sed -e "s/Consul Alerts //"`
+fi
+
+# For consul use version, but also return compatibility information.
+
+cVers=`/opt/consul/bin/consul --version 2>/dev/null`
+if [ "${cVers}" == "" ]; then
+    consulVersion="Not Installed"
+	cp1=""
+	cp2=""
+else
+    consulVersion=`echo -e ${cVers} | sed -e "s/Consul *//g;s/Protocol.*//;s/v//"`
+    consulProtocol=`echo -e ${cVers} | sed -e "s/.*\(Protocol.*\)/\1/"`
+    if [ ${#consulProtocol} -gt 60 ]; then
+		cp1=`echo -e ${consulProtocol} | sed -e "s/\(.\{,60\}[^ ]\).*/\1/"`
+		cp2=`echo -e ${consulProtocol} | sed -e "s/.\{,60\}[^ ]* \(.*\)/\1/"`
+    else
+        cp1="${consulProtocol}"
+		cp2=""
+    fi
+fi
+
+elasticVersion=`/opt/elasticsearch/bin/elasticsearch --version 2>/dev/null`
+if [ "${elasticVersion}" == "" ]; then
+    elasticV="Not Installed"
+    ev1=""
+    ev2=""
+else
+    #Version: 2.4.1, Build: c67dc32/2016-09-27T18:57:55Z, JVM: 1.7.0_131
+    elasticV=`echo -e ${elasticVersion} | sed -e "s/\(Version: \)\([0-9.]*\).*/\2/"`
+    ev1=`echo -e ${elasticVersion} | sed -e "s/.*\(Build: [^,]*\).*/\1/"`
+    ev2=`echo -e ${elasticVersion} | sed -e "s/.*\(JVM: [0-9_.]*\).*/\1/"`
+fi
+
+echo ""
+echo "ryft-versions: ${scriptVersion}"
+echo "Hostname:      ${hostName}"
+echo "S/N:           ${serialNo}"
+if [ "${AWSInstance}" == "true" ]; then
+    echo "AMI ID:        ${AMIId}"
+    if [ "${AWSType:0:2}" == "f1" ]; then
+        echo "AFI ID:        ${AFIId}  (SHELL: ${AFIShell})"
+    fi
+fi
+echo ""
+echo "Repository:    ${Repository}"
+echo "Firmware:      ${Firmware}"
+echo "ryftx:         ${ryftxVersion}"
+echo "ryftpcre2:     ${ryftpcre2Version}"
+echo ""
+echo "ryft-server:   ${serverRev}"
+echo "Ryft ODBC:     ${ODBCVersion}"
+echo "Web API Demo:  ${webApiDemoVersion}"
+echo ""
+echo "Consul:        ${consulVersion}"
+if [ ${#cp1} -gt 0 ]; then
+    echo "               ${cp1}"
+fi
+if [ ${#cp2} -gt 0 ]; then
+    echo "               ${cp2}"
+fi
+echo "Consul Alerts: ${consulAlertsVersion}"
+echo "Elastic:       ${elasticV}"
+if [ ${#ev1} -gt 0 ]; then
+    echo "               ${ev1}"
+fi
+if [ ${#ev2} -gt 0 ]; then
+    echo "               ${ev2}"
+fi
+echo ""
+

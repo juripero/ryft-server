@@ -79,6 +79,8 @@ type Task struct {
 	toolStartTime time.Time
 	toolStopTime  time.Time
 	readStartTime time.Time
+	aggsStartTime time.Time
+	aggsStopTime  time.Time
 }
 
 // NewTask creates new task.

@@ -168,6 +168,12 @@ func OpenCatalog(path string) (*Catalog, error) {
 
 	// update database scheme
 	if !cached {
+		cat.log().Debugf("[%s]: updating journal mode...", TAG)
+		if err := cat.updateJournalModeSync(); err != nil {
+			cat.Close()
+			return nil, err
+		}
+
 		cat.log().Debugf("[%s]: updating scheme...", TAG)
 		if err := cat.updateSchemeSync(); err != nil {
 			cat.Close()

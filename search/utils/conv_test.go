@@ -183,3 +183,45 @@ func TestAsBool(t *testing.T) {
 	bad("aaa", "invalid syntax")
 	bad([]byte{0x01}, "is not a bool")
 }
+
+// AsFloat64 tests
+func TestAsFloat64(t *testing.T) {
+	// parse a good float64
+	check := func(val interface{}, expected float64) {
+		d, err := AsFloat64(val)
+		if assert.NoError(t, err) {
+			assert.InDelta(t, expected, d, 1e-9, "bad float64 [%s]", val)
+		}
+	}
+
+	// parse a "bad" float64
+	bad := func(val interface{}, expectedError string) {
+		_, err := AsFloat64(val)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), expectedError, "unexpected error [%s]", val)
+		}
+	}
+
+	check(nil, 0.0)
+	check(uint64(123), 123.0)
+	check(int64(123), 123.0)
+	check(uint32(123), 123.0)
+	check(int32(123), 123.0)
+	check(uint16(123), 123.0)
+	check(int16(123), 123.0)
+	check(uint8(123), 123.0)
+	check(int8(123), 123.0)
+	check(uint(123), 123.0)
+	check(int(123), 123.0)
+
+	check("123", 123.0)
+	check("123.", 123.0)
+	check("123.0", 123.0)
+	check("1.23e2", 123.0)
+	check("1230.0e-1", 123.0)
+	check(float32(123.0), 123.0)
+	check(float64(123.0), 123.0)
+
+	bad("aaa", "invalid syntax")
+	bad([]byte{0x01}, "is not a float64")
+}

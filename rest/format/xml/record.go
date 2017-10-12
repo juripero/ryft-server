@@ -96,7 +96,7 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 
 	// try to parse raw data as XML...
 	if len(rec.RawData) != 0 {
-		parsed, err := parseXml(rec.RawData, fields)
+		parsed, err := ParseXml(rec.RawData, fields)
 		if parsed != nil {
 			// res.Data = parsed
 			for k, v := range parsed {
@@ -128,7 +128,7 @@ func ToRecord(rec *Record) *search.Record {
 // return parsed data as a map[string]interface{}
 // field filtration: if fields is empty all fields are used in result
 // othewise only requested fields are copied (missing fields are ignored)
-func parseXml(data []byte, fields []string) (map[string]interface{}, error) {
+func ParseXml(data []byte, fields []string) (map[string]interface{}, error) {
 	objs, err := xmlToMap(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse XML data: %s", err)

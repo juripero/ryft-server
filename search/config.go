@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/aggs"
 )
 
 // Config is a search configuration.
@@ -65,6 +66,10 @@ type Config struct {
 	// post-processing transformations
 	Transforms []Transform
 
+	// set of aggregations engines
+	Aggregations *aggs.Aggregations
+	DataFormat   string // used for aggregations
+
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)
 	ReportData  bool // if false, just indexes will be read (format=null)
@@ -75,6 +80,10 @@ type Config struct {
 	// backend tool, autoselect if empty
 	// should be "ryftprim" or "ryftx"
 	BackendTool string
+
+	// additional backend options
+	// addeded to the end of args
+	BackendOpts []string
 
 	// report performance metrics
 	Performance bool
@@ -193,6 +202,11 @@ func (cfg Config) String() string {
 	// backend
 	if len(cfg.BackendTool) != 0 {
 		props = append(props, fmt.Sprintf("backend:%q", cfg.BackendTool))
+	}
+
+	// backend-options
+	if len(cfg.BackendOpts) != 0 {
+		props = append(props, fmt.Sprintf("backend-options:%q", cfg.BackendOpts))
 	}
 
 	// flags

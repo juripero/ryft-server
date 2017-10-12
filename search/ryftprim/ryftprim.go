@@ -163,7 +163,7 @@ func (engine *Engine) prepare(task *Task) error {
 	}
 
 	// INDEX output file
-	if cfg.ReportIndex || len(cfg.KeepIndexAs) != 0 {
+	if cfg.ReportIndex || len(cfg.KeepIndexAs) != 0 || cfg.Aggregations != nil {
 		if len(cfg.KeepIndexAs) != 0 {
 			task.IndexFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepIndexAs)
 			task.KeepIndexFile = true // do not remove at the end!
@@ -185,7 +185,7 @@ func (engine *Engine) prepare(task *Task) error {
 	}
 
 	// DATA output file
-	if cfg.ReportData || len(cfg.KeepDataAs) != 0 {
+	if cfg.ReportData || len(cfg.KeepDataAs) != 0 || cfg.Aggregations != nil {
 		if len(cfg.KeepDataAs) != 0 {
 			task.DataFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepDataAs)
 			task.KeepDataFile = true // do not remove at the end!
@@ -229,7 +229,8 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	}
 
 	var err error
-	task.toolPath, err = engine.getExecPath(task.config)
+	var engineOpts []string
+	task.toolPath, engineOpts, err = engine.getExecPath(task.config)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
 		return fmt.Errorf("failed to find tool: %s", err)
@@ -237,6 +238,20 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		task.log().Warnf("[%s]: no appropriate tool found", TAG)
 		return fmt.Errorf("no tool found: %s", task.toolPath)
 	}
+
+	// backend options (should be added to the END)
+	// define them here because need to know which engine will be used
+	var backendOpts []string
+	if len(task.config.BackendOpts) > 0 { // options from request
+		backendOpts = task.config.BackendOpts
+	} else if len(engineOpts) > 0 { // engine default options
+		backendOpts = engineOpts
+	} else {
+		backendOpts = engine.RyftAllOpts // default options for all engines
+	}
+	// assign command line
+	task.toolArgs = append(task.toolArgs, backendOpts...)
+
 	task.log().WithFields(map[string]interface{}{
 		"tool": task.toolPath,
 		"args": task.toolArgs,
@@ -336,6 +351,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			if !task.readStartTime.IsZero() {
 				// for /count operation there is no "read-data"
 				metrics["read-data"] = time.Since(task.readStartTime).String()
+			}
+
+			if !task.aggsStartTime.IsZero() {
+				metrics["aggregations"] = task.aggsStopTime.Sub(task.aggsStartTime).String()
 			}
 
 			res.Stat.AddPerfStat("ryftprim", metrics)
@@ -461,6 +480,20 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			}
 			// TODO: report in performance metric
 		}
+	}
+
+	// apply aggregations
+	if task.config.Aggregations != nil {
+		task.aggsStartTime = time.Now()
+		err := ApplyAggregations(task.IndexFileName, task.DataFileName,
+			task.config.Delimiter, task.config.DataFormat, task.config.Aggregations,
+			func() bool { return res.IsCancelled() })
+		if err != nil {
+			task.log().WithError(err).
+				Warnf("[%s]: failed to apply aggregations", TAG)
+			res.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
+		}
+		task.aggsStopTime = time.Now()
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing
