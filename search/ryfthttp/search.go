@@ -142,8 +142,9 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 
 	// check status code
 	if resp.StatusCode != http.StatusOK {
-		task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid response status", TAG)
-		res.ReportError(fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status))
+		message := getOptionalErrorMessage(resp.Body)
+		task.log().WithField("status", resp.Status).Warnf("[%s]: invalid response status: %s", TAG, message)
+		res.ReportError(fmt.Errorf("invalid response status: %s (%s)", resp.Status, message))
 		return // failed (not 200)
 	}
 
@@ -270,8 +271,9 @@ func (engine *Engine) doCount0(task *Task, req *http.Request, res *search.Result
 	defer resp.Body.Close() // close it later
 
 	if resp.StatusCode != http.StatusOK {
-		task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid response status", TAG)
-		res.ReportError(fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status))
+		message := getOptionalErrorMessage(resp.Body)
+		task.log().WithField("status", resp.Status).Warnf("[%s]: invalid response status: %s", TAG, message)
+		res.ReportError(fmt.Errorf("invalid response status: %s (%s)", resp.Status, message))
 		return // failed (not 200)
 	}
 
@@ -319,4 +321,20 @@ func (engine *Engine) doCount0(task *Task, req *http.Request, res *search.Result
 	res.Stat = format.ToStat(&stat)
 	task.log().WithField("stat", res.Stat).
 		Infof("[%s]: statistics received", TAG)
+}
+
+// get optional error message from HTTP response
+func getOptionalErrorMessage(r io.Reader) string {
+	dec := json.NewDecoder(r)
+
+	var resp map[string]interface{}
+	if err := dec.Decode(&resp); err == nil {
+		if msg, ok := resp["message"]; ok {
+			if str, ok := msg.(string); ok {
+				return str
+			}
+		}
+	}
+
+	return "" // no message
 }
