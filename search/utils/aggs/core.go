@@ -64,11 +64,11 @@ type Function interface {
 type Aggregations struct {
 	functions map[string]Function
 	engines   map[string]Engine
-	options   interface{} // source options
+	options   map[string]interface{} // source options
 }
 
 // GetOpts gets aggregation options
-func (a *Aggregations) GetOpts() interface{} {
+func (a *Aggregations) GetOpts() map[string]interface{} {
 	return a.options
 }
 
