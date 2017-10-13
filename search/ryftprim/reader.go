@@ -45,6 +45,8 @@ import (
 )
 
 const (
+	ReadBufSize = 512 * 1024 // read buffer size, bytes
+
 	JsonArraySkip = 2 // begin:#5B0A, middle:#2C0A end:#0A5D
 )
 
@@ -239,7 +241,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 		}
 
 		defer f.Close() // close at the end
-		idxRd = bufio.NewReaderSize(f, 256*1024)
+		idxRd = bufio.NewReaderSize(f, ReadBufSize)
 	}
 
 	var datRd *bufio.Reader
@@ -256,7 +258,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 		}
 
 		defer f.Close() // close at the end
-		datRd = bufio.NewReaderSize(f, 256*1024)
+		datRd = bufio.NewReaderSize(f, ReadBufSize)
 		if rr.CheckJsonArray {
 			if jarr, err := IsJsonArray(datRd); err != nil {
 				res.ReportError(fmt.Errorf("failed to check JSON array: %s", err))
@@ -491,7 +493,7 @@ func (rr *ResultsReader) show(res *search.Result) {
 		}
 
 		defer f.Close() // close at the end
-		idxFd, idxRd = f, bufio.NewReaderSize(f, 256*1024)
+		idxFd, idxRd = f, bufio.NewReaderSize(f, ReadBufSize)
 	}
 
 	// DATA file reader
@@ -508,7 +510,7 @@ func (rr *ResultsReader) show(res *search.Result) {
 		}
 
 		defer f.Close() // close at the end
-		datFd, datRd = f, bufio.NewReaderSize(f, 256*1024)
+		datFd, datRd = f, bufio.NewReaderSize(f, ReadBufSize)
 	}
 
 	var viewRd *view.Reader // VIEW file reader
@@ -827,7 +829,7 @@ func CreateViewFile(indexPath, viewPath string, delimiter string, isJsonArray bo
 	defer w.Close()
 
 	// read all index records
-	rd := bufio.NewReaderSize(file, 256*1024)
+	rd := bufio.NewReaderSize(file, ReadBufSize)
 	delimLen := int64(len(delimiter))
 	indexPos := int64(0)
 	dataPos := int64(0)

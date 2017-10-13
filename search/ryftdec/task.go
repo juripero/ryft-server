@@ -455,7 +455,7 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 	defer file.Close() // close at the end
 
 	// read all index records
-	rd := bufio.NewReaderSize(file, 256*1024)
+	rd := bufio.NewReaderSize(file, ryftprim.ReadBufSize)
 	delimLen := uint64(len(delim))
 	dataPos := uint64(0)
 	dataSkip := uint64(0)
@@ -767,7 +767,7 @@ ItemsLoop:
 			} else {
 				cf = &CachedFile{
 					f:   f,
-					rd:  bufio.NewReaderSize(f, 256*1024),
+					rd:  bufio.NewReaderSize(f, ryftprim.ReadBufSize),
 					pos: 0,
 				}
 				files[item.dataFile] = cf // put to cache

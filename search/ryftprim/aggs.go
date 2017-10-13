@@ -81,7 +81,7 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 		}
 
 		defer f.Close() // close at the end
-		idxRd = bufio.NewReaderSize(f, 256*1024)
+		idxRd = bufio.NewReaderSize(f, ReadBufSize)
 	}
 
 	// open DATA file
@@ -94,7 +94,7 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 		}
 
 		defer f.Close() // close at the end
-		datRd = bufio.NewReaderSize(f, 256*1024)
+		datRd = bufio.NewReaderSize(f, ReadBufSize)
 		if checkJsonArray {
 			if jarr, err := IsJsonArray(datRd); err != nil {
 				return fmt.Errorf("failed to check JSON array: %s", err)
