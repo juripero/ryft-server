@@ -102,6 +102,11 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 		return // already started
 	}
 
+	// if we need only aggregations, then do nothing here
+	if !task.config.ReportData && !task.config.ReportIndex && task.config.Offset < 0 {
+		return // no need to read data
+	}
+
 	rr := NewResultsReader(task,
 		task.DataFileName, task.IndexFileName,
 		task.ViewFileName, task.config.Delimiter)

@@ -369,8 +369,9 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			res.Stat.AddSessionData("matches", res.Stat.Matches)
 
 			// save backend tool used
-			_, tool := filepath.Split(task.toolPath)
-			res.Stat.Extra["backend"] = tool
+			if _, tool := filepath.Split(task.toolPath); len(tool) != 0 {
+				res.Stat.Extra["backend"] = tool
+			}
 		}
 
 		res.ReportDone()
@@ -503,6 +504,11 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			res.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
 		}
 		task.aggsStopTime = time.Now()
+
+		if res.Stat == nil {
+			// create dummy statistics to report aggregations here
+			res.Stat = search.NewStat(engine.IndexHost)
+		}
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing

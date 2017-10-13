@@ -295,6 +295,7 @@ func main() {
 	// main API endpoints
 	private.GET("/search", server.DoSearch)
 	private.GET("/search/show", server.DoSearchShow)
+	private.GET("/search/aggs", server.DoAggregations)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
 	private.GET("/run", server.DoRun)
@@ -302,8 +303,12 @@ func main() {
 	// POST & PUT aliases for requests with JSON body
 	private.POST("/search", server.DoSearch)
 	private.POST("/count", server.DoCount)
+	private.POST("/search/show", server.DoSearchShow)
+	private.POST("/search/aggs", server.DoAggregations)
 	private.PUT("/search", server.DoSearch)
 	private.PUT("/count", server.DoCount)
+	private.PUT("/search/show", server.DoSearchShow)
+	private.PUT("/search/aggs", server.DoAggregations)
 
 	// need to provide both URLs to disable redirecting
 	private.GET("/files", server.DoGetFiles)

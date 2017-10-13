@@ -82,11 +82,6 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	// server URL should be parsed in engine initialization
 	// so we can omit error checking here
 	u, _ := url.Parse(engine.ServerURL)
-	if cfg.ReportIndex {
-		u.Path += "/search"
-	} else {
-		u.Path += "/count"
-	}
 
 	// prepare query
 	q := url.Values{}
