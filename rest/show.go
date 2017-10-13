@@ -53,8 +53,8 @@ type SearchShowParams struct {
 	ViewFile  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 	Session   string `form:"session" json:"session,omitempty" msgpack:"session,omitempty"`
-	Offset    uint64 `form:"offset" json:"offset,omitempty" msgpack:"offset,omitempty"`
-	Count     uint64 `form:"count" json:"count,omitempty" msgpack:"count,omitempty"`
+	Offset    int64  `form:"offset" json:"offset,omitempty" msgpack:"offset,omitempty"`
+	Count     int64  `form:"count" json:"count,omitempty" msgpack:"count,omitempty"`
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
@@ -82,10 +82,17 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	// parse request parameters
 	params := SearchShowParams{
 		Format: format.RAW,
+		Count:  -1, // all records
 	}
 	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
+	}
+
+	// error prefix
+	var errorPrefix string
+	if params.InternalErrorPrefix {
+		errorPrefix = server.Config.HostName
 	}
 
 	var sessionInfo []interface{}
@@ -141,8 +148,8 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = true // /search
 	cfg.ReportData = !format.IsNull(params.Format)
-	cfg.Offset = uint(params.Offset)
-	cfg.Limit = uint(params.Count)
+	cfg.Offset = params.Offset
+	cfg.Limit = params.Count
 	cfg.Performance = params.Performance
 
 	// parse post-process transformations
@@ -170,6 +177,9 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	searchStartTime := time.Now() // performance metric
 	res, err := engine.Show(cfg)
 	if err != nil {
+		if len(errorPrefix) != 0 {
+			err = fmt.Errorf("[%s]: %s", errorPrefix, err)
+		}
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to start search/show"))
 	}
@@ -179,12 +189,6 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	// we need to cancel search request
 	// to prevent resource leaks
 	defer cancelIfNotDone(res)
-
-	// error prefix
-	var errorPrefix string
-	if params.InternalErrorPrefix {
-		errorPrefix = server.Config.HostName
-	}
 
 	// drain all results
 	transferStartTime := time.Now() // performance metric
@@ -270,7 +274,7 @@ func (server *Server) getShowEngine(localOnly bool, authToken, homeDir, userTag 
 
 		nodes = append(nodes, node)
 	} else {
-		if baseCfg.Limit == 0 {
+		if baseCfg.Limit < 0 {
 			log.Debugf("[%s/show]: requested range [%d..)", CORE, baseCfg.Offset)
 		} else {
 			log.Debugf("[%s/show]: requested range [%d..%d)", CORE, baseCfg.Offset, baseCfg.Offset+baseCfg.Limit)
@@ -292,7 +296,7 @@ func (server *Server) getShowEngine(localOnly bool, authToken, homeDir, userTag 
 				if end <= uint64(baseCfg.Offset) {
 					continue // out of range
 				}
-				if baseCfg.Limit != 0 && uint64(baseCfg.Offset+baseCfg.Limit) < beg {
+				if baseCfg.Limit >= 0 && uint64(baseCfg.Offset+baseCfg.Limit) < beg {
 					continue // out of range
 				}
 
@@ -333,19 +337,19 @@ func (server *Server) getShowEngine(localOnly bool, authToken, homeDir, userTag 
 				}
 
 				if beg < uint64(baseCfg.Offset) {
-					node.Cfg.Offset = uint(uint64(baseCfg.Offset) - beg)
+					node.Cfg.Offset = baseCfg.Offset - int64(beg)
 				} else {
 					node.Cfg.Offset = 0
 				}
-				if baseCfg.Limit != 0 {
+				if baseCfg.Limit >= 0 {
 					if end < uint64(baseCfg.Offset+baseCfg.Limit) {
-						node.Cfg.Limit = uint(matches - uint64(node.Cfg.Offset))
+						node.Cfg.Limit = int64(matches) - node.Cfg.Offset
 					} else {
-						node.Cfg.Limit = uint(matches - (end - uint64(baseCfg.Offset+baseCfg.Limit)) - uint64(node.Cfg.Offset))
+						node.Cfg.Limit = int64(matches) - (int64(end) - (baseCfg.Offset + baseCfg.Limit)) - node.Cfg.Offset
 					}
 				} else {
 					// get all remaining matches
-					node.Cfg.Limit = uint(matches - uint64(node.Cfg.Offset)) // 0
+					node.Cfg.Limit = int64(matches) - node.Cfg.Offset // 0
 				}
 
 				log.Debugf("[%s/show]: %s mapped range [%d/%d]", CORE, node.Url, node.Cfg.Offset, node.Cfg.Limit)

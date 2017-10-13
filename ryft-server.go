@@ -352,37 +352,53 @@ func main() {
 	})
 
 	// start listening on HTTPS port
+	var httpsServer *graceful.Server
 	if tls := server.Config.TLS; tls.Enabled {
-		ep := &http.Server{Addr: tls.ListenAddress, Handler: router}
-		ep.ReadTimeout = server.Config.HttpTimeout
-		ep.WriteTimeout = server.Config.HttpTimeout
+		httpsServer = &graceful.Server{
+			Timeout: server.Config.ShutdownTimeout,
+			Server: &http.Server{
+				Addr: tls.ListenAddress, Handler: router,
+				ReadTimeout:  server.Config.HttpTimeout,
+				WriteTimeout: server.Config.HttpTimeout,
+			},
+		}
 
 		go func() {
-			worker := &graceful.Server{
-				Timeout: server.Config.ShutdownTimeout,
-				Server:  ep,
-			}
-
-			if err := worker.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
+			defer log.Debugf("HTTPS server has stopped")
+			log.WithField("address", tls.ListenAddress).Debugf("starting HTTPS server")
+			if err := httpsServer.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
 				log.WithError(err).WithField("address", tls.ListenAddress).Fatal("failed to listen HTTPS")
 			}
 		}()
 	}
 
 	// start listening on HTTP port
+	var httpServer *graceful.Server
 	if addr := server.Config.ListenAddress; len(addr) != 0 {
-		ep := &http.Server{Addr: addr, Handler: router}
-		ep.ReadTimeout = server.Config.HttpTimeout
-		ep.WriteTimeout = server.Config.HttpTimeout
-
-		worker := &graceful.Server{
+		httpServer = &graceful.Server{
 			Timeout: server.Config.ShutdownTimeout,
-			Server:  ep,
+			Server: &http.Server{
+				Addr: addr, Handler: router,
+				ReadTimeout:  server.Config.HttpTimeout,
+				WriteTimeout: server.Config.HttpTimeout,
+			},
 		}
 
-		if err := worker.ListenAndServe(); err != nil {
-			log.WithError(err).WithField("address", addr).Fatal("failed to listen HTTP")
-		}
+		go func() {
+			defer log.Debugf("HTTP server has stopped")
+			log.WithField("address", addr).Debugf("starting HTTP server")
+			if err := httpServer.ListenAndServe(); err != nil {
+				log.WithError(err).WithField("address", addr).Fatal("failed to listen HTTP")
+			}
+		}()
+	}
+
+	// wait servers
+	if httpServer != nil {
+		<-httpServer.StopChan()
+	}
+	if httpsServer != nil {
+		<-httpsServer.StopChan()
 	}
 
 	log.Info("server stopped")

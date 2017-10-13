@@ -145,7 +145,7 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	if cfg.Lifetime != 0 {
 		q.Set("lifetime", cfg.Lifetime.String())
 	}
-	if cfg.Limit > 0 {
+	if cfg.Limit >= 0 {
 		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
 	}
 	if cfg.Offset > 0 {

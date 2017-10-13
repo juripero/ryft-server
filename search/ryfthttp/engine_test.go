@@ -57,7 +57,7 @@ func newFake(records, errors int) *fakeServer {
 	}
 
 	mux.HandleFunc("/search", fs.doSearch)
-	mux.HandleFunc("/count", fs.doCount)
+	mux.HandleFunc("/count", fs.doSearch)
 	//mux.HandleFunc("/search/show", fs.doSearchShow)
 	mux.HandleFunc("/files", fs.doFiles)
 
@@ -178,7 +178,7 @@ func TestEnginePrepareSearchUrl(t *testing.T) {
 		"http://localhost:12345/count?--internal-error-prefix=true&--internal-no-session-id=true&cs=true&format=null&limit=100&local=false&query=hello&stats=true&stream=true")
 	check(cfg, "http://localhost:12345", true,
 		"http://localhost:12345/count?--internal-error-prefix=true&--internal-no-session-id=true&cs=true&format=null&limit=100&local=true&query=hello&stats=true&stream=true")
-	cfg.Limit = 0
+	cfg.Limit = -1
 
 	cfg.ReportIndex = true
 	cfg.ReportData = true

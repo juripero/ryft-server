@@ -72,7 +72,7 @@ type SearchParams struct {
 	KeepViewAs  string   `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string   `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 	Lifetime    string   `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
-	Limit       int      `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
+	Limit       int64    `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
@@ -97,6 +97,17 @@ type SearchParams struct {
 
 // Handle /search endpoint.
 func (server *Server) DoSearch(ctx *gin.Context) {
+	server.doSearch(ctx, SearchParams{
+		Format: format.RAW,
+		Case:   true,
+		Reduce: true,
+		Limit:  -1, // no limit
+		Stats:  false,
+	})
+}
+
+// Handle /search endpoint.
+func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
@@ -104,11 +115,6 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := SearchParams{
-		Format: format.RAW,
-		Case:   true,
-		Reduce: true,
-	}
 	if err := bindOptionalJson(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request JSON parameters"))
@@ -116,6 +122,12 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
+	}
+
+	// error prefix
+	var errorPrefix string
+	if params.InternalErrorPrefix {
+		errorPrefix = server.Config.HostName
 	}
 
 	// backward compatibility old files and catalogs (just aliases)
@@ -185,10 +197,10 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 				WithDetails("failed to parse lifetime"))
 		}
 	}
-	cfg.ReportIndex = true // /search
-	cfg.ReportData = !format.IsNull(params.Format)
+	cfg.ReportIndex = params.Limit != 0 // -1 or >0
+	cfg.ReportData = params.Limit != 0 && !format.IsNull(params.Format)
 	cfg.Offset = 0
-	cfg.Limit = uint(params.Limit)
+	cfg.Limit = params.Limit
 	cfg.Performance = params.Performance
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	if err != nil {
@@ -232,6 +244,9 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	searchStartTime := time.Now() // performance metric
 	res, err := engine.Search(cfg)
 	if err != nil {
+		if len(errorPrefix) != 0 {
+			err = fmt.Errorf("[%s]: %s", errorPrefix, err)
+		}
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to start search"))
 	}
@@ -244,12 +259,6 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 
 	server.onSearchStarted(cfg)
 	defer server.onSearchStopped(cfg)
-
-	// error prefix
-	var errorPrefix string
-	if params.InternalErrorPrefix {
-		errorPrefix = server.Config.HostName
-	}
 
 	// drain all results
 	transferStartTime := time.Now() // performance metric
