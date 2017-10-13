@@ -42,6 +42,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/getryft/ryft-server/search/utils/query"
 	"github.com/getryft/ryft-server/search/utils/view"
@@ -137,8 +138,8 @@ type PostProcessing interface {
 	Drop(keep bool) // finish work
 	ClearAll()      // clear all data
 
-	AddRyftResults(dataPath, indexPath string,
-		delimiter string, width int, opt uint32) error
+	AddRyftResults(dataPath, indexPath string, delimiter string,
+		width int, opt uint32, isJsonArray bool) error
 	AddCatalog(base *catalog.Catalog) error
 
 	DrainFinalResults(task *Task, mux *search.Result,
@@ -432,7 +433,7 @@ func (mpp *InMemoryPostProcessing) ClearAll() {
 }
 
 // add Ryft results
-func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delim string, width int, opt uint32) error {
+func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delim string, width int, opt uint32, isJsonArray bool) error {
 	start := time.Now()
 	defer func() {
 		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-result duration", TAG)
@@ -457,6 +458,11 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 	rd := bufio.NewReaderSize(file, 256*1024)
 	delimLen := uint64(len(delim))
 	dataPos := uint64(0)
+	dataSkip := uint64(0)
+	if isJsonArray {
+		dataSkip = ryftprim.JsonArraySkip
+	}
+
 	for {
 		// read line by line
 		line, err := rd.ReadBytes('\n')
@@ -466,8 +472,8 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 				return fmt.Errorf("failed to parse index: %s", err)
 			}
 
-			indexFile.Add(index.SetDataPos(dataPos))
-			dataPos += (index.Length + delimLen)
+			indexFile.Add(index.SetDataPos(dataPos + dataSkip))
+			dataPos += (dataSkip + index.Length + delimLen)
 		}
 
 		if err != nil {
@@ -478,6 +484,10 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 			}
 		}
 	}
+
+	// in case of JSON array file - take into account
+	// the final part or JSON array: "\n]"
+	dataPos += dataSkip
 
 	// check DATA file consistency
 	if info, err := os.Stat(dataPath); err == nil {

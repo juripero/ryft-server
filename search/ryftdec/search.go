@@ -321,7 +321,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		for _, out := range res.Output {
 			if err := task.result.AddRyftResults(
 				opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
-				out.Delimiter, out.Width, 1 /*final*/); err != nil {
+				out.Delimiter, out.Width, 1 /*final*/, out.isJsonArray); err != nil {
 				task.log().WithError(err).Errorf("[%s]: failed to add final Ryft results", TAG)
 				mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
 				return
@@ -331,7 +331,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				// TODO: move this code to final results, becase there is no transformation applied yet
 				if err := ryftprim.ApplyAggregations(opts.atHome(out.IndexFile), opts.atHome(out.DataFile),
 					out.Delimiter, cfg.DataFormat, cfg.Aggregations,
-					func() bool { return mux.IsCancelled() }); err != nil {
+					out.isJsonArray, func() bool { return mux.IsCancelled() }); err != nil {
 					task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
 					mux.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
 					return
@@ -418,6 +418,7 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 	cfg.ReportIndex = false
 	cfg.ReportData = false
 	cfg.Aggregations = nil // disable
+	cfg.IsRecord = query.IsStructured()
 
 	task.log().WithFields(map[string]interface{}{
 		"query": cfg.Query,
@@ -428,16 +429,24 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 		return nil, err
 	}
 
-	var result SearchResult
-	result.Output = append(result.Output, RyftCall{
+	rc := RyftCall{
 		DataFile:  cfg.KeepDataAs,
 		IndexFile: cfg.KeepIndexAs,
 		Delimiter: cfg.Delimiter,
 		Width:     cfg.Width,
-	})
+	}
 
 	task.drainResults(mux, res)
+	var result SearchResult
 	result.Stat = res.Stat
+	if cfg.IsRecord {
+		// for RECORD search we have to check the JSON array format
+		if err := rc.checkJsonArray(opts); err != nil {
+			return nil, fmt.Errorf("failed to check JSON array: %s", err)
+		}
+	}
+	result.Output = append(result.Output, rc)
+
 	task.log().WithField("output", result).Infof("Ryft call result")
 	stopTime := time.Now()
 
@@ -474,10 +483,10 @@ func getHostPerfStat(stat *search.Stat) map[string]interface{} {
 func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.log().Infof("[%s/%d]: running AND", TAG, task.subtaskId)
 
-	tempCfg := *cfg
+	tempCfg := cfg.Clone()
 	tempCfg.Delimiter = catalog.DefaultDataDelimiter
 	tempCfg.ReportData, tempCfg.ReportIndex = false, false // /count
-	res1, err1 := engine.doSearch(task, opts, query.Arguments[0], &tempCfg, mux)
+	res1, err1 := engine.doSearch(task, opts, query.Arguments[0], tempCfg, mux)
 	if err1 != nil {
 		return nil, err1
 	}
@@ -514,7 +523,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			for _, out := range res1.Output {
 				if err := task.result.AddRyftResults(
 					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
-					out.Delimiter, out.Width, 1 /*final*/); err != nil {
+					out.Delimiter, out.Width, 1 /*final*/, out.isJsonArray); err != nil {
 					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
 				}
 			}
@@ -555,7 +564,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			for _, out := range res1.Output {
 				if err := task.result.AddRyftResults(
 					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
-					out.Delimiter, out.Width, 0 /*intermediate*/); err != nil {
+					out.Delimiter, out.Width, 0 /*intermediate*/, out.isJsonArray); err != nil {
 					task.log().WithError(err).Warnf("[%s]: failed to add Ryft intermediate results", TAG)
 					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
 				}
@@ -576,7 +585,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			tempCfg.Delimiter = cfg.Delimiter
 		}
 
-		res2, err2 := engine.doSearch(task, opts, q2, &tempCfg, mux)
+		res2, err2 := engine.doSearch(task, opts, q2, tempCfg, mux)
 		if err2 != nil {
 			return nil, err2
 		}
@@ -599,7 +608,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 func (engine *Engine) doOr(task *Task, opts backendOptions, query query.Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.log().Infof("[%s/%d]: running OR", TAG, task.subtaskId)
 
-	tempCfg := *cfg
+	tempCfg := cfg.Clone()
 	// tempCfg.Delimiter
 
 	var result SearchResult
@@ -611,7 +620,7 @@ func (engine *Engine) doOr(task *Task, opts backendOptions, query query.Query, c
 			break // stop
 		}
 
-		res1, err1 := engine.doSearch(task, opts, query.Arguments[i], &tempCfg, mux)
+		res1, err1 := engine.doSearch(task, opts, query.Arguments[i], tempCfg, mux)
 		if err1 != nil {
 			return nil, err1
 		}

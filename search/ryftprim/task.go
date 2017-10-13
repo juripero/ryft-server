@@ -111,6 +111,7 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 	rr.Limit = task.config.Limit         // limit the total number of records
 	rr.ReadData = task.config.ReportData // if `false` only indexes will be reported
 	rr.MakeView = !task.isShow           // if /show do not create VIEW file, just use it
+	rr.CheckJsonArray = task.config.IsRecord
 
 	// report filepath relative to home and update index's host
 	rr.RelativeToHome = filepath.Join(engine.MountPoint, engine.HomeDir)

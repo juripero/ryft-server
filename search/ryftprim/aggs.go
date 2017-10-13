@@ -45,9 +45,10 @@ import (
 
 // Apply aggregations
 func ApplyAggregations(indexPath, dataPath string, delimiter string, format string,
-	aggregations *aggs.Aggregations, cancelFunc func() bool) error {
+	aggregations *aggs.Aggregations, checkJsonArray bool, cancelFunc func() bool) error {
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
+	var dataSkip uint64
 
 	// select DATA format
 	var doFormat func([]byte) (interface{}, error)
@@ -94,6 +95,13 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 
 		defer f.Close() // close at the end
 		datRd = bufio.NewReaderSize(f, 256*1024)
+		if checkJsonArray {
+			if jarr, err := IsJsonArray(datRd); err != nil {
+				return fmt.Errorf("failed to check JSON array: %s", err)
+			} else if jarr {
+				dataSkip = JsonArraySkip // JSON array marker
+			}
+		}
 	}
 
 	// read INDEX line-by-line and corresponding DATA
@@ -117,8 +125,20 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 
 		index, err := search.ParseIndex(line)
 		if err != nil {
-			log.WithError(err).Warnf("[%s/reader]: failed to parse INDEX from %q", TAG, bytes.TrimSpace(line))
+			log.WithError(err).Warnf("[%s/aggs]: failed to parse INDEX from %q", TAG, bytes.TrimSpace(line))
 			return fmt.Errorf("failed to parse INDEX: %s", err)
+		}
+
+		// skip JSON array mark
+		if n := int(dataSkip); n != 0 {
+			m, err := datRd.Discard(n)
+			if err != nil {
+				log.WithError(err).Warnf("[%s/aggs]: failed to skip JSON mark", TAG)
+				return fmt.Errorf("failed to skip JSON mark: %s", err)
+			} else if m != n {
+				log.Warnf("[%s/aggs]: not all JSON mark skipped: %d of %d", TAG, m, n)
+				return fmt.Errorf("not all JSON mark skipped: %d of %d", m, n)
+			}
 		}
 
 		data := make([]byte, index.Length)
@@ -129,7 +149,7 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 			log.Warnf("[%s/aggs]: not all DATA read: %d of %d", TAG, n, index.Length)
 			return fmt.Errorf("not all DATA read: %d of %d", n, index.Length)
 		}
-		dataPos += uint64(len(data))
+		dataPos += dataSkip + uint64(len(data))
 
 		//		log.WithField("data", string(data)).
 		//			Debugf("[%s/aggs]: new DATA read", TAG) // FIXME: DEBUG

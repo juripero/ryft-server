@@ -473,7 +473,16 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	} else if !task.isShow {
 		// it's /count, check if we have to create VIEW file
 		if len(task.ViewFileName) != 0 {
-			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter); err != nil {
+			isJsonArray := false
+			if task.config.IsRecord && len(task.DataFileName) != 0 {
+				if jarr, err := IsJsonArrayFile(task.DataFileName); err != nil {
+					res.ReportError(fmt.Errorf("failed to check JSON array: %s", err))
+				} else {
+					isJsonArray = jarr
+				}
+			}
+
+			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter, isJsonArray); err != nil {
 				task.log().WithError(err).WithField("path", task.ViewFileName).
 					Warnf("[%s]: failed to create VIEW file", TAG)
 				res.ReportError(fmt.Errorf("failed to create VIEW file: %s", err))
@@ -487,7 +496,7 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		task.aggsStartTime = time.Now()
 		err := ApplyAggregations(task.IndexFileName, task.DataFileName,
 			task.config.Delimiter, task.config.DataFormat, task.config.Aggregations,
-			func() bool { return res.IsCancelled() })
+			task.config.IsRecord, func() bool { return res.IsCancelled() })
 		if err != nil {
 			task.log().WithError(err).
 				Warnf("[%s]: failed to apply aggregations", TAG)
