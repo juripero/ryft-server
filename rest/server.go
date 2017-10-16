@@ -100,6 +100,8 @@ type ServerConfig struct {
 	ShutdownTimeout_ TimeDuration  `yaml:"shutdown-timeout,omitempty"`
 	ShutdownTimeout  time.Duration `yaml:"-"`
 
+	ProcessingThreads int `yaml:"processing-threads"`
+
 	TLS struct {
 		Enabled       bool   `yaml:"enabled,omitempty"`
 		ListenAddress string `yaml:"address,omitempty"`

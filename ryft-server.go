@@ -34,6 +34,7 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -146,6 +147,11 @@ func main() {
 		}
 	}
 
+	// set number of processing threads
+	if n := server.Config.ProcessingThreads; n > 0 {
+		runtime.GOMAXPROCS(n)
+	}
+
 	// prepare server to start
 	if err := server.Prepare(); err != nil {
 		log.WithError(err).Fatal("failed to prepare server configuration")
@@ -167,6 +173,7 @@ func main() {
 		"logging":       server.Config.Logging,
 		"address":       server.Config.ListenAddress,
 		"settings-path": server.Config.SettingsPath,
+		"max-threads":   runtime.GOMAXPROCS(0),
 	}).Info("main configuration")
 	log.WithFields(map[string]interface{}{
 		"search-backend":     server.Config.SearchBackend,
