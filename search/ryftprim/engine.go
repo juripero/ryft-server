@@ -72,11 +72,26 @@ type Engine struct {
 	IndexHost string // optional host (cluster mode)
 
 	RyftxOpts     []string // options for ryftx backend
-	RyftprimOpts  []string // options for ryftprim backendg
+	RyftprimOpts  []string // options for ryftprim backend
 	Ryftpcre2Opts []string // options for pcre2 backend
 	RyftAllOpts   []string // common options for all backends
 
+	TweakOpts *TweakOpts // backend tweak options
+
 	options map[string]interface{}
+}
+
+// NewTweakOpts creates Tweak object. TODO: use tree struct in order to serve keys of arbitrary size with the priority
+func NewTweakOpts(data map[string][]string) *TweakOpts {
+	return &TweakOpts{data}
+}
+
+type TweakOpts struct {
+	data map[string][]string
+}
+
+func (t TweakOpts) GetOptions(mode, backend, primitive string) ([]string, error) {
+	return nil, nil
 }
 
 // NewEngine creates new RyftPrim search engine.

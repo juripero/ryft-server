@@ -89,7 +89,6 @@ clean:
 	rm -f $(ASSETS)
 	rm -f $(BINARIES)
 
-
 # clone and pull ryft-docker remote repository
 .PHONY: clone_ryft_docker pull_ryft_docker
 clone_ryft_docker:
@@ -120,3 +119,7 @@ integration_test: pull_ryft_integration_test
 .PHONY: unit_test
 unit_test: pull_ryft_docker
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} unit_test
+
+.PHONY: cli
+cli: pull_ryft_docker
+	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} cli
