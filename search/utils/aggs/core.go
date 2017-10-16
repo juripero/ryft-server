@@ -72,6 +72,12 @@ func (a *Aggregations) GetOpts() map[string]interface{} {
 	return a.options
 }
 
+// Clone clones the aggregation engines and functions
+func (a *Aggregations) Clone() *Aggregations {
+	n, _ := MakeAggs(a.options)
+	return n
+}
+
 // ToJson saves all aggregations to JSON
 // if final is true then all functions are reported
 // otherwise the all engines are reported (cluster mode).

@@ -39,6 +39,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/getryft/ryft-server/rest/format/xml"
 	"github.com/getryft/ryft-server/search"
@@ -121,13 +122,13 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 		// each goroutine will use its own Aggerations
 		subAggs = make([]*aggregationGoroutine, concurrency)
 		dataCh = make(chan []byte, 4*1024)
+		log.Debugf("[%s/aggs]: start sub-processing in %d threads", TAG, concurrency)
+		start := time.Now()
 
 		// run several processing goroutines
 		for i := range subAggs {
-			if a, err := aggs.MakeAggs(aggregations.GetOpts()); err != nil {
-				return fmt.Errorf("failed to create sub-aggregation: %s", err)
-			} else {
-				subAggs[i].aggregations = a
+			subAggs[i] = &aggregationGoroutine{
+				aggregations: aggregations.Clone(),
 			}
 
 			wg.Add(1)
@@ -166,7 +167,7 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 			log.Debugf("[%s/aggs]: stopping sub-processing", TAG)
 			close(dataCh)
 			wg.Wait()
-			log.Debugf("[%s/aggs]: sub-processing done", TAG)
+			log.Debugf("[%s/aggs]: sub-processing done in %s", TAG, time.Since(start))
 
 			// print errors to the log
 			for _, sa := range subAggs {
