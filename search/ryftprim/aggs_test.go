@@ -78,7 +78,7 @@ func TestApplyAggregations(t *testing.T) {
 			return
 		}
 
-		err = ApplyAggregations(indexPath, dataPath, "\n", format, Aggs, true, nil)
+		err = ApplyAggregations(1, indexPath, dataPath, "\n", format, Aggs, true, nil)
 		if err != nil {
 			assert.Contains(t, err.Error(), expected)
 		} else {

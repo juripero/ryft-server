@@ -52,7 +52,7 @@ type aggregationGoroutine struct {
 }
 
 // Apply aggregations
-func ApplyAggregations(parallel int, indexPath, dataPath string, delimiter string, format string,
+func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter string, format string,
 	aggregations *aggs.Aggregations, checkJsonArray bool, cancelFunc func() bool) error {
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
@@ -116,10 +116,10 @@ func ApplyAggregations(parallel int, indexPath, dataPath string, delimiter strin
 	var dataCh chan []byte
 	var wg sync.WaitGroup
 	var subErrs int32
-	if parallel > 1 {
+	if concurrency > 1 {
 		// create a few goroutines to process aggregations
 		// each goroutine will use its own Aggerations
-		subAggs = make([]*aggregationGoroutine, parallel)
+		subAggs = make([]*aggregationGoroutine, concurrency)
 		dataCh = make(chan []byte, 4*1024)
 
 		// run several processing goroutines
@@ -244,7 +244,7 @@ func ApplyAggregations(parallel int, indexPath, dataPath string, delimiter strin
 			dataPos += uint64(len(delimiter))
 		}
 
-		if parallel > 1 {
+		if concurrency > 1 {
 			dataCh <- data // send data to processing goroutines
 			if atomic.LoadInt32(&subErrs) != 0 {
 				return fmt.Errorf("parallel error occurred")

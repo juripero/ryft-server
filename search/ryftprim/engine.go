@@ -69,6 +69,9 @@ type Engine struct {
 	ReadFilePollTimeout time.Duration
 	ReadFilePollLimit   int
 
+	// number of parallel threads to calculate aggregations on
+	AggregationConcurrency int
+
 	IndexHost string // optional host (cluster mode)
 
 	RyftxOpts     []string // options for ryftx backend
