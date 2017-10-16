@@ -105,6 +105,24 @@
           {
             "in": "query",
             "type": "string",
+            "x-go-name": "BackendMode",
+            "name": "backend-mode",
+            "description": "Backend mode (normal, high-performance, etc...).",
+            "enum": ["normal", "hp"]
+          },
+          {
+            "in": "query",
+            "type": "array",
+            "name": "backend-option",
+            "x-go-name": "BackendOpts",
+            "description": "Optional list of backend options",
+            "items": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "type": "string",
             "x-go-name": "Data",
             "name": "data",
             "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
@@ -247,11 +265,11 @@
       }
     },
     "/count": {
-      "produces": [
-        "application/json",
-        "text/csv"
-      ],
       "get": {
+        "produces": [
+          "application/json",
+          "text/csv"
+        ],
         "description": "Endpoint for the count. Does the search but returns just statistics.",
         "tags": [
           "search"
@@ -326,6 +344,24 @@
             "name": "backend",
             "description": "Optional backend tool.",
             "enum": ["ryftprim", "ryftx"]
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "BackendMode",
+            "name": "backend-mode",
+            "description": "Backend mode (normal, high-performance, etc...).",
+            "enum": ["normal", "hp"]
+          },
+          {
+            "in": "query",
+            "type": "array",
+            "name": "backend-option",
+            "x-go-name": "BackendOpts",
+            "description": "Optional list of backend options",
+            "items": {
+              "type": "string"
+            }
           },
           {
             "in": "query",
@@ -1391,6 +1427,20 @@
           "x-go-name": "Backend",
           "description": "Optional backend tool.",
           "enum": ["ryftprim", "ryftx"]
+        },
+        "backend-mode": {
+          "type": "string",
+          "x-go-name": "BackendMode",
+          "description": "Backend mode (normal, high-performance, etc...).",
+          "enum": ["normal", "hp"]
+        },
+        "backend-option": {
+          "type": "array",
+          "x-go-name": "BackendOpts",
+          "description": "Optional list of backend options",
+          "items": {
+            "type": "string"
+          }
         },
         "data": {
           "type": "string",

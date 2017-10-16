@@ -67,6 +67,7 @@ type SearchParams struct {
 
 	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
 	BackendOpts []string `form:"backend-option" json:"backend-options,omitempty" msgpack:"backend-options,omitempty"` // search engine parameters (useless without "backend")
+	BackendMode string   `form:"backend-mode" json:"backend-mode,omitempty" msgpack:"backend-mode,omitempty"`
 	KeepDataAs  string   `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string   `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	KeepViewAs  string   `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
