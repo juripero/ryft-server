@@ -265,7 +265,15 @@ func (rr *ResultsReader) process(res *search.Result) {
 				return // failed
 			} else if jarr {
 				dataSkip = JsonArraySkip // JSON array marker
+				rr.log().WithField("path", rr.DataPath).
+					Debugf("[%s/reader]: is JSON array file", TAG)
+			} else {
+				rr.log().WithField("path", rr.DataPath).
+					Debugf("[%s/reader]: is a simple binary file", TAG)
 			}
+		} else {
+			rr.log().WithField("path", rr.DataPath).
+				Debugf("[%s/reader]: no JSON array check needed", TAG)
 		}
 	}
 

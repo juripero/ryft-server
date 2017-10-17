@@ -419,7 +419,6 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 	cfg.ReportIndex = false
 	cfg.ReportData = false
 	cfg.Aggregations = nil // disable
-	cfg.IsRecord = query.IsStructured()
 
 	task.log().WithFields(map[string]interface{}{
 		"query": cfg.Query,

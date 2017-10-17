@@ -123,6 +123,7 @@ func (engine *Engine) getBackendAggConcurrency() int {
 // updates the seach configuration
 func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery, boolOps int) {
 	updateConfig(cfg, q.Options)
+	cfg.IsRecord = q.Structured
 	if engine.CompatMode {
 		cfg.Query = q.ExprOld
 	} else {
