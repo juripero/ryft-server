@@ -164,7 +164,7 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 
 		// at the end combine all sub-aggregations
 		defer func() {
-			log.Debugf("[%s/aggs]: stopping sub-processing", TAG)
+			log.Debugf("[%s/aggs]: waiting sub-processing", TAG)
 			close(dataCh)
 			wg.Wait()
 			log.Debugf("[%s/aggs]: sub-processing done in %s", TAG, time.Since(start))
