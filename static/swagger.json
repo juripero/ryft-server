@@ -538,7 +538,87 @@
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
+            "description": "Search result contains all requested records.",
+            "schema": {
+              "$ref": "#/definitions/SearchResponse"
+            }
+          },
+          "default": {
+            "description": "Error responses",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/search/aggs": {
+      "get": {
+        "description": "Endpoint to calculate aggregations on search results (Should be prepared with /search or /count).",
+        "tags": [
+          "search"
+        ],
+        "produces": [
+          "application/json",
+          "text/csv"
+        ],
+        "summary": "Calculate aggregations on search results",
+        "operationId": "searchAggs",
+        "parameters": [
+          {
+            "in": "query",
+            "type": "string",
+            "name": "format",
+            "x-go-name": "Format",
+            "description": "Input data format. Parameter is used with structured or RAW text search.",
+            "enum": ["raw", "xml", "json", "utf8", "null"]
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Session",
+            "name": "session",
+            "description": "Session token to access search results."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "x-go-name": "Data",
+            "name": "data",
+            "description": "Name of DATA file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "index",
+            "x-go-name": "Index",
+            "description": "Name of INDEX file to read."
+          },
+          {
+            "in": "query",
+            "type": "string",
+            "name": "delimiter",
+            "x-go-name": "Delimiter",
+            "description": "The delimiter is used between found records in DATA file."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "local",
+            "x-go-name": "Local",
+            "description": "Perform search only on this cluster member. Default 'false'."
+          },
+          {
+            "in": "query",
+            "type": "boolean",
+            "name": "performance",
+            "x-go-name": "Performance",
+            "description": "Include performance metrics in response. Default 'false'."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains all calculated aggregations.",
             "schema": {
               "$ref": "#/definitions/SearchResponse"
             }
