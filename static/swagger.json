@@ -29,7 +29,7 @@
           { "$ref": "#/parameters/SaveView" },
           { "$ref": "#/parameters/Delimiter" },
           { "$ref": "#/parameters/Lifetime" },
-          { "$ref": "#/parameters/ShareMode" },
+          { "$ref": "#/parameters/ReadShareMode" },
           { "$ref": "#/parameters/SearchNodes" },
           { "$ref": "#/parameters/Local" },
           { "$ref": "#/parameters/SearchStat" },
@@ -94,7 +94,7 @@
           { "$ref": "#/parameters/SaveView" },
           { "$ref": "#/parameters/Delimiter" },
           { "$ref": "#/parameters/Lifetime" },
-          { "$ref": "#/parameters/ShareMode" },
+          { "$ref": "#/parameters/ReadShareMode" },
           { "$ref": "#/parameters/SearchNodes" },
           { "$ref": "#/parameters/Local" },
           { "$ref": "#/parameters/Performance" }
@@ -139,7 +139,7 @@
         "description": "Endpoint to access search results. Reads already existing search results.",
         "tags": [ "search" ],
         "produces": [ "application/json", "text/csv" ],
-        "summary": "Read search results",
+        "summary": "Read the search results",
         "operationId": "searchShow",
         "parameters": [
           { "$ref": "#/parameters/ShowOffset" },
@@ -194,9 +194,9 @@
     },
     "/run": {
       "get": {
-        "tags": [ "run" ],
+        "tags": [ "misc" ],
         "summary": "Run custom command on server side",
-        "description": "Endpoint to run custom command",
+        "description": "Endpoint to run custom command on server side. Is used for custom post-processing.",
         "operationId": "run",
         "parameters": [
           {
@@ -209,16 +209,14 @@
           {
             "name": "command",
             "type": "string",
-            "description": "Command to run.",
+            "description": "Command or script to run.",
             "required": false,
             "in": "query"
           },
           {
             "in": "query",
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "name": "arg",
             "description": "Set of arguments.",
             "collectionFormat": "multi",
@@ -229,7 +227,8 @@
           "200": {
             "description": "STDOUT and STDERR combined output of the command",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "binary"
             }
           },
           "default": {
@@ -242,48 +241,25 @@
     "/rename": {
       "put": {
         "tags": [ "files" ],
-        "summary": "Change file/directory/catalog name or file name in catalog",
-        "description": "Endpoint for the file renaming",
-        "operationId": "updateFiles",
+        "summary": "Rename file or directory",
+        "description": "Endpoint for the file/directory renaming. Catalogs are also supported.",
+        "operationId": "renameFile",
         "parameters": [
-          {
-            "name": "file",
-            "type": "string",
-            "description": "The uploading filename.",
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "dir",
-            "type": "string",
-            "description": "Directory name.",
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "Catalog name.",
-            "required": false,
-            "in": "query"
-          },
+          { "$ref": "#/parameters/FilePath" },
+          { "$ref": "#/parameters/DirPath" },
+          { "$ref": "#/parameters/CatalogPath" },
           {
             "name": "new",
             "type": "string",
-            "description": "New name for a file/directore/catalog or file inside catalog.",
+            "description": "The new name for a file/directory/catalog or file inside catalog.",
             "required": true,
             "in": "query"
           },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "description": "Perform action only on this cluster member. Default 'false'."
-          }
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
-            "description": "Map of file/dir/catalog and its status",
+            "description": "Rename status for each item.",
             "schema": { "$ref": "#/definitions/RenameResponse" }
           },
           "default": {
@@ -300,30 +276,10 @@
         "description": "Endpoint to download a file",
         "operationId": "getFile",
         "parameters": [
-          {
-            "name": "dir",
-            "type": "string",
-            "description": "The folder path where file is located. Default '/'",
-            "in": "query"
-          },
-          {
-            "name": "local",
-            "type": "boolean",
-            "description": "Return file structure from local node only or whole cluster",
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "The path to catalog to download file of",
-            "in": "query"
-          },
-          {
-            "name": "file",
-            "type": "string",
-            "description": "The filepath to download",
-            "in": "query"
-          }
+          { "$ref": "#/parameters/DirPath" },
+          { "$ref": "#/parameters/CatalogPath" },
+          { "$ref": "#/parameters/FilePath" },
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
@@ -342,73 +298,29 @@
       "post": {
         "tags": [ "files" ],
         "summary": "Upload a file",
-        "description": "Endpoint to upload a file",
+        "description": "Endpoint to upload a file.",
         "operationId": "postFile",
         "consumes": [ "multipart/form-data" ],
         "parameters": [
           {
-            "name": "content",
             "in": "formData",
+            "name": "content",
             "type": "file",
             "description": "File content to upload",
             "required": true
           },
-          {
-            "name": "file",
-            "type": "string",
-            "description": "The uploading filename. Use {{random}} for random names.",
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "The catalog to append file to.",
-            "in": "query"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "delimiter",
-            "description": "The delimiter is used between file parts in catalog."
-          },
-          {
-            "name": "offset",
-            "type": "integer",
-            "format": "int64",
-            "description": "The optional file part offset.",
-            "in": "query"
-          },
-          {
-            "name": "length",
-            "type": "integer",
-            "format": "int64",
-            "description": "The optional file part length.",
-            "in": "query"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "lifetime",
-            "description": "The file or catalog lifetime, for example \"2h\"."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "share-mode",
-            "x-go-name": "ShareMode",
-            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "description": "Perform action only on this cluster member. Default 'false'."
-          }
+          { "$ref": "#/parameters/NewFilePath" },
+          { "$ref": "#/parameters/CatalogPath" },
+          { "$ref": "#/parameters/FileDelimiter" },
+          { "$ref": "#/parameters/FileOffset" },
+          { "$ref": "#/parameters/FileLength" },
+          { "$ref": "#/parameters/FileLifetime" },
+          { "$ref": "#/parameters/WriteShareMode" },
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
-            "description": "Map of files and directories uploaded",
+            "description": "Status of files uploaded.",
             "schema": { "$ref": "#/definitions/PostFileResponse" }
           },
           "default": {
@@ -425,30 +337,15 @@
         "description": "Endpoint to query node/cluster file system structure",
         "operationId": "getFiles",
         "parameters": [
-          {
-            "name": "dir",
-            "type": "string",
-            "description": "The folder path to return child items of. Default '/'",
-            "in": "query"
-          },
+          { "$ref": "#/parameters/DirPath" },
+          { "$ref": "#/parameters/CatalogPath" },
           {
             "name": "hidden",
             "type": "boolean",
             "description": "Report hidden files",
             "in": "query"
           },
-          {
-            "name": "local",
-            "type": "boolean",
-            "description": "Return file structure from local node only or whole cluster",
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "The path to catalog to get content of",
-            "in": "query"
-          }
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
@@ -463,16 +360,14 @@
       },
       "delete": {
         "tags": [ "files" ],
-        "summary": "Delete directories and files",
+        "summary": "Delete file or directory",
         "description": "Endpoint to delete node's directories and files",
         "operationId": "deleteFiles",
         "parameters": [
           {
             "name": "dir",
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "collectionFormat": "multi",
             "description": "The directory path to delete. Wildcards are supported.",
             "in": "query"
@@ -480,9 +375,7 @@
           {
             "name": "file",
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "collectionFormat": "multi",
             "description": "The file path to delete. Wildcards are supported.",
             "in": "query"
@@ -490,24 +383,16 @@
           {
             "name": "catalog",
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "collectionFormat": "multi",
             "description": "The catalog path to delete. Wildcards are supported.",
             "in": "query"
           },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "x-go-name": "Local",
-            "description": "Perform action only on this cluster member. Default 'false'."
-          }
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
-            "description": "Map of files and directories deleted",
+            "description": "Status of files and directories deleted.",
             "schema": { "$ref": "#/definitions/DeleteFilesResponse" }
           },
           "default": {
@@ -535,62 +420,18 @@
             "description": "Byte content to upload",
             "required": true
           },
-          {
-            "name": "file",
-            "type": "string",
-            "description": "The uploading filename. Use {{random}} for random names.",
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "The catalog to append file to.",
-            "in": "query"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "delimiter",
-            "description": "The delimiter is used between file parts in catalog."
-          },
-          {
-            "name": "offset",
-            "type": "integer",
-            "format": "int64",
-            "description": "The optional file part offset.",
-            "in": "query"
-          },
-          {
-            "name": "length",
-            "type": "integer",
-            "format": "int64",
-            "description": "The optional file part length.",
-            "in": "query"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "lifetime",
-            "description": "The file or catalog lifetime, for example \"2h\"."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "share-mode",
-            "x-go-name": "ShareMode",
-            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "description": "Perform action only on this cluster member. Default 'false'."
-          }
+          { "$ref": "#/parameters/NewFilePath" },
+          { "$ref": "#/parameters/CatalogPath" },
+          { "$ref": "#/parameters/FileDelimiter" },
+          { "$ref": "#/parameters/FileOffset" },
+          { "$ref": "#/parameters/FileLength" },
+          { "$ref": "#/parameters/FileLifetime" },
+          { "$ref": "#/parameters/WriteShareMode" },
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
-            "description": "Map of files and directories uploaded",
+            "description": "Status of files uploaded.",
             "schema": { "$ref": "#/definitions/PostFileResponse" }
           },
           "default": {
@@ -640,7 +481,7 @@
             "schema": { "$ref": "#/definitions/LoginResponse" }
           },
           "default": {
-            "description": "Error responses",
+            "description": "Error response.",
             "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         },
@@ -659,7 +500,7 @@
             "schema": { "$ref": "#/definitions/LoginResponse" }
           },
           "default": {
-            "description": "Error responses",
+            "description": "Error response.",
             "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
@@ -671,7 +512,7 @@
       "in": "query",
       "name": "query",
       "type": "string",
-      "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")",
+      "description": "What to search. Could be simple pain text like `hello` or Ryft search query like `(RECORD.body CONTAINS \"night\")`.",
       "required": true
     },
     "SearchFile": {
@@ -679,7 +520,7 @@
       "name": "file",
       "type": "array",
       "items": { "type": "string" },
-      "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
+      "description": "Set of files or catalogs to search. The path should be designated relative to `/ryftone`. Wildcards are supported, for example: `*.txt`",
       "collectionFormat": "multi",
       "required": true
     },
@@ -687,14 +528,14 @@
       "in": "query",
       "name": "mode",
       "type": "string",
-      "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6), RegExp search (pcre2)",
-      "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6", "pcre2" ]
+      "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search",
+      "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2" ]
     },
     "Surrounding": {
       "in": "query",
       "name": "surrounding",
       "type": "string",
-      "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
+      "description": "Number of characters before the match and after the match that will be returned. Can be `line` to get whole line. This parameter is used with RAW text search."
     },
     "Fuzziness": {
       "in": "query",
@@ -703,7 +544,7 @@
       "format": "uint8",
       "maximum": 255,
       "minimum": 0,
-      "description": "Fuzziness of the search. Measured as the maximum Hamming distance for \"fhs\" mode or edit distance for \"feds\" mode."
+      "description": "Fuzziness of the search. Measured as the maximum Hamming distance for `fhs` mode or edit distance for `feds` mode."
     },
     "SearchFormat": {
       "in": "query",
@@ -717,14 +558,14 @@
       "name": "cs",
       "type": "boolean",
       "default": true,
-      "description": "Case sensitive flag"
+      "description": "Case sensitivity flag."
     },
     "SearchReduce": {
       "in": "query",
       "name": "reduce",
       "type": "boolean",
       "default": true,
-      "description": "Reduce flag for fuzzy edit distance search"
+      "description": "Reduce flag for fuzzy edit distance search."
     },
     "SearchFields": {
       "in": "query",
@@ -749,7 +590,7 @@
       "in": "query",
       "name": "data",
       "type": "string",
-      "description": "Name of DATA file to keep. `{{random}}` keyword is replaced with unique number. WARNING: file will be overriden!"
+      "description": "Name of DATA file to keep. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
     },
     "UseData": {
       "in": "query",
@@ -761,7 +602,7 @@
       "in": "query",
       "name": "index",
       "type": "string",
-      "description": "Name of INDEX file to keep. `{{random}}` keyword is replaced with unique number. WARNING: file will be overriden!"
+      "description": "Name of INDEX file to keep. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
     },
     "UseIndex": {
       "in": "query",
@@ -773,7 +614,7 @@
       "in": "query",
       "name": "view",
       "type": "string",
-      "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. `{{random}}` keyword is replaced with unique number. WARNING: file will be overriden!"
+      "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
     },
     "UseView": {
       "in": "query",
@@ -791,13 +632,19 @@
       "in": "query",
       "name": "lifetime",
       "type": "string",
-      "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
+      "description": "The output files lifetime (DATA, INDEX, VIEW), for example `2h`."
     },
-    "ShareMode": {
+    "ReadShareMode": {
       "in": "query",
       "name": "share-mode",
       "type": "string",
-      "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
+      "description": "Sharing mode used to access data files. Can be `wait-10s`, `skip` or `ignore`. By default `wait-0s` is used."
+    },
+    "WriteShareMode": {
+      "in": "query",
+      "name": "share-mode",
+      "type": "string",
+      "description": "Sharing mode used to write data files. Can be `wait-10s`, `ignore`. By default `wait-0s` is used."
     },
     "SearchNodes": {
       "in": "query",
@@ -814,7 +661,7 @@
       "name": "local",
       "type": "boolean",
       "default": false,
-      "description": "Perform search only on this cluster member."
+      "description": "Perform search only on this cluster node."
     },
     "SearchStat": {
       "in": "query",
@@ -828,7 +675,7 @@
       "name": "performance",
       "type": "boolean",
       "default": false,
-      "description": "Include performance metrics in response. Default 'false'."
+      "description": "Include performance metrics in response."
     },
     "SearchLimit": {
       "in": "query",
@@ -857,7 +704,58 @@
       "type": "array",
       "items": { "type": "string" },
       "collectionFormat": "multi",
-      "description": "Additional data transformation. Could be match(\"^.*$\"), replace(\"^(.*)apple(.*)$\", \"$1orange$2\") or script(\"filter_position\")"
+      "description": "Additional data transformation. Could be:\n- `match(\"^.*$\")` to match text,\n- `replace(\"^(.*)apple(.*)$\", \"$1orange$2\")` to replace text,\n- `script(\"filter_position\")` to run custom script"
+    },
+    "FilePath": {
+      "in": "query",
+      "name": "file",
+      "type": "string",
+      "description": "The path to a file."
+    },
+    "NewFilePath": {
+      "in": "query",
+      "name": "file",
+      "type": "string",
+      "description": "The path to an uploading file. Use `{{random}}` for random names.",
+      "required": true
+    },
+    "DirPath": {
+      "in": "query",
+      "name": "dir",
+      "type": "string",
+      "description": "The path to a directory."
+    },
+    "CatalogPath": {
+      "in": "query",
+      "name": "catalog",
+      "type": "string",
+      "description": "The path to a catalog."
+    },
+    "FileDelimiter": {
+      "in": "query",
+      "name": "delimiter",
+      "type": "string",
+      "description": "The delimiter is used between file parts in catalog."
+    },
+    "FileOffset": {
+      "in": "query",
+      "name": "offset",
+      "type": "integer",
+      "format": "int64",
+      "description": "The optional file part offset."
+    },
+    "FileLength": {
+      "in": "query",
+      "name": "length",
+      "type": "integer",
+      "format": "int64",
+      "description": "The optional file part length."
+    },
+    "FileLifetime": {
+      "in": "query",
+      "type": "string",
+      "name": "lifetime",
+      "description": "The file or catalog lifetime, for example `2h`."
     }
   },
   "definitions": {
@@ -1120,7 +1018,7 @@
         "view": { "$ref": "#/parameters/SaveView" },
         "delimiter": { "$ref": "#/parameters/Delimiter" },
         "lifetime": { "$ref": "#/parameters/Lifetime" },
-        "share-mode": { "$ref": "#/parameters/ShareMode" },
+        "share-mode": { "$ref": "#/parameters/ReadShareMode" },
         "nodes": { "$ref": "#/parameters/SearchNodes" },
         "local": { "$ref": "#/parameters/Local" },
         "stats": { "$ref": "#/parameters/SearchStat" },
@@ -1149,7 +1047,7 @@
         "view": { "$ref": "#/parameters/SaveView" },
         "delimiter": { "$ref": "#/parameters/Delimiter" },
         "lifetime": { "$ref": "#/parameters/Lifetime" },
-        "share-mode": { "$ref": "#/parameters/ShareMode" },
+        "share-mode": { "$ref": "#/parameters/ReadShareMode" },
         "nodes": { "$ref": "#/parameters/SearchNodes" },
         "local": { "$ref": "#/parameters/Local" },
         "performance": { "$ref": "#/parameters/Performance" },
