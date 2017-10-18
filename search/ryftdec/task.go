@@ -698,6 +698,15 @@ BuildItems:
 		keepDataAs = "" // prevent further processing
 	}
 
+	// check all Ryft calls have JSON array
+	isJsonArray := true
+	for _, rc := range ryftCalls {
+		if !rc.isJsonArray {
+			isJsonArray = false
+			break
+		}
+	}
+
 	// output DATA file
 	var datFile *bufio.Writer
 	if len(keepDataAs) > 0 {
@@ -705,8 +714,11 @@ BuildItems:
 		if err != nil {
 			return 0, fmt.Errorf("failed to create DATA file: %s", err)
 		}
-		datFile = bufio.NewWriterSize(f, 256*1024)
+		datFile = bufio.NewWriterSize(f, ryftprim.ReadBufSize)
 		defer func() {
+			if isJsonArray {
+				datFile.Write([]byte("\n]"))
+			}
 			datFile.Flush()
 			f.Close()
 		}()
@@ -719,7 +731,7 @@ BuildItems:
 		if err != nil {
 			return 0, fmt.Errorf("failed to create INDEX file: %s", err)
 		}
-		idxFile = bufio.NewWriterSize(f, 256*1024)
+		idxFile = bufio.NewWriterSize(f, ryftprim.ReadBufSize)
 		defer func() {
 			idxFile.Flush()
 			f.Close()
@@ -856,6 +868,13 @@ ItemsLoop:
 		dataEnd := dataPos + int64(len(recRawData))
 		if datFile != nil {
 			start := time.Now()
+			if isJsonArray {
+				if matches == 0 {
+					datFile.Write([]byte("[\n")) // first record
+				} else {
+					datFile.Write([]byte(",\n")) // others
+				}
+			}
 			n, err := datFile.Write(recRawData)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write DATA file: %s", err))
