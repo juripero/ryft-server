@@ -12,6 +12,12 @@ import (
 func TestParserParseSimpleQuery(t *testing.T) {
 	// check
 	check := func(structured bool, data string, expectedOld, expectedNew string) {
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Failf(t, "shouldn't panic", "(data:%s, err:%s)", data, r)
+			}
+		}()
+
 		if p := NewParserString(data); assert.NotNil(t, p) {
 			if res := p.parseSimpleQuery(); assert.NotNil(t, res) {
 				if expectedOld != "" {
@@ -94,12 +100,26 @@ func TestParserParseSimpleQuery(t *testing.T) {
 		`(RECORD.text CONTAINS EXACT("hello"))[es]`)
 	bad(`RECORD. CONTAINS "hello"`, "no field name found for RECORD")
 	bad(`RECORD., CONTAINS "hello"`, "no field name found for RECORD")
-	bad(`RECORD."no" CONTAINS "hello"`, "no field name found for RECORD")
+	bad(`RECORD.= CONTAINS "hello"`, "no field name found for RECORD")
 	check(true,
 		` RECORD.[] CONTAINS "hello" `,
 		`(RECORD.[] CONTAINS "hello")[es]`,
 		`(RECORD.[] CONTAINS EXACT("hello"))[es]`)
 	bad(`RECORD.[ CONTAINS "hello"`, "no closing ] found")
+
+	// csv support
+	check(true,
+		` RECORD.123 CONTAINS "hello" `,
+		`(RECORD.123 CONTAINS "hello")[es]`,
+		`(RECORD.123 CONTAINS EXACT("hello"))[es]`)
+	check(true,
+		` RECORD.123.456 CONTAINS "hello" `,
+		`(RECORD.123.456 CONTAINS "hello")[es]`,
+		`(RECORD.123.456 CONTAINS EXACT("hello"))[es]`)
+	check(true,
+		` RECORD."123" CONTAINS "hello" `,
+		`(RECORD."123" CONTAINS "hello")[es]`,
+		`(RECORD."123" CONTAINS EXACT("hello"))[es]`)
 
 	// operators
 	check(false,
