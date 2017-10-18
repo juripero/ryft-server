@@ -609,7 +609,6 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 
 	simple := true
 	items := make(memItems, 0, capacity)
-BuildItems:
 	for dataFile, f := range mpp.indexes {
 		if (f.Option & 0x01) != 0x01 {
 			continue // ignore temporary results
@@ -639,11 +638,6 @@ BuildItems:
 				dataPos:  dataPos + uint64(shift),
 				Index:    idx,
 			})
-
-			// apply limit options here
-			if task.config.Limit >= 0 && int64(len(items)) >= task.config.Limit {
-				break BuildItems
-			}
 		}
 	}
 
@@ -922,7 +916,8 @@ ItemsLoop:
 			}
 		}
 
-		if reportRecords {
+		// apply limit options here
+		if reportRecords && (task.config.Limit < 0 || int64(matches) < task.config.Limit) {
 			idx := search.NewIndexCopy(item.Index)
 			idx.UpdateHost(task.UpdateHostTo)
 			rec := search.NewRecord(idx, recRawData)
