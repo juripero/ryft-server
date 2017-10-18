@@ -132,10 +132,19 @@ func (s *Stat) Add(data interface{}) error {
 
 // merge another intermediate aggregation
 func (s *Stat) Merge(data_ interface{}) error {
-	data, ok := data_.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("no valid data")
+	switch data := data_.(type) {
+	case *Stat:
+		return s.merge(data)
+
+	case map[string]interface{}:
+		return s.mergeMap(data)
 	}
+
+	return fmt.Errorf("no valid data")
+}
+
+// merge another intermediate aggregation (map)
+func (s *Stat) mergeMap(data map[string]interface{}) error {
 
 	// count is important
 	count, err := utils.AsUint64(data["count"])
@@ -192,6 +201,42 @@ func (s *Stat) Merge(data_ interface{}) error {
 
 	// count
 	s.Count += count
+
+	return nil // OK
+}
+
+// merge another intermediate aggregation (native)
+func (s *Stat) merge(other *Stat) error {
+	if other.Count == 0 {
+		return nil // nothing to merge
+	}
+
+	// sum
+	if (s.flags & StatSum) != 0 {
+		s.Sum += other.Sum
+	}
+
+	// sum of squared values
+	if (s.flags & StatSum2) != 0 {
+		s.Sum2 += other.Sum2
+	}
+
+	// minimum
+	if (s.flags & StatMin) != 0 {
+		if s.Count == 0 || other.Min < s.Min {
+			s.Min = other.Min
+		}
+	}
+
+	// maximum
+	if (s.flags & StatMax) != 0 {
+		if s.Count == 0 || other.Max > s.Max {
+			s.Max = other.Max
+		}
+	}
+
+	// count
+	s.Count += other.Count
 
 	return nil // OK
 }

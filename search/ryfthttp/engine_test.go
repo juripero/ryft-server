@@ -98,6 +98,12 @@ func TestEnginePrepareSearchUrl(t *testing.T) {
 		})
 		if assert.NoError(t, err) {
 			url := engine.prepareSearchUrl(cfg)
+			if cfg.ReportIndex {
+				url.Path += "/search"
+			} else {
+				url.Path += "/count"
+			}
+
 			assert.EqualValues(t, expected, url.String())
 		}
 	}

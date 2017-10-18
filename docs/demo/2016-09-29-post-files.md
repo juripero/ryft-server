@@ -19,8 +19,8 @@ Run the consul agent on local node: `consul agent -dev`
 Then adds the services to the consul:
 ```{.sh}
 curl -X PUT --data '{"ID":"ryft-1","Name":"ryft-rest-api","Tags":["A","B"],"Address":"127.0.0.1","Port":5001}' "http://localhost:8500/v1/agent/service/register"
-curl -X PUT --data '{"ID":"ryft-2","Name":"ryft-rest-api","Tags":["B","C"],"Address":"127.0.0.1","Port":5002}' "http://localhost:8500/v1/agent/service/register"
-curl -X PUT --data '{"ID":"ryft-3","Name":"ryft-rest-api","Tags":["C","D"],"Address":"127.0.0.1","Port":5003}' "http://localhost:8500/v1/agent/service/register"
+curl -X PUT --data '{"ID":"ryft-2","Name":"ryft-rest-api","Tags":["B","C"],"Address":"127.0.0.2","Port":5002}' "http://localhost:8500/v1/agent/service/register"
+curl -X PUT --data '{"ID":"ryft-3","Name":"ryft-rest-api","Tags":["C","D"],"Address":"127.0.0.3","Port":5003}' "http://localhost:8500/v1/agent/service/register"
 ```
 
 Add test partitions to the consul's KV storage:

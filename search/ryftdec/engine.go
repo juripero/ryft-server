@@ -113,9 +113,17 @@ func (engine *Engine) getBackendOptions() backendOptions {
 	}
 }
 
+// get backend aggregation-concurrency option
+func (engine *Engine) getBackendAggConcurrency() int {
+	opts := engine.Backend.Options()
+	n, _ := utils.AsInt64(opts["aggregation-concurrency"])
+	return int(n)
+}
+
 // updates the seach configuration
 func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery, boolOps int) {
 	updateConfig(cfg, q.Options)
+	cfg.IsRecord = q.Structured
 	if engine.CompatMode {
 		cfg.Query = q.ExprOld
 	} else {

@@ -67,7 +67,7 @@ func TestApplyAggregations(t *testing.T) {
 3.txt,3,3,0`), 0644))
 
 	// do positive and negative tests
-	check := func(indexPath, dataPath, format string, opts string, expected string) {
+	check := func(n int, indexPath, dataPath, format string, opts string, expected string) {
 		var params map[string]interface{}
 		err := json.Unmarshal([]byte(opts), &params)
 		assert.NoError(t, err)
@@ -78,7 +78,7 @@ func TestApplyAggregations(t *testing.T) {
 			return
 		}
 
-		err = ApplyAggregations(indexPath, dataPath, "\n", format, Aggs, true, nil)
+		err = ApplyAggregations(n, indexPath, dataPath, "\n", format, Aggs, true, nil)
 		if err != nil {
 			assert.Contains(t, err.Error(), expected)
 		} else {
@@ -90,69 +90,72 @@ func TestApplyAggregations(t *testing.T) {
 	}
 
 	all := true
+	for n := 1; n < 16; n *= 2 {
+		//if n := 2; true {
 
-	// check JSON data
-	if all {
-		check(filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
-			`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
-		check(filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
-			`{ "my": { "sum": { "field": "foo.bar" } } }`, `{"my": {"value": 600}}`)
-		check(filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
-			`{ "my": { "min": { "field": "foo.bar" } } }`, `{"my": {"value": 100}}`)
-		check(filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
-			`{ "my": { "max": { "field": "foo.bar" } } }`, `{"my": {"value": 300}}`)
-		check(filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
-			`{ "my": { "value_count": { "field": "foo.bar" } } }`, `{"my": {"value": 3}}`)
-		check(filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
-			`{ "my": { "stats": { "field": "foo.bar" } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
-	}
+		// check JSON data
+		if all {
+			check(n, filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
+				`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
+			check(n, filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
+				`{ "my": { "sum": { "field": "foo.bar" } } }`, `{"my": {"value": 600}}`)
+			check(n, filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
+				`{ "my": { "min": { "field": "foo.bar" } } }`, `{"my": {"value": 100}}`)
+			check(n, filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
+				`{ "my": { "max": { "field": "foo.bar" } } }`, `{"my": {"value": 300}}`)
+			check(n, filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
+				`{ "my": { "value_count": { "field": "foo.bar" } } }`, `{"my": {"value": 3}}`)
+			check(n, filepath.Join(root, "data.json.txt"), filepath.Join(root, "data.json"), "json",
+				`{ "my": { "stats": { "field": "foo.bar" } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
+		}
 
-	// check JSON data (JSON array format)
-	if all {
-		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
-			`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
-		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
-			`{ "my": { "sum": { "field": "foo.bar" } } }`, `{"my": {"value": 600}}`)
-		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
-			`{ "my": { "min": { "field": "foo.bar" } } }`, `{"my": {"value": 100}}`)
-		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
-			`{ "my": { "max": { "field": "foo.bar" } } }`, `{"my": {"value": 300}}`)
-		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
-			`{ "my": { "value_count": { "field": "foo.bar" } } }`, `{"my": {"value": 3}}`)
-		check(filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
-			`{ "my": { "stats": { "field": "foo.bar" } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
-	}
+		// check JSON data (JSON array format)
+		if all {
+			check(n, filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+				`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
+			check(n, filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+				`{ "my": { "sum": { "field": "foo.bar" } } }`, `{"my": {"value": 600}}`)
+			check(n, filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+				`{ "my": { "min": { "field": "foo.bar" } } }`, `{"my": {"value": 100}}`)
+			check(n, filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+				`{ "my": { "max": { "field": "foo.bar" } } }`, `{"my": {"value": 300}}`)
+			check(n, filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+				`{ "my": { "value_count": { "field": "foo.bar" } } }`, `{"my": {"value": 3}}`)
+			check(n, filepath.Join(root, "data.jarr.txt"), filepath.Join(root, "data.jarr"), "json",
+				`{ "my": { "stats": { "field": "foo.bar" } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
+		}
 
-	// check XML data
-	if all {
-		check(filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
-			`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
-		check(filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
-			`{ "my": { "sum": { "field": "foo.bar" } } }`, `{"my": {"value": 600}}`)
-		check(filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
-			`{ "my": { "min": { "field": "foo.bar" } } }`, `{"my": {"value": 100}}`)
-		check(filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
-			`{ "my": { "max": { "field": "foo.bar" } } }`, `{"my": {"value": 300}}`)
-		check(filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
-			`{ "my": { "value_count": { "field": "foo.bar" } } }`, `{"my": {"value": 3}}`)
-		check(filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
-			`{ "my": { "stats": { "field": "foo.bar" } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
-	}
+		// check XML data
+		if all {
+			check(n, filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
+				`{ "my": { "avg": { "field": "foo.bar" } } }`, `{"my": {"value": 200}}`)
+			check(n, filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
+				`{ "my": { "sum": { "field": "foo.bar" } } }`, `{"my": {"value": 600}}`)
+			check(n, filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
+				`{ "my": { "min": { "field": "foo.bar" } } }`, `{"my": {"value": 100}}`)
+			check(n, filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
+				`{ "my": { "max": { "field": "foo.bar" } } }`, `{"my": {"value": 300}}`)
+			check(n, filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
+				`{ "my": { "value_count": { "field": "foo.bar" } } }`, `{"my": {"value": 3}}`)
+			check(n, filepath.Join(root, "data.xml.txt"), filepath.Join(root, "data.xml"), "xml",
+				`{ "my": { "stats": { "field": "foo.bar" } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
+		}
 
-	// check UTF8 data
-	if all {
-		check(filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
-			`{ "my": { "avg": { "field": "." } } }`, `{"my": {"value": 200}}`)
+		// check UTF8 data
+		if all {
+			check(n, filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
+				`{ "my": { "avg": { "field": "." } } }`, `{"my": {"value": 200}}`)
 
-		check(filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
-			`{ "my": { "sum": { "field": "." } } }`, `{"my": {"value": 600}}`)
-		check(filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
-			`{ "my": { "min": { "field": "." } } }`, `{"my": {"value": 100}}`)
-		check(filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
-			`{ "my": { "max": { "field": "." } } }`, `{"my": {"value": 300}}`)
-		check(filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
-			`{ "my": { "value_count": { "field": "." } } }`, `{"my": {"value": 3}}`)
-		check(filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
-			`{ "my": { "stats": { "field": "." } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
+			check(n, filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
+				`{ "my": { "sum": { "field": "." } } }`, `{"my": {"value": 600}}`)
+			check(n, filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
+				`{ "my": { "min": { "field": "." } } }`, `{"my": {"value": 100}}`)
+			check(n, filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
+				`{ "my": { "max": { "field": "." } } }`, `{"my": {"value": 300}}`)
+			check(n, filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
+				`{ "my": { "value_count": { "field": "." } } }`, `{"my": {"value": 3}}`)
+			check(n, filepath.Join(root, "data.utf8.txt"), filepath.Join(root, "data.utf8"), "utf-8",
+				`{ "my": { "stats": { "field": "." } } }`, `{"my": {"avg": 200, "sum": 600, "min": 100, "max":300, "count": 3}}`)
+		}
 	}
 }

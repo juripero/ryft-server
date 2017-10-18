@@ -222,6 +222,9 @@ func (cfg Config) String() string {
 	if cfg.Performance {
 		props = append(props, "P")
 	}
+	if cfg.IsRecord {
+		props = append(props, "R")
+	}
 
 	return fmt.Sprintf("Config{%s}", strings.Join(props, ", "))
 }

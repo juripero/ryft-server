@@ -329,7 +329,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 			if cfg.Aggregations != nil {
 				// TODO: move this code to final results, becase there is no transformation applied yet
-				if err := ryftprim.ApplyAggregations(opts.atHome(out.IndexFile), opts.atHome(out.DataFile),
+				if err := ryftprim.ApplyAggregations(engine.getBackendAggConcurrency(),
+					opts.atHome(out.IndexFile), opts.atHome(out.DataFile),
 					out.Delimiter, cfg.DataFormat, cfg.Aggregations,
 					out.isJsonArray, func() bool { return mux.IsCancelled() }); err != nil {
 					task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
@@ -418,7 +419,6 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 	cfg.ReportIndex = false
 	cfg.ReportData = false
 	cfg.Aggregations = nil // disable
-	cfg.IsRecord = query.IsStructured()
 
 	task.log().WithFields(map[string]interface{}{
 		"query": cfg.Query,
