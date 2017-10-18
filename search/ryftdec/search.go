@@ -299,6 +299,27 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		keepViewAs := cfg.KeepViewAs
 		delimiter := cfg.Delimiter
 
+		// save final results for aggregations (even if not requested)
+		if cfg.Aggregations != nil {
+			// keep INDEX file
+			if len(keepIndexAs) == 0 {
+				keepIndexAs = filepath.Join(opts.InstanceName, fmt.Sprintf(".temp-idx-%s-%d%s",
+					task.Identifier, 0, ".txt"))
+				if !engine.KeepResultFiles {
+					defer os.RemoveAll(opts.atHome(keepIndexAs))
+				}
+			}
+
+			// keep DATA file
+			if len(keepDataAs) == 0 {
+				keepDataAs = filepath.Join(opts.InstanceName, fmt.Sprintf(".temp-dat-%s-%d%s",
+					task.Identifier, 0, task.extension))
+				if !engine.KeepResultFiles {
+					defer os.RemoveAll(opts.atHome(keepDataAs))
+				}
+			}
+		}
+
 		searchStart := time.Now()
 		res, err := engine.doSearch(task, opts, task.rootQuery, cfg, mux)
 		if err != nil {
@@ -318,25 +339,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// post-processing
 		task.log().WithField("output", res.Output).Infof("[%s]: final results", TAG)
 		addingStart := time.Now()
+		isJsonArray := true
 		for _, out := range res.Output {
+			isJsonArray = isJsonArray && out.isJsonArray
 			if err := task.result.AddRyftResults(
 				opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
 				out.Delimiter, out.Width, 1 /*final*/, out.isJsonArray); err != nil {
 				task.log().WithError(err).Errorf("[%s]: failed to add final Ryft results", TAG)
 				mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
 				return
-			}
-
-			if cfg.Aggregations != nil {
-				// TODO: move this code to final results, becase there is no transformation applied yet
-				if err := ryftprim.ApplyAggregations(engine.getBackendAggConcurrency(),
-					opts.atHome(out.IndexFile), opts.atHome(out.DataFile),
-					out.Delimiter, cfg.DataFormat, cfg.Aggregations,
-					out.isJsonArray, func() bool { return mux.IsCancelled() }); err != nil {
-					task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
-					mux.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
-					return
-				}
 			}
 		}
 
@@ -351,6 +362,23 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			return
 		}
 		drainStop := time.Now()
+
+		// aggregations
+		var aggsTime time.Duration
+		if cfg.Aggregations != nil {
+			start := time.Now()
+
+			if err := ryftprim.ApplyAggregations(engine.getBackendAggConcurrency(),
+				opts.atHome(keepIndexAs), opts.atHome(keepDataAs),
+				delimiter, cfg.DataFormat, cfg.Aggregations,
+				isJsonArray, func() bool { return mux.IsCancelled() }); err != nil {
+				task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
+				mux.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
+				return
+			}
+
+			aggsTime = time.Since(start)
+		}
 
 		// performance metrics
 		if mux.Stat != nil && cfg.Performance {
@@ -367,6 +395,10 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				"prepare":            searchStart.Sub(taskStartTime).String(),
 				"intermediate-steps": task.callPerfStat,
 				"final-post-proc":    task.procPerfStat,
+			}
+
+			if cfg.Aggregations != nil {
+				metrics["aggregations"] = aggsTime.String()
 			}
 
 			mux.Stat.AddPerfStat("ryftdec", metrics)
