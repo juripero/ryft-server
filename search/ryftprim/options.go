@@ -43,63 +43,63 @@ import (
 
 // getExecPath get backend path (ryftprim, ryftx or pcre2) and its options
 func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) {
+	var execPath string
+
 	// if backend tool is specified use it
-	switch strings.ToLower(cfg.BackendTool) {
-	case "ryftprim", "prim", "1":
-		return engine.RyftprimExec, engine.RyftprimOpts, nil
-
-	case "ryftx", "x":
-		return engine.RyftxExec, engine.RyftxOpts, nil
-
-	case "pcre2", "regexp", "regex", "re":
-		return engine.Ryftpcre2Exec, engine.Ryftpcre2Opts, nil
-
-	case "":
-		break // auto-select, see below
-
-	default:
-		return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
-	}
-
-	// if both tools are provided
-	if engine.RyftprimExec != "" && engine.RyftxExec != "" {
-
+	if cfg.BackendTool != "" {
+		switch strings.ToLower(cfg.BackendTool) {
+		case RyftprimEngineV1, RyftprimEngineV2, RyftprimEngineV3:
+			execPath = engine.RyftprimExec
+		case RyftxEngineV1, RyftxEngineV2:
+			execPath = engine.RyftxExec
+		case Ryftpcre2EngineV1, Ryftpcre2EngineV2, Ryftpcre2EngineV3, Ryftpcre2EngineV4:
+			execPath = engine.Ryftpcre2Exec
+		default:
+			return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
+		}
+	} else if engine.RyftprimExec != "" && engine.RyftxExec != "" { // if both tools are provided
 		// select backend based on search type
 		switch strings.ToLower(cfg.Mode) {
-		case "g/es", "es":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ds", "ds":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ts", "ts":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ns", "ns":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/cs", "cs":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ipv4", "ipv4":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ipv6", "ipv6":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-
-		case "g/fhs", "fhs":
+		case GenericExactSearchPrimitive, ExactSearchPrimitiveV1:
+			execPath = engine.RyftxExec
+		case GenericDatePrimitive, DatePrimitiveV1:
+			execPath = engine.RyftxExec
+		case GenericTimePrimitive, TimePrimitiveV1:
+			execPath = engine.RyftxExec
+		case GenericNumberPrimitive, NumberPrimitiveV1:
+			execPath = engine.RyftxExec
+		case GenericCurrencyPrimitive, CurrencyPrimitiveV1:
+			execPath = engine.RyftxExec
+		case GenericIPv4Primitive, IPv4PrimitiveV1:
+			execPath = engine.RyftxExec
+		case GenericIPv6Primitive, IPv6PrimitiveV1:
+			execPath = engine.RyftxExec
+		case GenericFuzzyHammingPrimitive, FuzzyHammingPrimitiveV1:
 			if cfg.Dist > 1 {
-				return engine.RyftprimExec, engine.RyftprimOpts, nil
+				execPath = engine.RyftprimExec
 			} else {
-				return engine.RyftxExec, engine.RyftxOpts, nil
+				execPath = engine.RyftxExec
 			}
-
-		case "g/feds", "feds":
-			return engine.RyftprimExec, engine.RyftprimOpts, nil
-
-		case "g/pcre2", "pcre2":
-			return engine.Ryftpcre2Exec, engine.Ryftpcre2Opts, nil
+		case GenericFuzzyEditDistancePrimitive, FuzzyEditDistancePrimitiveV1:
+			execPath = engine.RyftprimExec
+		case GenericRegExpPrimitive, RegExpPrimitiveV1:
+			execPath = engine.Ryftpcre2Exec
+		default:
+			execPath = engine.RyftprimExec // use ryftprim as fallback
 		}
-
-		return engine.RyftprimExec, engine.RyftprimOpts, nil // use ryftprim as fallback
 	} else if engine.RyftprimExec != "" {
-		return engine.RyftprimExec, engine.RyftprimOpts, nil
+		execPath = engine.RyftprimExec
 	} else if engine.RyftxExec != "" {
-		return engine.RyftxExec, engine.RyftxOpts, nil
+		execPath = engine.RyftxExec
+	}
+
+	// detect corresponding tweak options
+	if execPath != "" {
+		tweakOpts, err := engine.TweakOpts.GetOptions(cfg.BackendMode, cfg.BackendTool, cfg.Mode)
+		if err != nil {
+			return "", nil, fmt.Errorf(`failed to fetch backend tweak opts with error: %s`, err)
+		}
+		return execPath, tweakOpts, nil
 	}
 
 	return "", nil, fmt.Errorf("no any backend found") // should be impossible
@@ -126,10 +126,8 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["keep-files"] = engine.KeepResultFiles
 	opts["minimize-latency"] = engine.MinimizeLatency
 	opts["index-host"] = engine.IndexHost
-	opts["ryftx-opts"] = engine.RyftxOpts
-	opts["ryftprim-opts"] = engine.RyftprimOpts
-	opts["ryftpcre2-opts"] = engine.Ryftpcre2Opts
-	opts["ryft-all-opts"] = engine.RyftAllOpts
+	opts["tweak-opts"] = engine.TweakOpts
+	opts["backend-router"] = engine.BackendRouter
 	return opts
 }
 
@@ -142,50 +140,6 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		if err != nil {
 			return fmt.Errorf(`failed to parse "instance-name": %s`, err)
 		}
-	}
-
-	// default options for all engines
-	if v, ok := opts["ryft-all-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryft-all-opts" with error: %s`, err)
-		} else {
-			engine.RyftAllOpts = vv
-		}
-	} else {
-		engine.RyftAllOpts = []string{}
-	}
-
-	// `ryftprim` options
-	if v, ok := opts["ryftprim-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftprim-opts" with error: %s`, err)
-		} else {
-			engine.RyftprimOpts = vv
-		}
-	} else {
-		engine.RyftprimOpts = []string{}
-	}
-
-	// `ryftx` options
-	if v, ok := opts["ryftx-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftx-opts" with error: %s`, err)
-		} else {
-			engine.RyftxOpts = vv
-		}
-	} else {
-		engine.RyftxOpts = []string{}
-	}
-
-	// `ryftpcre2` options
-	if v, ok := opts["ryftpcre2-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftpcre2-opts" with error: %s`, err)
-		} else {
-			engine.Ryftpcre2Opts = vv
-		}
-	} else {
-		engine.Ryftpcre2Opts = []string{}
 	}
 
 	// `ryftprim` executable path
@@ -355,6 +309,26 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		engine.IndexHost, err = utils.AsString(v)
 		if err != nil {
 			return fmt.Errorf(`failed to parse "index-host" option: %s`, err)
+		}
+	}
+
+	// tweak-opts
+	if v, ok := opts["tweak-opts"]; ok {
+		tweakOpts, err := utils.AsStringMapOfStringSlices(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "tweak-opts" option: %s`, err)
+		}
+		engine.TweakOpts, err = NewTweakOpts(tweakOpts)
+		if err != nil {
+			return fmt.Errorf(`failed to set "tweak-opts" with error: %s`, err)
+		}
+	}
+
+	// backend-router
+	if v, ok := opts["backend-router"]; ok {
+		engine.BackendRouter, err = utils.AsStringMapOfStrings(v)
+		if err != nil {
+			return fmt.Errorf(`failed to parse "backend-router" option: %s`, err)
 		}
 	}
 

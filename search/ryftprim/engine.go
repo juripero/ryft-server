@@ -33,6 +33,7 @@ package ryftprim
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -71,27 +72,32 @@ type Engine struct {
 
 	IndexHost string // optional host (cluster mode)
 
-	RyftxOpts     []string // options for ryftx backend
-	RyftprimOpts  []string // options for ryftprim backend
-	Ryftpcre2Opts []string // options for pcre2 backend
-	RyftAllOpts   []string // common options for all backends
-
 	TweakOpts *TweakOpts // backend tweak options
+
+	BackendRouter map[string]string // map primitive onto search backend engine
 
 	options map[string]interface{}
 }
 
 // NewTweakOpts creates Tweak object. TODO: use tree struct in order to serve keys of arbitrary size with the priority
-func NewTweakOpts(data map[string][]string) *TweakOpts {
-	return &TweakOpts{data}
+func NewTweakOpts(data map[string][]string) (*TweakOpts, error) {
+	return &TweakOpts{data}, nil
 }
 
 type TweakOpts struct {
 	data map[string][]string
 }
 
+func (t TweakOpts) String() string {
+	return fmt.Sprintf("%q", t.data)
+}
+
 func (t TweakOpts) GetOptions(mode, backend, primitive string) ([]string, error) {
-	return nil, nil
+	key := strings.Join([]string{mode, backend, primitive}, ".")
+	if v, ok := t.data[key]; ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf(`option for current key not found %s`, key)
 }
 
 // NewEngine creates new RyftPrim search engine.
@@ -101,7 +107,6 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse options: %s", err)
 	}
-
 	return engine, nil // OK
 }
 

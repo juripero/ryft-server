@@ -85,6 +85,9 @@ type Config struct {
 	// addeded to the end of args
 	BackendOpts []string
 
+	// Backend mode e.g. normal, high-performance, etc.
+	BackendMode string
+
 	// report performance metrics
 	Performance bool
 
@@ -210,6 +213,11 @@ func (cfg Config) String() string {
 	// backend-options
 	if len(cfg.BackendOpts) != 0 {
 		props = append(props, fmt.Sprintf("backend-options:%q", cfg.BackendOpts))
+	}
+
+	// backend-mode
+	if len(cfg.BackendMode) != 0 {
+		props = append(props, fmt.Sprintf("backend-mode:%q", cfg.BackendMode))
 	}
 
 	// flags

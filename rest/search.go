@@ -177,6 +177,7 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	cfg.Nodes = uint(params.Nodes)
 	cfg.BackendTool = params.Backend
 	cfg.BackendOpts = params.BackendOpts
+	cfg.BackendMode = params.BackendMode
 	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
