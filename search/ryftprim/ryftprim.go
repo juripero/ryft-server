@@ -324,10 +324,6 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		backendOpts = engineOpts
 	}
 
-	log.Debugln("============================")
-	log.Debugf("toolpath %s, backendopts %+v", task.toolPath, backendOpts)
-	log.Debugln("============================")
-
 	// assign command line
 	task.toolArgs = append(task.toolArgs, backendOpts...)
 

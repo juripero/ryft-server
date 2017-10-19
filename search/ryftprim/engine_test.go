@@ -658,3 +658,76 @@ exit(3)
 		}
 	}
 }
+
+func TestTweakOpts(t *testing.T) {
+	// empty config
+	data := map[string][]string{}
+	opts := NewTweakOpts(data)
+	assert.Equal(t, []string{}, opts.GetOptions("normal", "ryftx", "es"))
+
+	// longest chain wins
+	data = map[string][]string{
+		"normal.ryftx.es": []string{"1"},
+		"normal.ryftx":    []string{"2"},
+		"normal":          []string{"3"},
+	}
+	opts = NewTweakOpts(data)
+	assert.Equal(t, data["normal.ryftx.es"], opts.GetOptions("normal", "ryftx", "es"))
+	assert.Equal(t, data["normal.ryftx"], opts.GetOptions("normal", "ryftx", "time"))
+	assert.Equal(t, data["normal.ryftx"], opts.GetOptions("normal", "ryftx", ""))
+	assert.Equal(t, data["normal"], opts.GetOptions("normal", "ryftprim", "es"))
+	assert.Equal(t, data["normal"], opts.GetOptions("normal", "", ""))
+
+	// backend wins a mode
+	data = map[string][]string{
+		"normal.ryftx.es": []string{"1"},
+		"normal.ryftx":    []string{"2"},
+		"normal":          []string{"3"},
+		"ryftx":           []string{"4"},
+	}
+	opts = NewTweakOpts(data)
+
+	assert.Equal(t, data["normal.ryftx.es"], opts.GetOptions("normal", "ryftx", "es"))
+	assert.Equal(t, data["normal.ryftx"], opts.GetOptions("normal", "ryftx", ""))
+	assert.Equal(t, data["normal"], opts.GetOptions("normal", "ryftprim", ""))
+	assert.Equal(t, data["ryftx"], opts.GetOptions("", "ryftx", "ds"))
+	assert.Equal(t, data["ryftx"], opts.GetOptions("", "ryftx", "es"))
+
+	// primitive wins backend
+	data = map[string][]string{
+		"normal.ryftx.es": []string{"1"},
+		"normal.ryftx":    []string{"2"},
+		"ryftx":           []string{"4"},
+		"ryftx.es":        []string{"5"},
+	}
+	opts = NewTweakOpts(data)
+	assert.Equal(t, data["ryftx"], opts.GetOptions("", "ryftx", "ds"))
+	assert.Equal(t, data["ryftx.es"], opts.GetOptions("", "ryftx", "es"))
+
+	// choose mode
+	data = map[string][]string{
+		"normal":       []string{"1"},
+		"hp":           []string{"2"},
+		"normal.ryftx": []string{"3"},
+		"ryftx":        []string{"4"},
+	}
+	opts = NewTweakOpts(data)
+	assert.Equal(t, data["normal"], opts.GetOptions("normal", "ryftprim", ""))
+	assert.Equal(t, data["normal.ryftx"], opts.GetOptions("normal", "ryftx", ""))
+	assert.Equal(t, data["ryftx"], opts.GetOptions("", "ryftx", ""))
+	assert.Equal(t, data["hp"], opts.GetOptions("hp", "ryftprim", ""))
+	assert.Equal(t, []string{}, opts.GetOptions("", "ryftprim", ""))
+
+	// primitive wins all
+	data = map[string][]string{
+		"normal.ryftx":    []string{"1"},
+		"normal":          []string{"2"},
+		"ryftx":           []string{"3"},
+		"normal.ryftx.es": []string{"4"},
+		"es":              []string{"5"},
+	}
+	opts = NewTweakOpts(data)
+	assert.Equal(t, data["es"], opts.GetOptions("", "", "es"))
+	assert.Equal(t, data["es"], opts.GetOptions("normal", "ryftprim", "es"))
+	assert.Equal(t, data["normal.ryftx.es"], opts.GetOptions("normal", "ryftx", "es"))
+}

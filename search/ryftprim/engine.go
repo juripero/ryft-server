@@ -79,9 +79,8 @@ type Engine struct {
 	options map[string]interface{}
 }
 
-// NewTweakOpts creates Tweak object. TODO: use tree struct in order to serve keys of arbitrary size with the priority
-func NewTweakOpts(data map[string][]string) (*TweakOpts, error) {
-	return &TweakOpts{data}, nil
+func NewTweakOpts(data map[string][]string) *TweakOpts {
+	return &TweakOpts{data}
 }
 
 type TweakOpts struct {
@@ -92,12 +91,23 @@ func (t TweakOpts) String() string {
 	return fmt.Sprintf("%q", t.data)
 }
 
-func (t TweakOpts) GetOptions(mode, backend, primitive string) ([]string, error) {
-	key := strings.Join([]string{mode, backend, primitive}, ".")
-	if v, ok := t.data[key]; ok {
-		return v, nil
+func (t TweakOpts) GetOptions(mode, backend, primitive string) []string {
+	try := [][]string{
+		[]string{mode, backend, primitive},
+		[]string{backend, primitive},
+		[]string{mode, primitive},
+		[]string{mode, backend},
+		[]string{primitive},
+		[]string{backend},
+		[]string{mode},
 	}
-	return nil, fmt.Errorf(`option for current key not found %s`, key)
+	for _, el := range try {
+		key := strings.Join(el, ".")
+		if v, ok := t.data[key]; ok {
+			return v
+		}
+	}
+	return []string{}
 }
 
 // NewEngine creates new RyftPrim search engine.

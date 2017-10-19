@@ -43,62 +43,97 @@ import (
 
 // getExecPath get backend path (ryftprim, ryftx or pcre2) and its options
 func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) {
-	var execPath string
+	var (
+		execPath    string
+		backendTool string
+		mode        string
+	)
+	mode = strings.ToLower(cfg.Mode)
+
+	switch mode {
+	case GenericExactSearchPrimitive, ExactSearchPrimitiveV1:
+		mode = ExactSearchPrimitiveV1
+	case GenericDatePrimitive, DatePrimitiveV1:
+		mode = DatePrimitiveV1
+	case GenericTimePrimitive, TimePrimitiveV1:
+		mode = TimePrimitiveV1
+	case GenericNumberPrimitive, NumberPrimitiveV1:
+		mode = NumberPrimitiveV1
+	case GenericCurrencyPrimitive, CurrencyPrimitiveV1:
+		mode = CurrencyPrimitiveV1
+	case GenericIPv4Primitive, IPv4PrimitiveV1:
+		mode = IPv4PrimitiveV1
+	case GenericIPv6Primitive, IPv6PrimitiveV1:
+		mode = IPv6PrimitiveV1
+	case GenericFuzzyHammingPrimitive, FuzzyHammingPrimitiveV1:
+		mode = FuzzyHammingPrimitiveV1
+	case GenericFuzzyEditDistancePrimitive, FuzzyEditDistancePrimitiveV1:
+		mode = FuzzyEditDistancePrimitiveV1
+	case GenericRegExpPrimitive, RegExpPrimitiveV1:
+		mode = RegExpPrimitiveV1
+	default:
+		mode = ExactSearchPrimitiveV1
+	}
 
 	// if backend tool is specified use it
 	if cfg.BackendTool != "" {
 		switch strings.ToLower(cfg.BackendTool) {
 		case RyftprimEngineV1, RyftprimEngineV2, RyftprimEngineV3:
-			execPath = engine.RyftprimExec
+			backendTool = RyftprimBackendTool
 		case RyftxEngineV1, RyftxEngineV2:
-			execPath = engine.RyftxExec
+			backendTool = RyftxBackendTool
 		case Ryftpcre2EngineV1, Ryftpcre2EngineV2, Ryftpcre2EngineV3, Ryftpcre2EngineV4:
-			execPath = engine.Ryftpcre2Exec
+			backendTool = Ryftpcre2BackendTool
 		default:
 			return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
 		}
 	} else if engine.RyftprimExec != "" && engine.RyftxExec != "" { // if both tools are provided
 		// select backend based on search type
-		switch strings.ToLower(cfg.Mode) {
-		case GenericExactSearchPrimitive, ExactSearchPrimitiveV1:
-			execPath = engine.RyftxExec
-		case GenericDatePrimitive, DatePrimitiveV1:
-			execPath = engine.RyftxExec
-		case GenericTimePrimitive, TimePrimitiveV1:
-			execPath = engine.RyftxExec
-		case GenericNumberPrimitive, NumberPrimitiveV1:
-			execPath = engine.RyftxExec
-		case GenericCurrencyPrimitive, CurrencyPrimitiveV1:
-			execPath = engine.RyftxExec
-		case GenericIPv4Primitive, IPv4PrimitiveV1:
-			execPath = engine.RyftxExec
-		case GenericIPv6Primitive, IPv6PrimitiveV1:
-			execPath = engine.RyftxExec
-		case GenericFuzzyHammingPrimitive, FuzzyHammingPrimitiveV1:
+		switch strings.ToLower(mode) {
+		case ExactSearchPrimitiveV1:
+			backendTool = RyftxBackendTool
+		case DatePrimitiveV1:
+			backendTool = RyftxBackendTool
+		case TimePrimitiveV1:
+			backendTool = RyftxBackendTool
+		case NumberPrimitiveV1:
+			backendTool = RyftxBackendTool
+		case CurrencyPrimitiveV1:
+			backendTool = RyftxBackendTool
+		case IPv4PrimitiveV1:
+			backendTool = RyftxBackendTool
+		case IPv6PrimitiveV1:
+			backendTool = RyftxBackendTool
+		case FuzzyHammingPrimitiveV1:
 			if cfg.Dist > 1 {
-				execPath = engine.RyftprimExec
+				backendTool = RyftprimBackendTool
 			} else {
-				execPath = engine.RyftxExec
+				backendTool = RyftxBackendTool
 			}
-		case GenericFuzzyEditDistancePrimitive, FuzzyEditDistancePrimitiveV1:
-			execPath = engine.RyftprimExec
-		case GenericRegExpPrimitive, RegExpPrimitiveV1:
-			execPath = engine.Ryftpcre2Exec
+		case FuzzyEditDistancePrimitiveV1:
+			backendTool = RyftprimBackendTool
+		case RegExpPrimitiveV1:
+			backendTool = Ryftpcre2BackendTool
 		default:
-			execPath = engine.RyftprimExec // use ryftprim as fallback
+			backendTool = RyftprimBackendTool // use ryftprim as fallback
 		}
 	} else if engine.RyftprimExec != "" {
-		execPath = engine.RyftprimExec
+		backendTool = RyftprimBackendTool
 	} else if engine.RyftxExec != "" {
-		execPath = engine.RyftxExec
+		backendTool = RyftxBackendTool
 	}
 
 	// detect corresponding tweak options
-	if execPath != "" {
-		tweakOpts, err := engine.TweakOpts.GetOptions(cfg.BackendMode, cfg.BackendTool, cfg.Mode)
-		if err != nil {
-			return "", nil, fmt.Errorf(`failed to fetch backend tweak opts with error: %s`, err)
+	if backendTool != "" {
+		switch backendTool {
+		case RyftprimBackendTool:
+			execPath = engine.RyftprimExec
+		case RyftxBackendTool:
+			execPath = engine.RyftxExec
+		case Ryftpcre2BackendTool:
+			execPath = engine.Ryftpcre2Exec
 		}
+		tweakOpts := engine.TweakOpts.GetOptions(cfg.BackendMode, backendTool, mode)
 		return execPath, tweakOpts, nil
 	}
 
@@ -318,10 +353,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		if err != nil {
 			return fmt.Errorf(`failed to parse "tweak-opts" option: %s`, err)
 		}
-		engine.TweakOpts, err = NewTweakOpts(tweakOpts)
-		if err != nil {
-			return fmt.Errorf(`failed to set "tweak-opts" with error: %s`, err)
-		}
+		engine.TweakOpts = NewTweakOpts(tweakOpts)
 	}
 
 	// backend-router
