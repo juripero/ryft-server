@@ -56,7 +56,7 @@ func TestSearchUsual(t *testing.T) {
 			"failed to parse request parameters")
 
 		check("/search?query=hello", "", TO, http.StatusBadRequest,
-			"no any file or catalog provided")
+			"no file or catalog provided")
 		check(`/search?query=hello&ignore-missing-files=true&stats=true`, "application/json",
 			TO, http.StatusOK, `"stats":{"matches":0,"totalBytes":0`)
 

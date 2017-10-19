@@ -43,7 +43,7 @@ Just pass `--local-only` command line argument:
 ./ryft-server --local-only
 ```
 
-There is also no any load balancing enabled in local mode.
+There is also no load balancing enabled in local mode.
 
 
 ## Logging

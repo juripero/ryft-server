@@ -201,7 +201,7 @@ func (mw *Middleware) payload(userId string) map[string]interface{} {
 		}
 	}
 
-	return nil // no any data yet
+	return nil // no data yet
 }
 
 // Try to decode Authorization header (basic) to get username and password
