@@ -55,7 +55,9 @@ type CountParams struct {
 	Query    string   `form:"query" json:"query" msgpack:"query" binding:"required"`
 	OldFiles []string `form:"files" json:"-" msgpack:"-"`   // obsolete: will be deleted
 	Catalogs []string `form:"catalog" json:"-" msgpack:"-"` // obsolete: will be deleted
-	Files    []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
+
+	Files              []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
+	IgnoreMissingFiles bool     `form:"ignore-missing-files" json:"ignore-missing-files,omitempty" msgpack:"ignore-missing-files,omitempty"`
 
 	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`                      // optional, "" for generic mode
 	Width  string `form:"surrounding" json:"surrounding,omitempty" msgpack:"surrounding,omitempty"` // surrounding width or "line"
@@ -128,7 +130,7 @@ func (server *Server) DoCount0(ctx *gin.Context) {
 	params.OldFiles = nil // reset
 	params.Files = append(params.Files, params.Catalogs...)
 	params.Catalogs = nil // reset
-	if len(params.Files) == 0 {
+	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
 			"no any file or catalog provided"))
 	}
@@ -350,7 +352,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	params.OldFiles = nil // reset
 	params.Files = append(params.Files, params.Catalogs...)
 	params.Catalogs = nil // reset
-	if len(params.Files) == 0 {
+	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
 			"no any file or catalog provided"))
 	}
@@ -389,6 +391,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
+	cfg.SkipMissing = params.IgnoreMissingFiles
 	cfg.Limit = params.Limit
 
 	// parse post-process transformations

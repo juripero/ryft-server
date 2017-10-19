@@ -16,6 +16,7 @@
         "parameters": [
           { "$ref": "#/parameters/SearchQuery" },
           { "$ref": "#/parameters/SearchFile" },
+          { "$ref": "#/parameters/IgnoreMissingFiles" },
           { "$ref": "#/parameters/SearchMode" },
           { "$ref": "#/parameters/Surrounding" },
           { "$ref": "#/parameters/Fuzziness" },
@@ -83,6 +84,7 @@
         "parameters": [
           { "$ref": "#/parameters/SearchQuery" },
           { "$ref": "#/parameters/SearchFile" },
+          { "$ref": "#/parameters/IgnoreMissingFiles" },
           { "$ref": "#/parameters/SearchMode" },
           { "$ref": "#/parameters/Surrounding" },
           { "$ref": "#/parameters/Fuzziness" },
@@ -523,6 +525,12 @@
       "description": "Set of files or catalogs to search. The path should be designated relative to `/ryftone`. Wildcards are supported, for example: `*.txt`",
       "collectionFormat": "multi",
       "required": true
+    },
+    "IgnoreMissingFiles": {
+      "in": "query",
+      "name": "ignore-missing-files",
+      "type": "boolean",
+      "description": "If `true` report empty statistics instead of error."
     },
     "SearchMode": {
       "in": "query",
@@ -1005,6 +1013,7 @@
       "properties": {
         "query": { "$ref": "#/parameters/SearchQuery" },
         "files": { "$ref": "#/parameters/SearchFile" },
+        "ignore-missing-files": { "$ref": "#/parameters/IgnoreMissingFiles" },
         "mode": { "$ref": "#/parameters/SearchMode" },
         "surrounding": { "$ref": "#/parameters/Surrounding" },
         "fuzziness": { "$ref": "#/parameters/Fuzziness" },
@@ -1036,6 +1045,7 @@
       "properties": {
         "query": { "$ref": "#/parameters/SearchQuery" },
         "files": { "$ref": "#/parameters/SearchFile" },
+        "ignore-missing-files": { "$ref": "#/parameters/IgnoreMissingFiles" },
         "mode": { "$ref": "#/parameters/SearchMode" },
         "surrounding": { "$ref": "#/parameters/Surrounding" },
         "fuzziness": { "$ref": "#/parameters/Fuzziness" },

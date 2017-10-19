@@ -334,49 +334,58 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	}
 }
 
+// Finish the `ryftprim` task processing.
+func (task *Task) finish(res *search.Result) {
+	if res.Stat != nil && task.config.Performance {
+		metrics := make(map[string]interface{})
+
+		if !task.toolStartTime.IsZero() {
+			metrics["prepare"] = task.toolStartTime.Sub(task.taskStartTime).String()
+			metrics["tool-exec"] = task.toolStopTime.Sub(task.toolStartTime).String()
+		}
+
+		if !task.readStartTime.IsZero() {
+			// for /count operation there is no "read-data"
+			metrics["read-data"] = time.Since(task.readStartTime).String()
+		}
+
+		if !task.aggsStartTime.IsZero() {
+			metrics["aggregations"] = task.aggsStopTime.Sub(task.aggsStartTime).String()
+		}
+
+		res.Stat.AddPerfStat("ryftprim", metrics)
+	}
+
+	if res.Stat != nil {
+		if len(task.config.KeepIndexAs) != 0 {
+			res.Stat.AddSessionData("index", task.config.KeepIndexAs)
+		}
+		if len(task.config.KeepDataAs) != 0 {
+			res.Stat.AddSessionData("data", task.config.KeepDataAs)
+		}
+		if len(task.config.KeepViewAs) != 0 {
+			res.Stat.AddSessionData("view", task.config.KeepViewAs)
+		}
+		res.Stat.AddSessionData("delim", task.config.Delimiter)
+		res.Stat.AddSessionData("width", task.config.Width)
+		res.Stat.AddSessionData("matches", res.Stat.Matches)
+
+		// save backend tool used
+		if _, tool := filepath.Split(task.toolPath); len(tool) != 0 {
+			res.Stat.Extra["backend"] = tool
+		}
+	}
+
+	res.ReportDone()
+	res.Close()
+}
+
 // Finish the `ryftprim` tool processing.
 func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	task.toolStopTime = time.Now() // performance metric
 
 	// some futher cleanup
-	defer func() {
-		if res.Stat != nil && task.config.Performance {
-			metrics := make(map[string]interface{})
-
-			if !task.toolStartTime.IsZero() {
-				metrics["prepare"] = task.toolStartTime.Sub(task.taskStartTime).String()
-				metrics["tool-exec"] = task.toolStopTime.Sub(task.toolStartTime).String()
-			}
-
-			if !task.readStartTime.IsZero() {
-				// for /count operation there is no "read-data"
-				metrics["read-data"] = time.Since(task.readStartTime).String()
-			}
-
-			if !task.aggsStartTime.IsZero() {
-				metrics["aggregations"] = task.aggsStopTime.Sub(task.aggsStartTime).String()
-			}
-
-			res.Stat.AddPerfStat("ryftprim", metrics)
-		}
-
-		if res.Stat != nil {
-			res.Stat.AddSessionData("index", task.config.KeepIndexAs)
-			res.Stat.AddSessionData("data", task.config.KeepDataAs)
-			res.Stat.AddSessionData("view", task.config.KeepViewAs)
-			res.Stat.AddSessionData("delim", task.config.Delimiter)
-			res.Stat.AddSessionData("width", task.config.Width)
-			res.Stat.AddSessionData("matches", res.Stat.Matches)
-
-			// save backend tool used
-			if _, tool := filepath.Split(task.toolPath); len(tool) != 0 {
-				res.Stat.Extra["backend"] = tool
-			}
-		}
-
-		res.ReportDone()
-		res.Close()
-	}()
+	defer task.finish(res)
 
 	// ryftprim is finished we can release locked files
 	task.lockInProgress = false

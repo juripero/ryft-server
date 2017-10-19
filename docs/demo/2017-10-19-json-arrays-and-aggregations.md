@@ -349,3 +349,24 @@ $ curl -s "http://localhost:8765/search/aggs?session=$SESSION&format=json" -d '{
 }
 
 ```
+
+Note, the JSON arrays are not supported by `/search/show` and `/search/aggs` yet.
+There is no `RECORD` indicator in the DATA/INDEX results to check `[` at the begin of file.
+
+
+## New `ignore-missing-files` query option
+
+The `/search` and `/count` supports new option: `ignore-missing-files=true`.
+In this case the ryft server reports empty statistics instead of error message.
+
+```{.sh}
+$ curl -s "http://localhost:8765/count?local=true&query=hello&format=json&stats=true&ignore-missing-files=true" | jq .
+{
+  "results": [],
+  "stats": {
+    "matches": 0,
+    "totalBytes": 0,
+     ...
+  }
+}
+```

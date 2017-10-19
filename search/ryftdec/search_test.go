@@ -284,9 +284,9 @@ func TestEngineJsonArraySearchAnd3(t *testing.T) {
 			}, strRecords)
 
 			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", R}`, f1.SearchCfgLogTrace[0].String())
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hell")), files:[".work/.temp-dat-dec-00000001-2.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", R}`, f1.SearchCfgLogTrace[1].String())
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("he")), files:[".work/.temp-dat-dec-00000001-3.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", R}`, f1.SearchCfgLogTrace[2].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", is-record}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hell")), files:[".work/.temp-dat-dec-00000001-2.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", is-record}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("he")), files:[".work/.temp-dat-dec-00000001-3.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", is-record}`, f1.SearchCfgLogTrace[2].String())
 			}
 		}
 	}
@@ -353,9 +353,9 @@ func TestEngineJsonArraySearchOr3(t *testing.T) {
 			}, strRecords)
 
 			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", R}`, f1.SearchCfgLogTrace[0].String())
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hell")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", R}`, f1.SearchCfgLogTrace[1].String())
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("he")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", R}`, f1.SearchCfgLogTrace[2].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", is-record}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hell")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", is-record}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("he")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", is-record}`, f1.SearchCfgLogTrace[2].String())
 			}
 		}
 	}
@@ -391,9 +391,9 @@ func TestEngineJsonArraySearchOr3(t *testing.T) {
 			}, strRecords)
 
 			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", R}`, f1.SearchCfgLogTrace[0].String())
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", R}`, f1.SearchCfgLogTrace[1].String())
-				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", R}`, f1.SearchCfgLogTrace[2].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", is-record}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", is-record}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", is-record}`, f1.SearchCfgLogTrace[2].String())
 			}
 		}
 	}

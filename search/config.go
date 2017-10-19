@@ -74,6 +74,7 @@ type Config struct {
 	ReportIndex bool // if false, no processing enabled at all (/count)
 	ReportData  bool // if false, just indexes will be read (format=null)
 	IsRecord    bool // if true, then the record search is used
+	SkipMissing bool // if true, do not run ryftprim on empty fileset, just report zero statistics
 
 	// upload/search share mode
 	ShareMode utils.ShareMode
@@ -220,10 +221,13 @@ func (cfg Config) String() string {
 		props = append(props, "D")
 	}
 	if cfg.Performance {
-		props = append(props, "P")
+		props = append(props, "perf")
 	}
 	if cfg.IsRecord {
-		props = append(props, "R")
+		props = append(props, "is-record")
+	}
+	if cfg.SkipMissing {
+		props = append(props, "skip-missing")
 	}
 
 	return fmt.Sprintf("Config{%s}", strings.Join(props, ", "))

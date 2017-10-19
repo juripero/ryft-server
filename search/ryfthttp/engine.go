@@ -112,6 +112,9 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
 	q.Set("stats", fmt.Sprintf("%t", !engine.SkipStat))
 	q.Set("stream", fmt.Sprintf("%t", true))
+	if cfg.SkipMissing {
+		q.Set("ignore-missing-files", fmt.Sprintf("%t", cfg.SkipMissing))
+	}
 
 	q.Set("--internal-error-prefix", fmt.Sprintf("%t", true))  // enable error prefixes!
 	q.Set("--internal-no-session-id", fmt.Sprintf("%t", true)) // disable sessions!

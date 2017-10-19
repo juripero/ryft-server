@@ -31,6 +31,7 @@ The list of supported query parameters are the following (check detailed descrip
 | ------------- | ------- | ----------- |
 | `query`       | string  | **Required**. [The search expression](#search-query-parameter). |
 | `file`        | string  | **Required**. [The set of files or catalogs to search](#search-file-parameter). |
+| `ignore-missing-files` | boolean | [The flag to report empty statistics for missing files](#search-file-parameter). |
 | `mode`        | string  | [The search mode](#search-mode-parameter). |
 | `surrounding` | string  | [The data surrounding width](#search-surrounding-parameter). |
 | `fuzziness`   | uint8   | [The fuzziness distance](#search-fuzziness-parameter). |
@@ -116,7 +117,7 @@ See [short reference](../search/README.md) for more details.
 ### Search `file` parameter
 
 The second required parameter is the set of file to search.
-At least one file should be provided.
+At least one file should be provided if `ignore-missing-files` is not set to `true`.
 
 Multiple files can be provided as:
 
@@ -128,6 +129,9 @@ automatically detects catalogs and does appropriate substitutions.
 Also the `catalog=` alias is supported.
 
 Note, for backward compatibility the `files=` parameter is also supported.
+
+In case the input fileset is empty and `ignore-missing-files=true` the
+empty statistics is reported instead of error.
 
 
 ### Search `mode` parameter
@@ -647,6 +651,7 @@ The list of supported query parameters are the following:
 | ------------- | ------- | ----------- |
 | `query`       | string  | **Required**. [The search expression](#search-query-parameter). |
 | `file`        | string  | **Required**. [The set of files or catalogs to search](#search-file-parameter). |
+| `ignore-missing-files` | boolean | [The flag to report empty statistics for missing files](#search-file-parameter). |
 | `mode`        | string  | [The search mode](#search-mode-parameter). |
 | `surrounding` | uint16  | [The data surrounding width](#search-surrounding-parameter). |
 | `fuzziness`   | uint8   | [The fuzziness distance](#search-fuzziness-parameter). |
