@@ -705,7 +705,7 @@ func TestEngineSearchBad(t *testing.T) {
 
 		_, err := engine.Search(cfg)
 		if assert.Error(t, err) {
-			assert.Contains(t, err.Error(), "no any valid file or catalog found")
+			assert.Contains(t, err.Error(), "no valid file or catalog found")
 		}
 	}
 

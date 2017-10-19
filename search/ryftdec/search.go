@@ -227,7 +227,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to check for catalogs: %s", err)
 	}
 	if len(cfg.Files) == 0 && !cfg.SkipMissing {
-		return nil, fmt.Errorf("no any valid file or catalog found")
+		return nil, fmt.Errorf("no valid file or catalog found")
 	}
 
 	// automatic RECORD to XRECORD or CRECORD...

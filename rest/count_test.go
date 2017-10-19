@@ -57,7 +57,7 @@ func TestCountUsual(t *testing.T) {
 			"failed to parse request parameters")
 
 		check("/count?query=hello", "", TO, http.StatusBadRequest,
-			"no any file or catalog provided")
+			"no file or catalog provided")
 
 		check("/count?query=hello&file=*.txt&surrounding=bad", "", TO,
 			http.StatusBadRequest, "failed to parse surrounding width", "invalid syntax")

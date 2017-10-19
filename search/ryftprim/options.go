@@ -102,7 +102,7 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 		return engine.RyftxExec, engine.RyftxOpts, nil
 	}
 
-	return "", nil, fmt.Errorf("no any backend found") // should be impossible
+	return "", nil, fmt.Errorf("no backend found") // should be impossible
 }
 
 // Options gets all engine options.

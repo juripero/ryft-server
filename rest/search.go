@@ -139,7 +139,7 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	params.Catalogs = nil // reset
 	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
-			"no any file or catalog provided"))
+			"no file or catalog provided"))
 	}
 
 	// setting up transcoder to convert raw data
