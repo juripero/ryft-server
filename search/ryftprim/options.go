@@ -88,34 +88,15 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 			return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
 		}
 	} else if engine.RyftprimExec != "" && engine.RyftxExec != "" { // if both tools are provided
-		// select backend based on search type
-		switch strings.ToLower(mode) {
-		case ExactSearchPrimitiveV1:
-			backendTool = RyftxBackendTool
-		case DatePrimitiveV1:
-			backendTool = RyftxBackendTool
-		case TimePrimitiveV1:
-			backendTool = RyftxBackendTool
-		case NumberPrimitiveV1:
-			backendTool = RyftxBackendTool
-		case CurrencyPrimitiveV1:
-			backendTool = RyftxBackendTool
-		case IPv4PrimitiveV1:
-			backendTool = RyftxBackendTool
-		case IPv6PrimitiveV1:
-			backendTool = RyftxBackendTool
-		case FuzzyHammingPrimitiveV1:
+		backendTool = RyftprimBackendTool // fallback to ryftprim
+		if mode == FuzzyHammingPrimitiveV1 {
 			if cfg.Dist > 1 {
 				backendTool = RyftprimBackendTool
 			} else {
 				backendTool = RyftxBackendTool
 			}
-		case FuzzyEditDistancePrimitiveV1:
-			backendTool = RyftprimBackendTool
-		case RegExpPrimitiveV1:
-			backendTool = Ryftpcre2BackendTool
-		default:
-			backendTool = RyftprimBackendTool // use ryftprim as fallback
+		} else if v, ok := engine.BackendRouter[mode]; ok {
+			backendTool = v
 		}
 	} else if engine.RyftprimExec != "" {
 		backendTool = RyftprimBackendTool
@@ -136,7 +117,6 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 		tweakOpts := engine.TweakOpts.GetOptions(cfg.BackendMode, backendTool, mode)
 		return execPath, tweakOpts, nil
 	}
-
 	return "", nil, fmt.Errorf("no any backend found") // should be impossible
 }
 
