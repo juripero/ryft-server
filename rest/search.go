@@ -82,6 +82,11 @@ type SearchParams struct {
 	// aggregations
 	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 
+	// tweaks
+	Tweaks struct {
+		Cluster []interface{} `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
+	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
+
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
 	Stats  bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
@@ -171,14 +176,6 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	}
 	ctx.Set("encoder", enc) // to recover from panic in appropriate format
 
-	// get search engine
-	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	engine, err := server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
-	if err != nil {
-		panic(NewError(http.StatusInternalServerError, err.Error()).
-			WithDetails("failed to get search engine"))
-	}
-
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
 	cfg.Mode = params.Mode
@@ -228,6 +225,20 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
+	}
+
+	// get search engine
+	var engine search.Engine
+	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
+	if !server.Config.LocalOnly && !params.Local && len(params.Tweaks.Cluster) != 0 {
+		log.WithField("config", params.Tweaks.Cluster).Debugf("[%s]: create tweaked search engine", CORE)
+		engine, err = server.getClusterTweakEngine(authToken, homeDir, cfg, params.Tweaks.Cluster)
+	} else {
+		engine, err = server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
+	}
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get search engine"))
 	}
 
 	// session preparation
