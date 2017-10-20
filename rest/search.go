@@ -546,10 +546,21 @@ func updateSession(session *Session, stat *search.Stat) {
 
 // update aggregations in cluster mode
 func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) error {
+	// get main aggregations (in case if one node in cluster)
+	if d := stat.Extra[search.ExtraAggregations]; d != nil {
+		log.Debugf("[%s/aggs]: merging main aggregations: %+v", CORE, d)
+		if err := aggregations.Merge(d); err != nil {
+			return err
+		}
+
+		// cleanup intermediate aggergations
+		delete(stat.Extra, search.ExtraAggregations)
+	}
+
 	// get aggregations from details
 	for _, dstat := range stat.Details {
 		if d := dstat.Extra[search.ExtraAggregations]; d != nil {
-			log.Debugf("merging %v aggregations", d)
+			log.Debugf("[%s/aggs]: merging other aggregations: %+v", CORE, d)
 			if err := aggregations.Merge(d); err != nil {
 				return err
 			}
@@ -558,7 +569,7 @@ func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) erro
 			delete(dstat.Extra, search.ExtraAggregations)
 		}
 	}
-	log.Debugf("merged %v", aggregations.ToJson(true))
+	log.Debugf("[%s/aggs]: merged: %+v", CORE, aggregations.ToJson(true))
 
 	return nil // OK
 }
