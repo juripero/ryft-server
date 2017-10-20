@@ -79,6 +79,7 @@ func newFake() *fakeServer {
 
 	mux.GET("/search", fs.server.DoSearch)
 	mux.GET("/search/show", fs.server.DoSearchShow)
+	mux.GET("/search/aggs", fs.server.DoAggregations)
 	mux.GET("/count", fs.server.DoCount)
 	mux.GET("/files", fs.server.DoGetFiles)
 	mux.GET("/files/*path", fs.server.DoGetFiles)

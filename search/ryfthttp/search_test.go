@@ -94,7 +94,7 @@ func (fs *fakeServer) doSearch(w http.ResponseWriter, req *http.Request) {
 }
 
 // do fake GET /count
-func (fs *fakeServer) doCount(w http.ResponseWriter, req *http.Request) {
+func (fs *fakeServer) doCount0(w http.ResponseWriter, req *http.Request) {
 	//enc, _ := codec.NewStreamEncoder(w)
 	//defer enc.Close()
 

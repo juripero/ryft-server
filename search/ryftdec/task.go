@@ -42,6 +42,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/getryft/ryft-server/search/utils/query"
 	"github.com/getryft/ryft-server/search/utils/view"
@@ -137,8 +138,8 @@ type PostProcessing interface {
 	Drop(keep bool) // finish work
 	ClearAll()      // clear all data
 
-	AddRyftResults(dataPath, indexPath string,
-		delimiter string, width int, opt uint32) error
+	AddRyftResults(dataPath, indexPath string, delimiter string,
+		width int, opt uint32, isJsonArray bool) error
 	AddCatalog(base *catalog.Catalog) error
 
 	DrainFinalResults(task *Task, mux *search.Result,
@@ -432,7 +433,7 @@ func (mpp *InMemoryPostProcessing) ClearAll() {
 }
 
 // add Ryft results
-func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delim string, width int, opt uint32) error {
+func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, delim string, width int, opt uint32, isJsonArray bool) error {
 	start := time.Now()
 	defer func() {
 		log.WithField("t", time.Since(start)).Debugf("[%s]: add-ryft-result duration", TAG)
@@ -454,9 +455,14 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 	defer file.Close() // close at the end
 
 	// read all index records
-	rd := bufio.NewReaderSize(file, 256*1024)
+	rd := bufio.NewReaderSize(file, ryftprim.ReadBufSize)
 	delimLen := uint64(len(delim))
 	dataPos := uint64(0)
+	dataSkip := uint64(0)
+	if isJsonArray {
+		dataSkip = ryftprim.JsonArraySkip
+	}
+
 	for {
 		// read line by line
 		line, err := rd.ReadBytes('\n')
@@ -466,8 +472,8 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 				return fmt.Errorf("failed to parse index: %s", err)
 			}
 
-			indexFile.Add(index.SetDataPos(dataPos))
-			dataPos += (index.Length + delimLen)
+			indexFile.Add(index.SetDataPos(dataPos + dataSkip))
+			dataPos += (dataSkip + index.Length + delimLen)
 		}
 
 		if err != nil {
@@ -478,6 +484,10 @@ func (mpp *InMemoryPostProcessing) AddRyftResults(dataPath, indexPath string, de
 			}
 		}
 	}
+
+	// in case of JSON array file - take into account
+	// the final part or JSON array: "\n]"
+	dataPos += dataSkip
 
 	// check DATA file consistency
 	if info, err := os.Stat(dataPath); err == nil {
@@ -599,7 +609,6 @@ func (mpp *InMemoryPostProcessing) DrainFinalResults(task *Task, mux *search.Res
 
 	simple := true
 	items := make(memItems, 0, capacity)
-BuildItems:
 	for dataFile, f := range mpp.indexes {
 		if (f.Option & 0x01) != 0x01 {
 			continue // ignore temporary results
@@ -629,11 +638,6 @@ BuildItems:
 				dataPos:  dataPos + uint64(shift),
 				Index:    idx,
 			})
-
-			// apply limit options here
-			if task.config.Limit != 0 && uint(len(items)) >= task.config.Limit {
-				break BuildItems
-			}
 		}
 	}
 
@@ -688,6 +692,15 @@ BuildItems:
 		keepDataAs = "" // prevent further processing
 	}
 
+	// check all Ryft calls have JSON array
+	isJsonArray := true
+	for _, rc := range ryftCalls {
+		if !rc.isJsonArray {
+			isJsonArray = false
+			break
+		}
+	}
+
 	// output DATA file
 	var datFile *bufio.Writer
 	if len(keepDataAs) > 0 {
@@ -695,8 +708,11 @@ BuildItems:
 		if err != nil {
 			return 0, fmt.Errorf("failed to create DATA file: %s", err)
 		}
-		datFile = bufio.NewWriterSize(f, 256*1024)
+		datFile = bufio.NewWriterSize(f, ryftprim.ReadBufSize)
 		defer func() {
+			if isJsonArray {
+				datFile.Write([]byte("\n]"))
+			}
 			datFile.Flush()
 			f.Close()
 		}()
@@ -709,7 +725,7 @@ BuildItems:
 		if err != nil {
 			return 0, fmt.Errorf("failed to create INDEX file: %s", err)
 		}
-		idxFile = bufio.NewWriterSize(f, 256*1024)
+		idxFile = bufio.NewWriterSize(f, ryftprim.ReadBufSize)
 		defer func() {
 			idxFile.Flush()
 			f.Close()
@@ -757,7 +773,7 @@ ItemsLoop:
 			} else {
 				cf = &CachedFile{
 					f:   f,
-					rd:  bufio.NewReaderSize(f, 256*1024),
+					rd:  bufio.NewReaderSize(f, ryftprim.ReadBufSize),
 					pos: 0,
 				}
 				files[item.dataFile] = cf // put to cache
@@ -846,6 +862,13 @@ ItemsLoop:
 		dataEnd := dataPos + int64(len(recRawData))
 		if datFile != nil {
 			start := time.Now()
+			if isJsonArray {
+				if matches == 0 {
+					datFile.Write([]byte("[\n")) // first record
+				} else {
+					datFile.Write([]byte(",\n")) // others
+				}
+			}
 			n, err := datFile.Write(recRawData)
 			if err != nil {
 				mux.ReportError(fmt.Errorf("failed to write DATA file: %s", err))
@@ -893,7 +916,8 @@ ItemsLoop:
 			}
 		}
 
-		if reportRecords {
+		// apply limit options here
+		if reportRecords && (task.config.Limit < 0 || int64(matches) < task.config.Limit) {
 			idx := search.NewIndexCopy(item.Index)
 			idx.UpdateHost(task.UpdateHostTo)
 			rec := search.NewRecord(idx, recRawData)

@@ -37,17 +37,27 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/getryft/ryft-server/rest/format/xml"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils/aggs"
 )
 
+// dedicated structure for aggregation goroutine
+type aggregationGoroutine struct {
+	aggregations *aggs.Aggregations
+	lastError    error
+}
+
 // Apply aggregations
-func ApplyAggregations(indexPath, dataPath string, delimiter string, format string,
-	aggregations *aggs.Aggregations, cancelFunc func() bool) error {
+func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter string, format string,
+	aggregations *aggs.Aggregations, checkJsonArray bool, cancelFunc func() bool) error {
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
+	var dataSkip uint64
 
 	// select DATA format
 	var doFormat func([]byte) (interface{}, error)
@@ -80,7 +90,7 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 		}
 
 		defer f.Close() // close at the end
-		idxRd = bufio.NewReaderSize(f, 256*1024)
+		idxRd = bufio.NewReaderSize(f, ReadBufSize)
 	}
 
 	// open DATA file
@@ -93,7 +103,83 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 		}
 
 		defer f.Close() // close at the end
-		datRd = bufio.NewReaderSize(f, 256*1024)
+		datRd = bufio.NewReaderSize(f, ReadBufSize)
+		if checkJsonArray {
+			if jarr, err := IsJsonArray(datRd); err != nil {
+				return fmt.Errorf("failed to check JSON array: %s", err)
+			} else if jarr {
+				dataSkip = JsonArraySkip // JSON array marker
+			}
+		}
+	}
+
+	var subAggs []*aggregationGoroutine
+	var dataCh chan []byte
+	var wg sync.WaitGroup
+	var subErrs int32
+	if concurrency > 1 {
+		// create a few goroutines to process aggregations
+		// each goroutine will use its own Aggerations
+		subAggs = make([]*aggregationGoroutine, concurrency)
+		dataCh = make(chan []byte, 4*1024)
+		log.Debugf("[%s/aggs]: start sub-processing in %d threads", TAG, concurrency)
+		start := time.Now()
+
+		// run several processing goroutines
+		for i := range subAggs {
+			subAggs[i] = &aggregationGoroutine{
+				aggregations: aggregations.Clone(),
+			}
+
+			wg.Add(1)
+			go func(a *aggregationGoroutine) {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Warnf("UNHANDLED PANIC: %s", r)
+					}
+				}()
+				defer wg.Done()
+
+				for {
+					if data, ok := <-dataCh; ok {
+						parsedData, err := doFormat(data)
+						if err != nil {
+							a.lastError = fmt.Errorf("failed to parse DATA: %s", err)
+							atomic.AddInt32(&subErrs, 1) // notify main thread
+							return
+						}
+
+						// apply aggregations
+						if err := a.aggregations.Add(parsedData); err != nil {
+							a.lastError = fmt.Errorf("failed to apply aggregation: %s", err)
+							atomic.AddInt32(&subErrs, 1) // notify main thread
+							return
+						}
+					} else {
+						break // done
+					}
+				}
+			}(subAggs[i])
+		}
+
+		// at the end combine all sub-aggregations
+		defer func() {
+			log.Debugf("[%s/aggs]: waiting sub-processing", TAG)
+			close(dataCh)
+			wg.Wait()
+			log.Debugf("[%s/aggs]: sub-processing done in %s", TAG, time.Since(start))
+
+			// print errors to the log
+			for _, sa := range subAggs {
+				if err := sa.lastError; err != nil {
+					log.WithError(err).Warnf("[%s/aggs]: sub-processing error", TAG)
+				}
+
+				if err := aggregations.Merge(sa.aggregations.ToJson(false)); err != nil {
+					log.WithError(err).Warnf("[%s/aggs]: sub-process merge error", TAG)
+				}
+			}
+		}()
 	}
 
 	// read INDEX line-by-line and corresponding DATA
@@ -117,8 +203,20 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 
 		index, err := search.ParseIndex(line)
 		if err != nil {
-			log.WithError(err).Warnf("[%s/reader]: failed to parse INDEX from %q", TAG, bytes.TrimSpace(line))
+			log.WithError(err).Warnf("[%s/aggs]: failed to parse INDEX from %q", TAG, bytes.TrimSpace(line))
 			return fmt.Errorf("failed to parse INDEX: %s", err)
+		}
+
+		// skip JSON array mark
+		if n := int(dataSkip); n != 0 {
+			m, err := datRd.Discard(n)
+			if err != nil {
+				log.WithError(err).Warnf("[%s/aggs]: failed to skip JSON mark", TAG)
+				return fmt.Errorf("failed to skip JSON mark: %s", err)
+			} else if m != n {
+				log.Warnf("[%s/aggs]: not all JSON mark skipped: %d of %d", TAG, m, n)
+				return fmt.Errorf("not all JSON mark skipped: %d of %d", m, n)
+			}
 		}
 
 		data := make([]byte, index.Length)
@@ -129,7 +227,7 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 			log.Warnf("[%s/aggs]: not all DATA read: %d of %d", TAG, n, index.Length)
 			return fmt.Errorf("not all DATA read: %d of %d", n, index.Length)
 		}
-		dataPos += uint64(len(data))
+		dataPos += dataSkip + uint64(len(data))
 
 		//		log.WithField("data", string(data)).
 		//			Debugf("[%s/aggs]: new DATA read", TAG) // FIXME: DEBUG
@@ -147,14 +245,21 @@ func ApplyAggregations(indexPath, dataPath string, delimiter string, format stri
 			dataPos += uint64(len(delimiter))
 		}
 
-		parsedData, err := doFormat(data)
-		if err != nil {
-			return fmt.Errorf("failed to parse DATA: %s", err)
-		}
+		if concurrency > 1 {
+			dataCh <- data // send data to processing goroutines
+			if atomic.LoadInt32(&subErrs) != 0 {
+				return fmt.Errorf("parallel error occurred")
+			}
+		} else {
+			parsedData, err := doFormat(data)
+			if err != nil {
+				return fmt.Errorf("failed to parse DATA: %s", err)
+			}
 
-		// apply aggregations
-		if err := aggregations.Add(parsedData); err != nil {
-			return fmt.Errorf("failed to apply aggregation: %s", err)
+			// apply aggregations
+			if err := aggregations.Add(parsedData); err != nil {
+				return fmt.Errorf("failed to apply aggregation: %s", err)
+			}
 		}
 
 		index.Release()

@@ -44,6 +44,12 @@ import (
 	"github.com/getryft/ryft-server/search/utils/view"
 )
 
+const (
+	ReadBufSize = 512 * 1024 // read buffer size, bytes
+
+	JsonArraySkip = 2 // begin:#5B0A, middle:#2C0A end:#0A5D
+)
+
 // ResultsReader reads INDEX and DATA files.
 type ResultsReader struct {
 	task *Task // used for logging
@@ -54,10 +60,13 @@ type ResultsReader struct {
 	Delimiter string // DATA delimiter string
 
 	// options
-	Offset   uint64 // start from the record
-	Limit    uint64 // limit the total number of records
-	ReadData bool   // if `false` only indexes will be reported
-	MakeView bool   // if `false` do not create VIEW file
+	Offset   int64 // start from the record
+	Limit    int64 // limit the total number of records
+	ReadData bool  // if `false` only indexes will be reported
+	MakeView bool  // if `false` do not create VIEW file
+
+	// automatic check for JSON arrays
+	CheckJsonArray bool
 
 	RelativeToHome string // report filepath relative to home
 	UpdateHostTo   string // update index's host
@@ -81,6 +90,28 @@ type ResultsReader struct {
 	totalDataLength  uint64 // total DATA length expected, sum of all index.Length and delimiters
 }
 
+// IsJsonArray checks if file is in JSON array format
+func IsJsonArray(f *bufio.Reader) (bool, error) {
+	if d, err := f.Peek(1); err == nil {
+		return d[0] == '[', nil // OK
+	} else {
+		return false, err // not an JSON array
+	}
+}
+
+// IsJsonArrayFile checks if file is in JSON array format
+func IsJsonArrayFile(filepath string) (bool, error) {
+	// try to open DATA file
+	f, err := os.Open(filepath)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close() // close at the end
+
+	rd := bufio.NewReader(f)
+	return IsJsonArray(rd)
+}
+
 // NewResultsReader creates new reader
 func NewResultsReader(task *Task, dataPath, indexPath, viewPath string, delimiter string) *ResultsReader {
 	rr := new(ResultsReader)
@@ -88,6 +119,7 @@ func NewResultsReader(task *Task, dataPath, indexPath, viewPath string, delimite
 	rr.DataPath = dataPath
 	rr.ViewPath = viewPath
 	rr.Delimiter = delimiter
+	rr.Limit = -1 // no limit
 
 	rr.IntrusiveMode = true
 
@@ -112,8 +144,8 @@ func (rr *ResultsReader) cancel() {
 }
 
 // check if processing has cancelled (non-zero).
-func (rr *ResultsReader) isCancelled() int {
-	return (int)(atomic.LoadInt32(&rr.cancelled))
+func (rr *ResultsReader) isCancelled() bool {
+	return atomic.LoadInt32(&rr.cancelled) != 0
 }
 
 // Stop processing (soft stop).
@@ -127,8 +159,8 @@ func (rr *ResultsReader) stop() {
 }
 
 // check if processing has stopped (non-zero).
-func (rr *ResultsReader) isStopped() int {
-	return (int)(atomic.LoadInt32(&rr.stopped))
+func (rr *ResultsReader) isStopped() bool {
+	return atomic.LoadInt32(&rr.stopped) != 0
 }
 
 // Finish processing.
@@ -153,26 +185,6 @@ func (rr *ResultsReader) process(res *search.Result) {
 	if !rr.MakeView && len(rr.ViewPath) != 0 {
 		rr.show(res) // just read using VIEW file provided
 		return
-	}
-
-	var idxRd, datRd *bufio.Reader
-	var dataPos uint64 // DATA read position
-
-	if idxRd == nil {
-		// try to open INDEX file
-		// if operation is cancelled `f` is nil
-		f, err := rr.openFile(rr.IndexPath)
-		if err != nil {
-			rr.log().WithError(err).WithField("path", rr.IndexPath).
-				Warnf("[%s/reader]: failed to open INDEX file", TAG)
-			res.ReportError(fmt.Errorf("failed to open INDEX file: %s", err))
-			return // failed
-		} else if f == nil {
-			return // cancelled
-		}
-
-		defer f.Close() // close at the end
-		idxRd = bufio.NewReaderSize(f, 256*1024)
 	}
 
 	var viewWr *view.Writer // VIEW writer
@@ -203,6 +215,66 @@ func (rr *ResultsReader) process(res *search.Result) {
 				}
 			}
 		}()
+	}
+
+	delimLen := uint64(len(rr.Delimiter))
+	var dataSkip uint64 // non zero for JSON array file
+	defer func() {
+		// in case of JSON array file - take into account
+		// the final part or JSON array: "\n]"
+		rr.totalDataLength += dataSkip
+		rr.log().WithField("expected-data-length", rr.totalDataLength).
+			Debugf("[%s/reader]: done", TAG)
+	}()
+
+	var idxRd *bufio.Reader
+	if idxRd == nil {
+		// try to open INDEX file (if operation is cancelled `f` is nil)
+		f, err := rr.openFile(rr.IndexPath)
+		if err != nil {
+			rr.log().WithError(err).WithField("path", rr.IndexPath).
+				Warnf("[%s/reader]: failed to open INDEX file", TAG)
+			res.ReportError(fmt.Errorf("failed to open INDEX file: %s", err))
+			return // failed
+		} else if f == nil {
+			return // cancelled
+		}
+
+		defer f.Close() // close at the end
+		idxRd = bufio.NewReaderSize(f, ReadBufSize)
+	}
+
+	var datRd *bufio.Reader
+	if (rr.CheckJsonArray || rr.ReadData) && datRd == nil {
+		// try to open DATA file (if operation is cancelled `f` is nil)
+		f, err := rr.openFile(rr.DataPath)
+		if err != nil {
+			rr.log().WithError(err).WithField("path", rr.DataPath).
+				Warnf("[%s/reader]: failed to open DATA file", TAG)
+			res.ReportError(fmt.Errorf("failed to open DATA file: %s", err))
+			return // failed
+		} else if f == nil {
+			return // cancelled
+		}
+
+		defer f.Close() // close at the end
+		datRd = bufio.NewReaderSize(f, ReadBufSize)
+		if rr.CheckJsonArray {
+			if jarr, err := IsJsonArray(datRd); err != nil {
+				res.ReportError(fmt.Errorf("failed to check JSON array: %s", err))
+				return // failed
+			} else if jarr {
+				dataSkip = JsonArraySkip // JSON array marker
+				rr.log().WithField("path", rr.DataPath).
+					Debugf("[%s/reader]: is JSON array file", TAG)
+			} else {
+				rr.log().WithField("path", rr.DataPath).
+					Debugf("[%s/reader]: is a simple binary file", TAG)
+			}
+		} else {
+			rr.log().WithField("path", rr.DataPath).
+				Debugf("[%s/reader]: no JSON array check needed", TAG)
+		}
 	}
 
 	// INDEX line can be read partially
@@ -258,8 +330,8 @@ func (rr *ResultsReader) process(res *search.Result) {
 				if viewWr != nil {
 					indexBeg := rr.totalIndexLength
 					indexEnd := indexBeg + uint64(len(line))
-					dataBeg := rr.totalDataLength
-					dataEnd := rr.totalDataLength + index.Length
+					dataBeg := rr.totalDataLength + dataSkip
+					dataEnd := rr.totalDataLength + dataSkip + index.Length
 					err := viewWr.Put(int64(indexBeg), int64(indexEnd),
 						int64(dataBeg), int64(dataEnd))
 					if err != nil {
@@ -276,31 +348,14 @@ func (rr *ResultsReader) process(res *search.Result) {
 				}
 
 				// update expected length
+				rr.totalDataLength += dataSkip + index.Length + delimLen
 				rr.totalIndexLength += uint64(len(line))
-				rr.totalDataLength += index.Length + uint64(len(rr.Delimiter))
 				recId += 1
 
 				// skip requested number of records
-				if recId <= rr.Offset {
+				if recId <= uint64(rr.Offset) {
 					if rr.ReadData {
-						if datRd == nil {
-							// try to open DATA file
-							// if operation is cancelled `f` is nil
-							f, err := rr.openFile(rr.DataPath)
-							if err != nil {
-								rr.log().WithError(err).WithField("path", rr.DataPath).
-									Warnf("[%s/reader]: failed to open DATA file", TAG)
-								res.ReportError(fmt.Errorf("failed to open DATA file: %s", err))
-								return // failed
-							} else if f == nil {
-								return // cancelled
-							}
-
-							defer f.Close() // close at the end
-							datRd = bufio.NewReaderSize(f, 256*1024)
-						}
-
-						n := int(index.Length) + len(rr.Delimiter)
+						n := int(dataSkip + index.Length + delimLen)
 						m, err := datRd.Discard(n)
 						if err != nil {
 							log.WithError(err).Warnf("[%s/reader]: failed to skip DATA", TAG)
@@ -311,8 +366,6 @@ func (rr *ResultsReader) process(res *search.Result) {
 							res.ReportError(fmt.Errorf("not all DATA skipped: %d of %d", m, n))
 							return // failed
 						}
-
-						dataPos += uint64(m)
 					}
 
 					continue // go to next RECORD
@@ -320,24 +373,21 @@ func (rr *ResultsReader) process(res *search.Result) {
 
 				var data []byte
 				if rr.ReadData {
-					if datRd == nil {
-						// try to open DATA file
-						// if operation is cancelled `f` is nil
-						f, err := rr.openFile(rr.DataPath)
+					// skip JSON array mark
+					if n := int(dataSkip); n != 0 {
+						m, err := datRd.Discard(n)
 						if err != nil {
-							rr.log().WithError(err).WithField("path", rr.DataPath).
-								Warnf("[%s/reader]: failed to open DATA file", TAG)
-							res.ReportError(fmt.Errorf("failed to open DATA file: %s", err))
+							rr.log().WithError(err).Warnf("[%s/reader]: failed to skip JSON mark", TAG)
+							res.ReportError(fmt.Errorf("failed to skip JSON mark: %s", err))
 							return // failed
-						} else if f == nil {
-							return // cancelled
+						} else if m != n {
+							log.Warnf("[%s/reader]: not all JSON mark skipped: %d of %d", TAG, m, n)
+							res.ReportError(fmt.Errorf("not all JSON mark skipped: %d of %d", m, n))
+							return // failed
 						}
-
-						defer f.Close() // close at the end
-						datRd = bufio.NewReaderSize(f, 256*1024)
 					}
 
-					// try to read data: if operation is cancelled `data` is nil
+					// try to read data (if operation is cancelled `data` is nil)
 					data, err = rr.readData(datRd, index.Length)
 					if err != nil {
 						rr.log().WithError(err).Warnf("[%s/reader]: failed to read DATA", TAG)
@@ -346,14 +396,13 @@ func (rr *ResultsReader) process(res *search.Result) {
 					} else if data == nil {
 						return // cancelled
 					}
-					dataPos += uint64(len(data))
 
 					// read and check delimiter
-					if len(rr.Delimiter) > 0 {
+					if delimLen > 0 {
 						// or just ... datRd.Discard(len(rr.Delimiter))
 
 						// try to read delimiter: if operation is cancelled `delim` is nil
-						delim, err := rr.readData(datRd, uint64(len(rr.Delimiter)))
+						delim, err := rr.readData(datRd, delimLen)
 						if err != nil {
 							rr.log().WithError(err).Warnf("[%s/reader]: failed to read DATA delimiter", TAG)
 							res.ReportError(fmt.Errorf("failed to read DATA delimiter: %s", err))
@@ -367,12 +416,10 @@ func (rr *ResultsReader) process(res *search.Result) {
 							rr.log().WithFields(map[string]interface{}{
 								"expected": rr.Delimiter,
 								"received": string(delim),
-							}).Warnf("[%s/reader]: unexpected delimiter found at %d", TAG, dataPos)
-							res.ReportError(fmt.Errorf("%q unexpected delimiter found at %d", string(delim), dataPos))
+							}).Warnf("[%s/reader]: unexpected delimiter found at %d", TAG, rr.totalDataLength-delimLen)
+							res.ReportError(fmt.Errorf("%q unexpected delimiter found at %d", string(delim), rr.totalDataLength-delimLen))
 							return // failed
 						}
-
-						dataPos += uint64(len(delim))
 					}
 				} // rr.ReadData
 
@@ -394,13 +441,13 @@ func (rr *ResultsReader) process(res *search.Result) {
 				// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
 				res.ReportRecord(rec)
-				if rr.Limit > 0 && res.RecordsReported() >= rr.Limit {
+				if rr.Limit >= 0 && res.RecordsReported() >= uint64(rr.Limit) {
 					rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 					return // done
 				}
 			}
 
-			if rr.isCancelled() != 0 {
+			if rr.isCancelled() {
 				rr.log().Debugf("[%s/reader]: cancelled***", TAG)
 			} else {
 				continue // go to next INDEX ASAP
@@ -408,9 +455,8 @@ func (rr *ResultsReader) process(res *search.Result) {
 		}
 
 		// check for soft stops
-		if rr.isStopped() != 0 {
-			rr.log().WithField("expected-data-length", rr.totalDataLength).
-				Debugf("[%s/reader]: stopped", TAG)
+		if rr.isStopped() {
+			rr.log().Debugf("[%s/reader]: stopped", TAG)
 			return // full stop
 		}
 
@@ -422,8 +468,7 @@ func (rr *ResultsReader) process(res *search.Result) {
 			// continue
 
 		case <-rr.cancelChan:
-			rr.log().WithField("expected-data-length", rr.totalDataLength).
-				Debugf("[%s/reader]: cancelled", TAG)
+			rr.log().Debugf("[%s/reader]: cancelled", TAG)
 			return // cancelled
 		}
 	}
@@ -444,8 +489,7 @@ func (rr *ResultsReader) show(res *search.Result) {
 
 	// INDEX file reader
 	if idxRd == nil {
-		// try to open INDEX file
-		// if operation is cancelled `f` is nil
+		// try to open INDEX file (if operation is cancelled `f` is nil)
 		f, err := rr.openFile(rr.IndexPath)
 		if err != nil {
 			rr.log().WithError(err).WithField("path", rr.IndexPath).
@@ -457,13 +501,12 @@ func (rr *ResultsReader) show(res *search.Result) {
 		}
 
 		defer f.Close() // close at the end
-		idxFd, idxRd = f, bufio.NewReaderSize(f, 256*1024)
+		idxFd, idxRd = f, bufio.NewReaderSize(f, ReadBufSize)
 	}
 
 	// DATA file reader
 	if datRd == nil && rr.ReadData {
-		// try to open DATA file
-		// if operation is cancelled `f` is nil
+		// try to open DATA file (if operation is cancelled `f` is nil)
 		f, err := rr.openFile(rr.DataPath)
 		if err != nil {
 			rr.log().WithError(err).WithField("path", rr.DataPath).
@@ -475,7 +518,7 @@ func (rr *ResultsReader) show(res *search.Result) {
 		}
 
 		defer f.Close() // close at the end
-		datFd, datRd = f, bufio.NewReaderSize(f, 256*1024)
+		datFd, datRd = f, bufio.NewReaderSize(f, ReadBufSize)
 	}
 
 	var viewRd *view.Reader // VIEW file reader
@@ -497,13 +540,13 @@ func (rr *ResultsReader) show(res *search.Result) {
 
 	// adjust count: if zero - get rest of records
 	if old, n := rr.Limit, viewRd.Count(); true {
-		if rr.Limit == 0 {
-			rr.Limit = n
+		if rr.Limit < 0 {
+			rr.Limit = int64(n)
 		}
 
 		// limit count to available number of items
-		if rr.Offset+rr.Limit > n {
-			rr.Limit = n - rr.Offset
+		if uint64(rr.Offset+rr.Limit) > n {
+			rr.Limit = int64(n) - rr.Offset
 		}
 
 		if old != rr.Limit {
@@ -514,9 +557,9 @@ func (rr *ResultsReader) show(res *search.Result) {
 		}
 	}
 
-	var i uint64
+	var i int64
 	for i = 0; i < rr.Limit; i++ {
-		indexBeg, indexEnd, dataBeg, dataEnd, err := viewRd.Get(int64(i + rr.Offset))
+		indexBeg, indexEnd, dataBeg, dataEnd, err := viewRd.Get(i + rr.Offset)
 		if err != nil {
 			rr.log().WithError(err).Warnf("[%s/reader]: failed to read VIEW at %d", TAG, i)
 			res.ReportError(fmt.Errorf("failed to read VIEW: %s", err))
@@ -533,6 +576,8 @@ func (rr *ResultsReader) show(res *search.Result) {
 					res.ReportError(fmt.Errorf("failed to seek INDEX file: %s", err))
 					return // FAILED
 				}
+
+				indexPos += int64(n)
 			}
 		} else {
 			// base case. read before buffer or too far after...
@@ -591,6 +636,8 @@ func (rr *ResultsReader) show(res *search.Result) {
 						res.ReportError(fmt.Errorf("failed to seek DATA file: %s", err))
 						return // FAILED
 					}
+
+					dataPos += int64(n)
 				}
 			} else {
 				// base case. read before buffer or too far after...
@@ -668,21 +715,20 @@ func (rr *ResultsReader) show(res *search.Result) {
 		// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
 		res.ReportRecord(rec)
-		if rr.Limit > 0 && res.RecordsReported() >= rr.Limit {
+		if rr.Limit >= 0 && res.RecordsReported() >= uint64(rr.Limit) {
 			rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 			return // done
 		}
 
-		if rr.isCancelled() != 0 {
+		if rr.isCancelled() {
 			rr.log().Debugf("[%s/reader]: cancelled***", TAG)
 		} else {
 			continue // go to next INDEX ASAP
 		}
 
 		// check for soft stops
-		if rr.isStopped() != 0 {
-			rr.log().WithField("expected-data-length", rr.totalDataLength).
-				Debugf("[%s/reader]: stopped", TAG)
+		if rr.isStopped() {
+			rr.log().Debugf("[%s/reader]: stopped", TAG)
 			return // full stop
 		}
 	}
@@ -775,7 +821,7 @@ func (rr *ResultsReader) readData(f *bufio.Reader, length uint64) ([]byte, error
 }
 
 // CreateViewFile creates VIEW file based on INDEX
-func CreateViewFile(indexPath, viewPath string, delimiter string) error {
+func CreateViewFile(indexPath, viewPath string, delimiter string, isJsonArray bool) error {
 	// open INDEX file
 	file, err := os.Open(indexPath)
 	if err != nil {
@@ -791,10 +837,17 @@ func CreateViewFile(indexPath, viewPath string, delimiter string) error {
 	defer w.Close()
 
 	// read all index records
-	rd := bufio.NewReaderSize(file, 256*1024)
+	rd := bufio.NewReaderSize(file, ReadBufSize)
 	delimLen := int64(len(delimiter))
 	indexPos := int64(0)
 	dataPos := int64(0)
+
+	// take into account JSON arrays
+	var dataSkip int64
+	if isJsonArray {
+		dataSkip = JsonArraySkip
+	}
+
 	for {
 		// read line by line
 		line, err := rd.ReadBytes('\n')
@@ -805,13 +858,13 @@ func CreateViewFile(indexPath, viewPath string, delimiter string) error {
 			}
 
 			err = w.Put(indexPos, indexPos+int64(len(line)),
-				dataPos, dataPos+int64(index.Length))
+				dataPos+dataSkip, dataPos+dataSkip+int64(index.Length))
 			if err != nil {
 				return fmt.Errorf("failed to write VIEW: %s", err)
 			}
 
 			indexPos += int64(len(line))
-			dataPos += int64(index.Length) + delimLen
+			dataPos += dataSkip + int64(index.Length) + delimLen
 		}
 
 		if err != nil {
@@ -824,7 +877,7 @@ func CreateViewFile(indexPath, viewPath string, delimiter string) error {
 	}
 
 	// update lengths
-	if err := w.Update(indexPos, dataPos); err != nil {
+	if err := w.Update(indexPos, dataPos+dataSkip); err != nil {
 		return fmt.Errorf("failed to update VIEW: %s", err)
 	}
 

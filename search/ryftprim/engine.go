@@ -70,6 +70,9 @@ type Engine struct {
 	ReadFilePollTimeout time.Duration
 	ReadFilePollLimit   int
 
+	// number of parallel threads to calculate aggregations on
+	AggregationConcurrency int
+
 	IndexHost string // optional host (cluster mode)
 
 	TweakOpts *TweakOpts // backend tweak options
@@ -164,6 +167,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	res := search.NewResult()
+	if len(cfg.Files) == 0 && cfg.SkipMissing {
+		// report empty stat!
+		res.Stat = search.NewStat(engine.IndexHost)
+		task.finish(res)
+		return res, nil // OK
+	}
+
 	err = engine.run(task, res)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to run", TAG)

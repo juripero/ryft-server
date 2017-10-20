@@ -41,6 +41,7 @@ import (
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftmux"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/aggs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -53,11 +54,14 @@ type SearchShowParams struct {
 	ViewFile  string `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter string `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 	Session   string `form:"session" json:"session,omitempty" msgpack:"session,omitempty"`
-	Offset    uint64 `form:"offset" json:"offset,omitempty" msgpack:"offset,omitempty"`
-	Count     uint64 `form:"count" json:"count,omitempty" msgpack:"count,omitempty"`
+	Offset    int64  `form:"offset" json:"offset,omitempty" msgpack:"offset,omitempty"`
+	Count     int64  `form:"count" json:"count,omitempty" msgpack:"count,omitempty"`
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
+
+	// aggregations
+	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
@@ -67,12 +71,32 @@ type SearchShowParams struct {
 	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 
 	// internal parameters
-	InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
-	//InternalNoSessionId bool `form:"--internal-no-session-id"`
+	InternalErrorPrefix bool   `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
+	InternalNoSessionId bool   `form:"--internal-no-session-id" json:"-" msgpack:"-"`
+	InternalFormat      string `form:"--internal-format" json:"-" msgpack:"-"` // override in cluster mode
+
+	isAggs bool `form:"-" json:"-" msgpack:"-"`
 }
 
 // Handle /search/show endpoint.
 func (server *Server) DoSearchShow(ctx *gin.Context) {
+	server.doSearchShow(ctx, SearchShowParams{
+		Format: format.RAW,
+		Count:  -1, // all records
+	})
+}
+
+// Handle /aggs endpoint.
+func (server *Server) DoAggregations(ctx *gin.Context) {
+	server.doSearchShow(ctx, SearchShowParams{
+		Format: format.RAW,
+		Count:  -1, // all records
+		isAggs: true,
+	})
+}
+
+// Handle /search/show endpoint.
+func (server *Server) doSearchShow(ctx *gin.Context, params SearchShowParams) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
@@ -80,12 +104,19 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := SearchShowParams{
-		Format: format.RAW,
+	if err := bindOptionalJson(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request JSON parameters"))
 	}
 	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request parameters"))
+	}
+
+	// error prefix
+	var errorPrefix string
+	if params.InternalErrorPrefix {
+		errorPrefix = server.Config.HostName
 	}
 
 	var sessionInfo []interface{}
@@ -139,10 +170,10 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	cfg.KeepIndexAs = params.IndexFile
 	cfg.KeepViewAs = params.ViewFile
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
-	cfg.ReportIndex = true // /search
-	cfg.ReportData = !format.IsNull(params.Format)
-	cfg.Offset = uint(params.Offset)
-	cfg.Limit = uint(params.Count)
+	cfg.ReportIndex = !params.isAggs // /search
+	cfg.ReportData = !params.isAggs && !format.IsNull(params.Format)
+	cfg.Offset = params.Offset
+	cfg.Limit = params.Count
 	cfg.Performance = params.Performance
 
 	// parse post-process transformations
@@ -152,9 +183,20 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 			WithDetails("failed to parse transformations"))
 	}
 
+	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
+	}
+	if len(params.InternalFormat) != 0 {
+		cfg.DataFormat = params.InternalFormat
+	} else {
+		cfg.DataFormat = params.Format
+	}
+
 	// get search engine
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	engine, err := server.getShowEngine(params.Local,
+	engine, err := server.getShowEngine(params.isAggs, params.Local,
 		authToken, homeDir, userTag, cfg, sessionInfo)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
@@ -170,6 +212,9 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	searchStartTime := time.Now() // performance metric
 	res, err := engine.Show(cfg)
 	if err != nil {
+		if len(errorPrefix) != 0 {
+			err = fmt.Errorf("[%s]: %s", errorPrefix, err)
+		}
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to start search/show"))
 	}
@@ -179,12 +224,6 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 	// we need to cancel search request
 	// to prevent resource leaks
 	defer cancelIfNotDone(res)
-
-	// error prefix
-	var errorPrefix string
-	if params.InternalErrorPrefix {
-		errorPrefix = server.Config.HostName
-	}
 
 	// drain all results
 	transferStartTime := time.Now() // performance metric
@@ -206,6 +245,16 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 			res.Stat.AddPerfStat("rest-search-show", metrics)
 		}
 
+		if cfg.Aggregations != nil {
+			if err := updateAggregations(cfg.Aggregations, res.Stat); err != nil {
+				panic(NewError(http.StatusInternalServerError, "failed to merge aggregations").WithDetails(err.Error()))
+			}
+			res.Stat.Extra[search.ExtraAggregations] = cfg.Aggregations.ToJson(!params.InternalNoSessionId)
+		}
+
+		res.Stat.ClearSessionData(true)
+		res.Stat.Details = nil // clear details too
+
 		xstat := tcode.FromStat(res.Stat)
 		err := enc.EncodeStat(xstat)
 		if err != nil {
@@ -221,13 +270,20 @@ func (server *Server) DoSearchShow(ctx *gin.Context) {
 }
 
 // get search.Engine (including overrides) for the /search/show operation
-func (server *Server) getShowEngine(localOnly bool, authToken, homeDir, userTag string,
+func (server *Server) getShowEngine(isAggs, localOnly bool, authToken, homeDir, userTag string,
 	baseCfg *search.Config, sessionInfo []interface{}) (search.Engine, error) {
 
 	// target node
 	type Node struct {
 		Cfg *search.Config
 		Url string // empty for local
+	}
+
+	// in case of /aggs
+	if isAggs {
+		// we need all range to run aggregations on
+		baseCfg.Offset = 0
+		baseCfg.Limit = -1
 	}
 
 	nodes := make([]Node, 0, len(sessionInfo))
@@ -270,7 +326,7 @@ func (server *Server) getShowEngine(localOnly bool, authToken, homeDir, userTag 
 
 		nodes = append(nodes, node)
 	} else {
-		if baseCfg.Limit == 0 {
+		if baseCfg.Limit < 0 {
 			log.Debugf("[%s/show]: requested range [%d..)", CORE, baseCfg.Offset)
 		} else {
 			log.Debugf("[%s/show]: requested range [%d..%d)", CORE, baseCfg.Offset, baseCfg.Offset+baseCfg.Limit)
@@ -292,7 +348,7 @@ func (server *Server) getShowEngine(localOnly bool, authToken, homeDir, userTag 
 				if end <= uint64(baseCfg.Offset) {
 					continue // out of range
 				}
-				if baseCfg.Limit != 0 && uint64(baseCfg.Offset+baseCfg.Limit) < beg {
+				if baseCfg.Limit >= 0 && uint64(baseCfg.Offset+baseCfg.Limit) < beg {
 					continue // out of range
 				}
 
@@ -333,19 +389,19 @@ func (server *Server) getShowEngine(localOnly bool, authToken, homeDir, userTag 
 				}
 
 				if beg < uint64(baseCfg.Offset) {
-					node.Cfg.Offset = uint(uint64(baseCfg.Offset) - beg)
+					node.Cfg.Offset = baseCfg.Offset - int64(beg)
 				} else {
 					node.Cfg.Offset = 0
 				}
-				if baseCfg.Limit != 0 {
+				if baseCfg.Limit >= 0 {
 					if end < uint64(baseCfg.Offset+baseCfg.Limit) {
-						node.Cfg.Limit = uint(matches - uint64(node.Cfg.Offset))
+						node.Cfg.Limit = int64(matches) - node.Cfg.Offset
 					} else {
-						node.Cfg.Limit = uint(matches - (end - uint64(baseCfg.Offset+baseCfg.Limit)) - uint64(node.Cfg.Offset))
+						node.Cfg.Limit = int64(matches) - (int64(end) - (baseCfg.Offset + baseCfg.Limit)) - node.Cfg.Offset
 					}
 				} else {
 					// get all remaining matches
-					node.Cfg.Limit = uint(matches - uint64(node.Cfg.Offset)) // 0
+					node.Cfg.Limit = int64(matches) - node.Cfg.Offset // 0
 				}
 
 				log.Debugf("[%s/show]: %s mapped range [%d/%d]", CORE, node.Url, node.Cfg.Offset, node.Cfg.Limit)
@@ -361,6 +417,15 @@ func (server *Server) getShowEngine(localOnly bool, authToken, homeDir, userTag 
 	mux, err := ryftmux.NewEngine()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MUX engine: %s", err)
+	}
+
+	// in case of /aggs
+	if isAggs {
+		for _, node := range nodes {
+			// notify search engine: we need only aggregations (no results)
+			node.Cfg.Offset = -1
+			node.Cfg.Limit = 0
+		}
 	}
 
 	if localOnly || len(sessionInfo) <= 1 {

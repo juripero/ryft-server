@@ -51,8 +51,8 @@ type Config struct {
 	Dist   uint     // fuzziness distance (FHS, FEDS)
 	Reduce bool     // reduce for FEDS
 	Nodes  uint     // number of hardware nodes to use (0..4)
-	Limit  uint     // limit the number of records (0 - no limit)
-	Offset uint     // first record index (/show feature)
+	Limit  int64    // limit the number of records (-1 - no limit)
+	Offset int64    // first record index (/show feature)
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
@@ -73,6 +73,8 @@ type Config struct {
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)
 	ReportData  bool // if false, just indexes will be read (format=null)
+	IsRecord    bool // if true, then the record search is used
+	SkipMissing bool // if true, do not run ryftprim on empty fileset, just report zero statistics
 
 	// upload/search share mode
 	ShareMode utils.ShareMode
@@ -99,6 +101,7 @@ type Config struct {
 func NewEmptyConfig() *Config {
 	cfg := new(Config)
 	cfg.Case = true // by default
+	cfg.Limit = -1  // no limit
 	return cfg
 }
 
@@ -108,6 +111,7 @@ func NewConfig(query string, files ...string) *Config {
 	cfg.Query = query
 	cfg.Files = files
 	cfg.Case = true
+	cfg.Limit = -1 // no limit
 	return cfg
 }
 
@@ -171,7 +175,7 @@ func (cfg Config) String() string {
 	}
 
 	// limit
-	if cfg.Limit != 0 {
+	if cfg.Limit >= 0 {
 		props = append(props, fmt.Sprintf("limit:%d", cfg.Limit))
 	}
 
@@ -228,7 +232,13 @@ func (cfg Config) String() string {
 		props = append(props, "D")
 	}
 	if cfg.Performance {
-		props = append(props, "P")
+		props = append(props, "perf")
+	}
+	if cfg.IsRecord {
+		props = append(props, "is-record")
+	}
+	if cfg.SkipMissing {
+		props = append(props, "skip-missing")
 	}
 
 	return fmt.Sprintf("Config{%s}", strings.Join(props, ", "))

@@ -88,7 +88,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	task.log().Debugf("[%s]: start subtask processing...", TAG)
 	var recordsReported uint64 // for all subtasks, atomic
 	var recordsLimit uint64
-	if task.config.Limit != 0 {
+	if task.config.Limit >= 0 {
 		recordsLimit = uint64(task.config.Limit)
 	} else {
 		recordsLimit = math.MaxUint64

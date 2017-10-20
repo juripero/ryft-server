@@ -276,10 +276,11 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 		buf.WriteString(strings.ToUpper(lex.literal))
 		for {
 			if dot := p.scan(); dot.token == PERIOD {
-				if lex := p.scan(); lex.token == IDENT {
+				switch lex := p.scan(); lex.token {
+				case IDENT, STRING: // RECORD.name or RECORD."name"
 					buf.WriteString(dot.literal)
 					buf.WriteString(lex.literal)
-				} else if lex.token == LBRACK {
+				case LBRACK:
 					// for JSON fields it's possible to specify array
 					// as "field.[].subfield"
 					if end := p.scan(); end.token == RBRACK {
@@ -289,9 +290,12 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 					} else {
 						panic(fmt.Errorf("no closing ] found"))
 					}
-				} else {
+				default:
 					panic(fmt.Errorf("no field name found for RECORD"))
 				}
+			} else if dot.token == FLOAT {
+				// support for RECORD.2.3
+				buf.WriteString(dot.literal)
 			} else {
 				p.unscan(dot)
 				break

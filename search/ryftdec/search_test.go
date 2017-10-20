@@ -235,6 +235,170 @@ func TestEngineSearchOr3(t *testing.T) {
 	}
 }
 
+// check for simple AND (JSON array)
+func TestEngineJsonArraySearchAnd3(t *testing.T) {
+	testSetLogLevel()
+	taskId = 0 // reset to check intermediate file names
+
+	f1 := testNewFake()
+	f1.SearchIsJsonArray = true // save results in JSON array format!
+	f1.HostName = "host-1"
+
+	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
+	assert.NoError(t, os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755))
+	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
+11111-hello-11111
+22222-hello-22222
+33333-hello-33333
+44444-hello-44444
+55555-hello-55555
+`), 0644)
+
+	// valid (usual case)
+	engine, err := NewEngine(f1, nil)
+	if assert.NoError(t, err) && assert.NotNil(t, engine) {
+		cfg := search.NewConfig(`{RECORD CONTAINS "hello"} AND {RECORD CONTAINS "hell"} AND {RECORD CONTAINS "he"}`, "1.txt")
+		// cfg.Width = 3
+		cfg.ReportIndex = true
+		cfg.ReportData = true
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			records, errors := testfake.Drain(res)
+
+			// convert records to strings and sort
+			strRecords := make([]string, 0, len(records))
+			for _, rec := range records {
+				strRecords = append(strRecords, rec.String())
+			}
+			sort.Strings(strRecords)
+
+			assert.Empty(t, errors)
+			assert.EqualValues(t, []string{
+				`Record{{1.txt#25, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#43, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#61, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#7, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#79, len:2, d:0}, data:"he"}`,
+			}, strRecords)
+
+			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", is-record}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hell")), files:[".work/.temp-dat-dec-00000001-2.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", is-record}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("he")), files:[".work/.temp-dat-dec-00000001-3.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", is-record}`, f1.SearchCfgLogTrace[2].String())
+			}
+		}
+	}
+}
+
+// check for simple OR (JSON array)
+func TestEngineJsonArraySearchOr3(t *testing.T) {
+	testSetLogLevel()
+
+	f1 := testNewFake()
+	f1.SearchIsJsonArray = true // save results in JSON array format!
+	f1.HostName = "host-1"
+
+	assert.NoError(t, os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir)))
+	defer os.RemoveAll(filepath.Join(f1.MountPoint, f1.HomeDir))
+	assert.NoError(t, os.MkdirAll(filepath.Join(f1.MountPoint, f1.HomeDir, f1.Instance), 0755))
+	ioutil.WriteFile(filepath.Join(f1.MountPoint, f1.HomeDir, "1.txt"), []byte(`
+11111-hello-11111
+22222-hello-22222
+33333-hello-33333
+44444-hello-44444
+55555-hello-55555
+`), 0644)
+
+	// valid (usual case)
+	engine, err := NewEngine(f1, nil)
+	if assert.NoError(t, err) && assert.NotNil(t, engine) {
+		cfg := search.NewConfig(`{RECORD CONTAINS "hello"} OR {RECORD CONTAINS "hell"} OR {RECORD CONTAINS "he"}`, "1.txt")
+		// cfg.Width = 3
+		cfg.ReportIndex = true
+		cfg.ReportData = true
+
+		taskId = 0 // reset to check intermediate file names
+		f1.SearchCfgLogTrace = nil
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			records, errors := testfake.Drain(res)
+
+			// convert records to strings and sort
+			strRecords := make([]string, 0, len(records))
+			for _, rec := range records {
+				strRecords = append(strRecords, rec.String())
+			}
+			sort.Strings(strRecords)
+
+			assert.Empty(t, errors)
+			assert.EqualValues(t, []string{
+				`Record{{1.txt#25, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#25, len:4, d:0}, data:"hell"}`,
+				`Record{{1.txt#25, len:5, d:0}, data:"hello"}`,
+				`Record{{1.txt#43, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#43, len:4, d:0}, data:"hell"}`,
+				`Record{{1.txt#43, len:5, d:0}, data:"hello"}`,
+				`Record{{1.txt#61, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#61, len:4, d:0}, data:"hell"}`,
+				`Record{{1.txt#61, len:5, d:0}, data:"hello"}`,
+				`Record{{1.txt#7, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#7, len:4, d:0}, data:"hell"}`,
+				`Record{{1.txt#7, len:5, d:0}, data:"hello"}`,
+				`Record{{1.txt#79, len:2, d:0}, data:"he"}`,
+				`Record{{1.txt#79, len:4, d:0}, data:"hell"}`,
+				`Record{{1.txt#79, len:5, d:0}, data:"hello"}`,
+			}, strRecords)
+
+			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", is-record}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hell")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", is-record}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("he")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", is-record}`, f1.SearchCfgLogTrace[2].String())
+			}
+		}
+	}
+
+	// remove duplicates (usual case)
+	if assert.NotNil(t, engine) {
+		cfg := search.NewConfig(`{RECORD CONTAINS "hello"} OR {RECORD CONTAINS "hello"} OR {RECORD CONTAINS "hello"}`, "1.txt")
+		// cfg.Width = 3
+		cfg.ReportIndex = true
+		cfg.ReportData = true
+
+		taskId = 0 // reset to check intermediate file names
+		f1.SearchCfgLogTrace = nil
+
+		res, err := engine.Search(cfg)
+		if assert.NoError(t, err) && assert.NotNil(t, res) {
+			records, errors := testfake.Drain(res)
+
+			// convert records to strings and sort
+			strRecords := make([]string, 0, len(records))
+			for _, rec := range records {
+				strRecords = append(strRecords, rec.String())
+			}
+			sort.Strings(strRecords)
+
+			assert.Empty(t, errors)
+			assert.EqualValues(t, []string{
+				`Record{{1.txt#25, len:5, d:0}, data:"hello"}`,
+				`Record{{1.txt#43, len:5, d:0}, data:"hello"}`,
+				`Record{{1.txt#61, len:5, d:0}, data:"hello"}`,
+				`Record{{1.txt#7, len:5, d:0}, data:"hello"}`,
+				`Record{{1.txt#79, len:5, d:0}, data:"hello"}`,
+			}, strRecords)
+
+			if assert.EqualValues(t, 3, len(f1.SearchCfgLogTrace)) {
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-2.txt", index:".work/.temp-idx-dec-00000001-2.txt", is-record}`, f1.SearchCfgLogTrace[0].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-3.txt", index:".work/.temp-idx-dec-00000001-3.txt", is-record}`, f1.SearchCfgLogTrace[1].String())
+				assert.EqualValues(t, `Config{query:(RECORD CONTAINS EXACT("hello")), files:["1.txt"], mode:"g/es", cs:true, data:".work/.temp-dat-dec-00000001-4.txt", index:".work/.temp-idx-dec-00000001-4.txt", is-record}`, f1.SearchCfgLogTrace[2].String())
+			}
+		}
+	}
+}
+
 // add a part to catalog
 func testAddToCatalog(cat *catalog.Catalog, filename string, offset int64, data string) error {
 	dataPath, dataPos, delim, err := cat.AddFilePart(filename, offset, int64(len(data)), nil)
@@ -783,7 +947,7 @@ func TestRyftFinalResults(t *testing.T) {
 
 			err := mpp.AddRyftResults(filepath.Join(root, rc.DataFile),
 				filepath.Join(root, rc.IndexFile),
-				rc.Delimiter, rc.Width, opt)
+				rc.Delimiter, rc.Width, opt, rc.isJsonArray)
 			if !assert.NoError(t, err) {
 				return
 			}
