@@ -95,6 +95,10 @@ func (t TweaksOpts) String() string {
 	return fmt.Sprintf("%q", t.data)
 }
 
+func (t TweaksOpts) Data() map[string][]string {
+	return t.data
+}
+
 func (t TweaksOpts) GetOptions(mode, backend, primitive string) []string {
 	try := [][]string{
 		[]string{mode, backend, primitive},

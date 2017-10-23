@@ -245,6 +245,10 @@ func AsStringMapOfStringSlices(v interface{}) (map[string][]string, error) {
 	case nil:
 		return nil, nil // empty
 
+	case map[string][]string:
+		res := v.(map[string][]string)
+		return res, nil
+
 	case map[interface{}]interface{}:
 		res := make(map[string][]string, len(vv))
 		for k, v := range vv {
@@ -269,6 +273,10 @@ func AsStringMapOfStrings(v interface{}) (map[string]string, error) {
 	switch vv := v.(type) {
 	case nil:
 		return nil, nil // empty
+
+	case map[string]string:
+		res := v.(map[string]string)
+		return res, nil
 
 	case map[interface{}]interface{}:
 		res := make(map[string]string, len(vv))

@@ -143,14 +143,16 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["minimize-latency"] = engine.MinimizeLatency
 	opts["index-host"] = engine.IndexHost
 	opts["backend-tweaks"] = map[string]interface{}{
-		"options": engine.TweaksOpts,
+		"options": engine.TweaksOpts.Data(),
 		"router":  engine.TweaksRouter,
 	}
-	// For backward compatibility
-	opts["ryftx-opts"] = engine.TweaksOpts.GetOptions("default", RyftxBackendTool, "")
-	opts["ryftprim-iots"] = engine.TweaksOpts.GetOptions("default", RyftprimBackendTool, "")
-	opts["ryftpcre2-opts"] = engine.TweaksOpts.GetOptions("default", Ryftpcre2BackendTool, "")
-	opts["ryft-all-opts"] = engine.TweaksOpts.GetOptions("default", "", "")
+	if len(engine.TweaksOpts.Data()) > 0 {
+		// For backward compatibility
+		opts["ryftx-opts"] = engine.TweaksOpts.GetOptions("default", RyftxBackendTool, "")
+		opts["ryftprim-opts"] = engine.TweaksOpts.GetOptions("default", RyftprimBackendTool, "")
+		opts["ryftpcre2-opts"] = engine.TweaksOpts.GetOptions("default", Ryftpcre2BackendTool, "")
+		opts["ryft-all-opts"] = engine.TweaksOpts.GetOptions("default", "", "")
+	}
 	return opts
 }
 
@@ -163,6 +165,9 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		if vv, err := utils.AsStringSlice(v); err != nil {
 			return fmt.Errorf(`failed to parse "ryft-all-opts" with error: %s`, err)
 		} else {
+			if engine.TweaksOpts == nil {
+				engine.TweaksOpts = NewTweakOpts(map[string][]string{})
+			}
 			engine.TweaksOpts.SetOptions(vv, "default", "", "")
 		}
 	}
@@ -172,6 +177,9 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		if vv, err := utils.AsStringSlice(v); err != nil {
 			return fmt.Errorf(`failed to parse "ryftprim-opts" with error: %s`, err)
 		} else {
+			if engine.TweaksOpts == nil {
+				engine.TweaksOpts = NewTweakOpts(map[string][]string{})
+			}
 			engine.TweaksOpts.SetOptions(vv, "default", RyftprimBackendTool, "")
 		}
 	}
@@ -181,6 +189,9 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		if vv, err := utils.AsStringSlice(v); err != nil {
 			return fmt.Errorf(`failed to parse "ryftx-opts" with error: %s`, err)
 		} else {
+			if engine.TweaksOpts == nil {
+				engine.TweaksOpts = NewTweakOpts(map[string][]string{})
+			}
 			engine.TweaksOpts.SetOptions(vv, "default", RyftxBackendTool, "")
 		}
 	}
@@ -190,6 +201,9 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		if vv, err := utils.AsStringSlice(v); err != nil {
 			return fmt.Errorf(`failed to parse "ryftpcre2-opts" with error: %s`, err)
 		} else {
+			if engine.TweaksOpts == nil {
+				engine.TweaksOpts = NewTweakOpts(map[string][]string{})
+			}
 			engine.TweaksOpts.SetOptions(vv, "default", Ryftpcre2BackendTool, "")
 		}
 	}
@@ -391,21 +405,28 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 			return fmt.Errorf(`failed to parse "backend-tweaks" options: %s`, err)
 		}
 		// backend-tweaks.options
-		if v, ok := bt["options"]; ok {
-			tweaksOpts, err := utils.AsStringMapOfStringSlices(v)
+		if vopts, ok := bt["options"]; ok {
+			tweaksOpts, err := utils.AsStringMapOfStringSlices(vopts)
 			if err != nil {
 				return fmt.Errorf(`failed to parse "options" option: %s`, err)
 			}
 			engine.TweaksOpts = NewTweakOpts(tweaksOpts)
+		} else {
+			engine.TweaksOpts = NewTweakOpts(map[string][]string{})
 		}
 
 		// backend-tweaks.router
-		if v, ok := bt["router"]; ok {
-			engine.TweaksRouter, err = utils.AsStringMapOfStrings(v)
+		if vrouter, ok := bt["router"]; ok {
+			engine.TweaksRouter, err = utils.AsStringMapOfStrings(vrouter)
 			if err != nil {
 				return fmt.Errorf(`failed to parse "router" option: %s`, err)
 			}
+		} else {
+			engine.TweaksRouter = map[string]string{}
 		}
+	} else {
+		engine.TweaksOpts = NewTweakOpts(map[string][]string{})
+		engine.TweaksRouter = map[string]string{}
 	}
 
 	return nil // OK
