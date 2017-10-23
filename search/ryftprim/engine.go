@@ -33,7 +33,6 @@ package ryftprim
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -83,54 +82,6 @@ type Engine struct {
 	options map[string]interface{}
 }
 
-func NewTweakOpts(data map[string][]string) *TweaksOpts {
-	return &TweaksOpts{data}
-}
-
-type TweaksOpts struct {
-	data map[string][]string
-}
-
-func (t TweaksOpts) String() string {
-	return fmt.Sprintf("%q", t.data)
-}
-
-func (t TweaksOpts) Data() map[string][]string {
-	return t.data
-}
-
-func (t TweaksOpts) GetOptions(mode, backend, primitive string) []string {
-	try := [][]string{
-		[]string{mode, backend, primitive},
-		[]string{backend, primitive},
-		[]string{mode, primitive},
-		[]string{mode, backend},
-		[]string{primitive},
-		[]string{backend},
-		[]string{mode},
-	}
-	for _, el := range try {
-		key := strings.Join(el, ".")
-		if v, ok := t.data[key]; ok {
-			return v
-		}
-	}
-	return []string{}
-}
-func (t *TweaksOpts) SetOptions(value []string, mode, backend, primitive string) {
-	keyStack := []string{}
-	if mode != "" {
-		keyStack = append(keyStack, mode)
-	}
-	if backend != "" {
-		keyStack = append(keyStack, backend)
-	}
-	if primitive != "" {
-		keyStack = append(keyStack, primitive)
-	}
-	t.data[strings.Join(keyStack, ".")] = value
-}
-
 // NewEngine creates new RyftPrim search engine.
 func NewEngine(opts map[string]interface{}) (*Engine, error) {
 	engine := new(Engine)
@@ -138,6 +89,7 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse options: %s", err)
 	}
+
 	return engine, nil // OK
 }
 
