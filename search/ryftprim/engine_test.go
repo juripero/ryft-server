@@ -177,8 +177,8 @@ func TestEngineUsual(t *testing.T) {
 			"home-dir":                "ryftprim",
 			"minimize-latency":        true,
 			"index-host":              "hozt",
-			"backend-router":          map[string]string{},
-			"tweak-opts":              map[string][]string{},
+			"tweaks-router":           map[string]string{},
+			"tweaks-options":          map[string][]string{},
 		})
 		if !assert.NoError(t, err) {
 			return
@@ -268,8 +268,8 @@ func TestEngineUsualLimit(t *testing.T) {
 		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
-		"backend-router":          map[string]string{},
-		"tweak-opts":              map[string][]string{},
+		"tweaks-router":           map[string]string{},
+		"tweaks-options":          map[string][]string{},
 	})
 	if !assert.NoError(t, err) {
 		return
@@ -340,8 +340,8 @@ func TestEngineUsualNoOutput(t *testing.T) {
 		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
-		"backend-router":          map[string]string{},
-		"tweak-opts":              map[string][]string{},
+		"tweaks-router":           map[string]string{},
+		"tweaks-options":          map[string][]string{},
 	})
 	if !assert.NoError(t, err) {
 		return
@@ -403,8 +403,8 @@ func TestEngineBadSearchMode(t *testing.T) {
 		"home-dir":                "ryft",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
-		"backend-router":          map[string]string{},
-		"tweak-opts":              map[string][]string{},
+		"tweaks-router":           map[string]string{},
+		"tweaks-options":          map[string][]string{},
 	})
 	if !assert.NoError(t, err) {
 		return
@@ -448,8 +448,8 @@ func TestEngineBadPath(t *testing.T) {
 		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
-		"backend-router":          map[string]string{},
-		"tweak-opts":              map[string][]string{},
+		"tweaks-router":           map[string]string{},
+		"tweaks-options":          map[string][]string{},
 	})
 	if !assert.NoError(t, err) {
 		return
@@ -504,8 +504,8 @@ func TestEngineFailedToStartTool(t *testing.T) {
 		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
-		"backend-router":          map[string]string{},
-		"tweak-opts":              map[string][]string{},
+		"tweaks-router":           map[string]string{},
+		"tweaks-options":          map[string][]string{},
 	})
 	if !assert.NoError(t, err) {
 		return
@@ -549,8 +549,8 @@ sleep 300s
 		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
-		"backend-router":          map[string]string{},
-		"tweak-opts":              map[string][]string{},
+		"tweaks-router":           map[string]string{},
+		"tweaks-options":          map[string][]string{},
 	})
 	if !assert.NoError(t, err) {
 		return
@@ -589,8 +589,8 @@ func TestEngineToolFailed(t *testing.T) {
 		"home-dir":                "ryft",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
-		"backend-router":          map[string]string{},
-		"tweak-opts":              map[string][]string{},
+		"tweaks-router":           map[string]string{},
+		"tweaks-options":          map[string][]string{},
 	})
 	if !assert.NoError(t, err) {
 		return
@@ -648,8 +648,8 @@ exit(3)
 		"home-dir":                "ryftprim",
 		"minimize-latency":        true,
 		"index-host":              "hozt",
-		"backend-router":          map[string]string{},
-		"tweak-opts":              map[string][]string{},
+		"tweaks-router":           map[string]string{},
+		"tweaks-options":          map[string][]string{},
 	})
 	if !assert.NoError(t, err) {
 		return

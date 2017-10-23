@@ -95,7 +95,7 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 			} else {
 				backendTool = RyftxBackendTool
 			}
-		} else if v, ok := engine.BackendRouter[mode]; ok {
+		} else if v, ok := engine.TweaksRouter[mode]; ok {
 			backendTool = v
 		}
 	} else if engine.RyftprimExec != "" {
@@ -114,7 +114,7 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 		case Ryftpcre2BackendTool:
 			execPath = engine.Ryftpcre2Exec
 		}
-		tweakOpts := engine.TweakOpts.GetOptions(cfg.BackendMode, backendTool, mode)
+		tweakOpts := engine.TweaksOpts.GetOptions(cfg.BackendMode, backendTool, mode)
 		return execPath, tweakOpts, nil
 	}
 	return "", nil, fmt.Errorf("no any backend found") // should be impossible
@@ -142,14 +142,57 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["keep-files"] = engine.KeepResultFiles
 	opts["minimize-latency"] = engine.MinimizeLatency
 	opts["index-host"] = engine.IndexHost
-	opts["tweak-opts"] = engine.TweakOpts
-	opts["backend-router"] = engine.BackendRouter
+	opts["backend-tweaks"] = map[string]interface{}{
+		"options": engine.TweaksOpts,
+		"router":  engine.TweaksRouter,
+	}
+	// For backward compatibility
+	opts["ryftx-opts"] = engine.TweaksOpts.GetOptions("default", RyftxBackendTool, "")
+	opts["ryftprim-iots"] = engine.TweaksOpts.GetOptions("default", RyftprimBackendTool, "")
+	opts["ryftpcre2-opts"] = engine.TweaksOpts.GetOptions("default", Ryftpcre2BackendTool, "")
+	opts["ryft-all-opts"] = engine.TweaksOpts.GetOptions("default", "", "")
 	return opts
 }
 
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	engine.options = opts // base
+
+	// default options for all engines
+	if v, ok := opts["ryft-all-opts"]; ok {
+		if vv, err := utils.AsStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "ryft-all-opts" with error: %s`, err)
+		} else {
+			engine.TweaksOpts.SetOptions(vv, "default", "", "")
+		}
+	}
+
+	// `ryftprim` options
+	if v, ok := opts["ryftprim-opts"]; ok {
+		if vv, err := utils.AsStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "ryftprim-opts" with error: %s`, err)
+		} else {
+			engine.TweaksOpts.SetOptions(vv, "default", RyftprimBackendTool, "")
+		}
+	}
+
+	// `ryftx` options
+	if v, ok := opts["ryftx-opts"]; ok {
+		if vv, err := utils.AsStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "ryftx-opts" with error: %s`, err)
+		} else {
+			engine.TweaksOpts.SetOptions(vv, "default", RyftxBackendTool, "")
+		}
+	}
+
+	// `ryftpcre2` options
+	if v, ok := opts["ryftpcre2-opts"]; ok {
+		if vv, err := utils.AsStringSlice(v); err != nil {
+			return fmt.Errorf(`failed to parse "ryftpcre2-opts" with error: %s`, err)
+		} else {
+			engine.TweaksOpts.SetOptions(vv, "default", Ryftpcre2BackendTool, "")
+		}
+	}
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)
@@ -342,20 +385,26 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 	}
 
-	// tweak-opts
-	if v, ok := opts["tweak-opts"]; ok {
-		tweakOpts, err := utils.AsStringMapOfStringSlices(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "tweak-opts" option: %s`, err)
+	if v, ok := opts["backend-tweaks"]; ok {
+		bt, err := utils.AsStringMap(v)
+		if ok == false {
+			return fmt.Errorf(`failed to parse "backend-tweaks" options: %s`, err)
 		}
-		engine.TweakOpts = NewTweakOpts(tweakOpts)
-	}
+		// backend-tweaks.options
+		if v, ok := bt["options"]; ok {
+			tweaksOpts, err := utils.AsStringMapOfStringSlices(v)
+			if err != nil {
+				return fmt.Errorf(`failed to parse "options" option: %s`, err)
+			}
+			engine.TweaksOpts = NewTweakOpts(tweaksOpts)
+		}
 
-	// backend-router
-	if v, ok := opts["backend-router"]; ok {
-		engine.BackendRouter, err = utils.AsStringMapOfStrings(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "backend-router" option: %s`, err)
+		// backend-tweaks.router
+		if v, ok := bt["router"]; ok {
+			engine.TweaksRouter, err = utils.AsStringMapOfStrings(v)
+			if err != nil {
+				return fmt.Errorf(`failed to parse "router" option: %s`, err)
+			}
 		}
 	}
 

@@ -75,26 +75,27 @@ type Engine struct {
 
 	IndexHost string // optional host (cluster mode)
 
-	TweakOpts *TweakOpts // backend tweak options
+	TweaksOpts *TweaksOpts // backend tweaks options
 
-	BackendRouter map[string]string // map primitive onto search backend engine
+	// backend tweaks router. Map primitive onto search backend engine
+	TweaksRouter map[string]string
 
 	options map[string]interface{}
 }
 
-func NewTweakOpts(data map[string][]string) *TweakOpts {
-	return &TweakOpts{data}
+func NewTweakOpts(data map[string][]string) *TweaksOpts {
+	return &TweaksOpts{data}
 }
 
-type TweakOpts struct {
+type TweaksOpts struct {
 	data map[string][]string
 }
 
-func (t TweakOpts) String() string {
+func (t TweaksOpts) String() string {
 	return fmt.Sprintf("%q", t.data)
 }
 
-func (t TweakOpts) GetOptions(mode, backend, primitive string) []string {
+func (t TweaksOpts) GetOptions(mode, backend, primitive string) []string {
 	try := [][]string{
 		[]string{mode, backend, primitive},
 		[]string{backend, primitive},
@@ -111,6 +112,19 @@ func (t TweakOpts) GetOptions(mode, backend, primitive string) []string {
 		}
 	}
 	return []string{}
+}
+func (t *TweaksOpts) SetOptions(value []string, mode, backend, primitive string) {
+	keyStack := []string{}
+	if mode != "" {
+		keyStack = append(keyStack, mode)
+	}
+	if backend != "" {
+		keyStack = append(keyStack, backend)
+	}
+	if primitive != "" {
+		keyStack = append(keyStack, primitive)
+	}
+	t.data[strings.Join(keyStack, ".")] = value
 }
 
 // NewEngine creates new RyftPrim search engine.
