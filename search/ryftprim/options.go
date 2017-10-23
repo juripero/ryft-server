@@ -75,9 +75,8 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 		if engine.RyftprimExec != "" && engine.RyftxExec != "" {
 			// if both tools are configured
 			// check the routing table by search primitive
-			if v, ok := engine.Tweaks.Router[prim]; ok {
-				tool = v
-			} else {
+			tool = engine.Tweaks.GetBackendTool(prim)
+			if tool == "" {
 				tool = "ryftprim" // fallback
 			}
 		} else if engine.RyftprimExec != "" {

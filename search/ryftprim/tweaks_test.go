@@ -27,10 +27,6 @@ func TestTweakOpts(t *testing.T) {
 		assert.EqualValues(t, []string(nil), opts.GetOptions("", "ryftprim", "es"))
 	}
 
-	check := func(opts []string, expected ...string) {
-		assert.EqualValues(t, expected, opts)
-	}
-
 	opts, err = parseYamlTweaks(`
 backend-tweaks:
   options:
@@ -48,18 +44,35 @@ backend-tweaks:
     default: ["?"]
 `)
 	if assert.NoError(t, err) {
-		check(opts.GetOptions("high", "ryftprim", "es"), "high", "prim", "es")
-		check(opts.GetOptions("high", "ryftprim", "feds"), "high", "prim")
-		check(opts.GetOptions("high", "ryftprim", "fhs"), "high", "fhs")
-		check(opts.GetOptions("high", "ryftx", "es"), "high")
-		check(opts.GetOptions("high", "ryftx", "feds"), "high")
-		check(opts.GetOptions("high", "ryftx", "fhs"), "high", "fhs")
+		assert.EqualValues(t, []string{"high", "prim", "es"}, opts.GetOptions("high", "ryftprim", "es"))
+		assert.EqualValues(t, []string{"high", "prim"}, opts.GetOptions("high", "ryftprim", "feds"))
+		assert.EqualValues(t, []string{"high", "fhs"}, opts.GetOptions("high", "ryftprim", "fhs"))
+		assert.EqualValues(t, []string{"high"}, opts.GetOptions("high", "ryftx", "es"))
+		assert.EqualValues(t, []string{"high"}, opts.GetOptions("high", "ryftx", "feds"))
+		assert.EqualValues(t, []string{"high", "fhs"}, opts.GetOptions("high", "ryftx", "fhs"))
 
-		check(opts.GetOptions("", "ryftx", "es"), "x", "es")
-		check(opts.GetOptions("", "ryftx", "feds"), "x")
-		check(opts.GetOptions("", "ryftx", "fhs"), "fhs")
-		check(opts.GetOptions("", "ryftprim", "es"), "?")
-		check(opts.GetOptions("", "ryftprim", "feds"), "?")
-		check(opts.GetOptions("", "ryftprim", "fhs"), "fhs")
+		assert.EqualValues(t, []string{"x", "es"}, opts.GetOptions("", "ryftx", "es"))
+		assert.EqualValues(t, []string{"x"}, opts.GetOptions("", "ryftx", "feds"))
+		assert.EqualValues(t, []string{"fhs"}, opts.GetOptions("", "ryftx", "fhs"))
+		assert.EqualValues(t, []string{"?"}, opts.GetOptions("", "ryftprim", "es"))
+		assert.EqualValues(t, []string{"?"}, opts.GetOptions("", "ryftprim", "feds"))
+		assert.EqualValues(t, []string{"fhs"}, opts.GetOptions("", "ryftprim", "fhs"))
+	}
+
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  options:
+    default: ["?"]
+  router:
+    pcre2: ryftpcre2
+    fhs,feds: ryftprim
+    default: ryftx
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, "ryftpcre2", opts.GetBackendTool("pcre2"))
+		assert.EqualValues(t, "ryftprim", opts.GetBackendTool("feds"))
+		assert.EqualValues(t, "ryftprim", opts.GetBackendTool("fhs"))
+		assert.EqualValues(t, "ryftx", opts.GetBackendTool("es"))
+		assert.EqualValues(t, "ryftx", opts.GetBackendTool("ts"))
 	}
 }

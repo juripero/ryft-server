@@ -192,3 +192,16 @@ func (t *Tweaks) SetOptions(mode, backend, primitive string, opts []string) {
 		delete(t.Options, key)
 	}
 }
+
+// GetBackendTool from routing table
+func (t *Tweaks) GetBackendTool(primitive string) string {
+	if tool, ok := t.Router[primitive]; ok {
+		return tool
+	}
+
+	if tool, ok := t.Router["default"]; ok {
+		return tool
+	}
+
+	return "" // not found
+}
