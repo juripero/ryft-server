@@ -43,82 +43,68 @@ import (
 
 // getExecPath get backend path (ryftprim, ryftx or pcre2) and its options
 func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) {
-	var (
-		execPath    string
-		backendTool string
-		mode        string
-	)
-	mode = strings.ToLower(cfg.Mode)
-
-	switch mode {
-	case GenericExactSearchPrimitive, ExactSearchPrimitiveV1:
-		mode = ExactSearchPrimitiveV1
-	case GenericDatePrimitive, DatePrimitiveV1:
-		mode = DatePrimitiveV1
-	case GenericTimePrimitive, TimePrimitiveV1:
-		mode = TimePrimitiveV1
-	case GenericNumberPrimitive, NumberPrimitiveV1:
-		mode = NumberPrimitiveV1
-	case GenericCurrencyPrimitive, CurrencyPrimitiveV1:
-		mode = CurrencyPrimitiveV1
-	case GenericIPv4Primitive, IPv4PrimitiveV1:
-		mode = IPv4PrimitiveV1
-	case GenericIPv6Primitive, IPv6PrimitiveV1:
-		mode = IPv6PrimitiveV1
-	case GenericFuzzyHammingPrimitive, FuzzyHammingPrimitiveV1:
-		mode = FuzzyHammingPrimitiveV1
-	case GenericFuzzyEditDistancePrimitive, FuzzyEditDistancePrimitiveV1:
-		mode = FuzzyEditDistancePrimitiveV1
-	case GenericRegExpPrimitive, RegExpPrimitiveV1:
-		mode = RegExpPrimitiveV1
-	default:
-		mode = ExactSearchPrimitiveV1
+	// search primitive (check aliases)
+	prim := strings.ToLower(cfg.Mode)
+	switch prim {
+	case "g/es", "es":
+		prim = "es"
+	case "g/fhs", "fhs":
+		prim = "fhs"
+	case "g/feds", "feds":
+		prim = "feds"
+	case "g/ds", "ds":
+		prim = "ds"
+	case "g/ts", "ts":
+		prim = "ts"
+	case "g/ns", "ns":
+		prim = "ns"
+	case "g/cs", "cs":
+		prim = "cs"
+	case "g/ipv4", "ipv4":
+		prim = "ipv4"
+	case "g/ipv6", "ipv6":
+		prim = "ipv6"
+	case "g/pcre2", "pcre2":
+		prim = "pcre2"
 	}
 
-	// if backend tool is specified use it
-	if cfg.Backend.Tool != "" {
-		switch strings.ToLower(cfg.Backend.Tool) {
-		case RyftprimEngineV1, RyftprimEngineV2, RyftprimEngineV3:
-			backendTool = RyftprimBackendTool
-		case RyftxEngineV1, RyftxEngineV2:
-			backendTool = RyftxBackendTool
-		case Ryftpcre2EngineV1, Ryftpcre2EngineV2, Ryftpcre2EngineV3, Ryftpcre2EngineV4:
-			backendTool = Ryftpcre2BackendTool
-		default:
-			return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.Backend.Tool)
-		}
-	} else if engine.RyftprimExec != "" && engine.RyftxExec != "" { // if both tools are provided
-		backendTool = RyftprimBackendTool // fallback to ryftprim
-		if mode == FuzzyHammingPrimitiveV1 {
-			if cfg.Dist > 1 {
-				backendTool = RyftprimBackendTool
+	// backend tool (with aliases)
+	var tool string
+	if cfg.Backend.Tool == "" {
+		// auto-selection
+		if engine.RyftprimExec != "" && engine.RyftxExec != "" {
+			// if both tools are configured
+			// check the routing table by search primitive
+			if v, ok := engine.Tweaks.Router[prim]; ok {
+				tool = v
 			} else {
-				backendTool = RyftxBackendTool
+				tool = "ryftprim" // fallback
 			}
-		} else if v, ok := engine.Tweaks.Router[mode]; ok {
-			backendTool = v
+		} else if engine.RyftprimExec != "" {
+			tool = "ryftprim"
+		} else if engine.RyftxExec != "" {
+			tool = "ryftx"
 		}
-	} else if engine.RyftprimExec != "" {
-		backendTool = RyftprimBackendTool
-	} else if engine.RyftxExec != "" {
-		backendTool = RyftxBackendTool
+	} else {
+		// use provided backend tool
+		tool = cfg.Backend.Tool
 	}
 
-	// detect corresponding tweak options
-	if backendTool != "" {
-		switch backendTool {
-		case RyftprimBackendTool:
-			execPath = engine.RyftprimExec
-		case RyftxBackendTool:
-			execPath = engine.RyftxExec
-		case Ryftpcre2BackendTool:
-			execPath = engine.Ryftpcre2Exec
-		}
-		tweakOpts := engine.Tweaks.GetOptions(cfg.Backend.Mode, backendTool, mode)
-		return execPath, tweakOpts, nil
+	// get tool path (check aliases)
+	var path string
+	switch strings.ToLower(tool) {
+	case "1", "prim", "ryftprim":
+		path, tool = engine.RyftprimExec, "ryftprim"
+	case "x", "ryftx":
+		path, tool = engine.RyftxExec, "ryftx"
+	case "re", "regex", "regexp", "pcre2", "ryftpcre2":
+		path, tool = engine.Ryftpcre2Exec, "ryftpcre2"
+	default:
+		return "", nil, fmt.Errorf(`"%s" is unknown backend tool`, tool)
 	}
 
-	return "", nil, fmt.Errorf("no backend found") // should be impossible
+	opts := engine.Tweaks.GetOptions(cfg.Backend.Mode, tool, prim)
+	return path, opts, nil // OK
 }
 
 // Options gets all engine options.

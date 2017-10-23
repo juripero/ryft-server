@@ -43,81 +43,6 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
-const (
-	ExactSearchPrimitiveV1      = "es"
-	ExactsearchPrimitiveV2      = "exact"
-	ExactSearchPrimitiveV3      = "exact_search"
-	GenericExactSearchPrimitive = "g/es"
-
-	FuzzyHammingPrimitiveV1      = "fhs"
-	FuzzyHammingPrimitiveV2      = "hamming"
-	FuzzyHammingPrimitiveV3      = "fuzzy_hamming"
-	FuzzyHammingPrimitiveV4      = "fuzzy_hamming_search"
-	GenericFuzzyHammingPrimitive = "g/fhs"
-
-	FuzzyEditDistancePrimitiveV1      = "feds"
-	FuzzyEditDistancePrimitiveV2      = "edit_distance"
-	FuzzyEditDistancePrimitiveV3      = "fuzzy_edit_distance"
-	FuzzyEditDistancePrimitiveV4      = "fuzzy_edit_distance_search"
-	GenericFuzzyEditDistancePrimitive = "g/feds"
-
-	DatePrimitiveV1      = "ds"
-	DatePrimitiveV2      = "date"
-	DatePrimitiveV3      = "date_search"
-	GenericDatePrimitive = "g/ds"
-
-	TimePrimitiveV1      = "ts"
-	TimePrimitiveV2      = "time"
-	TimePrimitiveV3      = "time_search"
-	GenericTimePrimitive = "g/ts"
-
-	NumberPrimitiveV1      = "ns"
-	NumberPrimitiveV2      = "num"
-	NumberPrimitiveV3      = "number_search"
-	GenericNumberPrimitive = "g/ns"
-
-	CurrencyPrimitiveV1      = "cs"
-	CurrencyPrimitiveV2      = "currency"
-	CurrencyPrimitiveV3      = "currency_search"
-	GenericCurrencyPrimitive = "g/cs"
-
-	IPv4PrimitiveV1      = "ipv4"
-	IPv4PrimitiveV2      = "ipv4_search"
-	GenericIPv4Primitive = "g/ipv4"
-
-	IPv6PrimitiveV1      = "ipv6"
-	IPv6PrimitiveV2      = "ipv6_search"
-	GenericIPv6Primitive = "g/ipv6"
-
-	RegExpPrimitiveV1      = "pcre2"
-	RegExpPrimitiveV2      = "pcre2_search"
-	RegExpPrimitiveV3      = "regex"
-	RegExpPrimitiveV4      = "regex_search"
-	RegExpPrimitiveV5      = "regexp"
-	RegExpPrimitiveV6      = "regexp_search"
-	GenericRegExpPrimitive = "g/pcre2"
-
-	GenericPrimitiveV1 = ""
-	GenericPrimitiveV2 = "g"
-	GenericPrimitiveV3 = "generic"
-
-	RyftprimEngineV1 = "1"
-	RyftprimEngineV2 = "prim"
-	RyftprimEngineV3 = "ryftprim"
-
-	RyftxEngineV1 = "x"
-	RyftxEngineV2 = "ryftx"
-
-	Ryftpcre2EngineV1 = "re"
-	Ryftpcre2EngineV2 = "regex"
-	Ryftpcre2EngineV3 = "regexp"
-	Ryftpcre2EngineV4 = "pcre2"
-
-	RyftprimBackendTool  = "ryftprim"
-	RyftxBackendTool     = "ryftx"
-	Ryftpcre2BackendTool = "ryftpcre2"
-)
-
 var (
 	ErrCancelled = fmt.Errorf("cancelled by user")
 )
@@ -140,31 +65,31 @@ func (engine *Engine) prepare(task *Task) error {
 	// select search mode
 	genericMode := false
 	switch strings.ToLower(cfg.Mode) {
-	case GenericPrimitiveV1, GenericPrimitiveV2, GenericPrimitiveV3, GenericExactSearchPrimitive,
-		GenericFuzzyHammingPrimitive, GenericFuzzyEditDistancePrimitive, GenericDatePrimitive, GenericTimePrimitive,
-		GenericNumberPrimitive, GenericCurrencyPrimitive, GenericIPv4Primitive, GenericIPv6Primitive, GenericRegExpPrimitive:
+	case "", "g", "g/es",
+		"g/fhs", "g/feds", "g/ds", "g/ts",
+		"g/ns", "g/cs", "g/ipv4", "g/ipv6", "g/pcre2":
 		args = append(args, "-p", "g")
 		genericMode = true
-	case ExactSearchPrimitiveV1, ExactsearchPrimitiveV2, ExactSearchPrimitiveV3:
+	case "es":
 		args = append(args, "-p", "es")
-	case FuzzyHammingPrimitiveV1, FuzzyHammingPrimitiveV2, FuzzyHammingPrimitiveV3, FuzzyHammingPrimitiveV4:
+	case "fhs":
 		args = append(args, "-p", "fhs")
-	case FuzzyEditDistancePrimitiveV1, FuzzyEditDistancePrimitiveV2, FuzzyEditDistancePrimitiveV3, FuzzyEditDistancePrimitiveV4:
+	case "feds":
 		args = append(args, "-p", "feds")
-	case DatePrimitiveV1, DatePrimitiveV2, DatePrimitiveV3:
+	case "ds":
 		args = append(args, "-p", "ds")
-	case TimePrimitiveV1, TimePrimitiveV2, TimePrimitiveV3:
+	case "ts":
 		args = append(args, "-p", "ts")
-	case NumberPrimitiveV1, NumberPrimitiveV2, NumberPrimitiveV3:
+	case "ns":
 		args = append(args, "-p", "ns")
-	case CurrencyPrimitiveV1, CurrencyPrimitiveV2, CurrencyPrimitiveV3:
+	case "cs":
 		// currency is a kind of numeric search!
 		args = append(args, "-p", "ns")
-	case IPv4PrimitiveV1, IPv4PrimitiveV2:
+	case "ipv4":
 		args = append(args, "-p", "ipv4")
-	case IPv6PrimitiveV1, IPv6PrimitiveV2:
+	case "ipv6":
 		args = append(args, "-p", "ipv6")
-	case RegExpPrimitiveV1, RegExpPrimitiveV2, RegExpPrimitiveV3, RegExpPrimitiveV4, RegExpPrimitiveV5, RegExpPrimitiveV6:
+	case "pcre2":
 		args = append(args, "-p", "pcre2")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)

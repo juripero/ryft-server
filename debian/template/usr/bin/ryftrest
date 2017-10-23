@@ -10,15 +10,16 @@ Usage: $0 [options]
 Search specific:
 -h|--help          Prints this short help message.
 -p|--mode=<mode>   Specifies the search mode to run, which can be one of:
-                     - exact_search (or es) (used by default)
-                     - fuzzy_hamming_search (or fhs)
-                     - fuzzy_edit_distance_search (or feds)
-                     - date_search (or ds)
-                     - time_search (or ts)
-                     - numeric_search (or ns) also used for currency
-                     - ipv4_search (or ipv4)
-                     - ipv6_search (or ipv6)
-                     - pcre2_search (or pcre2)
+                     - es for exact search (used by default)
+                     - fhs for fuzzy hamming search
+                     - feds for fuzzy edit distance search
+                     - ds for date search
+                     - ts for time search
+                     - ns for numeric search
+                     - cs for currency search
+                     - ipv4 for IPv4 search
+                     - ipv6 for IPv6 search
+                     - pcre2 for PCRE2 regex search
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.

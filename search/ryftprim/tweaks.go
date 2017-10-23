@@ -67,7 +67,7 @@ func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
 			if vv, err := utils.AsStringSlice(v); err != nil {
 				return nil, fmt.Errorf(`failed to parse "ryftprim-opts" option: %s`, err)
 			} else {
-				t.SetOptions("", RyftprimBackendTool, "", vv)
+				t.SetOptions("", "ryftprim", "", vv)
 			}
 		}
 
@@ -76,7 +76,7 @@ func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
 			if vv, err := utils.AsStringSlice(v); err != nil {
 				return nil, fmt.Errorf(`failed to parse "ryftx-opts" option: %s`, err)
 			} else {
-				t.SetOptions("", RyftxBackendTool, "", vv)
+				t.SetOptions("", "ryftx", "", vv)
 			}
 		}
 
@@ -85,7 +85,7 @@ func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
 			if vv, err := utils.AsStringSlice(v); err != nil {
 				return nil, fmt.Errorf(`failed to parse "ryftpcre2-opts" option: %s`, err)
 			} else {
-				t.SetOptions("", Ryftpcre2BackendTool, "", vv)
+				t.SetOptions("", "ryftpcre2", "", vv)
 			}
 		}
 	}
