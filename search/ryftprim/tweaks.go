@@ -33,25 +33,115 @@ package ryftprim
 import (
 	"fmt"
 	"strings"
+
+	"github.com/getryft/ryft-server/search/utils"
 )
 
-func NewTweakOpts(data map[string][]string) *TweaksOpts {
-	return &TweaksOpts{data}
+// Tweaks custom backend options and routing table
+type Tweaks struct {
+	Options map[string][]string // custom options
+
+	// routing table: [primitive] => backend
+	Router map[string]string
 }
 
-type TweaksOpts struct {
-	data map[string][]string
+// ParseTweaks parses tweaks from engine options
+func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
+	t := new(Tweaks)
+	t.Options = make(map[string][]string)
+	t.Router = make(map[string]string)
+
+	if true { // [backward compatibility]
+		// default options for all engines
+		if v, ok := opts_["ryft-all-opts"]; ok {
+			if vv, err := utils.AsStringSlice(v); err != nil {
+				return nil, fmt.Errorf(`failed to parse "ryft-all-opts" option: %s`, err)
+			} else {
+				t.SetOptions("default", "", "", vv)
+			}
+		}
+
+		// `ryftprim` options
+		if v, ok := opts_["ryftprim-opts"]; ok {
+			if vv, err := utils.AsStringSlice(v); err != nil {
+				return nil, fmt.Errorf(`failed to parse "ryftprim-opts" option: %s`, err)
+			} else {
+				t.SetOptions("", RyftprimBackendTool, "", vv)
+			}
+		}
+
+		// `ryftx` options
+		if v, ok := opts_["ryftx-opts"]; ok {
+			if vv, err := utils.AsStringSlice(v); err != nil {
+				return nil, fmt.Errorf(`failed to parse "ryftx-opts" option: %s`, err)
+			} else {
+				t.SetOptions("", RyftxBackendTool, "", vv)
+			}
+		}
+
+		// `ryftpcre2` options
+		if v, ok := opts_["ryftpcre2-opts"]; ok {
+			if vv, err := utils.AsStringSlice(v); err != nil {
+				return nil, fmt.Errorf(`failed to parse "ryftpcre2-opts" option: %s`, err)
+			} else {
+				t.SetOptions("", Ryftpcre2BackendTool, "", vv)
+			}
+		}
+	}
+
+	// tweaks options
+	opts, err := utils.AsStringMap(opts_["backend-tweaks"])
+	if err != nil {
+		return nil, fmt.Errorf(`failed to parse "backend-tweaks" option: %s`, err)
+	}
+
+	// backend-tweaks.options
+	if options_, ok := opts["options"]; ok {
+		options, err := utils.AsStringMap(options_)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "backend-tweaks.options": %s`, err)
+		}
+
+		for k, v := range options {
+			if vv, err := utils.AsStringSlice(v); err != nil {
+				return nil, fmt.Errorf(`bad "backend-tweaks.options" value for key "%s": %s`, k, err)
+			} else {
+				t.Options[k] = vv
+			}
+		}
+	}
+
+	// backend-tweaks.router
+	if router_, ok := opts["router"]; ok {
+		router, err := utils.AsStringMap(router_)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "backend-tweaks.router": %s`, err)
+		}
+
+		for k, v := range router {
+			if vv, err := utils.AsString(v); err != nil {
+				return nil, fmt.Errorf(`bad "backend-tweaks.router" value for key "%s": %s`, k, err)
+			} else {
+				for _, kk := range strings.Split(k, ",") {
+					if len(kk) != 0 {
+						t.Router[kk] = vv
+					}
+				}
+			}
+		}
+	}
+
+	return t, nil // OK
 }
 
-func (t TweaksOpts) String() string {
-	return fmt.Sprintf("%q", t.data)
-}
+// GetOptions gets the custom backend options
+func (t *Tweaks) GetOptions(mode, backend, primitive string) []string {
+	if len(mode) == 0 {
+		mode = "default"
+	}
 
-func (t TweaksOpts) Data() map[string][]string {
-	return t.data
-}
-
-func (t TweaksOpts) GetOptions(mode, backend, primitive string) []string {
+	// list of {mode.backend.primitive} combinations
+	// in priority order
 	try := [][]string{
 		[]string{mode, backend, primitive},
 		[]string{backend, primitive},
@@ -61,25 +151,34 @@ func (t TweaksOpts) GetOptions(mode, backend, primitive string) []string {
 		[]string{backend},
 		[]string{mode},
 	}
-	for _, el := range try {
-		key := strings.Join(el, ".")
-		if v, ok := t.data[key]; ok {
+
+	for _, attempt := range try {
+		key := strings.Join(attempt, ".")
+		if v, ok := t.Options[key]; ok {
 			return v
 		}
 	}
-	return []string{}
+
+	return nil // not found
 }
 
-func (t *TweaksOpts) SetOptions(value []string, mode, backend, primitive string) {
-	keyStack := []string{}
+// SetOptions sets the custom backend options
+func (t *Tweaks) SetOptions(mode, backend, primitive string, opts []string) {
+	keys := []string{}
 	if mode != "" {
-		keyStack = append(keyStack, mode)
+		keys = append(keys, mode)
 	}
 	if backend != "" {
-		keyStack = append(keyStack, backend)
+		keys = append(keys, backend)
 	}
 	if primitive != "" {
-		keyStack = append(keyStack, primitive)
+		keys = append(keys, primitive)
 	}
-	t.data[strings.Join(keyStack, ".")] = value
+
+	key := strings.Join(keys, ".")
+	if opts != nil {
+		t.Options[key] = opts
+	} else {
+		delete(t.Options, key)
+	}
 }

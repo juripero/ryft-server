@@ -95,7 +95,7 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 			} else {
 				backendTool = RyftxBackendTool
 			}
-		} else if v, ok := engine.TweaksRouter[mode]; ok {
+		} else if v, ok := engine.Tweaks.Router[mode]; ok {
 			backendTool = v
 		}
 	} else if engine.RyftprimExec != "" {
@@ -114,10 +114,11 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 		case Ryftpcre2BackendTool:
 			execPath = engine.Ryftpcre2Exec
 		}
-		tweakOpts := engine.TweaksOpts.GetOptions(cfg.Backend.Mode, backendTool, mode)
+		tweakOpts := engine.Tweaks.GetOptions(cfg.Backend.Mode, backendTool, mode)
 		return execPath, tweakOpts, nil
 	}
-	return "", nil, fmt.Errorf("no any backend found") // should be impossible
+
+	return "", nil, fmt.Errorf("no backend found") // should be impossible
 }
 
 // Options gets all engine options.
@@ -143,15 +144,8 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["minimize-latency"] = engine.MinimizeLatency
 	opts["index-host"] = engine.IndexHost
 	opts["backend-tweaks"] = map[string]interface{}{
-		"options": engine.TweaksOpts.Data(),
-		"router":  engine.TweaksRouter,
-	}
-	if len(engine.TweaksOpts.Data()) > 0 {
-		// For backward compatibility
-		opts["ryftx-opts"] = engine.TweaksOpts.GetOptions("default", RyftxBackendTool, "")
-		opts["ryftprim-opts"] = engine.TweaksOpts.GetOptions("default", RyftprimBackendTool, "")
-		opts["ryftpcre2-opts"] = engine.TweaksOpts.GetOptions("default", Ryftpcre2BackendTool, "")
-		opts["ryft-all-opts"] = engine.TweaksOpts.GetOptions("default", "", "")
+		"options": engine.Tweaks.Options,
+		"router":  engine.Tweaks.Router,
 	}
 	return opts
 }
@@ -160,53 +154,6 @@ func (engine *Engine) Options() map[string]interface{} {
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	engine.options = opts // base
 
-	// default options for all engines
-	if v, ok := opts["ryft-all-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryft-all-opts" with error: %s`, err)
-		} else {
-			if engine.TweaksOpts == nil {
-				engine.TweaksOpts = NewTweakOpts(map[string][]string{})
-			}
-			engine.TweaksOpts.SetOptions(vv, "default", "", "")
-		}
-	}
-
-	// `ryftprim` options
-	if v, ok := opts["ryftprim-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftprim-opts" with error: %s`, err)
-		} else {
-			if engine.TweaksOpts == nil {
-				engine.TweaksOpts = NewTweakOpts(map[string][]string{})
-			}
-			engine.TweaksOpts.SetOptions(vv, "default", RyftprimBackendTool, "")
-		}
-	}
-
-	// `ryftx` options
-	if v, ok := opts["ryftx-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftx-opts" with error: %s`, err)
-		} else {
-			if engine.TweaksOpts == nil {
-				engine.TweaksOpts = NewTweakOpts(map[string][]string{})
-			}
-			engine.TweaksOpts.SetOptions(vv, "default", RyftxBackendTool, "")
-		}
-	}
-
-	// `ryftpcre2` options
-	if v, ok := opts["ryftpcre2-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftpcre2-opts" with error: %s`, err)
-		} else {
-			if engine.TweaksOpts == nil {
-				engine.TweaksOpts = NewTweakOpts(map[string][]string{})
-			}
-			engine.TweaksOpts.SetOptions(vv, "default", Ryftpcre2BackendTool, "")
-		}
-	}
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)
@@ -399,34 +346,10 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 	}
 
-	if v, ok := opts["backend-tweaks"]; ok {
-		bt, err := utils.AsStringMap(v)
-		if ok == false {
-			return fmt.Errorf(`failed to parse "backend-tweaks" options: %s`, err)
-		}
-		// backend-tweaks.options
-		if vopts, ok := bt["options"]; ok {
-			tweaksOpts, err := utils.AsStringMapOfStringSlices(vopts)
-			if err != nil {
-				return fmt.Errorf(`failed to parse "options" option: %s`, err)
-			}
-			engine.TweaksOpts = NewTweakOpts(tweaksOpts)
-		} else {
-			engine.TweaksOpts = NewTweakOpts(map[string][]string{})
-		}
-
-		// backend-tweaks.router
-		if vrouter, ok := bt["router"]; ok {
-			engine.TweaksRouter, err = utils.AsStringMapOfStrings(vrouter)
-			if err != nil {
-				return fmt.Errorf(`failed to parse "router" option: %s`, err)
-			}
-		} else {
-			engine.TweaksRouter = map[string]string{}
-		}
-	} else {
-		engine.TweaksOpts = NewTweakOpts(map[string][]string{})
-		engine.TweaksRouter = map[string]string{}
+	// backend-tweaks
+	engine.Tweaks, err = ParseTweaks(opts)
+	if err != nil {
+		return fmt.Errorf(`failed to parse "backend-tweaks" options: %s`, err)
 	}
 
 	return nil // OK

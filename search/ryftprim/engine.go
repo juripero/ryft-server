@@ -74,12 +74,9 @@ type Engine struct {
 
 	IndexHost string // optional host (cluster mode)
 
-	TweaksOpts *TweaksOpts // backend tweaks options
+	Tweaks *Tweaks // backend tweaks
 
-	// backend tweaks router. Map primitive onto search backend engine
-	TweaksRouter map[string]string
-
-	options map[string]interface{}
+	options map[string]interface{} // base options
 }
 
 // NewEngine creates new RyftPrim search engine.
