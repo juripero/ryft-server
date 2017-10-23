@@ -129,10 +129,18 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["keep-files"] = engine.KeepResultFiles
 	opts["minimize-latency"] = engine.MinimizeLatency
 	opts["index-host"] = engine.IndexHost
-	opts["backend-tweaks"] = map[string]interface{}{
-		"options": engine.Tweaks.Options,
-		"router":  engine.Tweaks.Router,
+
+	btweaks := make(map[string]interface{})
+	if len(engine.Tweaks.Options) != 0 {
+		btweaks["options"] = engine.Tweaks.Options
 	}
+	if len(engine.Tweaks.Router) != 0 {
+		btweaks["router"] = engine.Tweaks.Router
+	}
+	if len(btweaks) != 0 {
+		opts["backend-tweaks"] = btweaks
+	}
+
 	return opts
 }
 

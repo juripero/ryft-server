@@ -43,10 +43,6 @@ func TestOptions(t *testing.T) {
 			"keep-files":              true,
 			"minimize-latency":        true,
 			"index-host":              "localhost",
-			"backend-tweaks": map[string]interface{}{
-				"options": map[string][]string{},
-				"router":  map[string]string{},
-			},
 		}
 
 		if len(name) != 0 {
@@ -75,10 +71,6 @@ func TestOptions(t *testing.T) {
 			"keep-files":              false,
 			"minimize-latency":        false,
 			"index-host":              "",
-			"backend-tweaks": map[string]interface{}{
-				"options": map[string][]string{},
-				"router":  map[string]string{},
-			},
 		}, engine.Options())
 
 		assert.EqualValues(t, `ryftprim{instance:"", ryftone:"/ryftone", home:"/", ryftprim:"/usr/bin/ryftprim", ryftx:""}`, engine.String())

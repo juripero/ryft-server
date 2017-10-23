@@ -143,24 +143,27 @@ func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
 
 // GetOptions gets the custom backend options
 func (t *Tweaks) GetOptions(mode, backend, primitive string) []string {
-	if len(mode) == 0 {
-		mode = "default"
-	}
-
-	// list of {mode.backend.primitive} combinations
-	// in priority order
+	// {mode.backend.primitive} combinations
+	// in order of priority
 	try := [][]string{
 		[]string{mode, backend, primitive},
-		[]string{backend, primitive},
 		[]string{mode, primitive},
 		[]string{mode, backend},
+		[]string{mode},
+		[]string{backend, primitive},
 		[]string{primitive},
 		[]string{backend},
-		[]string{mode},
 	}
 
-	for _, attempt := range try {
-		key := strings.Join(attempt, ".")
+	// check each combination
+	for _, k := range try {
+		key := strings.Join(k, ".")
+		key = strings.TrimPrefix(key, ".")
+		key = strings.TrimSuffix(key, ".")
+		if len(key) == 0 {
+			key = "default"
+		}
+
 		if v, ok := t.Options[key]; ok {
 			return v
 		}
