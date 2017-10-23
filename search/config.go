@@ -79,16 +79,19 @@ type Config struct {
 	// upload/search share mode
 	ShareMode utils.ShareMode
 
-	// backend tool, autoselect if empty
-	// should be "ryftprim" or "ryftx"
-	BackendTool string
+	Backend struct {
+		// backend tool, autoselect if empty
+		// should be "ryftprim" or "ryftx" or "ryftpcre2"
+		Tool string
 
-	// additional backend options
-	// addeded to the end of args
-	BackendOpts []string
+		// additional backend options
+		// addeded to the end of args
+		Opts []string
 
-	// Backend mode e.g. normal, high-performance, etc.
-	BackendMode string
+		// Backend mode e.g. default, high-performance, etc.
+		// (see corresponding configuration section)
+		Mode string
+	}
 
 	// report performance metrics
 	Performance bool
@@ -210,18 +213,18 @@ func (cfg Config) String() string {
 	}
 
 	// backend
-	if len(cfg.BackendTool) != 0 {
-		props = append(props, fmt.Sprintf("backend:%q", cfg.BackendTool))
+	if len(cfg.Backend.Tool) != 0 {
+		props = append(props, fmt.Sprintf("backend:%q", cfg.Backend.Tool))
 	}
 
 	// backend-options
-	if len(cfg.BackendOpts) != 0 {
-		props = append(props, fmt.Sprintf("backend-options:%q", cfg.BackendOpts))
+	if len(cfg.Backend.Opts) != 0 {
+		props = append(props, fmt.Sprintf("backend-options:%q", cfg.Backend.Opts))
 	}
 
 	// backend-mode
-	if len(cfg.BackendMode) != 0 {
-		props = append(props, fmt.Sprintf("backend-mode:%q", cfg.BackendMode))
+	if len(cfg.Backend.Mode) != 0 {
+		props = append(props, fmt.Sprintf("backend-mode:%q", cfg.Backend.Mode))
 	}
 
 	// flags

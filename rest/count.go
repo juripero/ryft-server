@@ -164,9 +164,9 @@ func (server *Server) DoCount0(ctx *gin.Context) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.BackendTool = params.Backend
-	cfg.BackendOpts = params.BackendOpts
-	cfg.BackendMode = params.BackendMode
+	cfg.Backend.Tool = params.Backend
+	cfg.Backend.Opts = params.BackendOpts
+	cfg.Backend.Mode = params.BackendMode
 	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
@@ -387,7 +387,9 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.BackendTool = params.Backend
+	cfg.Backend.Tool = params.Backend
+	cfg.Backend.Opts = params.BackendOpts
+	cfg.Backend.Mode = params.BackendMode
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 	cfg.KeepViewAs = params.KeepViewAs

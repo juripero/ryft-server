@@ -318,8 +318,8 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	// backend options (should be added to the END)
 	// define them here because need to know which engine will be used
 	var backendOpts []string
-	if len(task.config.BackendOpts) > 0 { // options from request
-		backendOpts = task.config.BackendOpts
+	if len(task.config.Backend.Opts) > 0 { // options from request
+		backendOpts = task.config.Backend.Opts
 	} else if len(engineOpts) > 0 { // engine default options
 		backendOpts = engineOpts
 	}

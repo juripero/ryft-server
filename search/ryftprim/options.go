@@ -76,8 +76,8 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 	}
 
 	// if backend tool is specified use it
-	if cfg.BackendTool != "" {
-		switch strings.ToLower(cfg.BackendTool) {
+	if cfg.Backend.Tool != "" {
+		switch strings.ToLower(cfg.Backend.Tool) {
 		case RyftprimEngineV1, RyftprimEngineV2, RyftprimEngineV3:
 			backendTool = RyftprimBackendTool
 		case RyftxEngineV1, RyftxEngineV2:
@@ -85,7 +85,7 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 		case Ryftpcre2EngineV1, Ryftpcre2EngineV2, Ryftpcre2EngineV3, Ryftpcre2EngineV4:
 			backendTool = Ryftpcre2BackendTool
 		default:
-			return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
+			return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.Backend.Tool)
 		}
 	} else if engine.RyftprimExec != "" && engine.RyftxExec != "" { // if both tools are provided
 		backendTool = RyftprimBackendTool // fallback to ryftprim
@@ -114,7 +114,7 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 		case Ryftpcre2BackendTool:
 			execPath = engine.Ryftpcre2Exec
 		}
-		tweakOpts := engine.TweaksOpts.GetOptions(cfg.BackendMode, backendTool, mode)
+		tweakOpts := engine.TweaksOpts.GetOptions(cfg.Backend.Mode, backendTool, mode)
 		return execPath, tweakOpts, nil
 	}
 	return "", nil, fmt.Errorf("no any backend found") // should be impossible

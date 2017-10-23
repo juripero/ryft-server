@@ -189,9 +189,9 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.BackendTool = params.Backend
-	cfg.BackendOpts = params.BackendOpts
-	cfg.BackendMode = params.BackendMode
+	cfg.Backend.Tool = params.Backend
+	cfg.Backend.Opts = params.BackendOpts
+	cfg.Backend.Mode = params.BackendMode
 	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
