@@ -78,10 +78,6 @@
     },
     "/count": {
       "get": {
-        "produces": [
-          "application/json",
-          "text/csv"
-        ],
         "description": "Endpoint for the count. Does the search but returns just statistics.",
         "tags": [ "search" ],
         "summary": "Count the number of matches",
@@ -596,21 +592,19 @@
       "description": "Optional backend tool to run search.",
       "enum": [ "ryftprim", "ryftx", "ryftpcre2" ]
     },
-    "SearchBackendMode":   {
+    "SearchBackendMode": {
       "in": "query",
       "type": "string",
       "name": "backend-mode",
-      "description": "Backend mode (default, high-performance, etc).",
-      "enum": ["normal", "hp"]
+      "description": "Backend mode (default, high-performance, etc)."
     },
     "SearchBackendOption":{
       "in": "query",
       "type": "array",
       "name": "backend-option",
       "description": "Optional list of backend options",
-      "items": {
-        "type": "string"
-      }
+      "items": { "type": "string" },
+      "collectionFormat": "multi"
     },
     "UseSession": {
       "in": "query",
@@ -1051,7 +1045,7 @@
         "fields": { "$ref": "#/parameters/SearchFields" },
         "backend": { "$ref": "#/parameters/SearchBackend" },
         "backend-mode": { "$ref": "#/parameters/SearchBackendMode" },
-        "backend-option":  { "$ref": "#/parameters/SearchBackendOption" },
+        "backend-option": { "$ref": "#/parameters/SearchBackendOption" },
         "data": { "$ref": "#/parameters/SaveData" },
         "index": { "$ref": "#/parameters/SaveIndex" },
         "view": { "$ref": "#/parameters/SaveView" },
@@ -1083,7 +1077,7 @@
         "reduce": { "$ref": "#/parameters/SearchReduce" },
         "backend": { "$ref": "#/parameters/SearchBackend" },
         "backend-mode": { "$ref": "#/parameters/SearchBackendMode" },
-        "backend-option":  { "$ref": "#/parameters/SearchBackendOption" },
+        "backend-option": { "$ref": "#/parameters/SearchBackendOption" },
         "data": { "$ref": "#/parameters/SaveData" },
         "index": { "$ref": "#/parameters/SaveIndex" },
         "view": { "$ref": "#/parameters/SaveView" },
