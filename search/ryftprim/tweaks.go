@@ -33,6 +33,7 @@ package ryftprim
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/getryft/ryft-server/search/utils"
 )
@@ -119,12 +120,18 @@ func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
 		}
 
 		for k, v := range router {
-			if vv, err := utils.AsString(v); err != nil {
+			if tool, err := utils.AsString(v); err != nil {
 				return nil, fmt.Errorf(`bad "backend-tweaks.router" value for key "%s": %s`, k, err)
 			} else {
-				for _, kk := range strings.Split(k, ",") {
-					if len(kk) != 0 {
-						t.Router[kk] = vv
+				// separator: space or any of ",;:"
+				sep := func(r rune) bool {
+					return unicode.IsSpace(r) ||
+						strings.ContainsRune(",;:", r)
+				}
+
+				for _, kk := range strings.FieldsFunc(k, sep) {
+					if mode := strings.TrimSpace(kk); len(mode) != 0 {
+						t.Router[mode] = tool
 					}
 				}
 			}
