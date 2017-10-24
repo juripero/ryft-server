@@ -66,7 +66,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		res, err := backend.Search(bcfg)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to start /search backend", TAG)
-			mux.ReportError(fmt.Errorf("failed to start /search backend: %s", err))
+			mux.ReportError(fmt.Errorf("failed to start /search backend: %s%s", err, getBackendInfo(backend)))
 			continue
 		}
 
@@ -107,7 +107,7 @@ func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 		res, err := backend.Show(bcfg)
 		if err != nil {
 			task.log().WithError(err).Warnf("[%s]: failed to start /search/show backend", TAG)
-			mux.ReportError(fmt.Errorf("failed to start /search/show backend: %s", err))
+			mux.ReportError(fmt.Errorf("failed to start /search/show backend: %s%s", err, getBackendInfo(backend)))
 			continue
 		}
 

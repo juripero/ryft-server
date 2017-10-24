@@ -216,15 +216,16 @@ func (server *Server) getClusterTweakEngine(authToken, homeDir string,
 
 	// target node
 	type Node struct {
-		Cfg *search.Config
-		Url string // empty for local
+		Cfg  *search.Config
+		Url  string // empty for local
+		Name string // node name
 	}
 
 	nodes := make([]Node, 0, len(clusterNodes))
 	for _, node_ := range clusterNodes {
-		info, ok := node_.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("bad info data format: %T", node_)
+		info, err := utils.AsStringMap(node_)
+		if err != nil {
+			return nil, fmt.Errorf("bad info data format: %s", err)
 		}
 
 		node := Node{
@@ -243,6 +244,11 @@ func (server *Server) getClusterTweakEngine(authToken, homeDir string,
 			if !server.isLocalServiceUrl(u) {
 				node.Url = u.String()
 			}
+		}
+
+		// parse node name
+		if node.Name, err = utils.AsString(info["node"]); err != nil {
+			return nil, fmt.Errorf("failed to get node name: %s", err)
 		}
 
 		// get files from info
@@ -273,13 +279,13 @@ func (server *Server) getClusterTweakEngine(authToken, homeDir string,
 		} else {
 			// remote node: use RyftHTTP backend (see server.getClusterSearchEngine)
 			opts := map[string]interface{}{
-				//"--cluster-node-name": service.Node,
-				//"--cluster-node-addr": node.Url,
-				"server-url": node.Url,
-				"auth-token": authToken,
-				"local-only": true,
-				"skip-stat":  false,
-				"index-host": node.Url,
+				"--cluster-node-name": node.Name,
+				"--cluster-node-addr": node.Url,
+				"server-url":          node.Url,
+				"auth-token":          authToken,
+				"local-only":          true,
+				"skip-stat":           false,
+				"index-host":          node.Url,
 			}
 
 			remote, err := search.NewEngine("ryfthttp", opts)

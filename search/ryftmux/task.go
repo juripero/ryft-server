@@ -108,7 +108,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					if ok && err != nil {
 						// TODO: mark error with subtask's tag?
 						// task.log().WithError(err).Debugf("[%s]: new error received", TAG) // FIXME: DEBUG
-						mux.ReportError(err)
+						mux.ReportError(fmt.Errorf("%s%s", err, getBackendInfo(backend)))
 					}
 
 				case rec, ok := <-res.RecordChan:
@@ -134,7 +134,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					// drain the whole errors channel
 					for err := range res.ErrorChan {
 						// task.log().WithError(err).Debugf("[%s]: *** new error received", TAG) // FIXME: DEBUG
-						mux.ReportError(err)
+						mux.ReportError(fmt.Errorf("%s%s", err, getBackendInfo(backend)))
 					}
 
 					// drain the whole records channel
