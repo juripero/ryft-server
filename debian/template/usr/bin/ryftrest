@@ -38,6 +38,7 @@ Search specific:
 -ov|--view=<file>  Used to keep a view results file. To speed up /search/show.
 --lifetime=<T>     Used to automatically cleanup results files. Examples: 1h, 1m, 20s.
 --backend=<X>      Used to select "ryftprim" or "ryftx" backend.
+--backend-mode=<mode> Used to select backend mode defined in `ryft-server.conf`.
 --backend-option=<opt> Additional backend option. Depends on selected --backend.
 
 REST specific:
@@ -132,6 +133,7 @@ INDEX=
 VIEW=
 LIFETIME=
 BACKEND=
+BACKEND_MODE=
 BACKEND_OPTS=()
 
 ADDRESS=http://localhost:8765
@@ -279,6 +281,14 @@ while [[ $# > 0 ]]; do
         ;;
     --backend)
         BACKEND="$2"
+        shift 2
+        ;;
+    --backend-mode=*)
+        BACKEND_MODE="${1#*=}"
+        shift
+        ;;
+    --backend-mode)
+        BACKEND_MODE="$2"
         shift 2
         ;;
     --backend-option=*|--backend-opt=*)
@@ -477,6 +487,7 @@ done
 [[ ! -z "$VIEW" ]] && URL_QUERY=("${URL_QUERY[@]}" view=$(urlencode "$VIEW"))
 [[ ! -z "$LIFETIME" ]] && URL_QUERY=("${URL_QUERY[@]}" lifetime=$(urlencode "$LIFETIME"))
 [[ ! -z "$BACKEND" ]] && URL_QUERY=("${URL_QUERY[@]}" backend=$(urlencode "$BACKEND"))
+[[ ! -z "$BACKEND_MODE" ]] && URL_QUERY=("${URL_QUERY[@]}" backend-mode=$(urlencode "$BACKEND_MODE"))
 for opt in "${BACKEND_OPTS[@]}"; do
     [[ ! -z "$opt" ]] && URL_QUERY=("${URL_QUERY[@]}" backend-option=$(urlencode "$opt"))
 done
