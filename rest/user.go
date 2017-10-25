@@ -33,6 +33,8 @@ package rest
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/getryft/ryft-server/middleware/auth"
 
@@ -113,7 +115,7 @@ func (server *Server) DoUserPost(ctx *gin.Context) {
 
 	// parse request parameters
 	var newUser auth.UserInfo
-	if err := bindOptionalJson(ctx.Request, &newUser); err != nil {
+	if err := binding.JSON.Bind(ctx.Request, &newUser); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request JSON parameters"))
 	}
@@ -130,12 +132,77 @@ func (server *Server) DoUserPost(ctx *gin.Context) {
 		panic(NewError(http.StatusForbidden, "only admin can create new users"))
 	}
 
-	log.Debugf("[%s/auth]: creating new user...", CORE)
 	res, err := server.AuthManager.CreateNew(&newUser)
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to create new user"))
 	}
 
+	log.WithField("user", res).Debugf("[%s/auth]: new user created", CORE)
+	ctx.JSON(http.StatusOK, res)
+}
+
+// Handle PUT /user endpoint - modify user
+func (server *Server) DoUserPut(ctx *gin.Context) {
+	// recover from panics if any
+	defer RecoverFromPanic(ctx)
+
+	var user *auth.UserInfo
+	if user_, ok := ctx.Get(gin.AuthUserKey); !ok {
+		panic(NewError(http.StatusUnauthorized, "no authenticated user found"))
+	} else if user, ok = user_.(*auth.UserInfo); !ok {
+		panic(NewError(http.StatusInternalServerError, "no authenticated user found"))
+	}
+
+	// parse request parameters
+	missing := fmt.Sprintf("{{missing-%x}}", time.Now().UnixNano()) // mark for missing fields
+	newUser := auth.UserInfo{
+		Name:       missing,
+		Password:   missing,
+		Passhash:   missing,
+		Roles:      []string{missing},
+		HomeDir:    missing,
+		ClusterTag: missing,
+	}
+	if err := binding.JSON.Bind(ctx.Request, &newUser); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request JSON parameters"))
+	}
+
+	// by default use the same name
+	if newUser.Name == missing {
+		newUser.Name = user.Name
+	}
+
+	// do we need to change password?
+	if newUser.Password != missing {
+		// anyone can change password
+	}
+	if newUser.Passhash != missing {
+		panic(NewError(http.StatusBadRequest, "cannot change password hash"))
+	}
+
+	// do we need to change home directory?
+	if newUser.HomeDir != missing && !user.HasRole(auth.AdminRole) {
+		panic(NewError(http.StatusForbidden, "only admin can change home directories"))
+	}
+
+	// do we need to change cluster tag?
+	if newUser.ClusterTag != missing && !user.HasRole(auth.AdminRole) {
+		panic(NewError(http.StatusForbidden, "only admin can change cluster tag"))
+	}
+
+	// do we need to change roles?
+	if strings.Join(newUser.Roles, ":") != missing && !user.HasRole(auth.AdminRole) {
+		panic(NewError(http.StatusForbidden, "only admin can change roles"))
+	}
+
+	res, err := server.AuthManager.Update(&newUser, missing)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to update user"))
+	}
+
+	log.WithField("user", res).Debugf("[%s/auth]: user updated", CORE)
 	ctx.JSON(http.StatusOK, res)
 }

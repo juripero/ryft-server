@@ -162,6 +162,56 @@ func (f *FileAuth) CreateNew(user *UserInfo) (*UserInfo, error) {
 	return user.WipeOut(), nil // OK
 }
 
+// update existing user
+func (f *FileAuth) Update(newUser *UserInfo, missing string) (*UserInfo, error) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	changed := false
+	user, ok := f.Users[newUser.Name]
+	if !ok {
+		return nil, fmt.Errorf(`no "%s" user found`, newUser.Name)
+	}
+
+	// change the password
+	if newUser.Password != missing {
+		hash, err := bcrypt.GenerateFromPassword([]byte(newUser.Password), PasswordCost)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate password hash: %s", err)
+		}
+		user.Passhash = string(hash)
+		user.Password = ""
+		changed = true
+	}
+
+	// change the home directory
+	if newUser.HomeDir != missing && user.HomeDir != newUser.HomeDir {
+		user.HomeDir = newUser.HomeDir
+		changed = true
+	}
+
+	// change the cluster tag
+	if newUser.ClusterTag != missing && user.ClusterTag != newUser.ClusterTag {
+		user.ClusterTag = newUser.ClusterTag
+		changed = true
+	}
+
+	// change the roles
+	if strings.Join(newUser.Roles, ":") != missing && strings.Join(user.Roles, ":") != strings.Join(newUser.Roles, ":") {
+		user.Roles = newUser.Roles
+		changed = true
+	}
+
+	// save updated file
+	if changed {
+		if err := f.saveFile(); err != nil {
+			return nil, fmt.Errorf("failed to save users: %s", err)
+		}
+	}
+
+	return user.WipeOut(), nil // OK
+}
+
 // save user credentials
 func (f *FileAuth) saveFile() error {
 	// get list of users

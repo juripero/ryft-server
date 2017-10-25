@@ -96,6 +96,9 @@ type Manager interface {
 
 	// create new user
 	CreateNew(user *UserInfo) (*UserInfo, error)
+
+	// update existing user
+	Update(user *UserInfo, missing string) (*UserInfo, error)
 }
 
 type Middleware struct {

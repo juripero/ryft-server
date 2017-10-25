@@ -340,6 +340,7 @@ func main() {
 		server.AuthManager = am // keep it for operations
 		private.GET("/user", server.DoUserGet)
 		private.POST("/user", server.DoUserPost)
+		private.PUT("/user", server.DoUserPut)
 	}
 
 	// debug API endpoints
