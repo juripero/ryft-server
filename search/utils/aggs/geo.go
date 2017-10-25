@@ -285,7 +285,9 @@ func (g *Geo) mergeMap(data map[string]interface{}) error {
 		if err != nil {
 			return err
 		}
+		g.Count += 1 // tricky way to avoid g.Count == 0 check inside updateBounds()
 		g.updateBounds(lat, lon)
+		g.Count -= 1
 	}
 
 	// geo_centroid weighted
@@ -326,7 +328,9 @@ func (g *Geo) merge(other *Geo) error {
 	// geo_bounds
 	if (g.flags & GeoBounds) != 0 {
 		g.updateBounds(other.TopLeft.Lat, other.TopLeft.Lon)
+		g.Count += 1 // tricky way to avoid g.Count == 0 check inside updateBounds()
 		g.updateBounds(other.BottomRight.Lat, other.BottomRight.Lon)
+		g.Count -= 1
 	}
 
 	// geo_centroid weighted
