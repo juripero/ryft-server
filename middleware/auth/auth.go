@@ -61,6 +61,12 @@ type UserInfo struct {
 	ClusterTag string   `json:"cluster-tag,omitempty" yaml:"cluster-tag,omitempty"`
 }
 
+// get as string
+func (u *UserInfo) String() string {
+	return fmt.Sprintf(`{name:%s home:%s tag:%s}`,
+		u.Name, u.HomeDir, u.ClusterTag)
+}
+
 // WipeOut creates copy of user with no sensitive information
 func (u *UserInfo) WipeOut() *UserInfo {
 	w := *u // copy
