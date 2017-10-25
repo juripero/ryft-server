@@ -38,6 +38,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v2"
 )
@@ -46,6 +47,8 @@ import (
 type FileAuth struct {
 	Users    map[string]*UserInfo
 	FileName string
+
+	mx sync.Mutex
 }
 
 // NewFile returns new File based credentials
@@ -80,6 +83,8 @@ func (f *FileAuth) Reload() error {
 		return err
 	}
 
+	f.mx.Lock()
+	defer f.mx.Unlock()
 	f.Users = unique
 	return nil // OK
 }
@@ -93,6 +98,50 @@ func (f *FileAuth) Verify(username, password string) *UserInfo {
 	}
 
 	return nil // not found or invalid password
+}
+
+// get list of users
+func (f *FileAuth) Get(who *UserInfo, names []string) ([]*UserInfo, error) {
+	var res []*UserInfo
+
+	if len(names) != 0 {
+		if who.HasRole(AdminRole) {
+			f.mx.Lock()
+			defer f.mx.Unlock()
+
+			// report all requested users
+			for _, name := range names {
+				if u, ok := f.Users[name]; ok {
+					res = append(res, u.WipeOut())
+				} else {
+					return nil, fmt.Errorf(`no "%s" user found`, name)
+				}
+			}
+		} else {
+			for _, name := range names {
+				if name == who.Name {
+					res = append(res, who.WipeOut())
+				} else {
+					return nil, fmt.Errorf(`you cannot access "%s" user`, name)
+				}
+			}
+		}
+	} else { // no names provided
+		if who.HasRole(AdminRole) {
+			f.mx.Lock()
+			defer f.mx.Unlock()
+
+			// report all users
+			for _, u := range f.Users {
+				res = append(res, u.WipeOut())
+			}
+		} else {
+			// report itself
+			res = append(res, who.WipeOut())
+		}
+	}
+
+	return res, nil // OK
 }
 
 // read user credentials from a text file (JSON or YAML)

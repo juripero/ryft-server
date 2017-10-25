@@ -3,6 +3,7 @@
 
 - username: "admin"
   password: "admin"
+  roles: ["admin"]
   home: "/"
 - username: "test"
   password: "test"
