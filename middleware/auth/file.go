@@ -46,7 +46,7 @@ import (
 )
 
 const (
-	PasswordCost = bcrypt.DefaultCost + 4
+	PasswordCost = bcrypt.DefaultCost
 )
 
 // FileAuth contains dictionary of users
@@ -98,8 +98,15 @@ func (f *FileAuth) Reload() error {
 // verify user credentials
 func (f *FileAuth) Verify(username, password string) *UserInfo {
 	if u, ok := f.Users[username]; ok {
-		if u.Password == password {
-			return u // verified!
+		if u.Passhash != "" {
+			if err := bcrypt.CompareHashAndPassword([]byte(u.Passhash), []byte(password)); err == nil {
+				return u // verified!
+			}
+		} else {
+			// fallback to plain password check
+			if u.Password == password {
+				return u // verified!
+			}
 		}
 	}
 
