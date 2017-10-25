@@ -339,6 +339,7 @@ func main() {
 	if am, ok := authProvider.(auth.Manager); ok {
 		server.AuthManager = am // keep it for operations
 		private.GET("/user", server.DoUserGet)
+		private.POST("/user", server.DoUserPost)
 	}
 
 	// debug API endpoints

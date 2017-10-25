@@ -40,7 +40,13 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	PasswordCost = bcrypt.DefaultCost + 4
 )
 
 // FileAuth contains dictionary of users
@@ -100,48 +106,93 @@ func (f *FileAuth) Verify(username, password string) *UserInfo {
 	return nil // not found or invalid password
 }
 
-// get list of users
-func (f *FileAuth) Get(who *UserInfo, names []string) ([]*UserInfo, error) {
-	var res []*UserInfo
+// get all users
+func (f *FileAuth) GetAllUsers() ([]*UserInfo, error) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
 
-	if len(names) != 0 {
-		if who.HasRole(AdminRole) {
-			f.mx.Lock()
-			defer f.mx.Unlock()
+	res := make([]*UserInfo, 0, len(f.Users))
+	for _, u := range f.Users {
+		res = append(res, u.WipeOut())
+	}
 
-			// report all requested users
-			for _, name := range names {
-				if u, ok := f.Users[name]; ok {
-					res = append(res, u.WipeOut())
-				} else {
-					return nil, fmt.Errorf(`no "%s" user found`, name)
-				}
-			}
+	return res, nil // OK
+}
+
+// get requested users
+func (f *FileAuth) GetUsers(names []string) ([]*UserInfo, error) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	res := make([]*UserInfo, 0, len(names))
+	for _, name := range names {
+		if u, ok := f.Users[name]; ok {
+			res = append(res, u.WipeOut())
 		} else {
-			for _, name := range names {
-				if name == who.Name {
-					res = append(res, who.WipeOut())
-				} else {
-					return nil, fmt.Errorf(`you cannot access "%s" user`, name)
-				}
-			}
-		}
-	} else { // no names provided
-		if who.HasRole(AdminRole) {
-			f.mx.Lock()
-			defer f.mx.Unlock()
-
-			// report all users
-			for _, u := range f.Users {
-				res = append(res, u.WipeOut())
-			}
-		} else {
-			// report itself
-			res = append(res, who.WipeOut())
+			return nil, fmt.Errorf(`no "%s" user found`, name)
 		}
 	}
 
 	return res, nil // OK
+}
+
+// create new user
+func (f *FileAuth) CreateNew(user *UserInfo) (*UserInfo, error) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	if _, ok := f.Users[user.Name]; ok {
+		return nil, fmt.Errorf(`"%s" user already exists`, user.Name)
+	}
+
+	// calculate hash on password
+	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), PasswordCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate password hash: %s", err)
+	}
+	user.Passhash = string(hash)
+	user.Password = ""
+
+	// save updated file
+	f.Users[user.Name] = user
+	if err := f.saveFile(); err != nil {
+		return nil, fmt.Errorf("failed to save users: %s", err)
+	}
+
+	return user.WipeOut(), nil // OK
+}
+
+// save user credentials
+func (f *FileAuth) saveFile() error {
+	// get list of users
+	users := make([]*UserInfo, 0, len(f.Users))
+	for _, u := range f.Users {
+		users = append(users, u)
+	}
+
+	// TODO: sort users by name
+
+	var data []byte
+	var err error
+	ext := filepath.Ext(f.FileName)
+	switch strings.ToLower(ext) {
+	case ".json":
+		data, err = json.Marshal(users)
+	case ".yaml", ".yml":
+		data, err = yaml.Marshal(users)
+	default:
+		err = fmt.Errorf("%q is unknown credentials file extention", ext)
+	}
+	if err != nil {
+		return err
+	}
+
+	// TODO: use some kind of SafeWrite here!!!
+	if err := ioutil.WriteFile(f.FileName, data, 0644); err != nil {
+		return err
+	}
+
+	return nil // OK
 }
 
 // read user credentials from a text file (JSON or YAML)

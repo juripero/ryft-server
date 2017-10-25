@@ -31,6 +31,7 @@
 package rest
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/getryft/ryft-server/middleware/auth"
@@ -44,7 +45,7 @@ type UserParams struct {
 	Names []string `form:"name" json:"names,omitempty" msgpack:"names,omitempty"`
 }
 
-// Handle GET /user endpoint.
+// Handle GET /user endpoint get all users
 func (server *Server) DoUserGet(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
@@ -67,10 +68,73 @@ func (server *Server) DoUserGet(ctx *gin.Context) {
 			WithDetails("failed to parse request parameters"))
 	}
 
-	res, err := server.AuthManager.Get(user, params.Names)
+	var res []*auth.UserInfo
+	var err error
+	if len(params.Names) == 0 {
+		if user.HasRole(auth.AdminRole) {
+			res, err = server.AuthManager.GetAllUsers()
+		} else {
+			res = append(res, user.WipeOut())
+		}
+	} else {
+		if user.HasRole(auth.AdminRole) {
+			res, err = server.AuthManager.GetUsers(params.Names)
+		} else {
+			for _, name := range params.Names {
+				if user.Name == name {
+					res = append(res, user.WipeOut())
+				} else {
+					panic(NewError(http.StatusForbidden,
+						fmt.Sprintf(`access to "%s" denied`, name)))
+				}
+			}
+		}
+	}
+
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to get users"))
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+// Handle POST /user endpoint - create new user
+func (server *Server) DoUserPost(ctx *gin.Context) {
+	// recover from panics if any
+	defer RecoverFromPanic(ctx)
+
+	var user *auth.UserInfo
+	if user_, ok := ctx.Get(gin.AuthUserKey); !ok {
+		panic(NewError(http.StatusUnauthorized, "no authenticated user found"))
+	} else if user, ok = user_.(*auth.UserInfo); !ok {
+		panic(NewError(http.StatusInternalServerError, "no authenticated user found"))
+	}
+
+	// parse request parameters
+	var newUser auth.UserInfo
+	if err := bindOptionalJson(ctx.Request, &newUser); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request JSON parameters"))
+	}
+
+	// check required parameters
+	if len(newUser.Name) == 0 {
+		panic(NewError(http.StatusBadRequest, "no username provided"))
+	}
+	if len(newUser.Password) == 0 {
+		panic(NewError(http.StatusBadRequest, "no password provided"))
+	}
+
+	if !user.HasRole(auth.AdminRole) {
+		panic(NewError(http.StatusForbidden, "only admin can create new users"))
+	}
+
+	log.Debugf("[%s/auth]: creating new user...", CORE)
+	res, err := server.AuthManager.CreateNew(&newUser)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to create new user"))
 	}
 
 	ctx.JSON(http.StatusOK, res)

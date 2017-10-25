@@ -88,10 +88,14 @@ type Provider interface {
 
 // used to manage set of users
 type Manager interface {
-	// get the list of users.
-	// if `who` has "admin" role then any user can requested
-	// otherwise "who" can request information about itself
-	Get(who *UserInfo, names []string) ([]*UserInfo, error)
+	// get the list of all users.
+	GetAllUsers() ([]*UserInfo, error)
+
+	// get the list of specified users
+	GetUsers(names []string) ([]*UserInfo, error)
+
+	// create new user
+	CreateNew(user *UserInfo) (*UserInfo, error)
 }
 
 type Middleware struct {
