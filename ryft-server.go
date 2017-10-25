@@ -341,6 +341,7 @@ func main() {
 		private.GET("/user", server.DoUserGet)
 		private.POST("/user", server.DoUserPost)
 		private.PUT("/user", server.DoUserPut)
+		private.DELETE("/user", server.DoUserDelete)
 	}
 
 	// debug API endpoints

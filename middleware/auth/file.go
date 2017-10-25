@@ -219,6 +219,33 @@ func (f *FileAuth) Update(newUser *UserInfo, missing string) (*UserInfo, error) 
 	return user.WipeOut(), nil // OK
 }
 
+// delete selected users
+func (f *FileAuth) Delete(names []string) ([]*UserInfo, error) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+	removed := 0
+
+	res := make([]*UserInfo, 0, len(names))
+	for _, name := range names {
+		if u, ok := f.Users[name]; ok {
+			res = append(res, u.WipeOut())
+			delete(f.Users, name)
+			removed += 1
+		} else {
+			return nil, fmt.Errorf(`no "%s" user found`, name)
+		}
+	}
+
+	// save updated file
+	if removed > 0 {
+		if err := f.saveFile(); err != nil {
+			return nil, fmt.Errorf("failed to save users: %s", err)
+		}
+	}
+
+	return res, nil // OK
+}
+
 // save user credentials
 func (f *FileAuth) saveFile() error {
 	// get list of users

@@ -99,6 +99,9 @@ type Manager interface {
 
 	// update existing user
 	Update(user *UserInfo, missing string) (*UserInfo, error)
+
+	// delete users
+	Delete(names []string) ([]*UserInfo, error)
 }
 
 type Middleware struct {

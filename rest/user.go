@@ -206,3 +206,40 @@ func (server *Server) DoUserPut(ctx *gin.Context) {
 	log.WithField("user", res).Debugf("[%s/auth]: user updated", CORE)
 	ctx.JSON(http.StatusOK, res)
 }
+
+// Handle DELETE /user endpoint - delete existing user
+func (server *Server) DoUserDelete(ctx *gin.Context) {
+	// recover from panics if any
+	defer RecoverFromPanic(ctx)
+
+	var user *auth.UserInfo
+	if user_, ok := ctx.Get(gin.AuthUserKey); !ok {
+		panic(NewError(http.StatusUnauthorized, "no authenticated user found"))
+	} else if user, ok = user_.(*auth.UserInfo); !ok {
+		panic(NewError(http.StatusInternalServerError, "no authenticated user found"))
+	}
+
+	// parse request parameters
+	var params UserParams
+	/*if err := bindOptionalJson(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request JSON parameters"))
+	}*/
+	if err := binding.Form.Bind(ctx.Request, &params); err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to parse request parameters"))
+	}
+
+	if !user.HasRole(auth.AdminRole) {
+		panic(NewError(http.StatusForbidden, "only admin can delete users"))
+	}
+
+	res, err := server.AuthManager.Delete(params.Names)
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to delete users"))
+	}
+
+	log.WithField("users", res).Debugf("[%s/auth]: users deleted", CORE)
+	ctx.JSON(http.StatusOK, res)
+}
