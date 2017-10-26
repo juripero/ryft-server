@@ -177,6 +177,9 @@ func (server *Server) DoUserPut(ctx *gin.Context) {
 	// do we need to change password?
 	if newUser.Password != missing {
 		// anyone can change password
+		if newUser.Name != user.Name && !user.HasRole(auth.AdminRole) {
+			panic(NewError(http.StatusForbidden, "only admin can change other user passwords"))
+		}
 	}
 	if newUser.Passhash != missing {
 		panic(NewError(http.StatusBadRequest, "cannot change password hash"))
