@@ -1,6 +1,10 @@
 # Demo - user management - October 26, 2017
 
-This demo covers `/user` API endpoints to manage users.
+This demo covers `/user` API endpoints to manage users:
+- get list of users
+- create new user
+- change existing user
+- delete users
 
 Note, these REST API endoints are avaialble only for file-based authentication.
 The ryft server configuration file should have `auth-type: file`.
@@ -26,7 +30,7 @@ used instead:
 ```
 
 As a side effect the Basic authentication works bit slower than JWT because
-ryft server need to calculate and check password hash each time and this is
+ryft server needs to calculate and check password HASH each time and this is
 time consuming operation. So it is recommended to use JWT authentication if possible.
 
 

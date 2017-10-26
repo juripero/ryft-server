@@ -1,9 +1,9 @@
 There are a few REST API endpoints related to user management:
 
-- [GET /user](#list)
-- [POST /user](#create)
-- [PUT /user](#change)
-- [DELETE /user](#delete)
+- [GET /user](#list-of-users)
+- [POST /user](#create-new-user)
+- [PUT /user](#change-existing-user)
+- [DELETE /user](#delete-users)
 
 Note, these endpoints are enabled only for `file-based` authentication,
 i.e. if `auth-type: file` is in server's configuration file.
@@ -14,8 +14,10 @@ See [authentication](../auth.md) for more details.
 For most endpoints the authenticated user should have `"admin"` role.
 If there is no `"admin"` role the user can change only its password.
 
+See [demo](../demo/2017-10-26-user-management.md) for examples.
 
-# List
+
+# List of users
 
 The `GET /user` endpoint is used to get list of users.
 
@@ -37,7 +39,7 @@ Multiple names can be provided as a list `name=foo&name=bar`.
 If authenticated user has no `"admin"` role then only that user can be requested.
 
 
-# Create
+# Create new user
 
 The `POST /user` endpoint is used to create a new user.
 
@@ -56,7 +58,7 @@ following JSON object:
 Only authenticated user who has `"admin"` role can create new users!
 
 
-# Change
+# Change existing user
 
 The `PUT /user` endpoint is used to change some user properties.
 
@@ -78,7 +80,7 @@ Only authenticated user who has `"admin"` role can change all properties!
 If authenticated user has no `"admin"` role then only password can be changed.
 
 
-# Delete
+# Delete users
 
 The `DELETE /user` endpoint is used to delete users.
 
