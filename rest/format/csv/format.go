@@ -28,20 +28,31 @@
  * ============
  */
 
-package raw
+package csv
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/getryft/ryft-server/search"
 )
 
-// RAW format, does 1=1 mapping.
-// Support for JSON tags.
-type Format struct{}
+// CSV format, tries to decode record data as CSV record.
+// Supports fields filtration.
+// Custom field separator and column names.
+type Format struct {
+	Fields []string
+}
 
-// New creates new RAW formatter.
-// No options supported.
-func New() (*Format, error) {
-	return new(Format), nil
+// New creates new CSV formatter.
+// "fields" option is supported.
+func New(opts map[string]interface{}) (*Format, error) {
+	f := new(Format)
+	err := f.parseFields(opts["fields"])
+	if err != nil {
+		return nil, fmt.Errorf(`failed to parse "fields" option: %s`, err)
+	}
+	return f, nil
 }
 
 // NewIndex creates new format specific data.
@@ -49,13 +60,13 @@ func (*Format) NewIndex() interface{} {
 	return NewIndex()
 }
 
-// Convert INDEX to RAW format specific data.
+// Convert INDEX to CSV format specific data.
 func (*Format) FromIndex(index *search.Index) interface{} {
 	return FromIndex(index)
 }
 
-// Convert RAW format specific data to INDEX.
-// WARN: will panic if argument is not of raw.Index type!
+// Convert CSV format specific data to INDEX.
+// WARN: will panic if argument is not of csv.Index type!
 func (*Format) ToIndex(index interface{}) *search.Index {
 	return ToIndex(index.(*Index))
 }
@@ -65,13 +76,13 @@ func (*Format) NewRecord() interface{} {
 	return NewRecord()
 }
 
-// Convert RECORD to RAW format specific data.
-func (*Format) FromRecord(rec *search.Record) interface{} {
-	return FromRecord(rec)
+// Convert RECORD to CSV format specific data.
+func (f *Format) FromRecord(rec *search.Record) interface{} {
+	return FromRecord(rec, f.Fields)
 }
 
-// Convert RAW format specific data to RECORD.
-// WARN: will panic if argument is not of raw.Record type!
+// Convert CSV format specific data to RECORD.
+// WARN: will panic if argument is not of csv.Record type!
 func (*Format) ToRecord(rec interface{}) *search.Record {
 	return ToRecord(rec.(*Record))
 }
@@ -81,13 +92,46 @@ func (*Format) NewStat() interface{} {
 	return NewStat()
 }
 
-// Convert STATISTICS to RAW format specific data.
+// Convert STAT to CSV format specific data.
 func (f *Format) FromStat(stat *search.Stat) interface{} {
 	return FromStat(stat)
 }
 
-// Convert RAW format specific data to STATISTICS.
-// WARN: will panic if argument is not of raw.Statistics type!
+// Convert CSV format specific data to STAT.
+// WARN: will panic if argument is not of csv.Stat type!
 func (f *Format) ToStat(stat interface{}) *search.Stat {
 	return ToStat(stat.(*Stat))
+}
+
+// AddFields adds coma separated fields
+func (f *Format) AddFields(fields string) {
+	ss := strings.Split(fields, ",")
+	for _, s := range ss {
+		// s := strings.TrimSpace(s)
+		if len(s) != 0 {
+			f.Fields = append(f.Fields, s)
+		}
+	}
+}
+
+// Parse fields option.
+func (f *Format) parseFields(opt interface{}) error {
+	switch v := opt.(type) {
+	case nil:
+		// do nothing
+		return nil
+
+	case string:
+		f.AddFields(v)
+		return nil
+
+	case []string:
+		for _, s := range v {
+			f.AddFields(s)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("%T is unsupported option type", opt)
+	}
 }

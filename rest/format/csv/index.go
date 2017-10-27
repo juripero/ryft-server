@@ -28,66 +28,27 @@
  * ============
  */
 
-package raw
+package csv
 
 import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// RAW format, does 1=1 mapping.
-// Support for JSON tags.
-type Format struct{}
-
-// New creates new RAW formatter.
-// No options supported.
-func New() (*Format, error) {
-	return new(Format), nil
-}
+// Index is format specific data for INDEX.
+// the same as search.Index
+type Index search.Index
 
 // NewIndex creates new format specific data.
-func (*Format) NewIndex() interface{} {
-	return NewIndex()
+func NewIndex() *Index {
+	return FromIndex(search.NewIndex("", 0, 0))
 }
 
-// Convert INDEX to RAW format specific data.
-func (*Format) FromIndex(index *search.Index) interface{} {
-	return FromIndex(index)
+// FromIndex converts INDEX to format specific data.
+func FromIndex(index *search.Index) *Index {
+	return (*Index)(index)
 }
 
-// Convert RAW format specific data to INDEX.
-// WARN: will panic if argument is not of raw.Index type!
-func (*Format) ToIndex(index interface{}) *search.Index {
-	return ToIndex(index.(*Index))
-}
-
-// NewRecord creates new format specific data.
-func (*Format) NewRecord() interface{} {
-	return NewRecord()
-}
-
-// Convert RECORD to RAW format specific data.
-func (*Format) FromRecord(rec *search.Record) interface{} {
-	return FromRecord(rec)
-}
-
-// Convert RAW format specific data to RECORD.
-// WARN: will panic if argument is not of raw.Record type!
-func (*Format) ToRecord(rec interface{}) *search.Record {
-	return ToRecord(rec.(*Record))
-}
-
-// NewStat creates new format specific data.
-func (*Format) NewStat() interface{} {
-	return NewStat()
-}
-
-// Convert STATISTICS to RAW format specific data.
-func (f *Format) FromStat(stat *search.Stat) interface{} {
-	return FromStat(stat)
-}
-
-// Convert RAW format specific data to STATISTICS.
-// WARN: will panic if argument is not of raw.Statistics type!
-func (f *Format) ToStat(stat interface{}) *search.Stat {
-	return ToStat(stat.(*Stat))
+// ToIndex converts format specific data to INDEX.
+func ToIndex(index *Index) *search.Index {
+	return (*search.Index)(index)
 }
