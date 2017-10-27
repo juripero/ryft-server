@@ -6,6 +6,7 @@ The `ryft-server` supports the following REST API endpoints:
 - [/files](./files.md)
 - [/rename](./rename.md)
 - [/run](./run.md)
+- [/user](./user.md)
 
 The main API endpoints are [/search](./search.md#search)
 and [/count](./search.md#count).
