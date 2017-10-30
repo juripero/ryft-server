@@ -31,10 +31,13 @@
 package csv
 
 import (
+	"bytes"
+	stdcsv "encoding/csv"
 	"encoding/json"
 	"fmt"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 // RECORD format specific data.
@@ -43,6 +46,7 @@ type Record map[string]interface{}
 const (
 	recFieldIndex = "_index"
 	recFieldError = "_error"
+	recFieldCsv   = "_csv"
 )
 
 // MarshalCSV converts json RECORD into csv-encoder compatible format
@@ -53,20 +57,29 @@ func (rec *Record) MarshalCSV() ([]string, error) {
 		return nil, err
 	}
 
-	filtered := Record{}
-	for k, v := range *rec {
-		// ignore "_error" and "_index" fields
-		if k == recFieldIndex || k == recFieldError {
-			continue
+	if native, ok := (*rec)[recFieldCsv]; ok {
+		data, err := utils.AsStringSlice(native)
+		if err != nil {
+			return nil, err
 		}
-		filtered[k] = v
+		csv = append(csv, data...)
+	} else {
+		filtered := Record{}
+		for k, v := range *rec {
+			// ignore "_error" and "_index" and "_csv" fields
+			if k == recFieldIndex || k == recFieldError || k == recFieldCsv {
+				continue
+			}
+			filtered[k] = v
+		}
+
+		jsonified, err := json.Marshal(filtered)
+		if err != nil {
+			return nil, err
+		}
+		csv = append(csv, string(jsonified))
 	}
 
-	jsonified, err := json.Marshal(filtered)
-	if err != nil {
-		return nil, err
-	}
-	csv = append(csv, string(jsonified))
 	return csv, nil
 }
 
@@ -84,7 +97,7 @@ func NewRecord() *Record {
 }
 
 // FromRecord converts RECORD to format specific data.
-func FromRecord(rec *search.Record, fields []string) *Record {
+func FromRecord(rec *search.Record, separator string, columns []string, fields []int, asArray bool) *Record {
 	if rec == nil {
 		return nil
 	}
@@ -93,26 +106,55 @@ func FromRecord(rec *search.Record, fields []string) *Record {
 	// res.RawData = rec.Data
 
 	if len(rec.RawData) != 0 {
-		// try to parse raw data as JSON...
-		err := json.Unmarshal(rec.RawData, &res)
+		// try to parse raw data as CSV...
+		rd := stdcsv.NewReader(bytes.NewReader(rec.RawData))
+		for _, s := range separator {
+			rd.Comma = s // use first character
+			break
+		}
+		rd.FieldsPerRecord = -1 // do not check number of columns
+		line, err := rd.Read()
 		if err == nil {
-			// field filtration: if fields is empty all fields are used in result
-			// othewise only requested fields are copied (missing fields are ignored)
-			if len(fields) > 0 {
-				filtered := Record{}
+			if !asArray {
+				// field filtration: if fields is empty all fields are used in result
+				// othewise only requested fields are copied (missing fields are ignored)
+				if len(fields) > 0 {
+					// do filtration by fields
+					for _, field := range fields {
+						// missing fields are ignored!
+						if 0 <= field && field < len(line) {
+							res[columns[field]] = line[field]
+						}
+					}
+				} else {
+					// copy all columns
+					for i, v := range line {
+						var name string
+						if i < len(columns) {
+							name = columns[i]
+						} else {
+							name = fmt.Sprintf("%d", i)
+						}
 
-				// do filtration by fields
-				for _, field := range fields {
-					// missing fields are ignored!
-					if v, ok := res[field]; ok {
-						filtered[field] = v
+						res[name] = v
 					}
 				}
-
-				res = filtered
+			} else {
+				if len(fields) > 0 {
+					// do filtration by fields
+					filtered := make([]string, 0, len(fields))
+					for _, field := range fields {
+						// missing fields are ignored!
+						if 0 <= field && field < len(line) {
+							filtered = append(filtered, line[field])
+						}
+					}
+					line = filtered
+				}
+				res[recFieldCsv] = line
 			}
 		} else {
-			res[recFieldError] = fmt.Sprintf("failed to parse JSON data: %s", err) // res.Error =
+			res[recFieldError] = fmt.Sprintf("failed to parse CSV data: %s", err) // res.Error =
 		}
 	}
 

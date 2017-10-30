@@ -60,7 +60,7 @@ func TestFormatStat(t *testing.T) {
 	testStatMarshal(t, stat1, `{"matches":123, "totalBytes":456, "duration":11, "dataRate":11.11, "fabricDuration":22, "fabricDataRate":22.22}`)
 }
 
-// test json STAT to CSV serialization
+// test STAT to CSV serialization
 func TestStat_MarshalCSV(t *testing.T) {
 	fmt, _ := New(nil)
 	stat1 := fmt.NewStat()

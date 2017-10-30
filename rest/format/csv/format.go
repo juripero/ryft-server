@@ -35,23 +35,54 @@ import (
 	"strings"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils"
 )
 
 // CSV format, tries to decode record data as CSV record.
 // Supports fields filtration.
 // Custom field separator and column names.
 type Format struct {
-	Fields []string
+	Separator string   // field separator
+	Columns   []string // column names
+
+	Fields  []int // field filter (column names)
+	AsArray bool  // report as array
 }
 
 // New creates new CSV formatter.
-// "fields" option is supported.
 func New(opts map[string]interface{}) (*Format, error) {
 	f := new(Format)
-	err := f.parseFields(opts["fields"])
-	if err != nil {
-		return nil, fmt.Errorf(`failed to parse "fields" option: %s`, err)
+
+	// parse "separator"
+	if opt, ok := opts["separator"]; ok {
+		if err := f.parseSeparator(opt); err != nil {
+			return nil, fmt.Errorf(`failed to parse "separator" option: %s`, err)
+		}
+	} else {
+		f.Separator = "," // by default
 	}
+
+	// parse "columns"
+	if opt, ok := opts["columns"]; ok {
+		if err := f.parseColumns(opt); err != nil {
+			return nil, fmt.Errorf(`failed to parse "columns" option: %s`, err)
+		}
+	}
+
+	// parse "fields"
+	if opt, ok := opts["fields"]; ok {
+		if err := f.parseFields(opt); err != nil {
+			return nil, fmt.Errorf(`failed to parse "fields" option: %s`, err)
+		}
+	}
+
+	// parse "array" flag
+	if opt, ok := opts["array"]; ok {
+		if err := f.parseIsArray(opt); err != nil {
+			return nil, fmt.Errorf(`failed to parse "array" flag: %s`, err)
+		}
+	}
+
 	return f, nil
 }
 
@@ -78,7 +109,7 @@ func (*Format) NewRecord() interface{} {
 
 // Convert RECORD to CSV format specific data.
 func (f *Format) FromRecord(rec *search.Record) interface{} {
-	return FromRecord(rec, f.Fields)
+	return FromRecord(rec, f.Separator, f.Columns, f.Fields, f.AsArray)
 }
 
 // Convert CSV format specific data to RECORD.
@@ -105,33 +136,114 @@ func (f *Format) ToStat(stat interface{}) *search.Stat {
 
 // AddFields adds coma separated fields
 func (f *Format) AddFields(fields string) {
-	ss := strings.Split(fields, ",")
+	ss := strings.Split(fields, ",") // note the coma is used as separator for fields!
 	for _, s := range ss {
 		// s := strings.TrimSpace(s)
-		if len(s) != 0 {
-			f.Fields = append(f.Fields, s)
+		if idx := f.columnIndex(s); idx >= 0 {
+			f.Fields = append(f.Fields, idx)
 		}
 	}
 }
 
-// Parse fields option.
+// Parse "separator" option.
+func (f *Format) parseSeparator(opt interface{}) error {
+	switch v := opt.(type) {
+	case string:
+		f.Separator = v
+
+	case []byte:
+		f.Separator = string(v)
+
+	default:
+		return fmt.Errorf("%T is unsupported option type, should be string", opt)
+	}
+
+	// can not be empty
+	if len(f.Separator) == 0 {
+		return fmt.Errorf("empty field separator")
+	}
+	if len(f.Separator) != 1 {
+		return fmt.Errorf("separator is too long")
+	}
+
+	return nil // OK
+}
+
+// Parse "columns" option.
+func (f *Format) parseColumns(opt interface{}) error {
+	switch v := opt.(type) {
+	case string:
+		f.Columns = strings.Split(v, f.Separator)
+
+	case []string:
+		f.Columns = v
+
+	case []interface{}:
+		if vv, err := utils.AsStringSlice(opt); err != nil {
+			return err
+		} else {
+			f.Columns = vv
+		}
+
+	default:
+		return fmt.Errorf("%T is unsupported option type, should be string or array of strings", opt)
+	}
+
+	// can not be empty
+	for _, name := range f.Columns {
+		if len(name) == 0 {
+			return fmt.Errorf("empty column name")
+		}
+	}
+
+	return nil // OK
+}
+
+// Parse "fields" option.
 func (f *Format) parseFields(opt interface{}) error {
 	switch v := opt.(type) {
-	case nil:
-		// do nothing
-		return nil
-
 	case string:
 		f.AddFields(v)
-		return nil
 
 	case []string:
 		for _, s := range v {
 			f.AddFields(s)
 		}
-		return nil
+
+	case []interface{}:
+		if vv, err := utils.AsStringSlice(opt); err != nil {
+			return err
+		} else {
+			for _, s := range vv {
+				f.AddFields(s)
+			}
+		}
 
 	default:
-		return fmt.Errorf("%T is unsupported option type", opt)
+		return fmt.Errorf("%T is unsupported option type, should be string or array of strings", opt)
 	}
+
+	return nil // OK
+}
+
+// Parse "array" option.
+func (f *Format) parseIsArray(opt interface{}) error {
+	res, err := utils.AsBool(opt)
+	if err != nil {
+		return err
+	}
+
+	f.AsArray = res
+	return nil // OK
+}
+
+// get column index (-1 if not found)
+func (f *Format) columnIndex(column string) int {
+	for i, name := range f.Columns {
+		if name == column {
+			return i
+		}
+	}
+
+	return -1 // not found
 }
