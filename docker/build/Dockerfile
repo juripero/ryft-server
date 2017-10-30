@@ -1,5 +1,5 @@
 # do not use alpine because it uses incompatible libc!
-FROM golang:1.8
+FROM golang:1.8.5
 
 RUN apt-get update && apt-get install -y git dpkg
 
