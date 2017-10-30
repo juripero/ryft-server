@@ -83,6 +83,11 @@ type SearchParams struct {
 	// aggregations
 	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 
+	// tweaks
+	Tweaks struct {
+		Cluster []interface{} `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
+	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
+
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
 	Stats  bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
@@ -140,7 +145,7 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	params.Catalogs = nil // reset
 	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
-			"no any file or catalog provided"))
+			"no file or catalog provided"))
 	}
 
 	// setting up transcoder to convert raw data
@@ -171,14 +176,6 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 			WithDetails("failed to get encoder"))
 	}
 	ctx.Set("encoder", enc) // to recover from panic in appropriate format
-
-	// get search engine
-	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	engine, err := server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
-	if err != nil {
-		panic(NewError(http.StatusInternalServerError, err.Error()).
-			WithDetails("failed to get search engine"))
-	}
 
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
@@ -231,6 +228,20 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
+	}
+
+	// get search engine
+	var engine search.Engine
+	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
+	if !server.Config.LocalOnly && !params.Local && len(params.Tweaks.Cluster) != 0 {
+		log.WithField("config", params.Tweaks.Cluster).Debugf("[%s]: create tweaked search engine", CORE)
+		engine, err = server.getClusterTweakEngine(authToken, homeDir, cfg, params.Tweaks.Cluster)
+	} else {
+		engine, err = server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
+	}
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get search engine"))
 	}
 
 	// session preparation
@@ -538,10 +549,21 @@ func updateSession(session *Session, stat *search.Stat) {
 
 // update aggregations in cluster mode
 func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) error {
+	// get main aggregations (in case if one node in cluster)
+	if d := stat.Extra[search.ExtraAggregations]; d != nil {
+		log.Debugf("[%s/aggs]: merging main aggregations: %+v", CORE, d)
+		if err := aggregations.Merge(d); err != nil {
+			return err
+		}
+
+		// cleanup intermediate aggergations
+		delete(stat.Extra, search.ExtraAggregations)
+	}
+
 	// get aggregations from details
 	for _, dstat := range stat.Details {
 		if d := dstat.Extra[search.ExtraAggregations]; d != nil {
-			log.Debugf("merging %v aggregations", d)
+			log.Debugf("[%s/aggs]: merging other aggregations: %+v", CORE, d)
 			if err := aggregations.Merge(d); err != nil {
 				return err
 			}
@@ -550,7 +572,7 @@ func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) erro
 			delete(dstat.Extra, search.ExtraAggregations)
 		}
 	}
-	log.Debugf("merged %v", aggregations.ToJson(true))
+	log.Debugf("[%s/aggs]: merged: %+v", CORE, aggregations.ToJson(true))
 
 	return nil // OK
 }

@@ -133,7 +133,7 @@ func (server *Server) DoCount0(ctx *gin.Context) {
 	params.Catalogs = nil // reset
 	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
-			"no any file or catalog provided"))
+			"no file or catalog provided"))
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
@@ -357,7 +357,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	params.Catalogs = nil // reset
 	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
-			"no any file or catalog provided"))
+			"no file or catalog provided"))
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)

@@ -131,7 +131,7 @@ LIMIT 1;`, filename)
 		if val.Valid {
 			offset = val.Int64
 		} else {
-			offset = 0 // no any parts found
+			offset = 0 // no parts found
 		}
 	}
 
@@ -190,7 +190,7 @@ func (cat *Catalog) getAllParts() (map[string]search.NodeInfo, error) {
 
 		if info, ok := res[file]; ok {
 			if len(info.Parts) == 0 {
-				// if no any parts yet, then add itself
+				// if no parts yet, then add itself
 				info.Parts = append(info.Parts, search.PartInfo{
 					Offset: info.Offset,
 					Length: info.Length,

@@ -349,9 +349,9 @@ func findBestMatch(client *consul.Client, userTag string, files []string) ([]str
 				tags_map[tag] += 1
 			}
 		} else {
-			// if no any tag found we have to search all nodes.
+			// if no tag found we have to search all nodes.
 			// already found tags are ignored.
-			log.WithField("file", f).Debugf("no any tag found for file, will search all nodes")
+			log.WithField("file", f).Debugf("no tag found for file, will search all nodes")
 			return []string{}, nil // search all nodes!
 		}
 	}
@@ -400,7 +400,7 @@ func findAllMatches(client *consul.Client, userTag string, files []string) ([][]
 				tags_map[tag] += 1
 			}
 		} else {
-			// if no any tag found we have to search all nodes.
+			// if no tag found we have to search all nodes.
 			res[i] = nil // search all nodes!
 			continue
 		}

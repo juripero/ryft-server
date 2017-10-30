@@ -335,6 +335,15 @@ func main() {
 	private.POST("/raw", server.DoPostFiles)
 	private.POST("/raw/*path", server.DoPostFiles)
 
+	// user management (file-based only)
+	if am, ok := authProvider.(auth.Manager); ok {
+		server.AuthManager = am // keep it for operations
+		private.GET("/user", server.DoUserGet)
+		private.POST("/user", server.DoUserPost)
+		private.PUT("/user", server.DoUserPut)
+		private.DELETE("/user", server.DoUserDelete)
+	}
+
 	// debug API endpoints
 	if server.Config.DebugMode {
 		router.GET("/debug/stack", server.DoDebugStack)

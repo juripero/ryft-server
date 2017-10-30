@@ -44,21 +44,70 @@ import (
 )
 
 const (
+	tokenAttrRoles   = "roles"
 	tokenAttrHomeDir = "home-dir"
 	tokenAttrCluster = "cluster-tag"
+
+	AdminRole = "admin"
 )
 
 // UserInfo is a user credentials and related information such a home directory.
 type UserInfo struct {
-	Name       string `json:"username" yaml:"username"`
-	Password   string `json:"password" yaml:"password"`
-	Home       string `json:"home" yaml:"home"`
-	ClusterTag string `json:"cluster-tag,omitempty" yaml:"cluster-tag,omitempty"`
+	Name       string   `json:"username" yaml:"username"`
+	Password   string   `json:"password,omitempty" yaml:"password,omitempty"` // for backward compatibility, should be empty
+	Passhash   string   `json:"passhash,omitempty" yaml:"passhash,omitempty"` // hashed password
+	Roles      []string `json:"roles,omitempty" yaml:"roles,omitempty"`       // "admin", "user"
+	HomeDir    string   `json:"home,omitempty" yaml:"home,omitempty"`
+	ClusterTag string   `json:"cluster-tag,omitempty" yaml:"cluster-tag,omitempty"`
 }
 
+// get as string
+func (u *UserInfo) String() string {
+	return fmt.Sprintf(`{name:%s home:%s tag:%s}`,
+		u.Name, u.HomeDir, u.ClusterTag)
+}
+
+// WipeOut creates copy of user with no sensitive information
+func (u *UserInfo) WipeOut() *UserInfo {
+	w := *u // copy
+	w.Password = ""
+	w.Passhash = ""
+	return &w
+}
+
+// HasRole checks if user has requested role
+func (u *UserInfo) HasRole(role string) bool {
+	for _, r := range u.Roles {
+		if role == r {
+			return true
+		}
+	}
+
+	return false // not found
+}
+
+// used to verify user's password
 type Provider interface {
 	Reload() error
 	Verify(username string, password string) *UserInfo
+}
+
+// used to manage set of users
+type Manager interface {
+	// get the list of all users.
+	GetAllUsers() ([]*UserInfo, error)
+
+	// get the list of specified users
+	GetUsers(names []string) ([]*UserInfo, error)
+
+	// create new user
+	CreateNew(user *UserInfo) (*UserInfo, error)
+
+	// update existing user
+	Update(user *UserInfo, missing string) (*UserInfo, error)
+
+	// delete users
+	Delete(names []string) ([]*UserInfo, error)
 }
 
 type Middleware struct {
@@ -70,6 +119,7 @@ type Middleware struct {
 	userCacheLock sync.Mutex
 }
 
+// Create new middleware with custom auth provider
 func NewMiddleware(provider Provider, realm string) *Middleware {
 	if len(realm) == 0 {
 		realm = "Authorization Required"
@@ -163,7 +213,8 @@ func getUserFromJwt(userId string, ctx *gin.Context) *UserInfo {
 		if val, ok := ival.(map[string]interface{}); ok {
 			user := new(UserInfo)
 			user.Name, _ = val["id"].(string) // userId
-			user.Home, _ = val[tokenAttrHomeDir].(string)
+			user.Roles, _ = val[tokenAttrRoles].([]string)
+			user.HomeDir, _ = val[tokenAttrHomeDir].(string)
 			user.ClusterTag, _ = val[tokenAttrCluster].(string)
 			return user
 		}
@@ -196,12 +247,13 @@ func (mw *Middleware) payload(userId string) map[string]interface{} {
 
 	if user, ok := mw.userCache[userId]; ok {
 		return map[string]interface{}{
-			tokenAttrHomeDir: user.Home,
+			tokenAttrRoles:   user.Roles,
+			tokenAttrHomeDir: user.HomeDir,
 			tokenAttrCluster: user.ClusterTag,
 		}
 	}
 
-	return nil // no any data yet
+	return nil // no data yet
 }
 
 // Try to decode Authorization header (basic) to get username and password

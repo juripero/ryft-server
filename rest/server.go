@@ -170,7 +170,11 @@ type ServerConfig struct {
 type Server struct {
 	Config ServerConfig
 
+	// lsiten address (parsed)
 	listenAddress *net.TCPAddr
+
+	// auth manager
+	AuthManager auth.Manager
 
 	// the number of active search requests on this node
 	// is used as a metric for "busyness"
@@ -326,7 +330,7 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 	if v, exists := ctx.Get(gin.AuthUserKey); exists && v != nil {
 		if user, ok := v.(*auth.UserInfo); ok {
 			userName = user.Name
-			homeDir = user.Home
+			homeDir = user.HomeDir
 			userTag = user.ClusterTag
 		}
 	}

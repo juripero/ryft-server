@@ -138,7 +138,7 @@ func (a *LdapAuth) verify(username, password string) (*UserInfo, error) {
 	user := new(UserInfo)
 	user.Name = userdn
 	// user.Password = password
-	user.Home = homeDir
+	user.HomeDir = homeDir
 	user.ClusterTag = clusterTag
 
 	return user, nil // OK

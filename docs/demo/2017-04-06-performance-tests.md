@@ -209,7 +209,7 @@ as an JSON object. Of course it takes additional resources.
 The `raw` format is also takes a bit longer comparing to `utf8`
 because we need to `base64`-encode DATA of every found record.
 
-The `null` format reports only INDEX information, no any data transferred.
+The `null` format reports only INDEX information, no data transferred.
 This format shows minimum execution time, very close to `ryftprim` execution time.
 The `.extra.performance.ryftprim.read-data` is about 554 ms.
 

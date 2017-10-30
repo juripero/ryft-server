@@ -32,6 +32,7 @@ package ryftmux
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 
@@ -83,6 +84,29 @@ func (engine *Engine) Options() map[string]interface{} {
 	}
 	opts["index-host"] = engine.IndexHost
 	return opts
+}
+
+// get main backend information
+func getBackendInfo(backend search.Engine) string {
+	var res []string
+
+	opts := backend.Options()
+
+	// cluster node name
+	if name, ok := opts["--cluster-node-name"]; ok {
+		res = append(res, fmt.Sprintf("name:%v", name))
+	}
+
+	// cluster node address
+	if addr, ok := opts["--cluster-node-addr"]; ok {
+		res = append(res, fmt.Sprintf("addr:%v", addr))
+	}
+
+	if len(res) != 0 {
+		return fmt.Sprintf(" (CLUSTER{%s})", strings.Join(res, ", "))
+	}
+
+	return "" // empty
 }
 
 // SetLogLevelString changes global module log level.

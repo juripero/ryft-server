@@ -5,7 +5,7 @@ There are a few REST API endpoints related to search:
 - [/search/show](#show)
 
 First one reports the data found. The seconds one reports
-just search statistics, no any data.
+just search statistics, but no found records.
 
 The `search/show` endpoint is used to access already existing results.
 
@@ -353,7 +353,7 @@ The following suffixes are supported:
 To customize output format the `delimiter=` parameter may be used. This optional
 string will be used to separate found records in the output data file.
 
-By default there is no any delimiter. To use Windows newline
+By default there is no delimiter. To use Windows newline
 just pass url-encoded `delimiter=%0D%0A`.
 
 
@@ -409,7 +409,7 @@ See [this document](../perf.md) for detailed metrics description.
 ### Search `limit` parameter
 
 This parameter is used to limit the total number of records reported.
-There is no any limit **by default** or when `limit=0`.
+There is no limit **by default** or when `limit=0`.
 
 
 ### Search `stream` parameter

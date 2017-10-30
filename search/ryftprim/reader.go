@@ -94,6 +94,8 @@ type ResultsReader struct {
 func IsJsonArray(f *bufio.Reader) (bool, error) {
 	if d, err := f.Peek(1); err == nil {
 		return d[0] == '[', nil // OK
+	} else if err == io.EOF {
+		return false, nil // special case for empty files
 	} else {
 		return false, err // not an JSON array
 	}
