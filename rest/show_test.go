@@ -65,7 +65,8 @@ func TestSearchShowNoView(t *testing.T) {
 			0, http.StatusOK, `"matches":5`)
 		var body map[string]interface{}
 		if assert.NoError(t, json.Unmarshal(body_, &body)) {
-			extra := body["extra"].(map[string]interface{})
+			stats := body["stats"].(map[string]interface{})
+			extra := stats["extra"].(map[string]interface{})
 			session, err := utils.AsString(extra["session"])
 			assert.NoError(t, err)
 
@@ -191,7 +192,8 @@ func TestSearchShowView(t *testing.T) {
 			0, http.StatusOK, `"matches":5`)
 		var body map[string]interface{}
 		if assert.NoError(t, json.Unmarshal(body_, &body)) {
-			extra := body["extra"].(map[string]interface{})
+			stats := body["stats"].(map[string]interface{})
+			extra := stats["extra"].(map[string]interface{})
 			session, err := utils.AsString(extra["session"])
 			assert.NoError(t, err)
 

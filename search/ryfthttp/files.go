@@ -75,8 +75,9 @@ func (engine *Engine) doFiles(task *Task, req *http.Request) (*search.DirInfo, e
 
 	// check status code
 	if resp.StatusCode != http.StatusOK {
-		task.log().WithField("status", resp.StatusCode).Warnf("invalid response status")
-		return nil, fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status)
+		message := getOptionalErrorMessage(resp.Body)
+		task.log().WithField("status", resp.Status).Warnf("invalid response status: %s", message)
+		return nil, fmt.Errorf("invalid response status: %s (%s)", resp.Status, message)
 	}
 
 	// decode body

@@ -8,436 +8,134 @@
   "paths": {
     "/search": {
       "get": {
-        "description": "Endpoint for the search. Does the text or structured search.",
-        "tags": [
-          "search"
-        ],
-        "produces": [
-          "application/json",
-          "text/csv"
-        ],
-        "summary": "Text or structured search",
         "operationId": "search",
+        "description": "Endpoint for the search. Does the text or structured search.",
+        "summary": "Text or structured search",
+        "tags": [ "search" ],
+        "produces": [ "application/json", "text/csv" ],
         "parameters": [
-          {
-            "in": "query",
-            "type": "string",
-            "name": "query",
-            "x-go-name": "Query",
-            "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")",
-            "required": true
-          },
-          {
-            "in": "query",
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "name": "file",
-            "x-go-name": "File",
-            "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
-            "collectionFormat": "multi",
-            "required": true
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "mode",
-            "x-go-name": "Mode",
-            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6)",
-            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6"]
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "surrounding",
-            "x-go-name": "Surrounding",
-            "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
-          },
-          {
-            "in": "query",
-            "type": "integer",
-            "format": "uint8",
-            "maximum": 255,
-            "minimum": 0,
-            "name": "fuzziness",
-            "x-go-name": "Fuzziness",
-            "description": "Fuzziness of the search. Measured as the maximum Hamming distance for \"fhs\" mode or edit distance for \"feds\" mode."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "format",
-            "x-go-name": "Format",
-            "description": "Input data format. Parameter is used with structured or RAW text search.",
-            "enum": ["raw", "xml", "json", "utf8", "null"]
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "cs",
-            "x-go-name": "CaseSensitive",
-            "description": "Case sensitive flag"
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "reduce",
-            "default": true,
-            "x-go-name": "Reduce",
-            "description": "Reduce flag for fuzzy edit distance search"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "fields",
-            "x-go-name": "Fields",
-            "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "x-go-name": "Backend",
-            "name": "backend",
-            "description": "Optional backend tool.",
-            "enum": ["ryftprim", "ryftx"]
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "x-go-name": "Data",
-            "name": "data",
-            "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "index",
-            "x-go-name": "Index",
-            "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "view",
-            "x-go-name": "View",
-            "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "delimiter",
-            "x-go-name": "Delimiter",
-            "description": "The delimiter is used between found records in DATA file."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "lifetime",
-            "x-go-name": "Lifetime",
-            "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "share-mode",
-            "x-go-name": "ShareMode",
-            "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
-          },
-          {
-            "in": "query",
-            "type": "integer",
-            "format": "uint8",
-            "maximum": 4,
-            "minimum": 0,
-            "name": "nodes",
-            "x-go-name": "Nodes",
-            "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
-            "enum": [1, 2, 3, 4]
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "x-go-name": "Local",
-            "description": "Perform search only on this cluster member. Default 'false'."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "stats",
-            "x-go-name": "Stats",
-            "description": "Include search statistics in response. Default 'false'."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "performance",
-            "x-go-name": "Performance",
-            "description": "Include performance metrics in response. Default 'false'."
-          },
-          {
-            "in": "query",
-            "type": "integer",
-            "format": "uint",
-            "name": "limit",
-            "x-go-name": "Limit",
-            "description": "Limit the total number of records reported."
-          },
-          {
-            "in": "query",
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "collectionFormat": "multi",
-            "name": "transform",
-            "description": "Additional data transformation. Could be match(\"^.*$\"), replace(\"^(.*)apple(.*)$\", \"$1orange$2\") or script(\"filter_position\")"
-          }
+          { "$ref": "#/parameters/SearchQuery" },
+          { "$ref": "#/parameters/SearchFile" },
+          { "$ref": "#/parameters/IgnoreMissingFiles" },
+          { "$ref": "#/parameters/SearchMode" },
+          { "$ref": "#/parameters/Surrounding" },
+          { "$ref": "#/parameters/Fuzziness" },
+          { "$ref": "#/parameters/SearchFormat" },
+          { "$ref": "#/parameters/SearchCase" },
+          { "$ref": "#/parameters/SearchReduce" },
+          { "$ref": "#/parameters/SearchFields" },
+          { "$ref": "#/parameters/SearchBackend" },
+          { "$ref": "#/parameters/SearchBackendMode" },
+          { "$ref": "#/parameters/SearchBackendOption" },
+          { "$ref": "#/parameters/SaveData" },
+          { "$ref": "#/parameters/SaveIndex" },
+          { "$ref": "#/parameters/SaveView" },
+          { "$ref": "#/parameters/Delimiter" },
+          { "$ref": "#/parameters/Lifetime" },
+          { "$ref": "#/parameters/ReadShareMode" },
+          { "$ref": "#/parameters/SearchNodes" },
+          { "$ref": "#/parameters/Local" },
+          { "$ref": "#/parameters/SearchStat" },
+          { "$ref": "#/parameters/Performance" },
+          { "$ref": "#/parameters/SearchLimit" },
+          { "$ref": "#/parameters/Transform" }
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
-            "schema": {
-              "$ref": "#/definitions/SearchResponse"
-            }
+            "description": "Search result contains all found records and search statistics.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       },
       "post": {
-        "description": "Endpoint for the search. Does the text or structured search.",
-        "tags": [
-          "search"
-        ],
-        "produces": [
-          "application/json",
-          "text/csv"
-        ],
+        "description": "Does the text or structured search. The same as `GET /search` but uses JSON object in request's body to specify search parameters.",
+        "tags": [ "search" ],
+        "produces": [ "application/json", "text/csv" ],
         "summary": "Text or structured search",
-        "operationId": "search_post",
+        "operationId": "searchPost",
         "parameters": [
           {
             "in": "body",
             "name": "body",
-            "schema": {
-              "$ref": "#/definitions/SearchParameters"
-            }
+            "schema": { "$ref": "#/definitions/SearchRequest" }
           }
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
-            "schema": {
-              "$ref": "#/definitions/SearchResponse"
-            }
+            "description": "Search result contains all found records and search statistics.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
     },
     "/count": {
-      "produces": [
-        "application/json",
-        "text/csv"
-      ],
       "get": {
         "description": "Endpoint for the count. Does the search but returns just statistics.",
-        "tags": [
-          "search"
-        ],
-        "summary": "Count the search matches",
+        "tags": [ "search" ],
+        "summary": "Count the number of matches",
         "operationId": "count",
+        "produces": [ "application/json", "text/csv" ],
         "parameters": [
-          {
-            "in": "query",
-            "type": "string",
-            "name": "query",
-            "x-go-name": "Query",
-            "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")",
-            "required": true
-          },
-          {
-            "in": "query",
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "name": "file",
-            "x-go-name": "File",
-            "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt",
-            "collectionFormat": "multi",
-            "required": true
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "mode",
-            "x-go-name": "Mode",
-            "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6)",
-            "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6"]
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "surrounding",
-            "x-go-name": "Surrounding",
-            "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
-          },
-          {
-            "in": "query",
-            "type": "integer",
-            "format": "uint8",
-            "maximum": 255,
-            "minimum": 0,
-            "name": "fuzziness",
-            "x-go-name": "Fuzziness",
-            "description": "Fuzziness of the search. Measured as the maximum Hamming distance for \"fhs\" mode or edit distance for \"feds\" mode."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "cs",
-            "x-go-name": "CaseSensitive",
-            "description": "Case sensitive flag"
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "reduce",
-            "default": true,
-            "x-go-name": "Reduce",
-            "description": "Reduce flag for fuzzy edit distance search"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "x-go-name": "Backend",
-            "name": "backend",
-            "description": "Optional backend tool.",
-            "enum": ["ryftprim", "ryftx"]
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "x-go-name": "Data",
-            "name": "data",
-            "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "index",
-            "x-go-name": "Index",
-            "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "view",
-            "x-go-name": "View",
-            "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "delimiter",
-            "x-go-name": "Delimiter",
-            "description": "The delimiter is used between found records in DATA file."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "lifetime",
-            "x-go-name": "Lifetime",
-            "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "share-mode",
-            "x-go-name": "ShareMode",
-            "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
-          },
-          {
-            "in": "query",
-            "type": "integer",
-            "format": "uint8",
-            "maximum": 4,
-            "minimum": 0,
-            "name": "nodes",
-            "x-go-name": "Nodes",
-            "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
-            "enum": [1, 2, 3, 4]
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "x-go-name": "Local",
-            "description": "Perform search only on this cluster member. Default 'false'."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "performance",
-            "x-go-name": "Performance",
-            "description": "Include performance metrics in response. Default 'false'."
-          }
+          { "$ref": "#/parameters/SearchQuery" },
+          { "$ref": "#/parameters/SearchFile" },
+          { "$ref": "#/parameters/IgnoreMissingFiles" },
+          { "$ref": "#/parameters/SearchMode" },
+          { "$ref": "#/parameters/Surrounding" },
+          { "$ref": "#/parameters/Fuzziness" },
+          { "$ref": "#/parameters/SearchCase" },
+          { "$ref": "#/parameters/SearchReduce" },
+          { "$ref": "#/parameters/SearchBackend" },
+          { "$ref": "#/parameters/SearchBackendMode" },
+          { "$ref": "#/parameters/SearchBackendOption" },
+          { "$ref": "#/parameters/SaveData" },
+          { "$ref": "#/parameters/SaveIndex" },
+          { "$ref": "#/parameters/SaveView" },
+          { "$ref": "#/parameters/Delimiter" },
+          { "$ref": "#/parameters/Lifetime" },
+          { "$ref": "#/parameters/ReadShareMode" },
+          { "$ref": "#/parameters/SearchNodes" },
+          { "$ref": "#/parameters/Local" },
+          { "$ref": "#/parameters/Performance" }
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
-            "schema": {
-              "$ref": "#/definitions/CountResponse"
-            }
+            "description": "Search result contains search statistics only.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       },
       "post": {
-        "description": "Endpoint for the count. Does the search but returns just statistics.",
-        "tags": [
-          "search"
-        ],
-        "summary": "Count the search matches",
-        "operationId": "count_post",
+        "description": "Does the search but returns just statistics. The same as `GET /count` but uses JSON object in request's body to specify search parameters.",
+        "tags": [ "search" ],
+        "summary": "Count the number of matches",
+        "operationId": "countPost",
         "parameters": [
           {
             "in": "body",
             "name": "body",
-            "schema": {
-              "$ref": "#/definitions/SearchParameters"
-            }
+            "schema": { "$ref": "#/definitions/CountRequest" }
           }
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
-            "schema": {
-              "$ref": "#/definitions/CountResponse"
-            }
+            "description": "Search result contains search statistics only.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
@@ -445,120 +143,66 @@
     "/search/show": {
       "get": {
         "description": "Endpoint to access search results. Reads already existing search results.",
-        "tags": [
-          "search"
-        ],
-        "produces": [
-          "application/json",
-          "text/csv"
-        ],
-        "summary": "Read search results",
+        "tags": [ "search" ],
+        "produces": [ "application/json", "text/csv" ],
+        "summary": "Read the search results",
         "operationId": "searchShow",
         "parameters": [
-          {
-            "in": "query",
-            "type": "integer",
-            "format": "uint",
-            "name": "offset",
-            "x-go-name": "Offset",
-            "description": "Offset of first record to report."
+          { "$ref": "#/parameters/ShowOffset" },
+          { "$ref": "#/parameters/ShowCount" },
+          { "$ref": "#/parameters/SearchFormat" },
+          { "$ref": "#/parameters/SearchFields" },
+          { "$ref": "#/parameters/UseSession" },
+          { "$ref": "#/parameters/UseData" },
+          { "$ref": "#/parameters/UseIndex" },
+          { "$ref": "#/parameters/UseView" },
+          { "$ref": "#/parameters/Delimiter" },
+          { "$ref": "#/parameters/Local" },
+          { "$ref": "#/parameters/Performance" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains all requested records.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
           },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    },
+    "/search/aggs": {
+      "post": {
+        "description": "Endpoint to calculate aggregations on search results (Should be prepared with `/search` or `/count`).",
+        "tags": [ "search" ],
+        "produces": [ "application/json", "text/csv" ],
+        "summary": "Calculate aggregations on search results",
+        "operationId": "searchAggsPost",
+        "parameters": [
           {
-            "in": "query",
-            "type": "integer",
-            "format": "uint",
-            "name": "count",
-            "x-go-name": "Count",
-            "description": "Total number of records to report."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "format",
-            "x-go-name": "Format",
-            "description": "Input data format. Parameter is used with structured or RAW text search.",
-            "enum": ["raw", "xml", "json", "utf8", "null"]
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "fields",
-            "x-go-name": "Fields",
-            "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "x-go-name": "Session",
-            "name": "session",
-            "description": "Session token to access search results."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "x-go-name": "Data",
-            "name": "data",
-            "description": "Name of DATA file to read."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "index",
-            "x-go-name": "Index",
-            "description": "Name of INDEX file to read."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "view",
-            "x-go-name": "View",
-            "description": "Name of VIEW file to read."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "delimiter",
-            "x-go-name": "Delimiter",
-            "description": "The delimiter is used between found records in DATA file."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "x-go-name": "Local",
-            "description": "Perform search only on this cluster member. Default 'false'."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "performance",
-            "x-go-name": "Performance",
-            "description": "Include performance metrics in response. Default 'false'."
+            "in": "body",
+            "name": "body",
+            "schema": { "$ref": "#/definitions/AggregationRequest" }
           }
         ],
         "responses": {
           "200": {
-            "description": "SearchResponseOK is a search result in an array with an elements of various structure",
-            "schema": {
-              "$ref": "#/definitions/SearchResponse"
-            }
+            "description": "Search result contains all calculated aggregations.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
     },
     "/run": {
       "get": {
-        "tags": [
-          "run"
-        ],
+        "tags": [ "misc" ],
         "summary": "Run custom command on server side",
-        "description": "Endpoint to run custom command",
+        "description": "Endpoint to run custom command on server side. Is used for custom post-processing.",
         "operationId": "run",
         "parameters": [
           {
@@ -571,16 +215,14 @@
           {
             "name": "command",
             "type": "string",
-            "description": "Command to run.",
+            "description": "Command or script to run.",
             "required": false,
             "in": "query"
           },
           {
             "in": "query",
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "name": "arg",
             "description": "Set of arguments.",
             "collectionFormat": "multi",
@@ -590,279 +232,148 @@
         "responses": {
           "200": {
             "description": "STDOUT and STDERR combined output of the command",
-            "schema":{
-              "type": "string"
+            "schema": {
+              "type": "string",
+              "format": "binary"
             }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
     },
     "/rename": {
       "put": {
-        "tags": [
-          "files"
-        ],
-        "summary": "Change file/directory/catalog name or file name in catalog",
-        "description": "Endpoint for the file renaming",
-        "operationId": "updateFiles",
+        "tags": [ "files" ],
+        "summary": "Rename file or directory",
+        "description": "Endpoint for the file/directory renaming. Catalogs are also supported.",
+        "operationId": "renameFile",
         "parameters": [
-          {
-            "name": "file",
-            "type": "string",
-            "description": "The uploading filename.",
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "dir",
-            "type": "string",
-            "description": "Directory name.",
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "Catalog name.",
-            "required": false,
-            "in": "query"
-          },
+          { "$ref": "#/parameters/FilePath" },
+          { "$ref": "#/parameters/DirPath" },
+          { "$ref": "#/parameters/CatalogPath" },
           {
             "name": "new",
             "type": "string",
-            "description": "New name for a file/directore/catalog or file inside catalog.",
+            "description": "The new name for a file/directory/catalog or file inside catalog.",
             "required": true,
             "in": "query"
           },
-          {
-          "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "description": "Perform action only on this cluster member. Default 'false'."
-          }
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
-            "description": "Map of file/dir/catalog and its status",
-            "schema": {
-              "$ref": "#/definitions/RenameResponse"
-            }
+            "description": "Rename status for each item.",
+            "schema": { "$ref": "#/definitions/RenameResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
     },
     "/file": {
       "get": {
-        "tags": [
-          "files"
-        ],
+        "tags": [ "files" ],
         "summary": "Download a file",
         "description": "Endpoint to download a file",
         "operationId": "getFile",
         "parameters": [
-          {
-            "name": "dir",
-            "type": "string",
-            "description": "The folder path where file is located. Default '/'",
-            "in": "query"
-          },
-          {
-            "name": "local",
-            "type": "boolean",
-            "description": "Return file structure from local node only or whole cluster",
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "The path to catalog to download file of",
-            "in": "query"
-          },
-          {
-            "name": "file",
-            "type": "string",
-            "description": "The filepath to download",
-            "in": "query"
-          }
+          { "$ref": "#/parameters/DirPath" },
+          { "$ref": "#/parameters/CatalogPath" },
+          { "$ref": "#/parameters/FilePath" },
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
             "description": "File content",
             "schema": {
-              "type":"string",
+              "type": "string",
               "format": "byte"
             }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       },
       "post": {
-        "tags": [
-          "files"
-        ],
+        "tags": [ "files" ],
         "summary": "Upload a file",
-        "description": "Endpoint to upload a file",
+        "description": "Endpoint to upload a file.",
         "operationId": "postFile",
-        "consumes": [
-          "multipart/form-data"
-        ],
+        "consumes": [ "multipart/form-data" ],
         "parameters": [
           {
-            "name": "content",
             "in": "formData",
+            "name": "content",
             "type": "file",
             "description": "File content to upload",
             "required": true
           },
-          {
-            "name": "file",
-            "type": "string",
-            "description": "The uploading filename. Use {{random}} for random names.",
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "The catalog to append file to.",
-            "in": "query"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "delimiter",
-            "description": "The delimiter is used between file parts in catalog."
-          },
-          {
-            "name": "offset",
-            "type": "integer",
-            "format": "int64",
-            "description": "The optional file part offset.",
-            "in": "query"
-          },
-          {
-            "name": "length",
-            "type": "integer",
-            "format": "int64",
-            "description": "The optional file part length.",
-            "in": "query"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "lifetime",
-            "description": "The file or catalog lifetime, for example \"2h\"."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "share-mode",
-            "x-go-name": "ShareMode",
-            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "description": "Perform action only on this cluster member. Default 'false'."
-          }
+          { "$ref": "#/parameters/NewFilePath" },
+          { "$ref": "#/parameters/CatalogPath" },
+          { "$ref": "#/parameters/FileDelimiter" },
+          { "$ref": "#/parameters/FileOffset" },
+          { "$ref": "#/parameters/FileLength" },
+          { "$ref": "#/parameters/FileLifetime" },
+          { "$ref": "#/parameters/WriteShareMode" },
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
-            "description": "Map of files and directories uploaded",
-            "schema": {
-              "$ref": "#/definitions/PostFileResponse"
-            }
+            "description": "Status of files uploaded.",
+            "schema": { "$ref": "#/definitions/PostFileResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
     },
     "/files": {
       "get": {
-        "tags": [
-          "files"
-        ],
+        "tags": [ "files" ],
         "summary": "List a directory or catalog content",
         "description": "Endpoint to query node/cluster file system structure",
         "operationId": "getFiles",
         "parameters": [
-          {
-            "name": "dir",
-            "type": "string",
-            "description": "The folder path to return child items of. Default '/'",
-            "in": "query"
-          },
+          { "$ref": "#/parameters/DirPath" },
+          { "$ref": "#/parameters/CatalogPath" },
           {
             "name": "hidden",
             "type": "boolean",
             "description": "Report hidden files",
             "in": "query"
           },
-          {
-            "name": "local",
-            "type": "boolean",
-            "description": "Return file structure from local node only or whole cluster",
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "The path to catalog to get content of",
-            "in": "query"
-          }
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
             "description": "List of files and directories for node/cluster",
-            "schema": {
-              "$ref": "#/definitions/GetFilesResponse"
-            }
+            "schema": { "$ref": "#/definitions/GetFilesResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       },
       "delete": {
-        "tags": [
-          "files"
-        ],
-        "summary": "Delete directories and files",
+        "tags": [ "files" ],
+        "summary": "Delete file or directory",
         "description": "Endpoint to delete node's directories and files",
         "operationId": "deleteFiles",
         "parameters": [
           {
             "name": "dir",
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "collectionFormat": "multi",
             "description": "The directory path to delete. Wildcards are supported.",
             "in": "query"
@@ -870,9 +381,7 @@
           {
             "name": "file",
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "collectionFormat": "multi",
             "description": "The file path to delete. Wildcards are supported.",
             "in": "query"
@@ -880,157 +389,85 @@
           {
             "name": "catalog",
             "type": "array",
-            "items": {
-              "type": "string"
-            },
+            "items": { "type": "string" },
             "collectionFormat": "multi",
             "description": "The catalog path to delete. Wildcards are supported.",
             "in": "query"
           },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "x-go-name": "Local",
-            "description": "Perform action only on this cluster member. Default 'false'."
-          }
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
-            "description": "Map of files and directories deleted",
-            "schema": {
-              "$ref": "#/definitions/DeleteFilesResponse"
-            }
+            "description": "Status of files and directories deleted.",
+            "schema": { "$ref": "#/definitions/DeleteFilesResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
     },
     "/raw": {
       "post": {
-        "tags": [
-          "files"
-        ],
+        "tags": [ "files" ],
         "summary": "Upload a RAW octet stream",
         "description": "Endpoint to upload RAW octet stream",
         "operationId": "postRawFile",
-        "consumes": [
-          "application/octet-stream"
-        ],
+        "consumes": [ "application/octet-stream" ],
         "parameters": [
           {
             "name": "content",
             "in": "body",
-             "schema": {
-                "type": "string",
-                "format": "byte"
+            "schema": {
+              "type": "string",
+              "format": "byte"
             },
             "description": "Byte content to upload",
             "required": true
           },
-          {
-            "name": "file",
-            "type": "string",
-            "description": "The uploading filename. Use {{random}} for random names.",
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "catalog",
-            "type": "string",
-            "description": "The catalog to append file to.",
-            "in": "query"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "delimiter",
-            "description": "The delimiter is used between file parts in catalog."
-          },
-          {
-            "name": "offset",
-            "type": "integer",
-            "format": "int64",
-            "description": "The optional file part offset.",
-            "in": "query"
-          },
-          {
-            "name": "length",
-            "type": "integer",
-            "format": "int64",
-            "description": "The optional file part length.",
-            "in": "query"
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "lifetime",
-            "description": "The file or catalog lifetime, for example \"2h\"."
-          },
-          {
-            "in": "query",
-            "type": "string",
-            "name": "share-mode",
-            "x-go-name": "ShareMode",
-            "description": "Sharing mode used to access data files. Can be \"wait-10s\" or \"ignore\". By default \"wait-0s\" is used."
-          },
-          {
-            "in": "query",
-            "type": "boolean",
-            "name": "local",
-            "description": "Perform action only on this cluster member. Default 'false'."
-          }
+          { "$ref": "#/parameters/NewFilePath" },
+          { "$ref": "#/parameters/CatalogPath" },
+          { "$ref": "#/parameters/FileDelimiter" },
+          { "$ref": "#/parameters/FileOffset" },
+          { "$ref": "#/parameters/FileLength" },
+          { "$ref": "#/parameters/FileLifetime" },
+          { "$ref": "#/parameters/WriteShareMode" },
+          { "$ref": "#/parameters/Local" }
         ],
         "responses": {
           "200": {
-            "description": "Map of files and directories uploaded",
-            "schema": {
-              "$ref": "#/definitions/PostFileResponse"
-            }
+            "description": "Status of files uploaded.",
+            "schema": { "$ref": "#/definitions/PostFileResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
     },
     "/version": {
       "get": {
-        "tags": [
-          "version"
-        ],
+        "tags": [ "misc" ],
         "summary": "Get server's version",
         "description": "Endpoint to query current build version",
         "operationId": "version",
         "responses": {
           "200": {
             "description": "Hash and version",
-            "schema": {
-              "$ref": "#/definitions/VersionResponse"
-            }
+            "schema": { "$ref": "#/definitions/VersionResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
     },
     "/login": {
       "post": {
-        "tags": [
-          "login"
-        ],
+        "tags": [ "login" ],
         "summary": "Authentication",
         "description": "Endpoint to authenticate an user",
         "operationId": "login",
@@ -1041,23 +478,17 @@
             "name": "body",
             "description": "User's credentials",
             "required": true,
-            "schema": {
-              "$ref": "#/definitions/LoginRequest"
-            }
+            "schema": { "$ref": "#/definitions/LoginRequest" }
           }
         ],
         "responses": {
           "200": {
             "description": "JWT",
-            "schema": {
-              "$ref": "#/definitions/LoginResponse"
-            }
+            "schema": { "$ref": "#/definitions/LoginResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         },
         "security": []
@@ -1065,27 +496,400 @@
     },
     "/token/refresh": {
       "get": {
-        "tags": [
-          "login"
-        ],
+        "tags": [ "login" ],
         "summary": "Refresh authentication",
         "description": "Endpoint to refresh existing authentication token",
         "operationId": "token_refresh",
         "responses": {
           "200": {
             "description": "JWT",
-            "schema": {
-              "$ref": "#/definitions/LoginResponse"
-            }
+            "schema": { "$ref": "#/definitions/LoginResponse" }
           },
           "default": {
-            "description": "Error responses",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
           }
         }
       }
+    },
+    "/user": {
+      "get": {
+        "tags": [ "users" ],
+        "summary": "Get users",
+        "description": "Get users and its properties.",
+        "operationId": "getUsers",
+        "parameters": [
+          { "$ref": "#/parameters/UserNames" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of requested users",
+            "schema": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/UserInfo" }
+            }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      },
+      "post": {
+        "tags": [ "users" ],
+        "summary": "Create new",
+        "description": "Create new user.",
+        "operationId": "createUser",
+        "consumes": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "User's properties",
+            "required": true,
+            "schema": { "$ref": "#/definitions/UserInfo" }
+          }
+        ],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Created user",
+            "schema": { "$ref": "#/definitions/UserInfo" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      },
+      "put": {
+        "tags": [ "users" ],
+        "summary": "Change user",
+        "description": "Change user properties.",
+        "operationId": "changeUser",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "User's properties",
+            "required": true,
+            "schema": { "$ref": "#/definitions/UserInfo" }
+          }
+        ],
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Updated user",
+            "schema": { "$ref": "#/definitions/UserInfo" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+
+      },
+      "delete": {
+        "tags": [ "users" ],
+        "summary": "Delete users",
+        "description": "Delete users.",
+        "operationId": "deleteUsers",
+        "parameters": [
+          { "$ref": "#/parameters/UserNames" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of deleted users",
+            "schema": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/UserInfo" }
+            }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    }
+  },
+  "parameters": {
+    "SearchQuery": {
+      "in": "query",
+      "name": "query",
+      "type": "string",
+      "description": "What to search. Could be simple pain text like `hello` or Ryft search query like `(RECORD.body CONTAINS \"night\")`.",
+      "required": true
+    },
+    "SearchFile": {
+      "in": "query",
+      "name": "file",
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Set of files or catalogs to search. The path should be designated relative to `/ryftone`. Wildcards are supported, for example: `*.txt`",
+      "collectionFormat": "multi",
+      "required": true
+    },
+    "IgnoreMissingFiles": {
+      "in": "query",
+      "name": "ignore-missing-files",
+      "type": "boolean",
+      "description": "If `true` report empty statistics instead of error."
+    },
+    "SearchMode": {
+      "in": "query",
+      "name": "mode",
+      "type": "string",
+      "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search",
+      "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2" ]
+    },
+    "Surrounding": {
+      "in": "query",
+      "name": "surrounding",
+      "type": "string",
+      "description": "Number of characters before the match and after the match that will be returned. Can be `line` to get whole line. This parameter is used with RAW text search."
+    },
+    "Fuzziness": {
+      "in": "query",
+      "name": "fuzziness",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0,
+      "description": "Fuzziness of the search. Measured as the maximum Hamming distance for `fhs` mode or edit distance for `feds` mode."
+    },
+    "SearchFormat": {
+      "in": "query",
+      "name": "format",
+      "type": "string",
+      "description": "Input data format. Parameter is used with structured or RAW text search.",
+      "enum": [ "raw", "xml", "json", "utf8", "null" ]
+    },
+    "SearchCase": {
+      "in": "query",
+      "name": "cs",
+      "type": "boolean",
+      "default": true,
+      "description": "Case sensitivity flag."
+    },
+    "SearchReduce": {
+      "in": "query",
+      "name": "reduce",
+      "type": "boolean",
+      "default": true,
+      "description": "Reduce flag for fuzzy edit distance search."
+    },
+    "SearchFields": {
+      "in": "query",
+      "name": "fields",
+      "type": "string",
+      "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
+    },
+    "SearchBackend": {
+      "in": "query",
+      "name": "backend",
+      "type": "string",
+      "description": "Optional backend tool to run search.",
+      "enum": [ "ryftprim", "ryftx", "ryftpcre2" ]
+    },
+    "SearchBackendMode": {
+      "in": "query",
+      "type": "string",
+      "name": "backend-mode",
+      "description": "Backend mode (default, high-performance, etc)."
+    },
+    "SearchBackendOption":{
+      "in": "query",
+      "type": "array",
+      "name": "backend-option",
+      "description": "Optional list of backend options",
+      "items": { "type": "string" },
+      "collectionFormat": "multi"
+    },
+    "UseSession": {
+      "in": "query",
+      "name": "session",
+      "type": "string",
+      "description": "Session token to access search results. Can be used to specify DATA,INDEX,VIEW files and delimiter instead of corresponding parameters."
+    },
+    "SaveData": {
+      "in": "query",
+      "name": "data",
+      "type": "string",
+      "description": "Name of DATA file to keep. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+    },
+    "UseData": {
+      "in": "query",
+      "name": "data",
+      "type": "string",
+      "description": "Name of DATA file to read."
+    },
+    "SaveIndex": {
+      "in": "query",
+      "name": "index",
+      "type": "string",
+      "description": "Name of INDEX file to keep. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+    },
+    "UseIndex": {
+      "in": "query",
+      "name": "index",
+      "type": "string",
+      "description": "Name of INDEX file to read."
+    },
+    "SaveView": {
+      "in": "query",
+      "name": "view",
+      "type": "string",
+      "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+    },
+    "UseView": {
+      "in": "query",
+      "name": "view",
+      "type": "string",
+      "description": "Name of VIEW file to read."
+    },
+    "Delimiter": {
+      "in": "query",
+      "name": "delimiter",
+      "type": "string",
+      "description": "The delimiter is used to place between records in DATA file."
+    },
+    "Lifetime": {
+      "in": "query",
+      "name": "lifetime",
+      "type": "string",
+      "description": "The output files lifetime (DATA, INDEX, VIEW), for example `2h`."
+    },
+    "ReadShareMode": {
+      "in": "query",
+      "name": "share-mode",
+      "type": "string",
+      "description": "Sharing mode used to access data files. Can be `wait-10s`, `skip` or `ignore`. By default `wait-0s` is used."
+    },
+    "WriteShareMode": {
+      "in": "query",
+      "name": "share-mode",
+      "type": "string",
+      "description": "Sharing mode used to write data files. Can be `wait-10s`, `ignore`. By default `wait-0s` is used."
+    },
+    "SearchNodes": {
+      "in": "query",
+      "name": "nodes",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 4,
+      "minimum": 0,
+      "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
+      "enum": [ 1, 2, 3, 4 ]
+    },
+    "Local": {
+      "in": "query",
+      "name": "local",
+      "type": "boolean",
+      "default": false,
+      "description": "Perform search only on this cluster node."
+    },
+    "SearchStat": {
+      "in": "query",
+      "name": "stats",
+      "type": "boolean",
+      "default": false,
+      "description": "Include search statistics in response."
+    },
+    "Performance": {
+      "in": "query",
+      "name": "performance",
+      "type": "boolean",
+      "default": false,
+      "description": "Include performance metrics in response."
+    },
+    "SearchLimit": {
+      "in": "query",
+      "name": "limit",
+      "type": "integer",
+      "format": "uint64",
+      "description": "Limit the total number of records reported."
+    },
+    "ShowOffset": {
+      "in": "query",
+      "name": "offset",
+      "type": "integer",
+      "format": "uint64",
+      "description": "Offset of first record to report."
+    },
+    "ShowCount": {
+      "in": "query",
+      "name": "count",
+      "type": "integer",
+      "format": "uint64",
+      "description": "Total number of records to report."
+    },
+    "Transform": {
+      "in": "query",
+      "name": "transform",
+      "type": "array",
+      "items": { "type": "string" },
+      "collectionFormat": "multi",
+      "description": "Additional data transformation. Could be:\n- `match(\"^.*$\")` to match text,\n- `replace(\"^(.*)apple(.*)$\", \"$1orange$2\")` to replace text,\n- `script(\"filter_position\")` to run custom script"
+    },
+    "FilePath": {
+      "in": "query",
+      "name": "file",
+      "type": "string",
+      "description": "The path to a file."
+    },
+    "NewFilePath": {
+      "in": "query",
+      "name": "file",
+      "type": "string",
+      "description": "The path to an uploading file. Use `{{random}}` for random names.",
+      "required": true
+    },
+    "DirPath": {
+      "in": "query",
+      "name": "dir",
+      "type": "string",
+      "description": "The path to a directory."
+    },
+    "CatalogPath": {
+      "in": "query",
+      "name": "catalog",
+      "type": "string",
+      "description": "The path to a catalog."
+    },
+    "FileDelimiter": {
+      "in": "query",
+      "name": "delimiter",
+      "type": "string",
+      "description": "The delimiter is used between file parts in catalog."
+    },
+    "FileOffset": {
+      "in": "query",
+      "name": "offset",
+      "type": "integer",
+      "format": "int64",
+      "description": "The optional file part offset."
+    },
+    "FileLength": {
+      "in": "query",
+      "name": "length",
+      "type": "integer",
+      "format": "int64",
+      "description": "The optional file part length."
+    },
+    "FileLifetime": {
+      "in": "query",
+      "type": "string",
+      "name": "lifetime",
+      "description": "The file or catalog lifetime, for example `2h`."
+    },
+    "UserNames": {
+      "in": "query",
+      "name": "name",
+      "type": "array",
+      "items": { "type": "string" },
+      "collectionFormat": "multi",
+      "description": "The set of user names."
     }
   },
   "definitions": {
@@ -1096,46 +900,61 @@
       ],
       "properties": {
         "dataRate": {
+          "description": "Data rate, MB/s",
           "type": "string"
         },
         "duration": {
+          "description": "Duration, milliseconds",
           "type": "number",
-          "format": "int32"
+          "format": "int64"
         },
         "fabricDataRate": {
+          "description": "Fabric data rate, MB/s",
           "type": "string"
         },
         "matches": {
+          "description": "Total number of records found",
           "type": "number",
-          "format": "int32"
+          "format": "int64"
         },
         "totalBytes": {
+          "description": "Total number of bytes processed",
           "type": "number",
-          "format": "int32"
+          "format": "int64"
         },
         "fabricDuration": {
+          "description": "Fabric duration, milliseconds",
           "type": "number",
-          "format": "int32"
+          "format": "int64"
         },
         "host": {
+          "description": "Cluster node name",
           "type": "string"
         },
         "details": {
+          "description": "Processing details",
           "type": "array",
           "items": {
             "$ref": "#/definitions/CountResponse"
           }
         },
         "extra": {
+          "description": "Extra information",
           "type": "object",
           "properties": {
             "backend": {
+              "description": "Backend tool used",
               "type": "string"
             },
             "session": {
+              "description": "Session identifier",
               "type": "string"
             },
             "aggregations": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "debug": {
               "type": "object",
               "additionalProperties": {}
             }
@@ -1153,6 +972,7 @@
       ],
       "properties": {
         "results": {
+          "description": "Set of found records",
           "type": "array",
           "items": {
             "type": "object",
@@ -1162,10 +982,9 @@
           }
         },
         "errors": {
+          "description": "Set of errors",
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "items": { "type": "string" }
         },
         "stats": {
           "$ref": "#/definitions/CountResponse"
@@ -1177,21 +996,15 @@
       "properties": {
         "folders": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "items": { "type": "string" }
         },
         "files": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "items": { "type": "string" }
         },
         "catalogs": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "items": { "type": "string" }
         },
         "details": {
           "type": "object"
@@ -1325,135 +1138,108 @@
         }
       }
     },
-    "SearchParameters": {
+    "SearchRequest": {
       "type": "object",
-        "properties": {
-        "query": {
-          "type": "string",
-          "x-go-name": "Query",
-          "description": "Search query, for example: (RAW_TEXT CONTAINS \"night\")"
+      "properties": {
+        "query": { "$ref": "#/parameters/SearchQuery" },
+        "files": { "$ref": "#/parameters/SearchFile" },
+        "ignore-missing-files": { "$ref": "#/parameters/IgnoreMissingFiles" },
+        "mode": { "$ref": "#/parameters/SearchMode" },
+        "surrounding": { "$ref": "#/parameters/Surrounding" },
+        "fuzziness": { "$ref": "#/parameters/Fuzziness" },
+        "format": { "$ref": "#/parameters/SearchFormat" },
+        "cs": { "$ref": "#/parameters/SearchCase" },
+        "reduce": { "$ref": "#/parameters/SearchReduce" },
+        "fields": { "$ref": "#/parameters/SearchFields" },
+        "backend": { "$ref": "#/parameters/SearchBackend" },
+        "backend-mode": { "$ref": "#/parameters/SearchBackendMode" },
+        "backend-option": { "$ref": "#/parameters/SearchBackendOption" },
+        "data": { "$ref": "#/parameters/SaveData" },
+        "index": { "$ref": "#/parameters/SaveIndex" },
+        "view": { "$ref": "#/parameters/SaveView" },
+        "delimiter": { "$ref": "#/parameters/Delimiter" },
+        "lifetime": { "$ref": "#/parameters/Lifetime" },
+        "share-mode": { "$ref": "#/parameters/ReadShareMode" },
+        "nodes": { "$ref": "#/parameters/SearchNodes" },
+        "local": { "$ref": "#/parameters/Local" },
+        "stats": { "$ref": "#/parameters/SearchStat" },
+        "performance": { "$ref": "#/parameters/Performance" },
+        "limit": { "$ref": "#/parameters/SearchLimit" },
+        "transform": { "$ref": "#/parameters/Transform" },
+        "aggs": {
+          "description": "Custom aggregations",
+          "type": "object"
+        }
+      }
+    },
+    "CountRequest": {
+      "type": "object",
+      "properties": {
+        "query": { "$ref": "#/parameters/SearchQuery" },
+        "files": { "$ref": "#/parameters/SearchFile" },
+        "ignore-missing-files": { "$ref": "#/parameters/IgnoreMissingFiles" },
+        "mode": { "$ref": "#/parameters/SearchMode" },
+        "surrounding": { "$ref": "#/parameters/Surrounding" },
+        "fuzziness": { "$ref": "#/parameters/Fuzziness" },
+        "cs": { "$ref": "#/parameters/SearchCase" },
+        "reduce": { "$ref": "#/parameters/SearchReduce" },
+        "backend": { "$ref": "#/parameters/SearchBackend" },
+        "backend-mode": { "$ref": "#/parameters/SearchBackendMode" },
+        "backend-option": { "$ref": "#/parameters/SearchBackendOption" },
+        "data": { "$ref": "#/parameters/SaveData" },
+        "index": { "$ref": "#/parameters/SaveIndex" },
+        "view": { "$ref": "#/parameters/SaveView" },
+        "delimiter": { "$ref": "#/parameters/Delimiter" },
+        "lifetime": { "$ref": "#/parameters/Lifetime" },
+        "share-mode": { "$ref": "#/parameters/ReadShareMode" },
+        "nodes": { "$ref": "#/parameters/SearchNodes" },
+        "local": { "$ref": "#/parameters/Local" },
+        "performance": { "$ref": "#/parameters/Performance" },
+        "aggs": {
+          "description": "Custom aggregations",
+          "type": "object"
+        }
+      }
+    },
+    "AggregationRequest": {
+      "type": "object",
+      "properties": {
+        "format": { "$ref": "#/parameters/SearchFormat" },
+        "session": { "$ref": "#/parameters/UseSession" },
+        "data": { "$ref": "#/parameters/UseData" },
+        "index": { "$ref": "#/parameters/UseIndex" },
+        "delimiter": { "$ref": "#/parameters/Delimiter" },
+        "local": { "$ref": "#/parameters/Local" },
+        "performance": { "$ref": "#/parameters/Performance" },
+        "aggs": {
+          "description": "Custom aggregations",
+          "type": "object"
+        }
+      }
+    },
+    "UserInfo": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "description": "Unique user name",
+          "type": "string"
         },
-        "files": {
+        "password": {
+          "description": "User's password",
+          "type": "string"
+        },
+        "roles": {
+          "description": "Set of user's roles",
           "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "x-go-name": "Files",
-          "description": "Set of files or catalogs to search. The path should be designated relative to /ryftone. Wildcards are supported, for example: *.txt"
+          "items": { "type": "string" }
         },
-        "mode": {
-          "type": "string",
-          "x-go-name": "Mode",
-          "description": "Search mode. Could be exact search (es), fuzzy hamming search (fhs), fuzzy edit distance search (feds), date search (ds), time search (ts), currency or numeric search (ns), regex search (rs), IPv4 search (ipv4), IPv6 search (ipv6)",
-          "enum": ["es", "fhs", "feds", "ds", "ts", "ns", "rs", "ipv4", "ipv6"]
+        "home": {
+          "description": "User's home directory inside `/ryftone` partition",
+          "type": "string"
         },
-        "surrounding": {
-          "type": "string",
-          "x-go-name": "Surrounding",
-          "description": "Number of characters before the match and after the match that will be returned. Can be surrounding=line to get whole line. This parameter is used with RAW text search."
-        },
-        "fuzziness": {
-          "type": "integer",
-          "format": "uint8",
-          "maximum": 255,
-          "minimum": 0,
-          "x-go-name": "Fuzziness",
-          "description": "Fuzziness of the search. Measured as the maximum Hamming distance for \"fhs\" mode or edit distance for \"feds\" mode."
-        },
-        "format": {
-          "type": "string",
-          "x-go-name": "Format",
-          "description": "Input data format. Parameter is used with structured or RAW text search.",
-          "enum": ["raw", "xml", "json", "utf8", "null"]
-        },
-        "cs": {
-          "type": "boolean",
-          "x-go-name": "CaseSensitive",
-          "description": "Case sensitive flag"
-        },
-        "reduce": {
-          "type": "boolean",
-          "default": true,
-          "x-go-name": "Reduce",
-          "description": "Reduce flag for fuzzy edit distance search"
-        },
-        "fields": {
-          "type": "string",
-          "x-go-name": "Fields",
-          "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
-        },
-        "backend": {
-          "type": "string",
-          "x-go-name": "Backend",
-          "description": "Optional backend tool.",
-          "enum": ["ryftprim", "ryftx"]
-        },
-        "data": {
-          "type": "string",
-          "x-go-name": "Data",
-          "description": "Name of DATA file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-        },
-        "index": {
-          "type": "string",
-          "x-go-name": "Index",
-          "description": "Name of INDEX file to keep. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-        },
-        "view": {
-          "type": "string",
-          "x-go-name": "View",
-          "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. \"{{random}}\" keyword is replaced with unique number. WARNING: file will be overriden!"
-        },
-        "delimiter": {
-          "type": "string",
-          "x-go-name": "Delimiter",
-          "description": "The delimiter is used between found records in DATA file."
-        },
-        "lifetime": {
-          "type": "string",
-          "x-go-name": "Lifetime",
-          "description": "The output files lifetime (DATA, INDEX, VIEW), for example \"2h\"."
-        },
-        "share-mode": {
-          "type": "string",
-          "x-go-name": "ShareMode",
-          "description": "Sharing mode used to access data files. Can be \"wait-10s\", \"skip\" or \"ignore\". By default \"wait-0s\" is used."
-        },
-        "nodes": {
-          "type": "integer",
-          "format": "uint8",
-          "maximum": 4,
-          "minimum": 0,
-          "x-go-name": "Nodes",
-          "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
-          "enum": [1, 2, 3, 4]
-        },
-        "local": {
-          "type": "boolean",
-          "x-go-name": "Local",
-          "description": "Perform search only on this cluster member. Default 'false'."
-        },
-        "stats": {
-          "type": "boolean",
-          "x-go-name": "Stats",
-          "description": "Include search statistics in response. Default 'false'."
-        },
-        "performance": {
-          "type": "boolean",
-          "x-go-name": "Performance",
-          "description": "Include performance metrics in response. Default 'false'."
-        },
-        "limit": {
-          "type": "integer",
-          "format": "uint",
-          "x-go-name": "Limit",
-          "description": "Limit the total number of records reported."
-        },
-        "transform": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Additional data transformation. Could be match(\"^.*$\"), replace(\"^(.*)apple(.*)$\", \"$1orange$2\") or script(\"filter_position\")"
+        "cluster-tag": {
+          "description": "Partitioning tag used in cluster mode",
+          "type": "string"
         }
       }
     }

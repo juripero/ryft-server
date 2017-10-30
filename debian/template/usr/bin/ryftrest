@@ -10,15 +10,16 @@ Usage: $0 [options]
 Search specific:
 -h|--help          Prints this short help message.
 -p|--mode=<mode>   Specifies the search mode to run, which can be one of:
-                     - exact_search (or es) (used by default)
-                     - fuzzy_hamming_search (or fhs)
-                     - fuzzy_edit_distance_search (or feds)
-                     - date_search (or ds)
-                     - time_search (or ts)
-                     - numeric_search (or ns) also used for currency
-                     - ipv4_search (or ipv4)
-                     - ipv6_search (or ipv6)
-                     - pcre2_search (or pcre2)
+                     - es for exact search (used by default)
+                     - fhs for fuzzy hamming search
+                     - feds for fuzzy edit distance search
+                     - ds for date search
+                     - ts for time search
+                     - ns for numeric search
+                     - cs for currency search
+                     - ipv4 for IPv4 search
+                     - ipv6 for IPv6 search
+                     - pcre2 for PCRE2 regex search
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
@@ -37,6 +38,7 @@ Search specific:
 -ov|--view=<file>  Used to keep a view results file. To speed up /search/show.
 --lifetime=<T>     Used to automatically cleanup results files. Examples: 1h, 1m, 20s.
 --backend=<X>      Used to select "ryftprim" or "ryftx" backend.
+--backend-mode=<mode> Used to select backend mode defined in `ryft-server.conf`.
 --backend-option=<opt> Additional backend option. Depends on selected --backend.
 
 REST specific:
@@ -131,6 +133,7 @@ INDEX=
 VIEW=
 LIFETIME=
 BACKEND=
+BACKEND_MODE=
 BACKEND_OPTS=()
 
 ADDRESS=http://localhost:8765
@@ -155,55 +158,7 @@ PRETTY=
 ADD_DRATE=
 ADD_DETAILS=
 HIDE_HOSTNAME=true
-#
-# individual pieces jq formatting to add units of measurment for demo displays
-#
-UNITS1=' if .duration >= 1000 then
-             {"Duration(sec)         ": ((.duration / 1000)|.*10+0.5|floor|./10)}
-        else {"Duration(msec)        ": .duration}
-        end
-        + if .totalBytes >= 1099511627776 then
-             {"Total Bytes(TB)       ": ((.totalBytes / 1024 / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
-        elif .totalBytes >= 1073741824 then
-             {"Total Bytes(GB)       ": ((.totalBytes / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
-        elif .totalBytes >= 1048576 then
-             {"Total Bytes(MB)       ": ((.totalBytes / 1024 / 1024)|.*100+0.005|floor|./100)}
-        elif .totalBytes >= 1024 then
-             {"Total Bytes(KB)       ": ((.totalBytes / 1024)|.*100+0.005|floor|./100)}
-        else {"Total Bytes           ": .totalBytes}
-        end'
-
-UNITS_DR=' + if .dataRate >= 1024 then
-             {"Data Rate(GB/s)       ": ((.dataRate / 1024)|.*100+0.005|floor|./100)}
-        elif .dataRate < 0.001 then
-             {"Data Rate(KB/s)       ": ((.dataRate * 1024)|.*100+0.005|floor|./100)}
-        else {"Data Rate(MB/s)       ": (.dataRate |.*100+0.005|floor|./100)}
-        end'
-
-UNITS2=' + {"Matches               ": .matches}
-        + if .fabricDataRate >= 1024 then
-             {"Fabric Data Rate(GB/s)": ((.fabricDataRate / 1024)|.*100+0.005|floor|./100)}
-        elif .fabricDataRate < 0.001 then
-             {"Fabric Data Rate(KB/s)": ((.fabricDataRate * 1024)|.*100+0.005|floor|./100)}
-        else {"Fabric Data Rate(MB/s)": .fabricDataRate}
-        end
-        + if .fabricDuration >= 1000 then
-             {"Fabric Duration(sec)  ": ((.fabricDuration / 1000)|.*100+0.005|floor|./100)}
-        else {"Fabric Duration(msec) ": .fabricDuration}
-        end'
-
-UNITS_H=' + {"Host                  ": .host}'
-
-UNITS_H_DET=' + {"Host             ": .details.host}'
-
-UNITS_1_DET=' + {"Duration         ": .details.duration}
-              + {"Total Bytes      ": .details.totalBytes}'
-
-UNITS_DR_DET=' + {"Data Rate        ": .details.dataRate}'
-
-UNITS_2_DET=' + {"Matches          ": .details.matches}
-              + {"Fabric Data Rate ": .details.fabricDataRate}
-              + {"Fabric Duration  ": .details.fabricDuration}'
+JQ_STR=
 
 # parse options
 while [[ $# > 0 ]]; do
@@ -328,6 +283,14 @@ while [[ $# > 0 ]]; do
         BACKEND="$2"
         shift 2
         ;;
+    --backend-mode=*)
+        BACKEND_MODE="${1#*=}"
+        shift
+        ;;
+    --backend-mode)
+        BACKEND_MODE="$2"
+        shift 2
+        ;;
     --backend-option=*|--backend-opt=*)
         BACKEND_OPTS=("${BACKEND_OPTS[@]}" "${1#*=}")
         shift
@@ -445,6 +408,12 @@ while [[ $# > 0 ]]; do
         BODY="$2"
         shift 2
         ;;
+    -vvv)
+        VERBOSE="-s" # tell curl to be silent
+        PRETTY=simple
+        JQ_STR="."
+        shift
+        ;;
     -vv|--pretty)
         VERBOSE="-s" # tell curl to be silent
         PRETTY=true
@@ -518,6 +487,7 @@ done
 [[ ! -z "$VIEW" ]] && URL_QUERY=("${URL_QUERY[@]}" view=$(urlencode "$VIEW"))
 [[ ! -z "$LIFETIME" ]] && URL_QUERY=("${URL_QUERY[@]}" lifetime=$(urlencode "$LIFETIME"))
 [[ ! -z "$BACKEND" ]] && URL_QUERY=("${URL_QUERY[@]}" backend=$(urlencode "$BACKEND"))
+[[ ! -z "$BACKEND_MODE" ]] && URL_QUERY=("${URL_QUERY[@]}" backend-mode=$(urlencode "$BACKEND_MODE"))
 for opt in "${BACKEND_OPTS[@]}"; do
     [[ ! -z "$opt" ]] && URL_QUERY=("${URL_QUERY[@]}" backend-option=$(urlencode "$opt"))
 done
@@ -537,42 +507,67 @@ done
 [[ -z `which curl` ]] && fail "no curl found, run 'apt-get install curl' to install it"
 [[ ! -z "$PRETTY" ]] && [[ -z `which jq` ]] && fail "no jq found, run 'apt-get install jq' to install it"
 
-if [[ ! -z "$PRETTY" ]]; then
+if [[ "$PRETTY" = "true" ]]; then
 # setup jq filter based on user inputs
 # check for query error; if local, remove hosts; if not dataRate, remove data rate; and normalize measurements
 # Build up the filtering string
-    if [[ -z "$ADD_DETAILS" ]]; then
-        DETAILS="."
-    else
-        DETAILS=". +{details}"
-    fi
+
+#
+# individual pieces jq formatting to add units of measurment for demo displays
+#
+UNITS1=' if .duration >= 1000 then
+             {"Duration(sec)         ": ((.duration / 1000)|.*10+0.5|floor|./10)}
+        else {"Duration(msec)        ": .duration}
+        end
+        + if .totalBytes >= 1099511627776 then
+             {"Total Bytes(TB)       ": ((.totalBytes / 1024 / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
+        elif .totalBytes >= 1073741824 then
+             {"Total Bytes(GB)       ": ((.totalBytes / 1024 / 1024 / 1024)|.*100+0.005|floor|./100)}
+        elif .totalBytes >= 1048576 then
+             {"Total Bytes(MB)       ": ((.totalBytes / 1024 / 1024)|.*100+0.005|floor|./100)}
+        elif .totalBytes >= 1024 then
+             {"Total Bytes(KB)       ": ((.totalBytes / 1024)|.*100+0.005|floor|./100)}
+        else {"Total Bytes           ": .totalBytes}
+        end'
+
+UNITS_DR=' + if .dataRate >= 1024 then
+             {"Data Rate(GB/s)       ": ((.dataRate / 1024)|.*100+0.005|floor|./100)}
+        elif .dataRate < 0.001 then
+             {"Data Rate(KB/s)       ": ((.dataRate * 1024)|.*100+0.005|floor|./100)}
+        else {"Data Rate(MB/s)       ": (.dataRate |.*100+0.005|floor|./100)}
+        end'
+
+UNITS2=' + {"Matches               ": .matches}
+        + if .fabricDataRate >= 1024 then
+             {"Fabric Data Rate(GB/s)": ((.fabricDataRate / 1024)|.*100+0.005|floor|./100)}
+        elif .fabricDataRate < 0.001 then
+             {"Fabric Data Rate(KB/s)": ((.fabricDataRate * 1024)|.*100+0.005|floor|./100)}
+        else {"Fabric Data Rate(MB/s)": .fabricDataRate}
+        end
+        + if .fabricDuration >= 1000 then
+             {"Fabric Duration(sec)  ": ((.fabricDuration / 1000)|.*100+0.005|floor|./100)}
+        else {"Fabric Duration(msec) ": .fabricDuration}
+        end'
+
+UNITS_H=' + {"Host                  ": .host}'
+
+    JQ_STR=". | .message // ( .stats | ${UNITS1} ${UNITS_DR} ${UNITS2} ${UNITS_H} + {details}"
     if [[ ! -z "$HIDE_HOSTNAME" ]]; then
-        if [[ ! -z "$ADD_DRATE" ]]; then
-            # Delete hostname, leave dataRate
-            JQ_STR="${DETAILS} | .message // ( . | del(.host) | ${UNITS1} ${UNITS_DR} ${UNITS2}"
-#            UNITS_DETAILS="${UNITS_1_DET} ${UNITS_DR_DET} ${UNITS_2_DET}"
-        else
-            # Delete hostname and dataRate
-            JQ_STR="${DETAILS} | .message // ( . | del(.dataRate,.host) | ${UNITS1} ${UNITS2}"
-#            UNITS_DETAILS="${UNITS_1_DET} ${UNITS_2_DET}"
-        fi
-    elif [[ -z "$ADD_DRATE" ]]; then
-        JQ_STR="${DETAILS} | .message // ( . | del(.dataRate) | ${UNITS1} ${UNITS2} ${UNITS_H}"
-#        UNITS_DETAILS="${UNITS_H_DET} ${UNITS_1_DET} ${UNITS_2_DET}"
-    else
-        JQ_STR="${DETAILS} | .message // ( . | ${UNITS1} ${UNITS_DR} ${UNITS2} ${UNITS_H}"
-#        UNITS_DETAILS="${UNITS_H_DET} ${UNITS_1_DET} ${UNITS_DR_DET} ${UNITS_2_DET}"
+        JQ_STR="$JQ_STR | del(.[\"Host                  \"])"
     fi
-    if [[ ! -z "$ADD_DETAILS" ]]; then
-        JQ_STR="$JQ_STR | . +{details})"
-    else
-        JQ_STR="${JQ_STR})"
+    if [[ -z "$ADD_DRATE" ]]; then
+        JQ_STR="$JQ_STR | del(.[\"Data Rate(GB/s)       \"],.[\"Data Rate(MB/s)       \"],.[\"Data Rate(KB/s)       \"])"
+        JQ_STR="$JQ_STR | del(.[\"Fabric Data Rate(GB/s)\"],.[\"Fabric Data Rate(MB/s)\"],.[\"Fabric Data Rate(KB/s)\"])"
     fi
+    if [[ -z "$ADD_DETAILS" ]]; then
+        JQ_STR="$JQ_STR | del(.details)"
+    fi
+    JQ_STR="$JQ_STR )"
 fi
 
 # for "dry-run" always use jq .
 if [[ ! -z "$DRYRUN" ]]; then
-    PRETTY=true
+    PRETTY=simple
     JQ_STR="."
 fi
 

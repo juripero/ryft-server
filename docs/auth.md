@@ -30,6 +30,7 @@ There are two special endpoints for JWT authentication:
 - `/login` is used to get JWT token.
 - `/token/refresh` is used to refresh existing token.
 
+
 ## JWT Login
 
 The `/login` endpoint expects `{"username":"login", "password":"password"}` JSON
@@ -141,6 +142,22 @@ To run server use the following command line:
 ```{.sh}
 ryft-server --auth=file --users-file "ryft-users.yaml"
 ```
+
+Since the `0.14.0` version user passwords are replaced with hash function.
+That means that there is no plain text password stored in configuration file:
+
+```{.yaml}
+- username: "admin"
+  passhash: "$2a$10$ewLPM0A4RJq3iUkMR7FbGep0KxV.JgbeMNeJx0cha.zPb1bZpGlRe"
+  roles: ["admin"]
+  home: "/"
+- username: "test"
+  passhash: "$2a$10$tNa9u2ueO2Q4cKiIXCtvWuikwI8lfST04FK6cqTwG5FITIlt7yaC."
+  home: "/test"
+  cluster-tag: "test"
+```
+
+There are special [REST API methods](./rest/user.md) to manage users.
 
 
 # Cluster Mode

@@ -6,6 +6,7 @@ The `ryft-server` supports the following REST API endpoints:
 - [/files](./files.md)
 - [/rename](./rename.md)
 - [/run](./run.md)
+- [/user](./user.md)
 
 The main API endpoints are [/search](./search.md#search)
 and [/count](./search.md#count).
@@ -33,6 +34,12 @@ search uses the following options by default:
 - "$" for the `SYMBOL` option
 - "," for the `SEPARATOR` option
 - "." for the `DECIMAL` option
+
+Since `0.14.0` the [limit] parameter has default value `-1` which means "no limit".
+The `limit=0` means do not report any found records.
+
+Since `0.14.0` the `/count` output format is equal to the `/search` format. To
+access search statistics the `.stats` field should be used.
 
 
 # Aggregation functions

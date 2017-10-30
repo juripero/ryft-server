@@ -198,11 +198,19 @@ func (g *Geo) Add(data interface{}) error {
 
 // merge another intermediate aggregation
 func (g *Geo) Merge(data_ interface{}) error {
-	data, ok := data_.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("no valid data")
+	switch data := data_.(type) {
+	case *Geo:
+		return g.merge(data)
+
+	case map[string]interface{}:
+		return g.mergeMap(data)
 	}
 
+	return fmt.Errorf("no valid data")
+}
+
+// merge another intermediate aggregation (map)
+func (g *Geo) mergeMap(data map[string]interface{}) error {
 	// count is important
 	count, err := utils.AsUint64(data["count"])
 	if err != nil {
@@ -277,7 +285,9 @@ func (g *Geo) Merge(data_ interface{}) error {
 		if err != nil {
 			return err
 		}
+		g.Count += 1 // tricky way to avoid g.Count == 0 check inside updateBounds()
 		g.updateBounds(lat, lon)
+		g.Count -= 1
 	}
 
 	// geo_centroid weighted
@@ -305,6 +315,39 @@ func (g *Geo) Merge(data_ interface{}) error {
 
 	// count
 	g.Count += count
+
+	return nil // OK
+}
+
+// merge another intermediate aggregation (native)
+func (g *Geo) merge(other *Geo) error {
+	if other.Count == 0 {
+		return nil // nothing to merge
+	}
+
+	// geo_bounds
+	if (g.flags & GeoBounds) != 0 {
+		g.updateBounds(other.TopLeft.Lat, other.TopLeft.Lon)
+		g.Count += 1 // tricky way to avoid g.Count == 0 check inside updateBounds()
+		g.updateBounds(other.BottomRight.Lat, other.BottomRight.Lon)
+		g.Count -= 1
+	}
+
+	// geo_centroid weighted
+	if (g.flags & GeoCentroidW) != 0 {
+		g.CentroidSumW.X += other.CentroidSumW.X
+		g.CentroidSumW.Y += other.CentroidSumW.Y
+		g.CentroidSumW.Z += other.CentroidSumW.Z
+	}
+
+	// geo_centroid simple
+	if (g.flags & GeoCentroid) != 0 {
+		g.CentroidSum.Lat += other.CentroidSum.Lat
+		g.CentroidSum.Lon += other.CentroidSum.Lon
+	}
+
+	// count
+	g.Count += other.Count
 
 	return nil // OK
 }

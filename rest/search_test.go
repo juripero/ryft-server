@@ -56,7 +56,9 @@ func TestSearchUsual(t *testing.T) {
 			"failed to parse request parameters")
 
 		check("/search?query=hello", "", TO, http.StatusBadRequest,
-			"no any file or catalog provided")
+			"no file or catalog provided")
+		check(`/search?query=hello&ignore-missing-files=true&stats=true`, "application/json",
+			TO, http.StatusOK, `"stats":{"matches":0,"totalBytes":0`)
 
 		check("/search?query=hello&file=*.txt&format=bad", "application/json", TO,
 			http.StatusBadRequest, "is unsupported format", "failed to get transcoder")
@@ -131,7 +133,7 @@ func TestSearchUsual(t *testing.T) {
 
 	if all {
 		check(`/search?query=hello&file=*.txt&backend-option=--rx-shard-size&backend-option=4M&backend-option=--rx-max-spawns&backend-option=5&backend=ryftx`,
-			"application/json", time.Second, http.StatusOK)
+			"application/json", TO, http.StatusOK)
 	}
 }
 

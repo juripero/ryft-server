@@ -2,9 +2,10 @@
 # Please change the default passwords!
 
 - username: "admin"
-  password: "admin"
+  passhash: "$2a$10$ewLPM0A4RJq3iUkMR7FbGep0KxV.JgbeMNeJx0cha.zPb1bZpGlRe"
+  roles: ["admin"]
   home: "/"
 - username: "test"
-  password: "test"
+  passhash: "$2a$10$tNa9u2ueO2Q4cKiIXCtvWuikwI8lfST04FK6cqTwG5FITIlt7yaC."
   home: "/test"
   cluster-tag: "test"

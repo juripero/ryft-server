@@ -102,15 +102,21 @@ func (task *Task) startProcessing(engine *Engine, res *search.Result) {
 		return // already started
 	}
 
+	// if we need only aggregations, then do nothing here
+	if !task.config.ReportData && !task.config.ReportIndex && task.config.Offset < 0 {
+		return // no need to read data
+	}
+
 	rr := NewResultsReader(task,
 		task.DataFileName, task.IndexFileName,
 		task.ViewFileName, task.config.Delimiter)
 
 	// result reader options
-	rr.Offset = uint64(task.config.Offset) // start from this record
-	rr.Limit = uint64(task.config.Limit)   // limit the total number of records
-	rr.ReadData = task.config.ReportData   // if `false` only indexes will be reported
-	rr.MakeView = !task.isShow             // if /show do not create VIEW file, just use it
+	rr.Offset = task.config.Offset       // start from this record
+	rr.Limit = task.config.Limit         // limit the total number of records
+	rr.ReadData = task.config.ReportData // if `false` only indexes will be reported
+	rr.MakeView = !task.isShow           // if /show do not create VIEW file, just use it
+	rr.CheckJsonArray = task.config.IsRecord
 
 	// report filepath relative to home and update index's host
 	rr.RelativeToHome = filepath.Join(engine.MountPoint, engine.HomeDir)

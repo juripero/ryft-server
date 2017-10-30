@@ -43,7 +43,7 @@ Just pass `--local-only` command line argument:
 ./ryft-server --local-only
 ```
 
-There is also no any load balancing enabled in local mode.
+There is also no load balancing enabled in local mode.
 
 
 ## Logging
@@ -197,6 +197,7 @@ debug-mode: false
 keep-results: false
 busyness-tolerance: 0
 http-timeout: 1h
+processing-threads: 8
 ```
 
 `local-only` is used to run `ryft-server` outside cluster. No consult dependency,
@@ -214,6 +215,10 @@ It's equivalent to `--busyness-tolerance` command line option.
 
 `http-timeout` is used as read request/write response timeout for HTTP/HTTPS connections.
 It's `1h` (one hour) by default.
+
+`processing-threads` is the number of parallel threads used to handle all requests.
+If zero the default system value is used. This value is used internally by Go runtime.
+See [GOMAXPROCS](https://golang.org/pkg/runtime/#GOMAXPROCS) for more details.
 
 
 #### TLS server configuration
@@ -524,5 +529,5 @@ It works with replace but not merge strategy because otherwise it would be impos
 Example:
 
     ryftprim-opts: ["-v"]
-    ryftx-opts: ["--rx-shard-size", "64M", "--rx-max-spawns", "14"]
+    ryftx-opts: ["--rx-shard-size", "64M", "--rx-max-spawns", "14"]
 

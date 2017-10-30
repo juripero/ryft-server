@@ -51,8 +51,8 @@ type Config struct {
 	Dist   uint     // fuzziness distance (FHS, FEDS)
 	Reduce bool     // reduce for FEDS
 	Nodes  uint     // number of hardware nodes to use (0..4)
-	Limit  uint     // limit the number of records (0 - no limit)
-	Offset uint     // first record index (/show feature)
+	Limit  int64    // limit the number of records (-1 - no limit)
+	Offset int64    // first record index (/show feature)
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
@@ -73,26 +73,38 @@ type Config struct {
 	// processing control
 	ReportIndex bool // if false, no processing enabled at all (/count)
 	ReportData  bool // if false, just indexes will be read (format=null)
+	IsRecord    bool // if true, then the record search is used
+	SkipMissing bool // if true, do not run ryftprim on empty fileset, just report zero statistics
 
 	// upload/search share mode
 	ShareMode utils.ShareMode
 
-	// backend tool, autoselect if empty
-	// should be "ryftprim" or "ryftx"
-	BackendTool string
+	Backend struct {
+		// backend tool, autoselect if empty
+		// should be "ryftprim" or "ryftx" or "ryftpcre2"
+		Tool string
 
-	// additional backend options
-	// addeded to the end of args
-	BackendOpts []string
+		// additional backend options
+		// addeded to the end of args
+		Opts []string
+
+		// Backend mode e.g. default, high-performance, etc.
+		// (see corresponding configuration section)
+		Mode string
+	}
 
 	// report performance metrics
 	Performance bool
+
+	// report debug internal info
+	DebugInternals bool
 }
 
 // NewEmptyConfig creates new empty search configuration.
 func NewEmptyConfig() *Config {
 	cfg := new(Config)
 	cfg.Case = true // by default
+	cfg.Limit = -1  // no limit
 	return cfg
 }
 
@@ -102,6 +114,7 @@ func NewConfig(query string, files ...string) *Config {
 	cfg.Query = query
 	cfg.Files = files
 	cfg.Case = true
+	cfg.Limit = -1 // no limit
 	return cfg
 }
 
@@ -165,7 +178,7 @@ func (cfg Config) String() string {
 	}
 
 	// limit
-	if cfg.Limit != 0 {
+	if cfg.Limit >= 0 {
 		props = append(props, fmt.Sprintf("limit:%d", cfg.Limit))
 	}
 
@@ -200,13 +213,18 @@ func (cfg Config) String() string {
 	}
 
 	// backend
-	if len(cfg.BackendTool) != 0 {
-		props = append(props, fmt.Sprintf("backend:%q", cfg.BackendTool))
+	if len(cfg.Backend.Tool) != 0 {
+		props = append(props, fmt.Sprintf("backend:%q", cfg.Backend.Tool))
 	}
 
 	// backend-options
-	if len(cfg.BackendOpts) != 0 {
-		props = append(props, fmt.Sprintf("backend-options:%q", cfg.BackendOpts))
+	if len(cfg.Backend.Opts) != 0 {
+		props = append(props, fmt.Sprintf("backend-options:%q", cfg.Backend.Opts))
+	}
+
+	// backend-mode
+	if len(cfg.Backend.Mode) != 0 {
+		props = append(props, fmt.Sprintf("backend-mode:%q", cfg.Backend.Mode))
 	}
 
 	// flags
@@ -217,7 +235,13 @@ func (cfg Config) String() string {
 		props = append(props, "D")
 	}
 	if cfg.Performance {
-		props = append(props, "P")
+		props = append(props, "perf")
+	}
+	if cfg.IsRecord {
+		props = append(props, "is-record")
+	}
+	if cfg.SkipMissing {
+		props = append(props, "skip-missing")
 	}
 
 	return fmt.Sprintf("Config{%s}", strings.Join(props, ", "))

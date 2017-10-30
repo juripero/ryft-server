@@ -39,7 +39,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	json_codec "github.com/getryft/ryft-server/rest/codec/json"
 	codec "github.com/getryft/ryft-server/rest/codec/msgpack.v1"
 	format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
@@ -49,6 +48,11 @@ import (
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
 	url := engine.prepareSearchUrl(cfg)
+	if cfg.ReportIndex {
+		url.Path += "/search"
+	} else {
+		url.Path += "/count"
+	}
 
 	// prepare request's body (aggregations, etc...)
 	bodyData := make(map[string]interface{})
@@ -72,13 +76,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return nil, fmt.Errorf("failed to create request: %s", err)
 	}
 
-	if cfg.ReportIndex {
-		// we expect MSGPACK format for streaming
-		req.Header.Set("Accept", codec.MIME)
-	} else {
-		// we expect JSON format, no streaming required
-		req.Header.Set("Accept", json_codec.MIME)
-	}
+	// we expect MSGPACK format for streaming (for /search and /count)
+	req.Header.Set("Accept", codec.MIME)
 
 	// authorization
 	if len(engine.AuthToken) != 0 {
@@ -86,11 +85,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	res := search.NewResult()
-	if cfg.ReportIndex {
-		go engine.doSearch(task, req, res)
-	} else {
-		go engine.doCount(task, req, res)
-	}
+	go engine.doSearch(task, req, res)
 
 	return res, nil // OK for now
 }
@@ -99,11 +94,29 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
 	url := engine.prepareSearchUrl(cfg)
-	url.Path += "/show" // should be /search/show!
+	if cfg.Offset >= 0 {
+		url.Path += "/search/show"
+	} else {
+		url.Path += "/search/aggs"
+	}
+
+	// prepare request's body (aggregations, etc...)
+	bodyData := make(map[string]interface{})
+	if cfg.Aggregations != nil {
+		bodyData["aggs"] = cfg.Aggregations.GetOpts()
+	}
+	var bodyRd io.Reader
+	if len(bodyData) != 0 {
+		if body, err := json.Marshal(bodyData); err != nil {
+			return nil, fmt.Errorf("failed to prepare request body: %s", err)
+		} else {
+			bodyRd = bytes.NewReader(body)
+		}
+	}
 
 	// prepare request
 	task.log().WithField("url", url.String()).Infof("[%s]: sending GET", TAG)
-	req, err := http.NewRequest("GET", url.String(), nil)
+	req, err := http.NewRequest("GET", url.String(), bodyRd)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to create request", TAG)
 		return nil, fmt.Errorf("failed to create request: %s", err)
@@ -152,8 +165,9 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 
 	// check status code
 	if resp.StatusCode != http.StatusOK {
-		task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid response status", TAG)
-		res.ReportError(fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status))
+		message := getOptionalErrorMessage(resp.Body)
+		task.log().WithField("status", resp.Status).Warnf("[%s]: invalid response status: %s", TAG, message)
+		res.ReportError(fmt.Errorf("invalid response status: %s (%s)", resp.Status, message))
 		return // failed (not 200)
 	}
 
@@ -252,8 +266,8 @@ func (engine *Engine) doSearch(task *Task, req *http.Request, res *search.Result
 	}
 }
 
-// do /count processing
-func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result) {
+// do /count processing [COMPATIBILITY, NOT USED YET]
+func (engine *Engine) doCount0(task *Task, req *http.Request, res *search.Result) {
 	// some futher cleanup
 	defer func() {
 		res.ReportUnhandledPanic(log)
@@ -280,8 +294,9 @@ func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result)
 	defer resp.Body.Close() // close it later
 
 	if resp.StatusCode != http.StatusOK {
-		task.log().WithField("status", resp.StatusCode).Warnf("[%s]: invalid response status", TAG)
-		res.ReportError(fmt.Errorf("invalid response status: %d (%s)", resp.StatusCode, resp.Status))
+		message := getOptionalErrorMessage(resp.Body)
+		task.log().WithField("status", resp.Status).Warnf("[%s]: invalid response status: %s", TAG, message)
+		res.ReportError(fmt.Errorf("invalid response status: %s (%s)", resp.Status, message))
 		return // failed (not 200)
 	}
 
@@ -329,4 +344,20 @@ func (engine *Engine) doCount(task *Task, req *http.Request, res *search.Result)
 	res.Stat = format.ToStat(&stat)
 	task.log().WithField("stat", res.Stat).
 		Infof("[%s]: statistics received", TAG)
+}
+
+// get optional error message from HTTP response
+func getOptionalErrorMessage(r io.Reader) string {
+	dec := json.NewDecoder(r)
+
+	var resp map[string]interface{}
+	if err := dec.Decode(&resp); err == nil {
+		if msg, ok := resp["message"]; ok {
+			if str, ok := msg.(string); ok {
+				return str
+			}
+		}
+	}
+
+	return "" // no message
 }
