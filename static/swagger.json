@@ -25,6 +25,8 @@
           { "$ref": "#/parameters/SearchReduce" },
           { "$ref": "#/parameters/SearchFields" },
           { "$ref": "#/parameters/SearchBackend" },
+          { "$ref": "#/parameters/SearchBackendMode" },
+          { "$ref": "#/parameters/SearchBackendOption" },
           { "$ref": "#/parameters/SaveData" },
           { "$ref": "#/parameters/SaveIndex" },
           { "$ref": "#/parameters/SaveView" },
@@ -91,6 +93,8 @@
           { "$ref": "#/parameters/SearchCase" },
           { "$ref": "#/parameters/SearchReduce" },
           { "$ref": "#/parameters/SearchBackend" },
+          { "$ref": "#/parameters/SearchBackendMode" },
+          { "$ref": "#/parameters/SearchBackendOption" },
           { "$ref": "#/parameters/SaveData" },
           { "$ref": "#/parameters/SaveIndex" },
           { "$ref": "#/parameters/SaveView" },
@@ -688,6 +692,20 @@
       "description": "Optional backend tool to run search.",
       "enum": [ "ryftprim", "ryftx", "ryftpcre2" ]
     },
+    "SearchBackendMode": {
+      "in": "query",
+      "type": "string",
+      "name": "backend-mode",
+      "description": "Backend mode (default, high-performance, etc)."
+    },
+    "SearchBackendOption":{
+      "in": "query",
+      "type": "array",
+      "name": "backend-option",
+      "description": "Optional list of backend options",
+      "items": { "type": "string" },
+      "collectionFormat": "multi"
+    },
     "UseSession": {
       "in": "query",
       "name": "session",
@@ -935,6 +953,10 @@
             "aggregations": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "debug": {
+              "type": "object",
+              "additionalProperties": {}
             }
           }
         }
@@ -1130,6 +1152,8 @@
         "reduce": { "$ref": "#/parameters/SearchReduce" },
         "fields": { "$ref": "#/parameters/SearchFields" },
         "backend": { "$ref": "#/parameters/SearchBackend" },
+        "backend-mode": { "$ref": "#/parameters/SearchBackendMode" },
+        "backend-option": { "$ref": "#/parameters/SearchBackendOption" },
         "data": { "$ref": "#/parameters/SaveData" },
         "index": { "$ref": "#/parameters/SaveIndex" },
         "view": { "$ref": "#/parameters/SaveView" },
@@ -1160,6 +1184,8 @@
         "cs": { "$ref": "#/parameters/SearchCase" },
         "reduce": { "$ref": "#/parameters/SearchReduce" },
         "backend": { "$ref": "#/parameters/SearchBackend" },
+        "backend-mode": { "$ref": "#/parameters/SearchBackendMode" },
+        "backend-option": { "$ref": "#/parameters/SearchBackendOption" },
         "data": { "$ref": "#/parameters/SaveData" },
         "index": { "$ref": "#/parameters/SaveIndex" },
         "view": { "$ref": "#/parameters/SaveView" },

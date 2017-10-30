@@ -122,11 +122,14 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 		q.Set("--internal-format", cfg.DataFormat)
 	}
 
-	if len(cfg.BackendTool) != 0 {
-		q.Set("backend", cfg.BackendTool)
+	if len(cfg.Backend.Tool) != 0 {
+		q.Set("backend", cfg.Backend.Tool)
 	}
-	for _, opt := range cfg.BackendOpts {
+	for _, opt := range cfg.Backend.Opts {
 		q.Add("backend-option", opt)
+	}
+	if len(cfg.Backend.Mode) != 0 {
+		q.Set("backend-mode", cfg.Backend.Mode)
 	}
 	if len(cfg.KeepDataAs) != 0 {
 		q.Set("data", cfg.KeepDataAs)

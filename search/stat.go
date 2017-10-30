@@ -178,9 +178,10 @@ const (
 	ExtraPerformance  = "performance"
 	ExtraSessionData  = "session-data"
 	ExtraAggregations = "aggregations"
+	ExtraDebug        = "debug"
 )
 
-// AddPerfStat ands extra performance metrics.
+// AddPerfStat adds extra performance metrics.
 func (stat *Stat) AddPerfStat(name string, data interface{}) {
 	if perf_, ok := stat.Extra[ExtraPerformance]; ok {
 		if perf, ok := perf_.(map[string]interface{}); ok {
@@ -202,7 +203,7 @@ func (stat *Stat) GetAllPerfStat() interface{} {
 	return stat.Extra[ExtraPerformance]
 }
 
-// AddSessionData ands extra session data.
+// AddSessionData adds extra session data.
 func (stat *Stat) AddSessionData(name string, data interface{}) {
 	if sd_, ok := stat.Extra[ExtraSessionData]; ok {
 		if sd, ok := sd_.(map[string]interface{}); ok {
@@ -229,4 +230,16 @@ func (stat *Stat) ClearSessionData(clearDetails bool) {
 // GetSessionData gets all session data.
 func (stat *Stat) GetSessionData() interface{} {
 	return stat.Extra[ExtraSessionData]
+}
+
+// AddDebugData adds extra debug data.
+func (stat *Stat) AddDebugData(name string, data interface{}) {
+	if debugData_, ok := stat.Extra[ExtraDebug]; ok {
+		if debugData, ok := debugData_.(map[string]interface{}); ok {
+			debugData[name] = data
+		}
+	} else {
+		// put new item
+		stat.Extra[ExtraDebug] = map[string]interface{}{name: data}
+	}
 }

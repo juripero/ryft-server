@@ -65,30 +65,31 @@ func (engine *Engine) prepare(task *Task) error {
 	// select search mode
 	genericMode := false
 	switch strings.ToLower(cfg.Mode) {
-	case "", "g", "generic", "g/es", "g/fhs", "g/feds", "g/ds",
-		"g/ts", "g/ns", "g/cs", "g/ipv4", "g/ipv6", "g/pcre2":
+	case "", "g", "g/es",
+		"g/fhs", "g/feds", "g/ds", "g/ts",
+		"g/ns", "g/cs", "g/ipv4", "g/ipv6", "g/pcre2":
 		args = append(args, "-p", "g")
 		genericMode = true
-	case "es", "exact", "exact_search":
+	case "es":
 		args = append(args, "-p", "es")
-	case "fhs", "hamming", "fuzzy_hamming", "fuzzy_hamming_search":
+	case "fhs":
 		args = append(args, "-p", "fhs")
-	case "feds", "edit_distance", "fuzzy_edit_distance", "fuzzy_edit_distance_search":
+	case "feds":
 		args = append(args, "-p", "feds")
-	case "ds", "date", "date_search":
+	case "ds":
 		args = append(args, "-p", "ds")
-	case "ts", "time", "time_search":
+	case "ts":
 		args = append(args, "-p", "ts")
-	case "ns", "num", "number_search":
+	case "ns":
 		args = append(args, "-p", "ns")
-	case "cs", "currency", "currency_search":
+	case "cs":
 		// currency is a kind of numeric search!
 		args = append(args, "-p", "ns")
-	case "ipv4", "ipv4_search":
+	case "ipv4":
 		args = append(args, "-p", "ipv4")
-	case "ipv6", "ipv6_search":
+	case "ipv6":
 		args = append(args, "-p", "ipv6")
-	case "pcre2", "pcre2_search", "regex", "regex_search", "regexp", "regexp_search":
+	case "pcre2":
 		args = append(args, "-p", "pcre2")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
@@ -242,13 +243,12 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	// backend options (should be added to the END)
 	// define them here because need to know which engine will be used
 	var backendOpts []string
-	if len(task.config.BackendOpts) > 0 { // options from request
-		backendOpts = task.config.BackendOpts
+	if len(task.config.Backend.Opts) > 0 { // options from request
+		backendOpts = task.config.Backend.Opts
 	} else if len(engineOpts) > 0 { // engine default options
 		backendOpts = engineOpts
-	} else {
-		backendOpts = engine.RyftAllOpts // default options for all engines
 	}
+
 	// assign command line
 	task.toolArgs = append(task.toolArgs, backendOpts...)
 
@@ -419,6 +419,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
 			err = fmt.Errorf("failed to parse statistics: %s", err)
 		} else {
+			if task.config.DebugInternals {
+				res.Stat.AddDebugData("tool", task.toolPath)
+				res.Stat.AddDebugData("args", task.toolArgs)
+			}
 			task.log().WithField("stat", res.Stat).
 				Infof("[%s]: parsed statistics", TAG)
 		}

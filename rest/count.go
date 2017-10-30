@@ -68,6 +68,7 @@ type CountParams struct {
 
 	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
 	BackendOpts []string `form:"backend-option" json:"backend-options,omitempty" msgpack:"backend-options,omitempty"` // search engine parameters (useless without "backend")
+	BackendMode string   `form:"backend-mode" json:"backend-mode,omitempty" msgpack:"backend-mode,omitempty"`
 	KeepDataAs  string   `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string   `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	KeepViewAs  string   `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
@@ -156,14 +157,16 @@ func (server *Server) DoCount0(ctx *gin.Context) {
 
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
+	cfg.DebugInternals = server.Config.DebugInternals
 	cfg.Mode = params.Mode
 	cfg.Width = mustParseWidth(params.Width)
 	cfg.Dist = uint(params.Dist)
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.BackendTool = params.Backend
-	cfg.BackendOpts = params.BackendOpts
+	cfg.Backend.Tool = params.Backend
+	cfg.Backend.Opts = params.BackendOpts
+	cfg.Backend.Mode = params.BackendMode
 	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
@@ -384,7 +387,9 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.BackendTool = params.Backend
+	cfg.Backend.Tool = params.Backend
+	cfg.Backend.Opts = params.BackendOpts
+	cfg.Backend.Mode = params.BackendMode
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 	cfg.KeepViewAs = params.KeepViewAs

@@ -43,66 +43,67 @@ import (
 
 // getExecPath get backend path (ryftprim, ryftx or pcre2) and its options
 func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) {
-	// if backend tool is specified use it
-	switch strings.ToLower(cfg.BackendTool) {
-	case "ryftprim", "prim", "1":
-		return engine.RyftprimExec, engine.RyftprimOpts, nil
-
-	case "ryftx", "x":
-		return engine.RyftxExec, engine.RyftxOpts, nil
-
-	case "pcre2", "regexp", "regex", "re":
-		return engine.Ryftpcre2Exec, engine.Ryftpcre2Opts, nil
-
-	case "":
-		break // auto-select, see below
-
-	default:
-		return "", nil, fmt.Errorf("%q is unknown backend tool", cfg.BackendTool)
+	// search primitive (check aliases)
+	prim := strings.ToLower(cfg.Mode)
+	switch prim {
+	case "g/es", "es":
+		prim = "es"
+	case "g/fhs", "fhs":
+		prim = "fhs"
+	case "g/feds", "feds":
+		prim = "feds"
+	case "g/ds", "ds":
+		prim = "ds"
+	case "g/ts", "ts":
+		prim = "ts"
+	case "g/ns", "ns":
+		prim = "ns"
+	case "g/cs", "cs":
+		prim = "cs"
+	case "g/ipv4", "ipv4":
+		prim = "ipv4"
+	case "g/ipv6", "ipv6":
+		prim = "ipv6"
+	case "g/pcre2", "pcre2":
+		prim = "pcre2"
 	}
 
-	// if both tools are provided
-	if engine.RyftprimExec != "" && engine.RyftxExec != "" {
-
-		// select backend based on search type
-		switch strings.ToLower(cfg.Mode) {
-		case "g/es", "es":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ds", "ds":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ts", "ts":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ns", "ns":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/cs", "cs":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ipv4", "ipv4":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-		case "g/ipv6", "ipv6":
-			return engine.RyftxExec, engine.RyftxOpts, nil
-
-		case "g/fhs", "fhs":
-			if cfg.Dist > 1 {
-				return engine.RyftprimExec, engine.RyftprimOpts, nil
-			} else {
-				return engine.RyftxExec, engine.RyftxOpts, nil
+	// backend tool (with aliases)
+	var tool string
+	if cfg.Backend.Tool == "" {
+		// auto-selection
+		if engine.RyftprimExec != "" && engine.RyftxExec != "" {
+			// if both tools are configured
+			// check the routing table by search primitive
+			tool = engine.Tweaks.GetBackendTool(prim)
+			if tool == "" {
+				tool = "ryftprim" // fallback
 			}
-
-		case "g/feds", "feds":
-			return engine.RyftprimExec, engine.RyftprimOpts, nil
-
-		case "g/pcre2", "pcre2":
-			return engine.Ryftpcre2Exec, engine.Ryftpcre2Opts, nil
+		} else if engine.RyftprimExec != "" {
+			tool = "ryftprim"
+		} else if engine.RyftxExec != "" {
+			tool = "ryftx"
 		}
-
-		return engine.RyftprimExec, engine.RyftprimOpts, nil // use ryftprim as fallback
-	} else if engine.RyftprimExec != "" {
-		return engine.RyftprimExec, engine.RyftprimOpts, nil
-	} else if engine.RyftxExec != "" {
-		return engine.RyftxExec, engine.RyftxOpts, nil
+	} else {
+		// use provided backend tool
+		tool = cfg.Backend.Tool
 	}
 
-	return "", nil, fmt.Errorf("no backend found") // should be impossible
+	// get tool path (check aliases)
+	var path string
+	switch strings.ToLower(tool) {
+	case "1", "prim", "ryftprim":
+		path, tool = engine.RyftprimExec, "ryftprim"
+	case "x", "ryftx":
+		path, tool = engine.RyftxExec, "ryftx"
+	case "re", "regex", "regexp", "pcre2", "ryftpcre2":
+		path, tool = engine.Ryftpcre2Exec, "ryftpcre2"
+	default:
+		return "", nil, fmt.Errorf(`"%s" is unknown backend tool`, tool)
+	}
+
+	opts := engine.Tweaks.GetOptions(cfg.Backend.Mode, tool, prim)
+	return path, opts, nil // OK
 }
 
 // Options gets all engine options.
@@ -127,66 +128,31 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["keep-files"] = engine.KeepResultFiles
 	opts["minimize-latency"] = engine.MinimizeLatency
 	opts["index-host"] = engine.IndexHost
-	opts["ryftx-opts"] = engine.RyftxOpts
-	opts["ryftprim-opts"] = engine.RyftprimOpts
-	opts["ryftpcre2-opts"] = engine.Ryftpcre2Opts
-	opts["ryft-all-opts"] = engine.RyftAllOpts
+
+	btweaks := make(map[string]interface{})
+	if len(engine.Tweaks.Options) != 0 {
+		btweaks["options"] = engine.Tweaks.Options
+	}
+	if len(engine.Tweaks.Router) != 0 {
+		btweaks["router"] = engine.Tweaks.Router
+	}
+	if len(btweaks) != 0 {
+		opts["backend-tweaks"] = btweaks
+	}
+
 	return opts
 }
 
 // update engine options.
 func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	engine.options = opts // base
+
 	// instance name
 	if v, ok := opts["instance-name"]; ok {
 		engine.Instance, err = utils.AsString(v)
 		if err != nil {
 			return fmt.Errorf(`failed to parse "instance-name": %s`, err)
 		}
-	}
-
-	// default options for all engines
-	if v, ok := opts["ryft-all-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryft-all-opts" with error: %s`, err)
-		} else {
-			engine.RyftAllOpts = vv
-		}
-	} else {
-		engine.RyftAllOpts = []string{}
-	}
-
-	// `ryftprim` options
-	if v, ok := opts["ryftprim-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftprim-opts" with error: %s`, err)
-		} else {
-			engine.RyftprimOpts = vv
-		}
-	} else {
-		engine.RyftprimOpts = []string{}
-	}
-
-	// `ryftx` options
-	if v, ok := opts["ryftx-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftx-opts" with error: %s`, err)
-		} else {
-			engine.RyftxOpts = vv
-		}
-	} else {
-		engine.RyftxOpts = []string{}
-	}
-
-	// `ryftpcre2` options
-	if v, ok := opts["ryftpcre2-opts"]; ok {
-		if vv, err := utils.AsStringSlice(v); err != nil {
-			return fmt.Errorf(`failed to parse "ryftpcre2-opts" with error: %s`, err)
-		} else {
-			engine.Ryftpcre2Opts = vv
-		}
-	} else {
-		engine.Ryftpcre2Opts = []string{}
 	}
 
 	// `ryftprim` executable path
@@ -371,6 +337,12 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		if err != nil {
 			return fmt.Errorf(`failed to parse "index-host" option: %s`, err)
 		}
+	}
+
+	// backend-tweaks
+	engine.Tweaks, err = ParseTweaks(opts)
+	if err != nil {
+		return fmt.Errorf(`failed to parse "backend-tweaks" options: %s`, err)
 	}
 
 	return nil // OK

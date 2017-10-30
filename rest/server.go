@@ -161,6 +161,9 @@ type ServerConfig struct {
 	} `yaml:"docker,omitempty"`
 
 	DefaultUserConfig map[string]interface{} `yaml:"default-user-config"`
+
+	// expose debug info in REST API response
+	DebugInternals bool `yaml:"debug-internals"`
 }
 
 // Server instance
