@@ -93,11 +93,16 @@ type Config struct {
 		Mode string
 	}
 
+	// fine tune options
+	Tweaks struct {
+		Format map[string]interface{} // format specific options (column names for CSV, etc)
+	}
+
 	// report performance metrics
 	Performance bool
 
 	// report debug internal info
-	DebugInternals bool
+	DebugInternals bool // TODO: move to Tweaks
 }
 
 // NewEmptyConfig creates new empty search configuration.

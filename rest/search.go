@@ -85,7 +85,8 @@ type SearchParams struct {
 
 	// tweaks
 	Tweaks struct {
-		Cluster []interface{} `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
+		Format  map[string]interface{} `json:"format,omitempty" msgpack:"format,omitempty"`
+		Cluster []interface{}          `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
 	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
@@ -149,12 +150,10 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	}
 
 	// setting up transcoder to convert raw data
-	// XML and JSON support additional fields filtration
-	var tcode format.Format
-	tcode_opts := map[string]interface{}{
-		"fields": params.Fields,
-	}
-	if tcode, err = format.New(params.Format, tcode_opts); err != nil {
+	// CSV, XML and JSON support additional fields filtration
+	tcode_opts := getFormatOptions(params.Tweaks.Format, params.Fields)
+	tcode, err := format.New(params.Format, tcode_opts)
+	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to get transcoder"))
 	}
@@ -229,6 +228,7 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	} else {
 		cfg.DataFormat = params.Format
 	}
+	cfg.Tweaks.Format = tcode_opts
 
 	// get search engine
 	var engine search.Engine
@@ -519,6 +519,17 @@ func parseNameAndArgs(s string) (string, []string, error) {
 	}
 
 	return "", nil, fmt.Errorf("no script name found")
+}
+
+// get format options: combine tweaks and "fields"
+func getFormatOptions(tweaks map[string]interface{}, fields string) map[string]interface{} {
+	res := mapClone(tweaks)
+
+	if fields != "" {
+		res["fields"] = fields
+	}
+
+	return res
 }
 
 // update Session token based on provided session data
