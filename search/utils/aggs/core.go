@@ -83,8 +83,14 @@ func (a *Aggregations) GetOpts() map[string]interface{} {
 
 // Clone clones the aggregation engines and functions
 func (a *Aggregations) Clone() search.Aggregations {
+	if a == nil {
+		return nil // nothing to clone
+	}
+
 	n := &Aggregations{
 		parseRawData: a.parseRawData,
+		functions:    make(map[string]Function),
+		engines:      make(map[string]Engine),
 		options:      a.options,
 	}
 
@@ -111,6 +117,9 @@ func (a *Aggregations) Clone() search.Aggregations {
 // otherwise the all engines are reported (cluster mode).
 func (a *Aggregations) ToJson(final bool) interface{} {
 	res := make(map[string]interface{})
+	if a == nil {
+		return res // empty
+	}
 
 	if final {
 		for name, f := range a.functions {
@@ -127,6 +136,10 @@ func (a *Aggregations) ToJson(final bool) interface{} {
 
 // Add adds new DATA record to all engines
 func (a *Aggregations) Add(rawData []byte) error {
+	if a == nil {
+		return nil // nothing to do
+	}
+
 	// first prepare data to process
 	data, err := a.parseRawData(rawData)
 	if err != nil {
@@ -177,20 +190,11 @@ func getStringOpt(name string, opts map[string]interface{}) (string, error) {
 }
 
 // get field option
-func getFieldOpt(name string, opts map[string]interface{}, objectToArray []string) (utils.Field, error) {
+func getFieldOpt(name string, opts map[string]interface{}, iNames []string) (utils.Field, error) {
 	if field, err := getStringOpt(name, opts); err != nil {
 		return nil, err
 	} else {
-		return utils.ParseFieldEx(field, objectToArray, nil)
-	}
-}
-
-// parse field, panic in case of error
-func mustParseField(field string) utils.Field {
-	if f, err := utils.ParseField(field); err != nil {
-		panic(err)
-	} else {
-		return f
+		return utils.ParseFieldEx(field, iNames, nil)
 	}
 }
 
@@ -202,7 +206,7 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		options:   params,
 	}
 
-	var strToInt []string // for CSV data
+	var strToIdx []string // for CSV data
 
 	// format
 	switch format {
@@ -218,10 +222,10 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 
 	case "csv":
 		csvFmt, err := csv.New(formatOpts)
-		strToInt = csvFmt.Columns
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare CSV format")
 		}
+		strToIdx = csvFmt.Columns
 		a.parseRawData = func(raw []byte) (interface{}, error) {
 			return csvFmt.ParseRaw(raw)
 		}
@@ -253,7 +257,7 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 			}
 
 			// parse and add function and corresponding engine
-			if err := a.addFunc(name, t, opts, strToInt); err != nil {
+			if err := a.addFunc(name, t, opts, strToIdx); err != nil {
 				return nil, err
 			}
 		}
@@ -267,8 +271,8 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 }
 
 // add aggregation function
-func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interface{}, fieldObjectToArray []string) error {
-	f, e, err := newFunc(aggType, opts, fieldObjectToArray)
+func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interface{}, iNames []string) error {
+	f, e, err := newFunc(aggType, opts, iNames)
 	if err != nil {
 		return err
 	}
@@ -288,66 +292,66 @@ func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interfac
 }
 
 // factory method: creates aggregation function and corresponding engine
-func newFunc(aggType string, opts map[string]interface{}, fieldObjectToArray []string) (Function, Engine, error) {
+func newFunc(aggType string, opts map[string]interface{}, iNames []string) (Function, Engine, error) {
 	switch aggType {
 	case "sum":
-		if f, err := newSumFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newSumFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "min":
-		if f, err := newMinFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newMinFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "max":
-		if f, err := newMaxFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newMaxFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "value_count", "count":
-		if f, err := newCountFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newCountFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "average", "avg":
-		if f, err := newAvgFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newAvgFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "stats":
-		if f, err := newStatsFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newStatsFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "extended_stats", "extended-stats", "e-stats":
-		if f, err := newExtendedStatsFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newExtendedStatsFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "geo_bounds", "geo-bounds":
-		if f, err := newGeoBoundsFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newGeoBoundsFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "geo_centroid", "geo-centroid":
-		if f, err := newGeoCentroidFunc(opts, fieldObjectToArray); err == nil {
+		if f, err := newGeoCentroidFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed

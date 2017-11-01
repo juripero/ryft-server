@@ -464,8 +464,8 @@ func (g *Geo) getCentroid() Point {
 }
 
 // parse "wrap_longitude" in additional to other Geo options
-func parseGeoBoundsOpts(opts map[string]interface{}, fieldObjectToArray []string) (field, lat, lon utils.Field, wrapLon bool, err error) {
-	field, lat, lon, err = parseGeoOpts(opts, fieldObjectToArray)
+func parseGeoBoundsOpts(opts map[string]interface{}, iNames []string) (field, lat, lon utils.Field, wrapLon bool, err error) {
+	field, lat, lon, err = parseGeoOpts(opts, iNames)
 	if err != nil {
 		return
 	}
@@ -478,16 +478,16 @@ func parseGeoBoundsOpts(opts map[string]interface{}, fieldObjectToArray []string
 }
 
 // parse "field" or "lat"/"lon" fields
-func parseGeoOpts(opts map[string]interface{}, fieldObjectToArray []string) (field, lat, lon utils.Field, err error) {
+func parseGeoOpts(opts map[string]interface{}, iNames []string) (field, lat, lon utils.Field, err error) {
 	if _, ok := opts["field"]; ok {
-		field, err = getFieldOpt("field", opts, fieldObjectToArray)
+		field, err = getFieldOpt("field", opts, iNames)
 	} else {
 		// fallback to "lat" and "lon" fields
-		lat, err = getFieldOpt("lat", opts, fieldObjectToArray)
+		lat, err = getFieldOpt("lat", opts, iNames)
 		if err != nil {
 			return
 		}
-		lon, err = getFieldOpt("lon", opts, fieldObjectToArray)
+		lon, err = getFieldOpt("lon", opts, iNames)
 		if err != nil {
 			return
 		}
@@ -521,8 +521,8 @@ func (f *geoBoundsFunc) clone() (Function, Engine) {
 }
 
 // make new "geo_bounds" aggregation
-func newGeoBoundsFunc(opts map[string]interface{}, fieldObjectToArray []string) (*geoBoundsFunc, error) {
-	field, lat, lon, wrapLon, err := parseGeoBoundsOpts(opts, fieldObjectToArray)
+func newGeoBoundsFunc(opts map[string]interface{}, iNames []string) (*geoBoundsFunc, error) {
+	field, lat, lon, wrapLon, err := parseGeoBoundsOpts(opts, iNames)
 	if err != nil {
 		return nil, err
 	}
@@ -576,8 +576,8 @@ func (f *geoCentroidFunc) clone() (Function, Engine) {
 }
 
 // make new "geo_centroid" aggregation
-func newGeoCentroidFunc(opts map[string]interface{}, fieldObjectToArray []string) (*geoCentroidFunc, error) {
-	if field, lat, lon, err := parseGeoOpts(opts, fieldObjectToArray); err != nil {
+func newGeoCentroidFunc(opts map[string]interface{}, iNames []string) (*geoCentroidFunc, error) {
+	if field, lat, lon, err := parseGeoOpts(opts, iNames); err != nil {
 		return nil, err
 	} else {
 		weighted := false // by default
