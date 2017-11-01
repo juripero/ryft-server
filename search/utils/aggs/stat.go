@@ -59,6 +59,12 @@ type Stat struct {
 	Max   float64 `json:"max" msgpack:"max"`     // maximum value
 }
 
+// clone the engine
+func (s *Stat) clone() *Stat {
+	n := *s
+	return &n
+}
+
 // get engine name/identifier
 func (s *Stat) Name() string {
 	if s.Missing != nil {
@@ -258,6 +264,13 @@ type sumFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *sumFunc) clone() (Function, Engine) {
+	n := &sumFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "sum" aggregation
 func newSumFunc(opts map[string]interface{}) (*sumFunc, error) {
 	if field, err := getFieldOpt("field", opts); err != nil {
@@ -283,6 +296,13 @@ func (f *sumFunc) ToJson() interface{} {
 // "min" aggregation function
 type minFunc struct {
 	statFunc
+}
+
+// clone the function
+func (f *minFunc) clone() (Function, Engine) {
+	n := &minFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
 }
 
 // make new "min" aggregation
@@ -318,6 +338,13 @@ type maxFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *maxFunc) clone() (Function, Engine) {
+	n := &maxFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "max" aggregation
 func newMaxFunc(opts map[string]interface{}) (*maxFunc, error) {
 	if field, err := getFieldOpt("field", opts); err != nil {
@@ -351,6 +378,13 @@ type countFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *countFunc) clone() (Function, Engine) {
+	n := &countFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "count" aggregation
 func newCountFunc(opts map[string]interface{}) (*countFunc, error) {
 	if field, err := getFieldOpt("field", opts); err != nil {
@@ -375,6 +409,13 @@ func (f *countFunc) ToJson() interface{} {
 // "avg" aggregation function
 type avgFunc struct {
 	statFunc
+}
+
+// clone the function
+func (f *avgFunc) clone() (Function, Engine) {
+	n := &avgFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
 }
 
 // make new "avg" aggregation
@@ -408,6 +449,13 @@ func (f *avgFunc) ToJson() interface{} {
 // "stats" aggregation function
 type statsFunc struct {
 	statFunc
+}
+
+// clone the function
+func (f *statsFunc) clone() (Function, Engine) {
+	n := &statsFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
 }
 
 // make new "stats" aggregation
@@ -450,6 +498,13 @@ func (f *statsFunc) ToJson() interface{} {
 type extendedStatsFunc struct {
 	statFunc
 	sigma float64
+}
+
+// clone the function
+func (f *extendedStatsFunc) clone() (Function, Engine) {
+	n := &extendedStatsFunc{sigma: f.sigma}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
 }
 
 // make new "extended_stats" aggregation

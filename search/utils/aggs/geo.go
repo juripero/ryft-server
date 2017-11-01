@@ -75,6 +75,12 @@ type Geo struct {
 	posLeft, negLeft, posRight, negRight float64
 }
 
+// clone the engine
+func (g *Geo) clone() *Geo {
+	n := *g
+	return &n
+}
+
 // Point represents a physical point in geographic notation [lat, lon].
 type Point struct {
 	Lat float64 `json:"lat" msgpack:"lat"`
@@ -507,6 +513,13 @@ type geoBoundsFunc struct {
 	geoFunc
 }
 
+// clone the function
+func (f *geoBoundsFunc) clone() (Function, Engine) {
+	n := &geoBoundsFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "geo_bounds" aggregation
 func newGeoBoundsFunc(opts map[string]interface{}) (*geoBoundsFunc, error) {
 	field, lat, lon, wrapLon, err := parseGeoBoundsOpts(opts)
@@ -553,6 +566,13 @@ func (f *geoBoundsFunc) ToJson() interface{} {
 type geoCentroidFunc struct {
 	geoFunc
 	weighted bool
+}
+
+// clone the function
+func (f *geoCentroidFunc) clone() (Function, Engine) {
+	n := &geoCentroidFunc{weighted: f.weighted}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
 }
 
 // make new "geo_centroid" aggregation

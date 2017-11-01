@@ -62,6 +62,9 @@ type Function interface {
 
 	// bind to another engine
 	bind(e Engine)
+
+	// clone function and engine
+	clone() (Function, Engine)
 }
 
 // Aggregations is a set of functions and related engines.
@@ -80,9 +83,26 @@ func (a *Aggregations) GetOpts() map[string]interface{} {
 
 // Clone clones the aggregation engines and functions
 func (a *Aggregations) Clone() search.Aggregations {
-	// TODO: update the CLone method
-	n, _ := MakeAggs(a.options, "-", nil)
-	n.parseRawData = a.parseRawData
+	n := &Aggregations{
+		parseRawData: a.parseRawData,
+		options:      a.options,
+	}
+
+	// clone functions and engines
+	for k, v := range a.functions {
+		f, e := v.clone()
+
+		// check existing engine
+		if ee, ok := n.engines[e.Name()]; ok {
+			ee.Join(e) // join existing engine
+			f.bind(ee) // replace engine
+		} else {
+			n.engines[e.Name()] = e // add new engine
+		}
+
+		n.functions[k] = f
+	}
+
 	return n
 }
 
@@ -207,8 +227,6 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		a.parseRawData = func(raw []byte) (interface{}, error) {
 			return string(raw), nil
 		}
-
-	case "-": // used in Clone()
 
 	default:
 		return nil, fmt.Errorf("%q is unknown data format", format)
