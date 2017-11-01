@@ -316,3 +316,103 @@ func TestAggsAdd(t *testing.T) {
 		[]string{`1.1`, `zzz`, `9.9`},
 		` invalid syntax`)
 }
+
+// Merge test
+func TestAggsMerge(t *testing.T) {
+	// positive check
+	check := func(opts string, format string, formatOpts string, rawData []string,
+		expectedEngines string, expectedFunctions string) {
+		a, err := MakeAggs(mustParseJsonMap(opts), format, mustParseJsonMap(formatOpts))
+		if assert.NoError(t, err) && a != nil {
+			b := a.Clone()
+			c := b.Clone()
+			z := c.Clone()
+			for i, d := range rawData {
+				if (i & 1) == 0 {
+					err = a.Add([]byte(d))
+				} else {
+					err = b.Add([]byte(d))
+				}
+				if !assert.NoError(t, err, "error for data: %s", d) {
+					return
+				}
+			}
+
+			assert.NoError(t, c.Merge(z.ToJson(false)))
+			assert.NoError(t, c.Merge(mustParseJsonMap(asJson(z.ToJson(false)))))
+			assert.NoError(t, c.Merge(a.ToJson(false)))
+			assert.NoError(t, c.Merge(mustParseJsonMap(asJson(b.ToJson(false)))))
+			assert.NoError(t, c.Merge(z.ToJson(false)))
+			assert.NoError(t, c.Merge(mustParseJsonMap(asJson(z.ToJson(false)))))
+			assert.JSONEq(t, expectedEngines, asJson(c.ToJson(false)))
+			assert.JSONEq(t, expectedFunctions, asJson(c.ToJson(true)))
+		}
+	}
+
+	// negative check
+	bad := func(opts string, format string, formatOpts string, rawData []string, expectedError string) {
+		a, err := MakeAggs(mustParseJsonMap(opts), format, mustParseJsonMap(formatOpts))
+		if assert.NoError(t, err) {
+			b := a.Clone()
+			c := b.Clone()
+			z := c.Clone()
+			for i, d := range rawData {
+				if (i & 1) == 0 {
+					err = a.Add([]byte(d))
+				} else {
+					err = b.Add([]byte(d))
+				}
+				if err != nil {
+					assert.Contains(t, err.Error(), expectedError)
+					return
+				}
+			}
+
+			if err = c.Merge(z.ToJson(false)); err != nil {
+				assert.Contains(t, err.Error(), expectedError)
+				return
+			}
+			if err = c.Merge(mustParseJsonMap(asJson(z.ToJson(false)))); err != nil {
+				assert.Contains(t, err.Error(), expectedError)
+				return
+			}
+			if err = c.Merge(a.ToJson(false)); err != nil {
+				assert.Contains(t, err.Error(), expectedError)
+				return
+			}
+			if err = c.Merge(mustParseJsonMap(asJson(b.ToJson(false)))); err != nil {
+				assert.Contains(t, err.Error(), expectedError)
+				return
+			}
+			if err = c.Merge(z.ToJson(false)); err != nil {
+				assert.Contains(t, err.Error(), expectedError)
+				return
+			}
+			if err = c.Merge(mustParseJsonMap(asJson(z.ToJson(false)))); err != nil {
+				assert.Contains(t, err.Error(), expectedError)
+				return
+			}
+
+			assert.Fail(t, "error expected")
+		}
+	}
+
+	// json
+	check(`{"my":{"extended_stats":{"field":"a"}}}`, "json", ``,
+		[]string{`{"a":1.1}`, `{"a":9.9}`, `{}`, `{}`},
+		`{"stat.a":{"min":1.1, "max":9.9, "count":2, "sum":11, "sum2":99.22}}`,
+		`{"my":{"count":2, "max":9.9, "min":1.1, "std_deviation":4.4, "sum":11, "avg":5.5, "sum_of_squares":99.22, "variance":19.36, "std_deviation_bounds":{"lower":-3.3000000000000007, "upper":14.3}}}`)
+	check(`{"xx":{"geo_bounds":{"field":"a"}}, "yy":{"geo_centroid":{"field":"a"}}, "zz":{"geo_centroid":{"field":"a", "weighted":true}}}`, "json", ``,
+		[]string{`{"a":{"lat":1.1, "lon":2.2}}`, `{"a":[9.9, 8.8]}`, `{}`, `{}`},
+		`{"geo.a":{"count":2, "top_left":{"lat":8.8, "lon":2.2}, "bottom_right":{"lat":1.1, "lon":9.9}, "centroid_wsum":{"x": 1.9725917593016726, "y":0.20828595117231147, "z":0.17218327868372774}, "centroid_sum":{"lat":9.9, "lon":12.100000000000001}}}`,
+		`{"xx":{"bounds": {"bottom_right":{"lat":1.1, "lon":9.9}, "top_left":{"lat":8.8, "lon":2.2}}},
+		  "yy":{"centroid": {"count":2, "location":{"lon":6.050000000000001, "lat":4.95}}},
+		  "zz":{"centroid": {"count":2, "location":{"lat":4.961139966549089, "lon":6.0275264114207365}}}}`)
+	check(`{"xx":{"geo_bounds":{"lat":"a", "lon":"b"}}, "yy":{"geo_centroid":{"lat":"a", "lon":"b"}}, "zz":{"geo_centroid":{"lat":"a", "lon":"b", "weighted":true}}}`, "json", ``,
+		[]string{`{"a":1.1, "b":2.2}`, `{"a":"8.8", "b":9.9}`, `{"a":0.0}`, `{"b":0.0}`},
+		`{"geo.a/b":{"count":2, "top_left":{"lat":8.8, "lon":2.2}, "bottom_right":{"lat":1.1, "lon":9.9}, "centroid_wsum":{"x": 1.9725917593016726, "y":0.20828595117231147, "z":0.17218327868372774}, "centroid_sum":{"lat":9.9, "lon":12.100000000000001}}}`,
+		`{"xx":{"bounds": {"bottom_right":{"lat":1.1, "lon":9.9}, "top_left":{"lat":8.8, "lon":2.2}}},
+		  "yy":{"centroid": {"count":2, "location":{"lon":6.050000000000001, "lat":4.95}}},
+		  "zz":{"centroid": {"count":2, "location":{"lat":4.961139966549089, "lon":6.0275264114207365}}}}`)
+	_ = bad
+}
