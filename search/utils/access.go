@@ -34,6 +34,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/getryft/ryft-server/search/utils/query"
 )
@@ -92,6 +93,22 @@ func ParseField(field string) (Field, error) {
 	}
 
 	return res, nil // OK
+}
+
+// String gets string representation
+// ParseField(field.String()) does not work!
+func (field Field) String() string {
+	var res []string
+	for _, f := range field {
+		switch t := f.(type) {
+		case fieldStr:
+			res = append(res, fmt.Sprintf("%s", t))
+		case fieldInt:
+			res = append(res, fmt.Sprintf("[%d]", t))
+		}
+	}
+
+	return strings.Join(res, ".")
 }
 
 // GetValue gets the nested value on map[string]interface{} or []interface{}

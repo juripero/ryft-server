@@ -61,10 +61,10 @@ type Geo struct {
 	// the following formats are supported:
 	// - "location": "<lat>,<lon>" or "location":"(<lat>,<lon>)"
 	// "lat": <lat>, "lon": <lon>
-	LocField     string `json:"-" msgpack:"-"` // "location" field
-	LonField     string `json:"-" msgpack:"-"` // "latitude" field
-	LatField     string `json:"-" msgpack:"-"` // "longitude" field
-	WrapLonField bool   `json:"-" msgpack:"-"` // "wrap_longitude" field
+	LocField     utils.Field `json:"-" msgpack:"-"` // "location" field
+	LonField     utils.Field `json:"-" msgpack:"-"` // "latitude" field
+	LatField     utils.Field `json:"-" msgpack:"-"` // "longitude" field
+	WrapLonField bool        `json:"-" msgpack:"-"` // "wrap_longitude" field
 
 	Count        uint64  `json:"count" msgpack:"count"` // number of points
 	TopLeft      Point   `json:"top_left" msgpack:"top_left"`
@@ -90,6 +90,9 @@ type Point3D struct {
 
 // get engine name/identifier
 func (g *Geo) Name() string {
+	if len(g.LonField) > 0 && len(g.LatField) > 0 {
+		return fmt.Sprintf("geo.%s/%s", g.LatField, g.LonField)
+	}
 	return fmt.Sprintf("geo.%s", g.LocField)
 }
 
@@ -115,7 +118,7 @@ func (g *Geo) Add(data interface{}) error {
 		// get "lat" and "lon" separated
 
 		// latitude
-		lat_, err = utils.AccessValue(data, g.LatField)
+		lat_, err = g.LatField.GetValue(data)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
@@ -124,7 +127,7 @@ func (g *Geo) Add(data interface{}) error {
 		}
 
 		// longitude
-		lon_, err = utils.AccessValue(data, g.LonField)
+		lon_, err = g.LonField.GetValue(data)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
@@ -134,7 +137,7 @@ func (g *Geo) Add(data interface{}) error {
 	} else {
 		// get "location" combined
 
-		latlon_, err := utils.AccessValue(data, g.LocField)
+		latlon_, err := g.LocField.GetValue(data)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
@@ -455,7 +458,7 @@ func (g *Geo) getCentroid() Point {
 }
 
 // parse "wrap_longitude" in additional to other Geo options
-func parseGeoBoundsOpts(opts map[string]interface{}) (field, lat, lon string, wrapLon bool, err error) {
+func parseGeoBoundsOpts(opts map[string]interface{}) (field, lat, lon utils.Field, wrapLon bool, err error) {
 	field, lat, lon, err = parseGeoOpts(opts)
 	if err != nil {
 		return
@@ -469,21 +472,19 @@ func parseGeoBoundsOpts(opts map[string]interface{}) (field, lat, lon string, wr
 }
 
 // parse "field" or "lat"/"lon" fields
-func parseGeoOpts(opts map[string]interface{}) (field string, lat, lon string, err error) {
+func parseGeoOpts(opts map[string]interface{}) (field, lat, lon utils.Field, err error) {
 	if _, ok := opts["field"]; ok {
-		field, err = getStringOpt("field", opts)
+		field, err = getFieldOpt("field", opts)
 	} else {
 		// fallback to "lat" and "lon" fields
-		lat, err = getStringOpt("lat", opts)
+		lat, err = getFieldOpt("lat", opts)
 		if err != nil {
 			return
 		}
-		lon, err = getStringOpt("lon", opts)
+		lon, err = getFieldOpt("lon", opts)
 		if err != nil {
 			return
 		}
-
-		field = fmt.Sprintf("%s/%s", lat, lon)
 	}
 
 	return

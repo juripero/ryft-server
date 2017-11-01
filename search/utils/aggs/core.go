@@ -141,6 +141,24 @@ func getStringOpt(name string, opts map[string]interface{}) (string, error) {
 	return "", fmt.Errorf(`no "%s" option found`, name)
 }
 
+// get field option
+func getFieldOpt(name string, opts map[string]interface{}) (utils.Field, error) {
+	if field, err := getStringOpt(name, opts); err != nil {
+		return nil, err
+	} else {
+		return utils.ParseField(field)
+	}
+}
+
+// parse field, panic in case of error
+func mustParseField(field string) utils.Field {
+	if f, err := utils.ParseField(field); err != nil {
+		panic(err)
+	} else {
+		return f
+	}
+}
+
 // MakeAggs makes set of aggregation engines
 func MakeAggs(params map[string]interface{}) (*Aggregations, error) {
 	a := &Aggregations{

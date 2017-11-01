@@ -49,6 +49,9 @@ func TestParseField(t *testing.T) {
 	bad("[5[", "found instead of ]")
 	bad("[xyz]", "found instead of index")
 	bad("(-)", "unexpected token found")
+
+	tmp := Field{fieldStr("a"), fieldInt(5), fieldStr("b")}
+	assert.EqualValues(t, tmp.String(), "a.[5].b")
 }
 
 // test nested field access

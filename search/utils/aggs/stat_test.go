@@ -22,7 +22,7 @@ func TestStatEngine(t *testing.T) {
 	check := func(flags int, missing interface{}, expected string) {
 		stat := &Stat{
 			flags:   flags,
-			Field:   "foo",
+			Field:   mustParseField("foo"),
 			Missing: missing,
 		}
 

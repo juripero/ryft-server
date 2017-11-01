@@ -49,7 +49,7 @@ const (
 type Stat struct {
 	flags int `json:"-"msgpack:"-"` // StatSum|StatSum2|StatMin|StatMax
 
-	Field   string      `json:"-" msgpack:"-"` // field path
+	Field   utils.Field `json:"-" msgpack:"-"` // field path
 	Missing interface{} `json:"-" msgpack:"-"` // missing value
 
 	Count uint64  `json:"count" msgpack:"count"` // number of values
@@ -84,7 +84,7 @@ func (s *Stat) ToJson() interface{} {
 // add data to the aggregation
 func (s *Stat) Add(data interface{}) error {
 	// extract field
-	val_, err := utils.AccessValue(data, s.Field)
+	val_, err := s.Field.GetValue(data)
 	if err != nil {
 		if err == utils.ErrMissed {
 			val_ = s.Missing // use provided value
@@ -260,7 +260,7 @@ type sumFunc struct {
 
 // make new "sum" aggregation
 func newSumFunc(opts map[string]interface{}) (*sumFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+	if field, err := getFieldOpt("field", opts); err != nil {
 		return nil, err
 	} else {
 		return &sumFunc{statFunc{
@@ -287,7 +287,7 @@ type minFunc struct {
 
 // make new "min" aggregation
 func newMinFunc(opts map[string]interface{}) (*minFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+	if field, err := getFieldOpt("field", opts); err != nil {
 		return nil, err
 	} else {
 		return &minFunc{statFunc{
@@ -320,7 +320,7 @@ type maxFunc struct {
 
 // make new "max" aggregation
 func newMaxFunc(opts map[string]interface{}) (*maxFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+	if field, err := getFieldOpt("field", opts); err != nil {
 		return nil, err
 	} else {
 		return &maxFunc{statFunc{
@@ -353,7 +353,7 @@ type countFunc struct {
 
 // make new "count" aggregation
 func newCountFunc(opts map[string]interface{}) (*countFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+	if field, err := getFieldOpt("field", opts); err != nil {
 		return nil, err
 	} else {
 		return &countFunc{statFunc{
@@ -379,7 +379,7 @@ type avgFunc struct {
 
 // make new "avg" aggregation
 func newAvgFunc(opts map[string]interface{}) (*avgFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+	if field, err := getFieldOpt("field", opts); err != nil {
 		return nil, err
 	} else {
 		return &avgFunc{statFunc{
@@ -412,7 +412,7 @@ type statsFunc struct {
 
 // make new "stats" aggregation
 func newStatsFunc(opts map[string]interface{}) (*statsFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+	if field, err := getFieldOpt("field", opts); err != nil {
 		return nil, err
 	} else {
 		return &statsFunc{statFunc{
@@ -454,7 +454,7 @@ type extendedStatsFunc struct {
 
 // make new "extended_stats" aggregation
 func newExtendedStatsFunc(opts map[string]interface{}) (*extendedStatsFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+	if field, err := getFieldOpt("field", opts); err != nil {
 		return nil, err
 	} else {
 		sigma := 2.0 // by default
