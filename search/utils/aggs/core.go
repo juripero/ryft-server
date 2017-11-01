@@ -33,6 +33,10 @@ package aggs
 import (
 	"fmt"
 
+	"github.com/getryft/ryft-server/rest/format/csv"
+	"github.com/getryft/ryft-server/rest/format/json"
+	"github.com/getryft/ryft-server/rest/format/xml"
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 )
 
@@ -62,6 +66,8 @@ type Function interface {
 
 // Aggregations is a set of functions and related engines.
 type Aggregations struct {
+	parseRawData func([]byte) (interface{}, error)
+
 	functions map[string]Function
 	engines   map[string]Engine
 	options   map[string]interface{} // source options
@@ -73,15 +79,17 @@ func (a *Aggregations) GetOpts() map[string]interface{} {
 }
 
 // Clone clones the aggregation engines and functions
-func (a *Aggregations) Clone() *Aggregations {
-	n, _ := MakeAggs(a.options)
+func (a *Aggregations) Clone() search.Aggregations {
+	// TODO: update the CLone method
+	n, _ := MakeAggs(a.options, "-", nil)
+	n.parseRawData = a.parseRawData
 	return n
 }
 
 // ToJson saves all aggregations to JSON
 // if final is true then all functions are reported
 // otherwise the all engines are reported (cluster mode).
-func (a *Aggregations) ToJson(final bool) map[string]interface{} {
+func (a *Aggregations) ToJson(final bool) interface{} {
 	res := make(map[string]interface{})
 
 	if final {
@@ -98,7 +106,14 @@ func (a *Aggregations) ToJson(final bool) map[string]interface{} {
 }
 
 // Add adds new DATA record to all engines
-func (a *Aggregations) Add(data interface{}) error {
+func (a *Aggregations) Add(rawData []byte) error {
+	// first prepare data to process
+	data, err := a.parseRawData(rawData)
+	if err != nil {
+		return fmt.Errorf("failed to parse data: %s", err)
+	}
+
+	// then add parsed data to engines
 	for _, engine := range a.engines {
 		if err := engine.Add(data); err != nil {
 			return err
@@ -160,11 +175,43 @@ func mustParseField(field string) utils.Field {
 }
 
 // MakeAggs makes set of aggregation engines
-func MakeAggs(params map[string]interface{}) (*Aggregations, error) {
+func MakeAggs(params map[string]interface{}, format string, formatOpts map[string]interface{}) (*Aggregations, error) {
 	a := &Aggregations{
 		functions: make(map[string]Function),
 		engines:   make(map[string]Engine),
 		options:   params,
+	}
+
+	// format
+	switch format {
+	case "xml":
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return xml.ParseXml(raw, nil)
+		}
+
+	case "json":
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return json.ParseRaw(raw)
+		}
+
+	case "csv":
+		csvFmt, err := csv.New(formatOpts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare CSV format")
+		}
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return csvFmt.ParseRaw(raw)
+		}
+
+	case "utf8", "utf-8":
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return string(raw), nil
+		}
+
+	case "-": // used in Clone()
+
+	default:
+		return nil, fmt.Errorf("%q is unknown data format", format)
 	}
 
 	// name: {type: {opts}}

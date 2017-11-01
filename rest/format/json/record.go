@@ -133,3 +133,10 @@ func ToRecord(rec *Record) *search.Record {
 	//res.Data = rec.RawData
 	//return res
 }
+
+// ParseRaw parses the JSON from raw bytes
+func ParseRaw(raw []byte) (interface{}, error) {
+	var res interface{}
+	err := json.Unmarshal(raw, &res)
+	return res, err
+}

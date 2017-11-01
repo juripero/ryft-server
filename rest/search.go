@@ -217,18 +217,20 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 			WithDetails("failed to parse transformations"))
 	}
 
-	// aggregations
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
-	if err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to prepare aggregations"))
-	}
 	if len(params.InternalFormat) != 0 {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
 	}
 	cfg.Tweaks.Format = tcode_opts
+
+	// aggregations
+	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations,
+		cfg.DataFormat, tcode_opts)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
+	}
 
 	// get search engine
 	var engine search.Engine
@@ -559,7 +561,7 @@ func updateSession(session *Session, stat *search.Stat) {
 }
 
 // update aggregations in cluster mode
-func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) error {
+func updateAggregations(aggregations search.Aggregations, stat *search.Stat) error {
 	// get main aggregations (in case if one node in cluster)
 	if d := stat.Extra[search.ExtraAggregations]; d != nil {
 		log.Debugf("[%s/aggs]: merging main aggregations: %+v", CORE, d)

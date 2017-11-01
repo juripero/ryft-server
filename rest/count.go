@@ -195,15 +195,16 @@ func (server *Server) DoCount0(ctx *gin.Context) {
 	}
 
 	// aggregations
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
-	if err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to prepare aggregations"))
-	}
 	if len(params.InternalFormat) != 0 {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
+	}
+	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations,
+		cfg.DataFormat, nil /*tcode_opts*/)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
 	}
 
 	// session preparation

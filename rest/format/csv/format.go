@@ -31,6 +31,8 @@
 package csv
 
 import (
+	"bytes"
+	stdcsv "encoding/csv"
 	"fmt"
 	"strings"
 
@@ -132,6 +134,18 @@ func (f *Format) FromStat(stat *search.Stat) interface{} {
 // WARN: will panic if argument is not of csv.Stat type!
 func (f *Format) ToStat(stat interface{}) *search.Stat {
 	return ToStat(stat.(*Stat))
+}
+
+// ParseRaw parses the raw data
+func (f *Format) ParseRaw(raw []byte) (interface{}, error) {
+	// try to parse raw data as CSV...
+	rd := stdcsv.NewReader(bytes.NewReader(raw))
+	for _, s := range f.Separator {
+		rd.Comma = s // use first character
+		break
+	}
+	rd.FieldsPerRecord = -1 // do not check number of columns
+	return rd.Read()
 }
 
 // AddFields adds coma separated fields

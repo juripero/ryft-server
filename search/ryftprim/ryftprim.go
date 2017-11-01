@@ -508,9 +508,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// apply aggregations
 	if task.config.Aggregations != nil {
 		task.aggsStartTime = time.Now()
-		err := ApplyAggregations(engine.AggregationConcurrency, task.IndexFileName, task.DataFileName,
-			task.config.Delimiter, task.config.DataFormat, task.config.Aggregations,
-			task.config.IsRecord, func() bool { return res.IsCancelled() })
+		err := ApplyAggregations(engine.AggregationConcurrency,
+			task.IndexFileName, task.DataFileName, task.config.Delimiter,
+			task.config.Aggregations, task.config.IsRecord,
+			func() bool { return res.IsCancelled() })
 		if err != nil {
 			task.log().WithError(err).
 				Warnf("[%s]: failed to apply aggregations", TAG)

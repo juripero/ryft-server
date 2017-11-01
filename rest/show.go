@@ -187,17 +187,20 @@ func (server *Server) doSearchShow(ctx *gin.Context, params SearchShowParams) {
 			WithDetails("failed to parse transformations"))
 	}
 
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
-	if err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to prepare aggregations"))
-	}
 	if len(params.InternalFormat) != 0 {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
 	}
 	cfg.Tweaks.Format = tcode_opts
+
+	// aggregations
+	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations,
+		cfg.DataFormat, tcode_opts)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
+	}
 
 	// get search engine
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)

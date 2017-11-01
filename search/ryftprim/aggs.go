@@ -33,7 +33,6 @@ package ryftprim
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -41,44 +40,21 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/getryft/ryft-server/rest/format/xml"
 	"github.com/getryft/ryft-server/search"
-	"github.com/getryft/ryft-server/search/utils/aggs"
 )
 
 // dedicated structure for aggregation goroutine
 type aggregationGoroutine struct {
-	aggregations *aggs.Aggregations
+	aggregations search.Aggregations
 	lastError    error
 }
 
 // Apply aggregations
-func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter string, format string,
-	aggregations *aggs.Aggregations, checkJsonArray bool, cancelFunc func() bool) error {
+func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter string,
+	aggregations search.Aggregations, checkJsonArray bool, cancelFunc func() bool) error {
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
 	var dataSkip uint64
-
-	// select DATA format
-	var doFormat func([]byte) (interface{}, error)
-	switch format {
-	case "xml":
-		doFormat = func(raw []byte) (interface{}, error) {
-			return xml.ParseXml(raw, nil)
-		}
-	case "json":
-		doFormat = func(raw []byte) (interface{}, error) {
-			var res interface{}
-			err := json.Unmarshal(raw, &res)
-			return res, err
-		}
-	case "utf8", "utf-8":
-		doFormat = func(raw []byte) (interface{}, error) {
-			return string(raw), nil
-		}
-	default:
-		return fmt.Errorf("%q is unknown data format", format)
-	}
 
 	// open INDEX file
 	if idxRd == nil {
@@ -142,15 +118,8 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 
 				for {
 					if data, ok := <-dataCh; ok {
-						parsedData, err := doFormat(data)
-						if err != nil {
-							a.lastError = fmt.Errorf("failed to parse DATA: %s", err)
-							atomic.AddInt32(&subErrs, 1) // notify main thread
-							return
-						}
-
 						// apply aggregations
-						if err := a.aggregations.Add(parsedData); err != nil {
+						if err := a.aggregations.Add(data); err != nil {
 							a.lastError = fmt.Errorf("failed to apply aggregation: %s", err)
 							atomic.AddInt32(&subErrs, 1) // notify main thread
 							return
@@ -251,13 +220,8 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 				return fmt.Errorf("parallel error occurred")
 			}
 		} else {
-			parsedData, err := doFormat(data)
-			if err != nil {
-				return fmt.Errorf("failed to parse DATA: %s", err)
-			}
-
 			// apply aggregations
-			if err := aggregations.Add(parsedData); err != nil {
+			if err := aggregations.Add(data); err != nil {
 				return fmt.Errorf("failed to apply aggregation: %s", err)
 			}
 		}
