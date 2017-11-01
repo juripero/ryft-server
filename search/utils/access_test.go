@@ -9,8 +9,8 @@ import (
 // test ParseField
 func TestParseField(t *testing.T) {
 	// check
-	check := func(field string, expected ...interface{}) {
-		f, err := ParseField(field)
+	check_ex := func(field string, str2idx []string, idx2str []string, expected ...interface{}) {
+		f, err := ParseFieldEx(field, str2idx, idx2str)
 		if assert.NoError(t, err) {
 			var ef Field
 			for _, e := range expected {
@@ -25,6 +25,9 @@ func TestParseField(t *testing.T) {
 			}
 			assert.EqualValues(t, ef, f)
 		}
+	}
+	check := func(field string, expected ...interface{}) {
+		check_ex(field, nil, nil, expected...)
 	}
 
 	// parse a "bad" map
@@ -44,6 +47,8 @@ func TestParseField(t *testing.T) {
 	check("[5]", 5)
 	check("a.[5]", "a", 5)
 	check("[5].b", 5, "b")
+	check_ex("a.b.c", []string{"x", "b", "z"}, nil, "a", 1, "c")
+	check_ex("a.[1].c", nil, []string{"x", "b", "z"}, "a", "b", "c")
 
 	bad("[11111111111111111111111]", "failed to parse field index")
 	bad("[5[", "found instead of ]")

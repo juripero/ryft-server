@@ -109,7 +109,7 @@ func TestGeoBoundsWrapLongitudeFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newGeoBoundsFunc(opts)
+			f, err := newGeoBoundsFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -137,7 +137,7 @@ func TestGeoBoundsNegativeLonFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newGeoBoundsFunc(opts)
+			f, err := newGeoBoundsFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -159,7 +159,7 @@ func TestGeoBoundsPositiveLonFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newGeoBoundsFunc(opts)
+			f, err := newGeoBoundsFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -182,7 +182,7 @@ func TestGeoCentroidFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newGeoCentroidFunc(opts)
+			f, err := newGeoCentroidFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -256,17 +256,17 @@ func TestGeoElastic(t *testing.T) {
 		return
 	}
 
-	c1, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": true})
+	c1, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": true}, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	c2, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": false})
+	c2, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": false}, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	b, err := newGeoBoundsFunc(map[string]interface{}{"field": "pos"})
+	b, err := newGeoBoundsFunc(map[string]interface{}{"field": "pos"}, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -326,7 +326,7 @@ func TestGeoElastic2(t *testing.T) {
 	}
 
 	b_cfg := map[string]interface{}{"field": "location"}
-	b, err := newGeoBoundsFunc(b_cfg)
+	b, err := newGeoBoundsFunc(b_cfg, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -352,7 +352,7 @@ func TestGeoElastic2(t *testing.T) {
 	                                  "top_left":{"lat":50.939502, "lon":30.011016}}}`)
 
 	// test merge
-	b2, err := newGeoBoundsFunc(b_cfg)
+	b2, err := newGeoBoundsFunc(b_cfg, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -375,7 +375,7 @@ func TestGeoElastic2(t *testing.T) {
 		return
 	}
 
-	b3, err := newGeoBoundsFunc(b_cfg)
+	b3, err := newGeoBoundsFunc(b_cfg, nil)
 	if !assert.NoError(t, err) {
 		return
 	}

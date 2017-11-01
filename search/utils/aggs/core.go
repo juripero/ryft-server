@@ -177,11 +177,11 @@ func getStringOpt(name string, opts map[string]interface{}) (string, error) {
 }
 
 // get field option
-func getFieldOpt(name string, opts map[string]interface{}) (utils.Field, error) {
+func getFieldOpt(name string, opts map[string]interface{}, objectToArray []string) (utils.Field, error) {
 	if field, err := getStringOpt(name, opts); err != nil {
 		return nil, err
 	} else {
-		return utils.ParseField(field)
+		return utils.ParseFieldEx(field, objectToArray, nil)
 	}
 }
 
@@ -202,6 +202,8 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		options:   params,
 	}
 
+	var strToInt []string // for CSV data
+
 	// format
 	switch format {
 	case "xml":
@@ -216,6 +218,7 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 
 	case "csv":
 		csvFmt, err := csv.New(formatOpts)
+		strToInt = csvFmt.Columns
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare CSV format")
 		}
@@ -250,7 +253,7 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 			}
 
 			// parse and add function and corresponding engine
-			if err := a.addFunc(name, t, opts); err != nil {
+			if err := a.addFunc(name, t, opts, strToInt); err != nil {
 				return nil, err
 			}
 		}
@@ -264,8 +267,8 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 }
 
 // add aggregation function
-func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interface{}) error {
-	f, e, err := newFunc(aggType, opts)
+func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interface{}, fieldObjectToArray []string) error {
+	f, e, err := newFunc(aggType, opts, fieldObjectToArray)
 	if err != nil {
 		return err
 	}
@@ -285,66 +288,66 @@ func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interfac
 }
 
 // factory method: creates aggregation function and corresponding engine
-func newFunc(aggType string, opts map[string]interface{}) (Function, Engine, error) {
+func newFunc(aggType string, opts map[string]interface{}, fieldObjectToArray []string) (Function, Engine, error) {
 	switch aggType {
 	case "sum":
-		if f, err := newSumFunc(opts); err == nil {
+		if f, err := newSumFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "min":
-		if f, err := newMinFunc(opts); err == nil {
+		if f, err := newMinFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "max":
-		if f, err := newMaxFunc(opts); err == nil {
+		if f, err := newMaxFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "value_count", "count":
-		if f, err := newCountFunc(opts); err == nil {
+		if f, err := newCountFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "average", "avg":
-		if f, err := newAvgFunc(opts); err == nil {
+		if f, err := newAvgFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "stats":
-		if f, err := newStatsFunc(opts); err == nil {
+		if f, err := newStatsFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "extended_stats", "extended-stats", "e-stats":
-		if f, err := newExtendedStatsFunc(opts); err == nil {
+		if f, err := newExtendedStatsFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "geo_bounds", "geo-bounds":
-		if f, err := newGeoBoundsFunc(opts); err == nil {
+		if f, err := newGeoBoundsFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "geo_centroid", "geo-centroid":
-		if f, err := newGeoCentroidFunc(opts); err == nil {
+		if f, err := newGeoCentroidFunc(opts, fieldObjectToArray); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed

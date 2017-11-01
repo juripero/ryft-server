@@ -272,8 +272,8 @@ func (f *sumFunc) clone() (Function, Engine) {
 }
 
 // make new "sum" aggregation
-func newSumFunc(opts map[string]interface{}) (*sumFunc, error) {
-	if field, err := getFieldOpt("field", opts); err != nil {
+func newSumFunc(opts map[string]interface{}, fieldObjectToArray []string) (*sumFunc, error) {
+	if field, err := getFieldOpt("field", opts, fieldObjectToArray); err != nil {
 		return nil, err
 	} else {
 		return &sumFunc{statFunc{
@@ -306,8 +306,8 @@ func (f *minFunc) clone() (Function, Engine) {
 }
 
 // make new "min" aggregation
-func newMinFunc(opts map[string]interface{}) (*minFunc, error) {
-	if field, err := getFieldOpt("field", opts); err != nil {
+func newMinFunc(opts map[string]interface{}, fieldObjectToArray []string) (*minFunc, error) {
+	if field, err := getFieldOpt("field", opts, fieldObjectToArray); err != nil {
 		return nil, err
 	} else {
 		return &minFunc{statFunc{
@@ -346,8 +346,8 @@ func (f *maxFunc) clone() (Function, Engine) {
 }
 
 // make new "max" aggregation
-func newMaxFunc(opts map[string]interface{}) (*maxFunc, error) {
-	if field, err := getFieldOpt("field", opts); err != nil {
+func newMaxFunc(opts map[string]interface{}, fieldObjectToArray []string) (*maxFunc, error) {
+	if field, err := getFieldOpt("field", opts, fieldObjectToArray); err != nil {
 		return nil, err
 	} else {
 		return &maxFunc{statFunc{
@@ -386,8 +386,8 @@ func (f *countFunc) clone() (Function, Engine) {
 }
 
 // make new "count" aggregation
-func newCountFunc(opts map[string]interface{}) (*countFunc, error) {
-	if field, err := getFieldOpt("field", opts); err != nil {
+func newCountFunc(opts map[string]interface{}, fieldObjectToArray []string) (*countFunc, error) {
+	if field, err := getFieldOpt("field", opts, fieldObjectToArray); err != nil {
 		return nil, err
 	} else {
 		return &countFunc{statFunc{
@@ -419,8 +419,8 @@ func (f *avgFunc) clone() (Function, Engine) {
 }
 
 // make new "avg" aggregation
-func newAvgFunc(opts map[string]interface{}) (*avgFunc, error) {
-	if field, err := getFieldOpt("field", opts); err != nil {
+func newAvgFunc(opts map[string]interface{}, fieldObjectToArray []string) (*avgFunc, error) {
+	if field, err := getFieldOpt("field", opts, fieldObjectToArray); err != nil {
 		return nil, err
 	} else {
 		return &avgFunc{statFunc{
@@ -459,8 +459,8 @@ func (f *statsFunc) clone() (Function, Engine) {
 }
 
 // make new "stats" aggregation
-func newStatsFunc(opts map[string]interface{}) (*statsFunc, error) {
-	if field, err := getFieldOpt("field", opts); err != nil {
+func newStatsFunc(opts map[string]interface{}, fieldObjectToArray []string) (*statsFunc, error) {
+	if field, err := getFieldOpt("field", opts, fieldObjectToArray); err != nil {
 		return nil, err
 	} else {
 		return &statsFunc{statFunc{
@@ -508,8 +508,8 @@ func (f *extendedStatsFunc) clone() (Function, Engine) {
 }
 
 // make new "extended_stats" aggregation
-func newExtendedStatsFunc(opts map[string]interface{}) (*extendedStatsFunc, error) {
-	if field, err := getFieldOpt("field", opts); err != nil {
+func newExtendedStatsFunc(opts map[string]interface{}, fieldObjectToArray []string) (*extendedStatsFunc, error) {
+	if field, err := getFieldOpt("field", opts, fieldObjectToArray); err != nil {
 		return nil, err
 	} else {
 		sigma := 2.0 // by default

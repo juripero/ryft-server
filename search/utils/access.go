@@ -55,7 +55,23 @@ type Field []interface{}
 
 // ParseField parses the string field
 func ParseField(field string) (Field, error) {
+	return ParseFieldEx(field, nil, nil)
+}
+
+// ParseFieldEx parses the string field and replaces string to integer if applied
+func ParseFieldEx(field string, stringToIndex []string, indexToString []string) (Field, error) {
 	s := query.NewScannerString(field)
+
+	// find string index
+	findStr := func(s string) int {
+		for i, v := range stringToIndex {
+			if s == v {
+				return i
+			}
+		}
+
+		return -1 // not found
+	}
 
 	var res Field
 	for {
@@ -67,7 +83,12 @@ func ParseField(field string) (Field, error) {
 
 		switch tok {
 		case query.IDENT, query.STRING, query.INT:
-			res = append(res, fieldStr(lex.Unquoted()))
+			name := lex.Unquoted()
+			if index := findStr(name); index >= 0 {
+				res = append(res, fieldInt(index))
+			} else {
+				res = append(res, fieldStr(name))
+			}
 
 		case query.PERIOD:
 		// just ignore the dot
@@ -78,7 +99,11 @@ func ParseField(field string) (Field, error) {
 					if x, err := strconv.ParseInt(idx.String(), 10, 32); err != nil {
 						return nil, fmt.Errorf("failed to parse field index: %s", err)
 					} else {
-						res = append(res, fieldInt(int(x)))
+						if 0 <= x && x < int64(len(indexToString)) {
+							res = append(res, fieldStr(indexToString[x]))
+						} else {
+							res = append(res, fieldInt(int(x)))
+						}
 					}
 				} else {
 					return nil, fmt.Errorf("%s found instead of ]", end.String())
