@@ -90,7 +90,7 @@ func TestMakeAggs(t *testing.T) {
 	check(`{}`, "utf-8", ``, `{}`, `{}`)
 	check(`{}`, "utf8", ``, `{}`, `{}`)
 
-	bad(`{}`, "msgpack", ``, "is unknown data format")
+	bad(`{"my":{"sum":{"field":"[0]"}}}`, "msgpack", ``, "is unknown data format")
 	bad(`{"my":5}`, "utf8", ``, "bad type of aggregation object")
 	bad(`{"my":{"a":1, "b":2}}`, "utf8", ``, "contains invalid aggregation object")
 	bad(`{"my":{"a":1}}`, "utf8", ``, "bad type of aggregation options")

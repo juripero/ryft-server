@@ -236,7 +236,7 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		}
 
 	default:
-		return nil, fmt.Errorf("%q is unknown data format", format)
+		// see failure check at the end
 	}
 
 	// name: {type: {opts}}
@@ -264,6 +264,10 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 	}
 
 	if len(a.engines) != 0 {
+		if a.parseRawData == nil {
+			return nil, fmt.Errorf("%q is unknown data format", format)
+		}
+
 		return a, nil // OK
 	}
 
