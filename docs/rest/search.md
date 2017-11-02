@@ -47,6 +47,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `backend`     | string  | [The backend tool](#search-backend-parameter). |
+| `backend-mode` | string | [The backend mode](#search-backend-mode-parameter). |
 | `backend-option`| string | [The backend tool options](#search-backend-option-parameter). |
 | `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
@@ -284,6 +285,12 @@ And `ryftx` tool is used in case of `backend=ryftx`.
 
 If `backend` is empty (by default) then the most appropriate backend
 is selected automatically.
+
+
+### Search `backend-mode` parameter
+
+The set of preconfigured backend options can be selected via corresponding mode.
+Please see [backend options tweaks](../tweaks.md) for more details.
 
 
 ### Search `backend-option` parameter
@@ -641,6 +648,7 @@ The list of supported query parameters are the following:
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `backend`     | string  | [The backend tool](#search-backend-parameter). |
+| `backend-mode` | string | [The backend mode](#search-backend-mode-parameter). |
 | `backend-option`| string | [The backend tool options](#search-backend-option-parameter). |
 | `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
