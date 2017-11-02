@@ -199,7 +199,19 @@ func getFieldOpt(name string, opts map[string]interface{}, iNames []string) (uti
 }
 
 // MakeAggs makes set of aggregation engines
-func MakeAggs(params map[string]interface{}, format string, formatOpts map[string]interface{}) (*Aggregations, error) {
+func MakeAggs(params map[string]interface{}, format string, formatOpts map[string]interface{}) (search.Aggregations, error) {
+	a, err := makeAggs(params, format, formatOpts)
+	if err != nil {
+		return nil, err
+	}
+	if a == nil {
+		return nil, err
+	}
+	return a, err
+}
+
+// MakeAggs makes set of aggregation engines
+func makeAggs(params map[string]interface{}, format string, formatOpts map[string]interface{}) (*Aggregations, error) {
 	a := &Aggregations{
 		functions: make(map[string]Function),
 		engines:   make(map[string]Engine),

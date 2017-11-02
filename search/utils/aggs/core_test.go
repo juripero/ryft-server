@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 
 	"github.com/stretchr/testify/assert"
@@ -60,7 +61,7 @@ func mustParseField(field string) utils.Field {
 func TestMakeAggs(t *testing.T) {
 	// positive check
 	check := func(opts string, format string, formatOpts string,
-		expectedEngines string, expectedFunctions string) *Aggregations {
+		expectedEngines string, expectedFunctions string) {
 		a, err := MakeAggs(mustParseJsonMap(opts), format, mustParseJsonMap(formatOpts))
 		if assert.NoError(t, err) {
 			if a != nil {
@@ -73,7 +74,6 @@ func TestMakeAggs(t *testing.T) {
 				assert.JSONEq(t, expectedFunctions, asJson(a.Clone().ToJson(true)))
 			}
 		}
-		return a
 	}
 
 	// negative check
@@ -243,26 +243,34 @@ func TestMakeAggs(t *testing.T) {
 	assert.Empty(t, a.ToJson(true))
 	assert.Empty(t, a.ToJson(false))
 	assert.NoError(t, a.Add(nil))
+
+	if a, err := MakeAggs(mustParseJsonMap(`{}`), "-", nil); assert.NoError(t, err) {
+		aa := search.Aggregations(a)
+		assert.Nil(t, a)
+		assert.Nil(t, aa)
+		if aa != nil {
+			assert.Fail(t, "should be nil!")
+		}
+	}
 }
 
 // Add test
 func TestAggsAdd(t *testing.T) {
 	// positive check
 	check := func(opts string, format string, formatOpts string, rawData []string,
-		expectedEngines string, expectedFunctions string) *Aggregations {
+		expectedEngines string, expectedFunctions string) {
 		a, err := MakeAggs(mustParseJsonMap(opts), format, mustParseJsonMap(formatOpts))
 		if assert.NoError(t, err) {
 			for _, d := range rawData {
 				err = a.Add([]byte(d))
 				if !assert.NoError(t, err, "error for data: %s", d) {
-					return a
+					return
 				}
 			}
 
 			assert.JSONEq(t, expectedEngines, asJson(a.ToJson(false)))
 			assert.JSONEq(t, expectedFunctions, asJson(a.ToJson(true)))
 		}
-		return a
 	}
 
 	// negative check

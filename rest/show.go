@@ -238,7 +238,7 @@ func (server *Server) doSearchShow(ctx *gin.Context, params SearchShowParams) {
 	server.drain(ctx, enc, tcode, cfg, res, errorPrefix)
 	transferStopTime := time.Now() // performance metric
 
-	if /*params.Stats &&*/ res.Stat != nil {
+	if /*params.Stats &&*/ res.Stat != nil && (cfg.Aggregations != nil || params.Performance) {
 		if server.Config.ExtraRequest {
 			res.Stat.Extra["request"] = &params
 		}
