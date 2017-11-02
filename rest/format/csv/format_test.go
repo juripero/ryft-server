@@ -154,3 +154,14 @@ func TestFormatOptions(t *testing.T) {
 	fmt2.AddFields("c,d")
 	// TODO: assert.EqualValues(t, fmt2.Fields, []string{"a", "b", "c", "d"})
 }
+
+// test parse RAW
+func TestParseRaw(t *testing.T) {
+	fmt1, err := New(nil)
+	if assert.NoError(t, err) {
+		line, err := fmt1.ParseRaw([]byte(`a,b,c,d`))
+		if assert.NoError(t, err) {
+			assert.EqualValues(t, []string{"a", "b", "c", "d"}, line)
+		}
+	}
+}
