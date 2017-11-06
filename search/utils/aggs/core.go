@@ -372,6 +372,12 @@ func newFunc(aggType string, opts map[string]interface{}, iNames []string) (Func
 		} else {
 			return nil, nil, err // failed
 		}
+	case "date_histogram", "date-histogram":
+		if f, err := newDateHistFunc(opts, iNames); err == nil {
+			return f, f.engine, nil // OK
+		} else {
+			return nil, nil, err // failed
+		}
 	}
 
 	return nil, nil, fmt.Errorf("%q is unsupported aggregation", aggType)
