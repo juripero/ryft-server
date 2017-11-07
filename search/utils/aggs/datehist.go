@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/araddon/dateparse"
 	"github.com/getryft/ryft-server/search/utils"
 )
 
@@ -34,11 +35,18 @@ func (d *DateHist) Name() string {
 // Key counts name of a bucket where an element should fall into
 func (d DateHist) Key(data interface{}) (time.Time, error) {
 	fd := d.Field.String()
-	ts, err := time.Parse("04/15/2015 11:59:00 PM", fd)
+	smData, err := utils.AsStringMap(data)
 	if err != nil {
-		return time.Now(), err
+		return time.Time{}, fmt.Errorf("unable to create key: %s", err)
 	}
-
+	v, err := utils.AsString(smData[fd])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("unable to create key: %s", err)
+	}
+	ts, err := dateparse.ParseLocal(v)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("unable to create key: %s", err)
+	}
 	return ts, nil
 }
 

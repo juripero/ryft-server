@@ -27,6 +27,12 @@
 			"revisionTime": "2015-10-22T06:55:26Z"
 		},
 		{
+			"checksumSHA1": "sMNGYak6MM8KcTSbVRS4ADbuauM=",
+			"path": "github.com/araddon/dateparse",
+			"revision": "ca7e753bd149dae747d76fa7d52b20b920f3a814",
+			"revisionTime": "2017-10-07T16:34:59Z"
+		},
+		{
 			"checksumSHA1": "Y9anndxw8wlCmbcT1Wx05q57y7U=",
 			"path": "github.com/clbanning/mxj",
 			"revision": "1cda74d18ebbb04f525b355309c16d594e1f8f77",
