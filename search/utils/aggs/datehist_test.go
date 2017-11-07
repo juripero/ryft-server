@@ -105,6 +105,18 @@ func TestDateHistFunc(t *testing.T) {
 {"key":1510034400000, "key_as_string":"2017-11-07 06:00:00 +0000 UTC", "doc_count":1}
 	]}`)
 
+	check(`{"field":"created", "interval":"1h", "min_doc_count":2}`, `
+{"buckets": [
+{"key":1510027200000, "key_as_string":"2017-11-07 04:00:00 +0000 UTC", "doc_count":3},
+{"key":1510030800000, "key_as_string":"2017-11-07 05:00:00 +0000 UTC", "doc_count":2}
+	]}`)
+
+	check(`{"field":"created", "interval":"1h", "min_doc_count":2, "keyed":true}`, `
+{"buckets": {
+"2017-11-07 04:00:00 +0000 UTC": {"key":1510027200000, "key_as_string":"2017-11-07 04:00:00 +0000 UTC", "doc_count":3},
+"2017-11-07 05:00:00 +0000 UTC": {"key":1510030800000, "key_as_string":"2017-11-07 05:00:00 +0000 UTC", "doc_count":2}
+	}}`)
+
 	check(`{"field":"created", "interval":"1h", "_aggs":{
 "my_min":{"min":{"field":"foo.bar"}},
 "my_max":{"max":{"field":"foo.bar"}},

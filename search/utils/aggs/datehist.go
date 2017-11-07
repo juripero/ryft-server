@@ -168,6 +168,10 @@ func (d *DateHist) Join(other Engine) {
 // "date_histogram" aggregation function
 type dateHistFunc struct {
 	engine *DateHist
+
+	// options
+	keyed       bool
+	minDocCount int64
 }
 
 // ToJson
@@ -178,9 +182,20 @@ func (f *dateHistFunc) ToJson() interface{} {
 	}
 	sort.Sort(TimeSlice(keys))
 
-	var buckets []interface{}
+	var ares []interface{}
+	var mres map[string]interface{}
+	if f.keyed {
+		mres = make(map[string]interface{}, len(keys))
+	} else {
+		ares = make([]interface{}, 0, len(keys))
+	}
+
 	for _, k := range keys {
 		bucket := f.engine.Buckets[k]
+		if bucket.Count < f.minDocCount {
+			continue
+		}
+
 		keyAsString := k.String() // .Format(f.engine.Format)
 		b := map[string]interface{}{
 			"key_as_string": keyAsString,
@@ -193,11 +208,23 @@ func (f *dateHistFunc) ToJson() interface{} {
 				b[k] = v
 			}
 		}
-		buckets = append(buckets, b)
+
+		if f.keyed {
+			mres[keyAsString] = b
+		} else {
+			ares = append(ares, b)
+		}
 	}
 
-	// TODO: keyed, min_doc_count, extended_bounds etc...
-	return map[string][]interface{}{
+	var buckets interface{}
+	if f.keyed {
+		buckets = mres // JSON object
+	} else {
+		buckets = ares // JSON array
+	}
+
+	// TODO: extended_bounds etc...
+	return map[string]interface{}{
 		"buckets": buckets,
 	}
 }
@@ -242,6 +269,24 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 		}
 	*/
 
+	// keyed
+	var keyed bool
+	if opt, ok := opts["keyed"]; ok {
+		keyed, err = utils.AsBool(opt)
+		if err != nil {
+			return nil, fmt.Errorf(`bad "keyed" flag: %s`, err)
+		}
+	}
+
+	// min doc count
+	var minDocCount int64
+	if opt, ok := opts["min_doc_count"]; ok {
+		minDocCount, err = utils.AsInt64(opt)
+		if err != nil {
+			return nil, fmt.Errorf(`bad "min_doc_count" option: %s`, err)
+		}
+	}
+
 	// parse sub-aggregations
 	var subAggs *Aggregations
 	if aggs_, ok := opts[AGGS_NAME]; ok {
@@ -267,7 +312,9 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 	}
 
 	return &dateHistFunc{
-		engine: engine,
+		engine:      engine,
+		keyed:       keyed,
+		minDocCount: minDocCount,
 	}, nil
 }
 
