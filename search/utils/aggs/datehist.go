@@ -85,17 +85,13 @@ func (h *DateHist) Add(data interface{}) error {
 	}
 
 	// convert string to timestamp
-	val, err := utils.AsString(val_)
-	if err != nil {
-		return fmt.Errorf("failed to get datetime field: %s", err)
-	}
-	ts, err := dateparse.ParseLocal(val)
+	val, err := parseDateTime(val_, "")
 	if err != nil {
 		return fmt.Errorf("failed to parse datetime field: %s", err)
 	}
 
-	// TODO: convert ts to timezone and add custom offset!
-	key := ts.Truncate(h.Interval)
+	// TODO: convert val to timezone and add custom offset!
+	key := val.Truncate(h.Interval)
 	key = key.UTC()
 
 	// get bucket
