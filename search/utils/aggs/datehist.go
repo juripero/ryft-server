@@ -3,6 +3,7 @@ package aggs
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,10 +17,11 @@ type DateHist struct {
 	Missing interface{} `json:"-" msgpack:"-"` // missing value
 
 	Interval time.Duration `json:"-" msgpack:"-"`
-	Timezone string        `json:"-" msgpack:"-"`
-	Format   string        `json:"-" msgpack:"-"`
+	//Offset time.Duration
+	//Timezone string        `json:"-" msgpack:"-"`
+	//Format   string        `json:"-" msgpack:"-"`
 
-	Buckets map[string]*dateHistBucket `json:"buckets,omitempty" msgpack:"buckets,omitempty"`
+	Buckets map[time.Time]*dateHistBucket `json:"buckets,omitempty" msgpack:"buckets,omitempty"`
 
 	// initial engine (prototype) that will be used for all buckets
 	subAggs *Aggregations `json:"-" msgpack:"-"`
@@ -27,8 +29,6 @@ type DateHist struct {
 
 // data_histogram bucket
 type dateHistBucket struct {
-	Key time.Time `json:"key" msgpack:"key"`
-
 	// number of records added to this bucket
 	Count int64 `json:"count" msgpack:"count"`
 
@@ -41,9 +41,9 @@ func (h *DateHist) clone() *DateHist {
 	n := *h
 
 	n.subAggs = h.subAggs.clone()
+	n.Buckets = make(map[time.Time]*dateHistBucket)
 	for k, v := range h.Buckets {
 		n.Buckets[k] = &dateHistBucket{
-			Key:     v.Key,
 			Count:   v.Count,
 			SubAggs: v.SubAggs.clone(),
 		}
@@ -95,18 +95,23 @@ func (h *DateHist) Add(data interface{}) error {
 		return fmt.Errorf("failed to parse datetime field: %s", err)
 	}
 
-	ts = ts.Truncate(h.Interval)
-	key := ts.String()
+	// TODO: convert ts to timezone and add custom offset!
+	key := ts.Truncate(h.Interval)
+	key = key.UTC()
 
 	// get bucket
 	var bucket *dateHistBucket
 	if b, ok := h.Buckets[key]; !ok {
 		bucket = &dateHistBucket{
-			Key:     ts,
 			Count:   0,
 			SubAggs: h.subAggs.clone(),
 		}
-		h.Buckets[key] = bucket // put it back
+
+		// put it back
+		if h.Buckets == nil {
+			h.Buckets = make(map[time.Time]*dateHistBucket)
+		}
+		h.Buckets[key] = bucket
 	} else {
 		bucket = b
 	}
@@ -167,20 +172,20 @@ type dateHistFunc struct {
 
 // ToJson
 func (f *dateHistFunc) ToJson() interface{} {
-	keys := make([]string, 0, len(f.engine.Buckets))
+	keys := make([]time.Time, 0, len(f.engine.Buckets))
 	for k, _ := range f.engine.Buckets {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	sort.Sort(TimeSlice(keys))
 
 	var buckets []interface{}
 	for _, k := range keys {
 		bucket := f.engine.Buckets[k]
-		keyAsString := "" //bucket.Key.String() // .Format(f.engine.Format)
+		keyAsString := k.String() // .Format(f.engine.Format)
 		buckets = append(buckets,
 			map[string]interface{}{
 				"key_as_string": keyAsString,
-				"key":           bucket.Key.UnixNano() / 1000000, // ns -> ms
+				"key":           msecFromTime(k),
 				"doc_count":     bucket.Count,
 			})
 	}
@@ -207,15 +212,18 @@ func (f *dateHistFunc) clone() (Function, Engine) {
 
 // make new "date_histrogram" aggregation
 func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFunc, error) {
+	// field to get datetime from
 	field, err := getFieldOpt("field", opts, iNames)
 	if err != nil {
-		return nil, fmt.Errorf(`bad "field": %s`, err)
+		return nil, err
 	}
+
+	// rounding interval
 	interval_, err := getStringOpt("interval", opts)
 	if err != nil {
-		return nil, fmt.Errorf(`bad "interval": %s`, err)
+		return nil, err
 	}
-	interval, err := time.ParseDuration(interval_)
+	interval, err := parseInterval(interval_)
 	if err != nil {
 		return nil, fmt.Errorf(`bad "interval": %s`, err)
 	}
@@ -249,11 +257,50 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 		Interval: interval,
 		//Timezone: timezone,
 		//Format:   format,
-		Buckets: make(map[string]*dateHistBucket),
 		subAggs: subAggs,
 	}
 
 	return &dateHistFunc{
 		engine: engine,
 	}, nil
+}
+
+// parse the date-time field
+func parseDateTime(val interface{}, formatHint string) (time.Time, error) {
+	// get value as a string
+	s, err := utils.AsString(val)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to get datetime field: %s", err)
+	}
+
+	// convert string to timestamp
+	t, err := dateparse.ParseLocal(s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse datetime field: %s", err)
+	}
+
+	return t, nil // OK
+}
+
+// parse the interval option
+func parseInterval(val string) (time.Duration, error) {
+	// TODO: support for years, month etc...
+	return time.ParseDuration(val)
+}
+
+// TimeSlice attaches the methods of sort.Interface to []time.Time, sorting in increasing order.
+type TimeSlice []time.Time
+
+func (p TimeSlice) Len() int           { return len(p) }
+func (p TimeSlice) Less(i, j int) bool { return p[i].Before(p[j]) }
+func (p TimeSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+// Time as milliseconds since Unix epoch
+type msecFromTime time.Time
+
+// Format as int64, not as float64!
+func (t msecFromTime) MarshalJSON() ([]byte, error) {
+	msec := time.Time(t).UnixNano() / 1000000 // ns -> ms
+	s := strconv.FormatInt(msec, 10)
+	return []byte(s), nil // OK
 }

@@ -10,23 +10,34 @@ import (
 
 // populate engine with stat data
 func testDateHistPopulate(t *testing.T, engine Engine) {
-	assert.NoError(t, engine.Add(map[string]interface{}{"Data": "1", "Date": "04/15/2015 11:59:00 PM", "UpdatedOn": "04/22/2015 12:47:10 PM", "Year": "2015"}))
-	assert.NoError(t, engine.Add(map[string]interface{}{"Data": "2", "Date": "04/15/2015 11:55:00 PM", "UpdatedOn": "04/22/2015 12:47:10 PM", "Year": "2015"}))
-	assert.NoError(t, engine.Add(map[string]interface{}{"Data": "3", "Date": "05/15/2015 11:55:00 PM", "UpdatedOn": "06/22/2015 12:47:10 PM", "Year": "2015"}))
-	assert.NoError(t, engine.Add(map[string]interface{}{"Data": "4", "Date": "05/20/2015 11:55:00 PM", "UpdatedOn": "06/22/2015 12:47:10 PM", "Year": "2015"}))
-	assert.NoError(t, engine.Add(map[string]interface{}{"Data": "5", "Date": "11/01/2016 11:55:00 PM", "UpdatedOn": "01/01/2017 12:47:10 PM", "Year": "2016"}))
-	assert.NoError(t, engine.Add(map[string]interface{}{"Data": "6", "Date": "01/02/2017 11:55:00 PM", "UpdatedOn": "01/02/2017 12:47:10 PM", "Year": "2017"}))
-	assert.NoError(t, engine.Add(map[string]interface{}{"Data": "7", "Date": "02/02/2017 07:00:00 AM", "UpdatedOn": "02/02/2017 07:00:49 PM", "Year": "2017"}))
+	jsonData := `[
+{"foo": {"bar":1.1}, "created": "Tue, 07 Nov 2017 03:15:01 GMT", "updated": "Tue, 07 Nov 2017 04:15:01 GMT" },
+{"foo": {"bar":2.2}, "created": "Tue, 07 Nov 2017 04:15:02 GMT", "updated": "Tue, 07 Nov 2017 04:45:02 GMT" },
+{"foo": {"bar":3.3}, "created": "Tue, 07 Nov 2017 04:35:03 GMT", "updated": "Tue, 07 Nov 2017 05:30:03 GMT" },
+{"foo": {"bar":4.4}, "created": "Tue, 07 Nov 2017 04:46:04 GMT", "updated": "Tue, 07 Nov 2017 06:15:04 GMT" },
+{"foo": {"bar":5.5}, "created": "Tue, 07 Nov 2017 05:15:05 GMT", "updated": "Tue, 07 Nov 2017 06:30:05 GMT" },
+{"foo": {"bar":6.6}, "created": "Tue, 07 Nov 2017 05:31:06 GMT", "updated": "Tue, 07 Nov 2017 06:45:06 GMT" },
+{"foo": {"bar":7.7}, "created": "Tue, 07 Nov 2017 06:10:07 GMT", "updated": "Tue, 07 Nov 2017 07:10:07 GMT" },
+{"foo": {"bar":8.8},"?created": "Tue, 07 Nov 2017 21:10:08 GMT","?updated": "Tue, 07 Nov 2017 21:10:08 GMT" }
+	]`
+
+	var data []map[string]interface{}
+	if assert.NoError(t, json.Unmarshal([]byte(jsonData), &data)) {
+		for _, d := range data {
+			if !assert.NoError(t, engine.Add(d)) {
+				break
+			}
+		}
+	}
 }
 
 // date_histogram engine test
 func TestDateHistEngine(t *testing.T) {
-	check := func(interval time.Duration, missing interface{}, expected string) {
+	check := func(field string, interval string, missing interface{}, expected string) {
 		hist := &DateHist{
-			Field:    mustParseField("Date"),
-			Interval: interval,
+			Field:    mustParseField(field),
+			Interval: mustParseInterval(interval),
 			Missing:  missing,
-			Buckets:  make(map[string]*dateHistBucket),
 		}
 
 		testDateHistPopulate(t, hist)
@@ -37,15 +48,31 @@ func TestDateHistEngine(t *testing.T) {
 		}
 	}
 
-	check(24*time.Hour, nil, `
-{ "buckets": {
-  "2015-04-15 03:00:00 +0300 MSK":{"key":"2015-04-15T03:00:00+03:00", "count":2},
-  "2015-05-15 03:00:00 +0300 MSK":{"key":"2015-05-15T03:00:00+03:00", "count":1},
-  "2015-05-20 03:00:00 +0300 MSK":{"key":"2015-05-20T03:00:00+03:00", "count":1},
-  "2016-11-01 03:00:00 +0300 MSK":{"key":"2016-11-01T03:00:00+03:00", "count":1},
-  "2017-01-02 03:00:00 +0300 MSK":{"key":"2017-01-02T03:00:00+03:00", "count":1},
-  "2017-02-02 03:00:00 +0300 MSK":{"key":"2017-02-02T03:00:00+03:00", "count":1}
-}}`)
+	check("created", "1h", nil, `
+{"buckets":{
+"2017-11-07T03:00:00Z":{"count":1},
+"2017-11-07T04:00:00Z":{"count":3},
+"2017-11-07T05:00:00Z":{"count":2},
+"2017-11-07T06:00:00Z":{"count":1}
+	}}`)
+
+	check("created", "1h", "Tue, 07 Nov 2017 21:10:08 GMT", `
+{"buckets":{
+"2017-11-07T03:00:00Z":{"count":1},
+"2017-11-07T04:00:00Z":{"count":3},
+"2017-11-07T05:00:00Z":{"count":2},
+"2017-11-07T06:00:00Z":{"count":1},
+"2017-11-07T21:00:00Z":{"count":1}
+	}}`)
+
+	check("updated", "1h", nil, `
+{"buckets":{
+"2017-11-07T04:00:00Z":{"count":2},
+"2017-11-07T05:00:00Z":{"count":1},
+"2017-11-07T06:00:00Z":{"count":3},
+"2017-11-07T07:00:00Z":{"count":1}
+	}}`)
+
 }
 
 // check "date_histogram"
@@ -70,16 +97,23 @@ func TestDateHistFunc(t *testing.T) {
 	check(`{"no-field":"foo"}`, `no "field" option found`)
 	check(`{"field":"foo", "no-interval":"---"}`, `no "interval" option found`)
 
-	check(`{"field":"Date", "interval":"24h"}`, `
+	check(`{"field":"created", "interval":"1h"}`, `
 {"buckets": [
-  {"doc_count":2, "key":1.429056e+12, "key_as_string":""},
-  {"doc_count":1, "key":1.431648e+12, "key_as_string":""},
-  {"doc_count":1, "key":1.43208e+12, "key_as_string":""},
-  {"doc_count":1, "key":1.4779584e+12, "key_as_string":""},
-  {"doc_count":1, "key":1.4833152e+12, "key_as_string":""},
-  {"doc_count":1, "key":1.4859936e+12, "key_as_string":""}
-]}`)
+{"key":1510023600000, "key_as_string":"2017-11-07 03:00:00 +0000 UTC", "doc_count":1},
+{"key":1510027200000, "key_as_string":"2017-11-07 04:00:00 +0000 UTC", "doc_count":3},
+{"key":1510030800000, "key_as_string":"2017-11-07 05:00:00 +0000 UTC", "doc_count":2},
+{"key":1510034400000, "key_as_string":"2017-11-07 06:00:00 +0000 UTC", "doc_count":1}
+	]}`)
 
 	//check(`{"field":"Date", "interval":"24h", "missing": "TODO missing date"}`, `{"value": 1750}`)
 	//check(`{"field":"Date", "interval":"", "missing":"TODO missing date"}`, `{"value": 1750}`)
+}
+
+// parse interval, panic in case of error
+func mustParseInterval(interval string) time.Duration {
+	if d, err := parseInterval(interval); err != nil {
+		panic(err)
+	} else {
+		return d
+	}
 }
