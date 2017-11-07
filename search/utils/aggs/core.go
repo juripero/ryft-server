@@ -40,6 +40,11 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
+const (
+	AGGS_NAME = "_aggs"
+	// INAMES = "_names"
+)
+
 // Engine is abstract aggregation engine
 type Engine interface {
 	Name() string
@@ -83,6 +88,16 @@ func (a *Aggregations) GetOpts() map[string]interface{} {
 
 // Clone clones the aggregation engines and functions
 func (a *Aggregations) Clone() search.Aggregations {
+	if a == nil {
+		// IMPORTANT to report nil interface!
+		return nil // nothing to clone
+	}
+
+	return a.clone()
+}
+
+// clones the aggregation engines and functions
+func (a *Aggregations) clone() *Aggregations {
 	if a == nil {
 		return nil // nothing to clone
 	}
@@ -251,6 +266,11 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 			return string(raw), nil
 		}
 
+	case "-":
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return nil, fmt.Errorf("bad format")
+		}
+
 	default:
 		// see failure check at the end
 	}
@@ -376,7 +396,8 @@ func newFunc(aggType string, opts map[string]interface{}, iNames []string) (Func
 		} else {
 			return nil, nil, err // failed
 		}
-	case "date_histogram", "date-histogram":
+
+	case "date_histogram", "date-histogram", "date_hist", "date-hist":
 		if f, err := newDateHistFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
