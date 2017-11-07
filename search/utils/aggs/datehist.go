@@ -20,14 +20,14 @@ type DateHist struct {
 	//Timezone string        `json:"-" msgpack:"-"`
 	//Format   string        `json:"-" msgpack:"-"`
 
-	Buckets map[time.Time]*dateHistBucket `json:"buckets,omitempty" msgpack:"buckets,omitempty"`
+	Buckets map[time.Time]*Bucket `json:"buckets,omitempty" msgpack:"buckets,omitempty"`
 
 	// initial engine (prototype) that will be used for all buckets
 	subAggs *Aggregations `json:"-" msgpack:"-"`
 }
 
 // data_histogram bucket
-type dateHistBucket struct {
+type Bucket struct {
 	// number of records added to this bucket
 	Count int64 `json:"count" msgpack:"count"`
 
@@ -35,14 +35,29 @@ type dateHistBucket struct {
 	SubAggs *Aggregations `json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 }
 
+// add custom data to the bucker
+func (b *Bucket) Add(data interface{}) error {
+	if b.SubAggs != nil {
+		// add already parsed data to bucket's engines
+		for _, engine := range b.SubAggs.engines {
+			if err := engine.Add(data); err != nil {
+				return err
+			}
+		}
+	}
+
+	b.Count += 1
+	return nil // OK
+}
+
 // clone the engine
 func (h *DateHist) clone() *DateHist {
 	n := *h
 
 	n.subAggs = h.subAggs.clone()
-	n.Buckets = make(map[time.Time]*dateHistBucket)
+	n.Buckets = make(map[time.Time]*Bucket)
 	for k, v := range h.Buckets {
-		n.Buckets[k] = &dateHistBucket{
+		n.Buckets[k] = &Bucket{
 			Count:   v.Count,
 			SubAggs: v.SubAggs.clone(),
 		}
@@ -95,32 +110,26 @@ func (h *DateHist) Add(data interface{}) error {
 	key = key.UTC()
 
 	// get bucket
-	var bucket *dateHistBucket
+	var bucket *Bucket
 	if b, ok := h.Buckets[key]; !ok {
-		bucket = &dateHistBucket{
-			Count:   0,
+		bucket = &Bucket{
 			SubAggs: h.subAggs.clone(),
 		}
 
 		// put it back
 		if h.Buckets == nil {
-			h.Buckets = make(map[time.Time]*dateHistBucket)
+			h.Buckets = make(map[time.Time]*Bucket)
 		}
 		h.Buckets[key] = bucket
 	} else {
 		bucket = b
 	}
 
-	if bucket.SubAggs != nil {
-		// add already parsed data to bucket's engines
-		for _, engine := range bucket.SubAggs.engines {
-			if err := engine.Add(data); err != nil {
-				return fmt.Errorf("sub-aggs failed: %s", err)
-			}
-		}
+	// populate bucket
+	if err := bucket.Add(data); err != nil {
+		return fmt.Errorf("sub-aggs failed: %s", err)
 	}
 
-	bucket.Count += 1
 	return nil // OK
 }
 
@@ -175,7 +184,7 @@ func (f *dateHistFunc) ToJson() interface{} {
 	for k, _ := range f.engine.Buckets {
 		keys = append(keys, k)
 	}
-	sort.Sort(TimeSlice(keys))
+	sort.Sort(timeSlice(keys))
 
 	var ares []interface{}
 	var mres map[string]interface{}
@@ -337,8 +346,8 @@ func parseInterval(val string) (time.Duration, error) {
 }
 
 // TimeSlice attaches the methods of sort.Interface to []time.Time, sorting in increasing order.
-type TimeSlice []time.Time
+type timeSlice []time.Time
 
-func (p TimeSlice) Len() int           { return len(p) }
-func (p TimeSlice) Less(i, j int) bool { return p[i].Before(p[j]) }
-func (p TimeSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p timeSlice) Len() int           { return len(p) }
+func (p timeSlice) Less(i, j int) bool { return p[i].Before(p[j]) }
+func (p timeSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
