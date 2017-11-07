@@ -182,12 +182,18 @@ func (f *dateHistFunc) ToJson() interface{} {
 	for _, k := range keys {
 		bucket := f.engine.Buckets[k]
 		keyAsString := k.String() // .Format(f.engine.Format)
-		buckets = append(buckets,
-			map[string]interface{}{
-				"key_as_string": keyAsString,
-				"key":           msecFromTime(k),
-				"doc_count":     bucket.Count,
-			})
+		b := map[string]interface{}{
+			"key_as_string": keyAsString,
+			"key":           msecFromTime(k),
+			"doc_count":     bucket.Count,
+		}
+		if bucket.SubAggs != nil {
+			subAggs := bucket.SubAggs.ToJson(true)
+			for k, v := range subAggs {
+				b[k] = v
+			}
+		}
+		buckets = append(buckets, b)
 	}
 
 	// TODO: keyed, min_doc_count, extended_bounds etc...

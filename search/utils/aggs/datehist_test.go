@@ -105,6 +105,18 @@ func TestDateHistFunc(t *testing.T) {
 {"key":1510034400000, "key_as_string":"2017-11-07 06:00:00 +0000 UTC", "doc_count":1}
 	]}`)
 
+	check(`{"field":"created", "interval":"1h", "_aggs":{
+"my_min":{"min":{"field":"foo.bar"}},
+"my_max":{"max":{"field":"foo.bar"}},
+"my_sum":{"sum":{"field":"foo.bar"}}
+}}`,
+		`{"buckets": [
+{"key":1510023600000, "key_as_string":"2017-11-07 03:00:00 +0000 UTC", "doc_count":1, "my_min":{"value":1.1}, "my_max":{"value":1.1}, "my_sum":{"value":1.1}},
+{"key":1510027200000, "key_as_string":"2017-11-07 04:00:00 +0000 UTC", "doc_count":3, "my_min":{"value":2.2}, "my_max":{"value":4.4}, "my_sum":{"value":9.9}},
+{"key":1510030800000, "key_as_string":"2017-11-07 05:00:00 +0000 UTC", "doc_count":2, "my_min":{"value":5.5}, "my_max":{"value":6.6}, "my_sum":{"value":12.1}},
+{"key":1510034400000, "key_as_string":"2017-11-07 06:00:00 +0000 UTC", "doc_count":1, "my_min":{"value":7.7}, "my_max":{"value":7.7}, "my_sum":{"value":7.7}}
+	]}`)
+
 	//check(`{"field":"Date", "interval":"24h", "missing": "TODO missing date"}`, `{"value": 1750}`)
 	//check(`{"field":"Date", "interval":"", "missing":"TODO missing date"}`, `{"value": 1750}`)
 }

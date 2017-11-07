@@ -130,7 +130,7 @@ func (a *Aggregations) clone() *Aggregations {
 // ToJson saves all aggregations to JSON
 // if final is true then all functions are reported
 // otherwise the all engines are reported (cluster mode).
-func (a *Aggregations) ToJson(final bool) interface{} {
+func (a *Aggregations) ToJson(final bool) map[string]interface{} {
 	res := make(map[string]interface{})
 	if a == nil {
 		return res // empty
