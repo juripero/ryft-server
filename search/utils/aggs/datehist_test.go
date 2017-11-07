@@ -1,6 +1,7 @@
 package aggs
 
 import (
+	"encoding/json"
 	"log"
 	"testing"
 
@@ -26,5 +27,7 @@ func TestDateHistogramEngine(t *testing.T) {
 	assert.NoError(t, err)
 	testPopulate(t, fn.engine)
 	res := fn.ToJson()
-	log.Printf("result %s", res)
+	res, err = json.Marshal(res)
+	assert.NoError(t, err)
+	log.Printf("jsonified %s", res)
 }

@@ -13,11 +13,10 @@ type DateHist struct {
 	Interval string      `json:"-" msgpack:"-"`
 	Timezone string      `json:"-" msgpack:"-"`
 	Format   string      `json:"-" msgpack:"-"`
+	flags    int
 
-	flags int
-
-	Engine  Engine                   `json:"engine" msgpack:"engine"` // initial engine that will be used for all buckets
-	Buckets map[time.Duration]Engine `json:"buckets" msgpack:"buckets"`
+	Engine  Engine               `json:"engine" msgpack:"engine"` // initial engine that will be used for all buckets
+	Buckets map[time.Time]Engine `json:"buckets" msgpack:"buckets"`
 }
 
 // Name returns unique token for the current Engine
@@ -32,9 +31,15 @@ func (d *DateHist) Name() string {
 	return fmt.Sprintf("datehist.%s", strings.Join(name, "/"))
 }
 
-// bucketName counts name of a bucket where an element should fall into
-func (d DateHist) Key(data interface{}) (time.Duration, error) {
-	return time.Duration(0), nil
+// Key counts name of a bucket where an element should fall into
+func (d DateHist) Key(data interface{}) (time.Time, error) {
+	fd := d.Field.String()
+	ts, err := time.Parse("04/15/2015 11:59:00 PM", fd)
+	if err != nil {
+		return time.Now(), err
+	}
+
+	return ts, nil
 }
 
 // ToJson get object that can be serialized to JSON
@@ -107,9 +112,10 @@ func (f *dateHistFunc) ToJson() interface{} {
 			continue
 		}
 
+		keyAsString := name.Format(f.engine.Format)
 		buckets = append(buckets, map[string]interface{}{
-			"key_as_string": time.UTC.String(),
-			"key":           name,
+			"key_as_string": keyAsString,
+			"key":           name.UnixNano() / 1000000, // return in milliseconds since the epoch
 			"doc_count":     data.Count,
 		})
 	}
@@ -142,7 +148,10 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 	}
 
 	timezone, _ := getStringOpt("timezone", opts)
-	format, _ := getStringOpt("format", opts)
+	format, err := getStringOpt("format", opts)
+	if err != nil {
+		format = time.RFC3339Nano
+	}
 
 	// TODO: extract sub-aggregations here
 	countFunc, err := newCountFunc(opts, iNames)
@@ -157,7 +166,7 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 			Timezone: timezone,
 			Format:   format,
 			Engine:   countFunc.engine,
-			Buckets:  make(map[time.Duration]Engine),
+			Buckets:  make(map[time.Time]Engine),
 		},
 	}, nil
 }
