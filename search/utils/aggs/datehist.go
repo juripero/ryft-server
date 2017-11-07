@@ -3,7 +3,6 @@ package aggs
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -199,7 +198,7 @@ func (f *dateHistFunc) ToJson() interface{} {
 		keyAsString := k.String() // .Format(f.engine.Format)
 		b := map[string]interface{}{
 			"key_as_string": keyAsString,
-			"key":           msecFromTime(k),
+			"key":           k.UnixNano() / 1000000, // ns -> ms
 			"doc_count":     bucket.Count,
 		}
 		if bucket.SubAggs != nil {
@@ -347,13 +346,3 @@ type TimeSlice []time.Time
 func (p TimeSlice) Len() int           { return len(p) }
 func (p TimeSlice) Less(i, j int) bool { return p[i].Before(p[j]) }
 func (p TimeSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
-// Time as milliseconds since Unix epoch
-type msecFromTime time.Time
-
-// Format as int64, not as float64!
-func (t msecFromTime) MarshalJSON() ([]byte, error) {
-	msec := time.Time(t).UnixNano() / 1000000 // ns -> ms
-	s := strconv.FormatInt(msec, 10)
-	return []byte(s), nil // OK
-}
