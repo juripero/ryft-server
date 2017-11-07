@@ -173,7 +173,8 @@ func (a *Aggregations) Add(rawData []byte) error {
 
 // merge another (intermediate) aggregation engines
 func (a *Aggregations) Merge(data_ interface{}) error {
-	if data, ok := data_.(map[string]interface{}); ok {
+	switch data := data_.(type) {
+	case map[string]interface{}:
 		for _, engine := range a.engines {
 			if im, ok := data[engine.Name()]; ok {
 				if err := engine.Merge(im); err != nil {
@@ -183,7 +184,19 @@ func (a *Aggregations) Merge(data_ interface{}) error {
 				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
 			}
 		}
-	} else {
+
+	case *Aggregations:
+		for _, engine := range a.engines {
+			if im, ok := data.engines[engine.Name()]; ok {
+				if err := engine.Merge(im); err != nil {
+					return fmt.Errorf("failed to merge intermediate aggregation: %s", err)
+				}
+			} else {
+				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
+			}
+		}
+
+	default:
 		return fmt.Errorf("data is not a map")
 	}
 

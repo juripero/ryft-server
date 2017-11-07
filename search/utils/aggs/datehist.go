@@ -50,6 +50,46 @@ func (b *Bucket) Add(data interface{}) error {
 	return nil // OK
 }
 
+// merge the bucket (native)
+func (b *Bucket) merge(other *Bucket) error {
+	// merge sub-aggregations
+	if b.SubAggs != nil {
+		if err := b.SubAggs.Merge(other.SubAggs); err != nil {
+			return err
+		}
+	}
+
+	b.Count += other.Count
+	return nil // OK
+}
+
+// merge the bucket (map)
+func (b *Bucket) mergeMap(data_ interface{}) error {
+	data, ok := data_.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("not a valid data")
+	}
+
+	// count is important
+	count, err := utils.AsInt64(data["count"])
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return nil // nothing to merge
+	}
+
+	// merge sub-aggregations
+	if b.SubAggs != nil {
+		if err := b.SubAggs.Merge(data["aggs"]); err != nil {
+			return err
+		}
+	}
+
+	b.Count += count
+	return nil // OK
+}
+
 // clone the engine
 func (h *DateHist) clone() *DateHist {
 	n := *h
@@ -74,7 +114,21 @@ func (h *DateHist) Name() string {
 		//fmt.Sprintf("timezone::%s", h.Timezone),
 		//fmt.Sprintf("format::%s", h.Format),
 	}
-	//fmt.Sprintf("engine::%s", h.subAggs.Name()),
+
+	// optional "missing" value
+	if h.Missing != nil {
+		name = append(name, fmt.Sprintf("missing::%s", h.Missing))
+	}
+
+	// names of all sub-aggregations
+	if h.subAggs != nil {
+		var subAggs []string
+		for _, e := range h.subAggs.engines {
+			subAggs = append(subAggs, e.Name())
+		}
+		name = append(name, fmt.Sprintf("sub-aggs<%s>",
+			strings.Join(subAggs, "|")))
+	}
 
 	return fmt.Sprintf("datehist.%s", strings.Join(name, "/"))
 }
@@ -134,39 +188,70 @@ func (h *DateHist) Add(data interface{}) error {
 }
 
 // Merge merge another aggregation engine
-func (d *DateHist) Merge(data_ interface{}) error {
+func (h *DateHist) Merge(data_ interface{}) error {
 	switch data := data_.(type) {
 	case *DateHist:
-		return d.merge(data)
+		return h.merge(data)
 	case map[string]interface{}:
-		return d.mergeMap(data)
+		return h.mergeMap(data)
 	}
 
 	return fmt.Errorf("no valid data")
 }
 
 // merge another intermediate aggregation (native)
-func (d *DateHist) merge(other *DateHist) error {
-	/*for k, engine := range other.Buckets {
-		if _, ok := d.Buckets[k]; ok {
-			d.Buckets[k].Merge(engine)
+func (h *DateHist) merge(other *DateHist) error {
+	for k, b := range other.Buckets {
+		if bb, ok := h.Buckets[k]; ok {
+			if err := bb.merge(b); err != nil {
+				return err
+			}
 		} else {
-			d.Buckets[k] = engine
+			// bucket was missing
+			h.Buckets[k] = &Bucket{
+				Count:   b.Count,
+				SubAggs: b.SubAggs.clone(),
+			}
 		}
 	}
-	return nil */
-	return fmt.Errorf("merge is not implemented YET")
+
+	return nil
 }
 
 // merge another intermediate aggregation (map)
-func (d *DateHist) mergeMap(data map[string]interface{}) error {
-	/*return nil*/
+func (h *DateHist) mergeMap(data map[string]interface{}) error {
+	buckets, err := utils.AsStringMap(data["buckets"])
+	if err != nil {
+		return err
+	}
+
+	for kk, b := range buckets {
+		k, err := time.Parse(time.RFC3339, kk)
+		if err != nil {
+			return err
+		}
+
+		var bucket *Bucket
+		if bb, ok := h.Buckets[k]; !ok {
+			bucket := &Bucket{
+				SubAggs: h.subAggs.clone(),
+			}
+			h.Buckets[k] = bucket
+		} else {
+			bucket = bb
+		}
+
+		if err := bucket.mergeMap(b); err != nil {
+			return err
+		}
+	}
+
 	return fmt.Errorf("merge is not implemented YET")
 }
 
 // join another engine
-func (d *DateHist) Join(other Engine) {
-	panic(fmt.Errorf("join is not implemented YET"))
+func (h *DateHist) Join(other Engine) {
+	// nothing to share
 }
 
 // "date_histogram" aggregation function
