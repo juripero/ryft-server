@@ -61,7 +61,8 @@ type SearchShowParams struct {
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
 
 	// aggregations
-	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 
 	// tweaks
 	Tweaks struct {
@@ -195,7 +196,8 @@ func (server *Server) doSearchShow(ctx *gin.Context, params SearchShowParams) {
 	cfg.Tweaks.Format = tcode_opts
 
 	// aggregations
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations,
+	cfg.Aggregations, err = aggs.MakeAggs(
+		selectAggsOpts(params.ShortAggs, params.LongAggs),
 		cfg.DataFormat, tcode_opts)
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).

@@ -1,5 +1,5 @@
 # backend options tweaks
-d
+
 There described new section in the `ryft-server.conf` that allow user to tune backend options in order to achieve better performance.
 
 Part of config:

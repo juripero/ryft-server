@@ -53,25 +53,14 @@ type fieldInt int
 // Field is an array of fieldStr or fieldInt
 type Field []interface{}
 
-// ParseField parses the string field
-func ParseField(field string) (Field, error) {
-	return ParseFieldEx(field, nil, nil)
+// MakeIntField parses the integer field
+func MakeIntField(field int) Field {
+	return Field{fieldInt(field)}
 }
 
-// ParseFieldEx parses the string field and replaces string to integer if applied
-func ParseFieldEx(field string, stringToIndex []string, indexToString []string) (Field, error) {
+// ParseField parses the string field
+func ParseField(field string) (Field, error) {
 	s := query.NewScannerString(field)
-
-	// find string index
-	findStr := func(s string) int {
-		for i, v := range stringToIndex {
-			if s == v {
-				return i
-			}
-		}
-
-		return -1 // not found
-	}
 
 	var res Field
 	for {
@@ -83,12 +72,7 @@ func ParseFieldEx(field string, stringToIndex []string, indexToString []string) 
 
 		switch tok {
 		case query.IDENT, query.STRING, query.INT:
-			name := lex.Unquoted()
-			if index := findStr(name); index >= 0 {
-				res = append(res, fieldInt(index))
-			} else {
-				res = append(res, fieldStr(name))
-			}
+			res = append(res, fieldStr(lex.Unquoted()))
 
 		case query.PERIOD:
 		// just ignore the dot
@@ -99,11 +83,7 @@ func ParseFieldEx(field string, stringToIndex []string, indexToString []string) 
 					if x, err := strconv.ParseInt(idx.String(), 10, 32); err != nil {
 						return nil, fmt.Errorf("failed to parse field index: %s", err)
 					} else {
-						if 0 <= x && x < int64(len(indexToString)) {
-							res = append(res, fieldStr(indexToString[x]))
-						} else {
-							res = append(res, fieldInt(int(x)))
-						}
+						res = append(res, fieldInt(int(x)))
 					}
 				} else {
 					return nil, fmt.Errorf("%s found instead of ]", end.String())
@@ -134,6 +114,54 @@ func (field Field) String() string {
 	}
 
 	return strings.Join(res, ".")
+}
+
+// StringToIndex replaces the known names with indexes
+func (field Field) StringToIndex(knownNames []string) Field {
+	if len(knownNames) == 0 {
+		return field // as is
+	}
+
+	// build the map of names
+	names := make(map[string]int)
+	for i, v := range knownNames {
+		names[v] = i
+	}
+
+	res := make(Field, 0, len(field))
+	for _, f := range field {
+		if s, ok := f.(fieldStr); ok {
+			if index, ok := names[string(s)]; ok {
+				res = append(res, fieldInt(index))
+				continue // replaced
+			}
+		}
+
+		res = append(res, f) // as is
+	}
+
+	return res
+}
+
+// IndexToString replaces the indexes to known names
+func (field Field) IndexToString(knownNames []string) Field {
+	if len(knownNames) == 0 {
+		return field // as is
+	}
+
+	res := make(Field, 0, len(field))
+	for _, f := range field {
+		if x, ok := f.(fieldInt); ok {
+			if 0 <= x && int(x) < len(knownNames) {
+				res = append(res, fieldStr(knownNames[x]))
+				continue // replaced
+			}
+		}
+
+		res = append(res, f) // as is
+	}
+
+	return res
 }
 
 // GetValue gets the nested value on map[string]interface{} or []interface{}

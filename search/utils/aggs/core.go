@@ -194,7 +194,11 @@ func getFieldOpt(name string, opts map[string]interface{}, iNames []string) (uti
 	if field, err := getStringOpt(name, opts); err != nil {
 		return nil, err
 	} else {
-		return utils.ParseFieldEx(field, iNames, nil)
+		f, err := utils.ParseField(field)
+		if err != nil {
+			return nil, err
+		}
+		return f.StringToIndex(iNames), nil
 	}
 }
 

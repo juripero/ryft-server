@@ -10,8 +10,11 @@ import (
 func TestParseField(t *testing.T) {
 	// check
 	check_ex := func(field string, str2idx []string, idx2str []string, expected ...interface{}) {
-		f, err := ParseFieldEx(field, str2idx, idx2str)
+		f, err := ParseField(field)
 		if assert.NoError(t, err) {
+			f = f.StringToIndex(str2idx)
+			f = f.IndexToString(idx2str)
+
 			var ef Field
 			for _, e := range expected {
 				switch v := e.(type) {
@@ -57,6 +60,7 @@ func TestParseField(t *testing.T) {
 
 	tmp := Field{fieldStr("a"), fieldInt(5), fieldStr("b")}
 	assert.EqualValues(t, tmp.String(), "a.[5].b")
+	assert.EqualValues(t, MakeIntField(555).String(), "[555]")
 }
 
 // test nested field access

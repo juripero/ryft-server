@@ -3,11 +3,18 @@ There are a few REST API endpoints related to search:
 - [/search](#search)
 - [/count](#count)
 - [/search/show](#show)
+- [/search/aggs](#aggregations)
 
 First one reports the data found. The seconds one reports
 just search statistics, but no found records.
 
 The `search/show` endpoint is used to access already existing results.
+The `search/aggs` endpoint is used to run custom aggregations on
+already existing results.
+
+Note, although the main methods `/search` and `/count` are GET
+the POST is also supported. All parameters can be passed within
+request's body. See [POST Search](#post-search) for more details.
 
 
 # Search
@@ -21,7 +28,6 @@ There are a few [content types](#search-accept-header) that server can produce:
 - `Accept: application/json` which is used by default
 - `Accept: text/csv`
 - `Accept: application/msgpack` which is used internally in cluster mode
-
 
 ## Search query parameters
 
@@ -41,6 +47,7 @@ The list of supported query parameters are the following (check detailed descrip
 | `fields`      | string  | [The set of fields to get](#search-fields-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `backend`     | string  | [The backend tool](#search-backend-parameter). |
+| `backend-mode` | string | [The backend mode](#search-backend-mode-parameter). |
 | `backend-option`| string | [The backend tool options](#search-backend-option-parameter). |
 | `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
@@ -147,6 +154,7 @@ empty statistics is reported instead of error.
 - `cs` for currency search
 - `ipv4` for IPv4 search
 - `ipv6` for IPv6 search
+- `pcre2` for PCRE2 regex search
 
 If no search mode is specified, exact search is used **by default** for simple queries.
 It is also possible to automatically detect search modes: if search query contains `DATE`
@@ -189,13 +197,13 @@ The input data format for the structured search.
 **By default** structured search uses `format=raw` format.
 That means that found data are reported as base-64 encoded raw bytes.
 
-There are two other options: `format=xml` and `format=json`.
+There are a few other options: `format=xml`, `format=json` and `format=csv`.
 
 If input file set contains XML data, the found records could be decoded.
 Just pass `format=xml` query parameter and records will be translated
 from XML to JSON.
 
-The same is true for JSON data.
+The same is true for JSON and CSV data.
 
 See also [fields parameter](#search-fields-parameter).
 
@@ -250,7 +258,7 @@ The comma-separated list of fields for structured search. If omitted, all fields
 This parameter is used to minimize structured search output or to get just subset of fields.
 For example, to get identifier and date from a `*.pcrime` file pass `format=xml&fields=ID,Date`.
 
-The same is true for JSON data: `format=json&fields=Name,AlterEgo`.
+The same is true for JSON and CSV data: `format=json&fields=Name,AlterEgo`.
 
 
 ### Search `transform` parameter
@@ -277,6 +285,12 @@ And `ryftx` tool is used in case of `backend=ryftx`.
 
 If `backend` is empty (by default) then the most appropriate backend
 is selected automatically.
+
+
+### Search `backend-mode` parameter
+
+The set of preconfigured backend options can be selected via corresponding mode.
+Please see [backend options tweaks](../tweaks.md) for more details.
 
 
 ### Search `backend-option` parameter
@@ -473,31 +487,6 @@ to be able to decode input data on the fly:
 ```
 
 
-### Search `ep` parameter
-
-Helper "error prefix" flag for cluster mode. `ep=false` is used **by default**.
-
-To let user know which cluster node reports error `ryft-server` adds node's hostname to each error message:
-
-`ep=false` (used by default):
-
-```{.json}
-{
-    "message": "ryftprim failed ...",
-    "status": 500
-}
-```
-
-`ep=true` (used in cluster mode):
-
-```{.json}
-{
-    "message": "[ryftone-777]: ryftprim failed ...",
-   "status": 500
-}
-```
-
-
 ## Search examples
 
 ### Not structured request example
@@ -659,6 +648,7 @@ The list of supported query parameters are the following:
 | `reduce`      | boolean | [The reduce flag for FEDS](#search-reduce-parameter). |
 | `transform`   | string  | [The post-process transformation](#search-transform-parameter). |
 | `backend`     | string  | [The backend tool](#search-backend-parameter). |
+| `backend-mode` | string | [The backend mode](#search-backend-mode-parameter). |
 | `backend-option`| string | [The backend tool options](#search-backend-option-parameter). |
 | `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
 | `index`       | string  | [The name of INDEX file to keep](#search-data-and-index-parameters). |
@@ -764,3 +754,107 @@ parameters. Session contains all information about previous `/search` or `/count
 call (session token can be extracted from `stats.extra.session` field).
 
 Moreover, session is the only way to show results in cluster mode.
+
+
+# Aggregations
+
+To run custom aggregation on found records the [POST Search](#post-search)
+should be used. There is special JSON object under `"aggs"` key that
+describes all the aggregations that should be applied. For example:
+
+```{.json}
+{"aggs": {"my_stat": {"stats": {"field": "foo.bar"}} }}
+```
+
+See [aggregations document](./aggs.md) for the list of all avaialble
+aggregation functions and its properties.
+
+
+
+# POST Search
+
+The POST counterparts accept the JSON object in the request body.
+
+Note, any option can be overrided with corresponding URL query option
+because URL query has higher priority.
+
+But some options have no corresponding URL query option and can be
+specified only via JSON object in the request body.
+
+
+## POST search parameters
+
+The JSON object has the following fields:
+- `"query"` [The search expression](#search-query-parameter).
+- `"files"` [The set of files or catalogs to search](#search-file-parameter).
+- `"ignore-missing-files"` [The flag to report empty statistics for missing files](#search-file-parameter).
+- `"mode"` [The search mode](#search-mode-parameter).
+- `"surrounding"` [The data surrounding width](#search-surrounding-parameter).
+- `"fuzziness"` [The fuzziness distance](#search-fuzziness-parameter).
+- `"cs"` [The case sensitive flag](#search-cs-parameter).
+- `"reduce"` [The reduce flag for FEDS](#search-reduce-parameter).
+- `"nodes"` [The number of processing nodes](#search-nodes-parameter).
+- `"backend"` [The backend tool](#search-backend-parameter).
+- `"backend-options"` [The backend tool options](#search-backend-option-parameter).
+- `"backend-mode"` [The backend mode](#search-backend-mode-parameter).
+- `"data"` [The name of DATA file to keep](#search-data-and-index-parameters).
+- `"index"` [The name of INDEX file to keep](#search-data-and-index-parameters).
+- `"view"` [The name of VIEW file to keep](#search-data-and-index-parameters).
+- `"delimiter"` [The delimiter is used to separate found records](#search-delimiter-parameter).
+- `"lifetime"` [The output files lifetime](#search-lifetime-parameter).
+- `"limit"` [Limit the total number of records reported](#search-limit-parameter).
+- `"transforms"` [The post-process transformation](#search-transform-parameter).
+- `"format"` [The structured search format](#search-format-parameter).
+- `"fields"` [The set of fields to get](#search-fields-parameter).
+- `"stats"` [The statistics flag](#search-stats-parameter).
+- `"stream"` [The stream output format flag](#search-stream-parameters).
+- `"local"` [The local/cluster search flag](#search-local-parameter).
+- `"share-mode"` [The share mode used to access data files](#search-share-mode-parameter).
+- `"performance"` [Flag to report performance metrics](#search-performance-parameter).
+
+
+## POST search tweaks
+
+Under the `"tweaks"` key the following sections can be placed:
+- `"format"` [format tweaks](#post-search-format-tweaks)
+- `"cluster"` [cluster tweaks](#post-search-cluster-tweaks)
+
+
+### POST search format tweaks
+
+With the `"tweaks.format"` section it is possible to provide additional information
+about the data format used.
+
+In particular this section is very useful with the `CSV` data format. The following
+options can be customized for the CSV data format:
+- `separator` The CSV field separator
+- `columns` The list of column names
+- `array` The array output flag.
+
+Please see [corresponding demo](../demo/2017-11-02-csv-format.md) for more details.
+
+
+### POST search cluster tweaks
+
+With `"tweaks.cluster"` it is possible to override the [partitioning rules](../cluster.md#partitioning).
+The list of cluster nodes can be specified manually!
+
+```{.json}
+{"tweaks": {"cluster": [
+  {"location": "http://node-1:8765", "files":[ ... ]},
+  {"location": "http://node-2:8765", "files":[ ... ]},
+  ...
+]}}
+```
+
+The `tweaks.cluster` is an array of the cluster nodes. Each node contains:
+- `location` is the cluster node URL address
+- `files` optional list of files to search on that cluster node
+
+This feature is used by some plugins to override cluster rules.
+
+
+## POST search aggregations
+
+Under the `"aggs"` key the [aggregation](#aggregations) configuration is placed.
+See [aggregations document](./aggs.md) for more details.

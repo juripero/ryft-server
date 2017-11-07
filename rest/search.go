@@ -81,7 +81,8 @@ type SearchParams struct {
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
 
 	// aggregations
-	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 
 	// tweaks
 	Tweaks struct {
@@ -225,7 +226,8 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	cfg.Tweaks.Format = tcode_opts
 
 	// aggregations
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations,
+	cfg.Aggregations, err = aggs.MakeAggs(
+		selectAggsOpts(params.ShortAggs, params.LongAggs),
 		cfg.DataFormat, tcode_opts)
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
@@ -558,6 +560,20 @@ func updateSession(session *Session, stat *search.Stat) {
 
 	session.SetData("info", data)
 	stat.ClearSessionData(true)
+}
+
+// select one of "aggs" or "aggregations"
+func selectAggsOpts(a, b map[string]interface{}) map[string]interface{} {
+	if a != nil && b != nil {
+		panic(NewError(http.StatusBadRequest, "invalid aggregation configuration").
+			WithDetails(`both "aggs" and "aggregations" connot be provided`))
+	}
+
+	if a != nil {
+		return a
+	}
+
+	return b // might be nil
 }
 
 // update aggregations in cluster mode
