@@ -96,10 +96,10 @@ func (h *DateHist) clone() *DateHist {
 
 	n.subAggs = h.subAggs.clone()
 	n.Buckets = make(map[time.Time]*Bucket)
-	for k, v := range h.Buckets {
+	for k, b := range h.Buckets {
 		n.Buckets[k] = &Bucket{
-			Count:   v.Count,
-			SubAggs: v.SubAggs.clone(),
+			Count:   b.Count,
+			SubAggs: b.SubAggs.clone(),
 		}
 	}
 
@@ -135,7 +135,40 @@ func (h *DateHist) Name() string {
 
 // ToJson get object that can be serialized to JSON
 func (h *DateHist) ToJson() interface{} {
-	return h
+	buckets := make(map[string]interface{})
+	for k, b := range h.Buckets {
+		bb := map[string]interface{}{
+			"count": b.Count,
+		}
+		if b.SubAggs != nil {
+			bb["aggs"] = b.SubAggs.ToJson(false)
+		}
+		buckets[k.Format(time.RFC3339)] = bb
+	}
+
+	return map[string]interface{}{
+		"buckets": buckets,
+	}
+}
+
+// get existing or create new bucket
+func (h *DateHist) getBucket(key time.Time) *Bucket {
+	b, ok := h.Buckets[key]
+	if !ok {
+		// create empty bucket
+		b = &Bucket{
+			SubAggs: h.subAggs.clone(),
+		}
+
+		if h.Buckets == nil {
+			// create buckets container
+			h.Buckets = make(map[time.Time]*Bucket)
+		}
+
+		h.Buckets[key] = b
+	}
+
+	return b
 }
 
 // Add add data to the aggregation
@@ -161,25 +194,9 @@ func (h *DateHist) Add(data interface{}) error {
 
 	// TODO: convert val to timezone and add custom offset!
 	key := val.Truncate(h.Interval)
-	key = key.UTC()
-
-	// get bucket
-	var bucket *Bucket
-	if b, ok := h.Buckets[key]; !ok {
-		bucket = &Bucket{
-			SubAggs: h.subAggs.clone(),
-		}
-
-		// put it back
-		if h.Buckets == nil {
-			h.Buckets = make(map[time.Time]*Bucket)
-		}
-		h.Buckets[key] = bucket
-	} else {
-		bucket = b
-	}
 
 	// populate bucket
+	bucket := h.getBucket(key.UTC())
 	if err := bucket.Add(data); err != nil {
 		return fmt.Errorf("sub-aggs failed: %s", err)
 	}
@@ -202,16 +219,9 @@ func (h *DateHist) Merge(data_ interface{}) error {
 // merge another intermediate aggregation (native)
 func (h *DateHist) merge(other *DateHist) error {
 	for k, b := range other.Buckets {
-		if bb, ok := h.Buckets[k]; ok {
-			if err := bb.merge(b); err != nil {
-				return err
-			}
-		} else {
-			// bucket was missing
-			h.Buckets[k] = &Bucket{
-				Count:   b.Count,
-				SubAggs: b.SubAggs.clone(),
-			}
+		bb := h.getBucket(k)
+		if err := bb.merge(b); err != nil {
+			return err
 		}
 	}
 
@@ -231,22 +241,13 @@ func (h *DateHist) mergeMap(data map[string]interface{}) error {
 			return err
 		}
 
-		var bucket *Bucket
-		if bb, ok := h.Buckets[k]; !ok {
-			bucket := &Bucket{
-				SubAggs: h.subAggs.clone(),
-			}
-			h.Buckets[k] = bucket
-		} else {
-			bucket = bb
-		}
-
-		if err := bucket.mergeMap(b); err != nil {
+		bb := h.getBucket(k)
+		if err := bb.mergeMap(b); err != nil {
 			return err
 		}
 	}
 
-	return fmt.Errorf("merge is not implemented YET")
+	return nil // OK
 }
 
 // join another engine
