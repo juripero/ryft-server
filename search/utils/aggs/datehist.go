@@ -2,6 +2,7 @@ package aggs
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -33,21 +34,104 @@ func (d *DateHist) Name() string {
 }
 
 // Key counts name of a bucket where an element should fall into
-func (d DateHist) Key(data interface{}) (time.Time, error) {
-	fd := d.Field.String()
-	smData, err := utils.AsStringMap(data)
+func (d DateHist) Key(data_ interface{}) (time.Time, error) {
+	var key time.Time
+	// find current `Field` and convert it into time.Time
+	field := d.Field.String()
+	data, err := utils.AsStringMap(data_)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("unable to create key: %s", err)
+		return key, fmt.Errorf("unable to create key: %s", err)
 	}
-	v, err := utils.AsString(smData[fd])
+	_, ok := data[field]
+	if !ok {
+		return key, fmt.Errorf("input data doesn't contain %s field", field)
+	}
+	v, err := utils.AsString(data[field])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("unable to create key: %s", err)
+		return key, fmt.Errorf("unable to create key: %s", err)
 	}
-	ts, err := dateparse.ParseLocal(v)
+	fieldDate, err := dateparse.ParseLocal(v)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("unable to create key: %s", err)
+		return key, fmt.Errorf("unable to create key: %s", err)
 	}
-	return ts, nil
+
+	key, err = d.alignWithInterval(fieldDate)
+	if err != nil {
+		return key, fmt.Errorf("unable to create key: %s", err)
+	}
+	// find step (time.Time) and
+	return key, nil
+}
+
+func (d DateHist) alignWithInterval(t time.Time) (time.Time, error) {
+	var key time.Time
+	interval := d.Field.String()
+	// possible options: year, quarter, month, week, day, hour, minute, second
+	if interval == "year" {
+		key = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location())
+	} else if interval == "month" {
+		key = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
+	} else if interval == "quarter" {
+		month := t.Month()
+		if month <= 3 {
+			key = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location())
+		} else if month <= 6 {
+			key = time.Date(t.Year(), 4, 1, 0, 0, 0, 0, t.Location())
+		} else if month <= 9 {
+			key = time.Date(t.Year(), 7, 1, 0, 0, 0, 0, t.Location())
+		} else if month <= 12 {
+			key = time.Date(t.Year(), 10, 1, 0, 0, 0, 0, t.Location())
+		} else {
+			return key, fmt.Errorf("month number %s is out of [1:12] range", month)
+		}
+	} else if interval == "week" {
+		_, week := t.ISOWeek()
+		mondayAligned := (week-1)*7 + 1
+		key = time.Date(t.Year(), t.Month(), mondayAligned, 0, 0, 0, 0, t.Location())
+	} else if interval == "days" {
+		key = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	} else if interval == "hour" {
+		key = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
+	} else if interval == "minute" {
+		key = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, t.Location())
+	} else if interval == "second" {
+		key = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, t.Location())
+	} else {
+		// if used time-units syntax (https://www.elastic.co/guide/en/elasticsearch/reference/current/common-options.html#time-units)
+		interval = strings.ToLower(interval)
+		interval = strings.Trim(interval, " +-")
+
+		compiledPattern, err := regexp.Compile(`^([\d]*)([\w]*)$`)
+		if err != nil {
+			return key, fmt.Errorf("failed to parse interval %s", err)
+		}
+		found := compiledPattern.FindAllStringSubmatch(interval, -1)
+		if len(found) == 0 || len(found[0]) < 3 {
+			return key, fmt.Errorf("failed to parse interval %s", interval)
+		}
+		amount, err := utils.AsInt64(found[0][1])
+		if err != nil {
+			return key, fmt.Errorf("failed to parse interval %s", interval)
+		}
+		timeunit := found[0][2]
+		switch timeunit {
+		case "d":
+			/*
+				timeInterval := amount * int64(24) * int64(time.Hour)
+				diff := t.Unix()
+			*/
+
+		case "h":
+		case "s":
+		case "ms":
+		case "micros":
+		case "nanos":
+		default:
+			return key, fmt.Errorf("time-unit of interval set incorrectly %s", timeunit)
+		}
+
+	}
+	return key, nil
 }
 
 // ToJson get object that can be serialized to JSON
