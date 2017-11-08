@@ -281,7 +281,7 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 
 	case "-":
 		a.parseRawData = func(raw []byte) (interface{}, error) {
-			return nil, fmt.Errorf("bad format")
+			return nil, fmt.Errorf("internal format, shouldn't be used")
 		}
 
 	default:
@@ -294,6 +294,21 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		if !ok {
 			return nil, fmt.Errorf("bad type of aggregation object: %T", agg_)
 		}
+
+		// extract sub-aggregations (will be moved to aggregation options)
+		var subAggs interface{}
+		if s1, ok := agg["aggregations"]; ok {
+			delete(agg, "aggregations")
+			subAggs = s1
+		}
+		if s2, ok := agg["aggs"]; ok {
+			if subAggs != nil {
+				return nil, fmt.Errorf(`both "aggs" and "aggregations" cannot be provided`)
+			}
+			delete(agg, "aggs")
+			subAggs = s2
+		}
+
 		if len(agg) != 1 {
 			return nil, fmt.Errorf("%q contains invalid aggregation object", name)
 		}
@@ -303,6 +318,10 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 			opts, ok := opts_.(map[string]interface{})
 			if !ok {
 				return nil, fmt.Errorf("bad type of aggregation options: %T", opts_)
+			}
+
+			if subAggs != nil {
+				opts[AGGS_NAME] = subAggs
 			}
 
 			// parse and add function and corresponding engine

@@ -566,7 +566,7 @@ func updateSession(session *Session, stat *search.Stat) {
 func selectAggsOpts(a, b map[string]interface{}) map[string]interface{} {
 	if a != nil && b != nil {
 		panic(NewError(http.StatusBadRequest, "invalid aggregation configuration").
-			WithDetails(`both "aggs" and "aggregations" connot be provided`))
+			WithDetails(`both "aggs" and "aggregations" cannot be provided`))
 	}
 
 	if a != nil {
