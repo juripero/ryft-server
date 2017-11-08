@@ -173,7 +173,8 @@ func (a *Aggregations) Add(rawData []byte) error {
 
 // merge another (intermediate) aggregation engines
 func (a *Aggregations) Merge(data_ interface{}) error {
-	if data, ok := data_.(map[string]interface{}); ok {
+	switch data := data_.(type) {
+	case map[string]interface{}:
 		for _, engine := range a.engines {
 			if im, ok := data[engine.Name()]; ok {
 				if err := engine.Merge(im); err != nil {
@@ -183,7 +184,19 @@ func (a *Aggregations) Merge(data_ interface{}) error {
 				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
 			}
 		}
-	} else {
+
+	case *Aggregations:
+		for _, engine := range a.engines {
+			if im, ok := data.engines[engine.Name()]; ok {
+				if err := engine.Merge(im); err != nil {
+					return fmt.Errorf("failed to merge intermediate aggregation: %s", err)
+				}
+			} else {
+				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
+			}
+		}
+
+	default:
 		return fmt.Errorf("data is not a map")
 	}
 
@@ -268,7 +281,7 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 
 	case "-":
 		a.parseRawData = func(raw []byte) (interface{}, error) {
-			return nil, fmt.Errorf("bad format")
+			return nil, fmt.Errorf("internal format, shouldn't be used")
 		}
 
 	default:
@@ -281,6 +294,21 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		if !ok {
 			return nil, fmt.Errorf("bad type of aggregation object: %T", agg_)
 		}
+
+		// extract sub-aggregations (will be moved to aggregation options)
+		var subAggs interface{}
+		if s1, ok := agg["aggregations"]; ok {
+			delete(agg, "aggregations")
+			subAggs = s1
+		}
+		if s2, ok := agg["aggs"]; ok {
+			if subAggs != nil {
+				return nil, fmt.Errorf(`both "aggs" and "aggregations" cannot be provided`)
+			}
+			delete(agg, "aggs")
+			subAggs = s2
+		}
+
 		if len(agg) != 1 {
 			return nil, fmt.Errorf("%q contains invalid aggregation object", name)
 		}
@@ -290,6 +318,10 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 			opts, ok := opts_.(map[string]interface{})
 			if !ok {
 				return nil, fmt.Errorf("bad type of aggregation options: %T", opts_)
+			}
+
+			if subAggs != nil {
+				opts[AGGS_NAME] = subAggs
 			}
 
 			// parse and add function and corresponding engine
