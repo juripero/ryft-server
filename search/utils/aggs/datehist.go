@@ -2,6 +2,7 @@ package aggs
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -15,10 +16,10 @@ type DateHist struct {
 	Field   utils.Field `json:"-" msgpack:"-"` // field path
 	Missing interface{} `json:"-" msgpack:"-"` // missing value
 
-	Interval time.Duration `json:"-" msgpack:"-"`
-	//Offset time.Duration
-	//Timezone string        `json:"-" msgpack:"-"`
-	//Format   string        `json:"-" msgpack:"-"`
+	Interval string        `json:"-" msgpack:"-"` // intervals like "month", "year" cannot be defined with time.Duration
+	Offset   time.Duration `json:"-" msgpack:"-"`
+	Timezone string        `json:"-" msgpack:"-"`
+	Format   string        `json:"-" msgpack:"-"`
 
 	Buckets map[time.Time]*Bucket `json:"buckets,omitempty" msgpack:"buckets,omitempty"`
 
@@ -111,13 +112,20 @@ func (h *DateHist) Name() string {
 	name := []string{
 		fmt.Sprintf("field::%s", h.Field),
 		fmt.Sprintf("interval::%s", h.Interval),
-		//fmt.Sprintf("timezone::%s", h.Timezone),
-		//fmt.Sprintf("format::%s", h.Format),
+		fmt.Sprintf("format::%s", h.Format),
 	}
 
 	// optional "missing" value
 	if h.Missing != nil {
 		name = append(name, fmt.Sprintf("missing::%s", h.Missing))
+	}
+	// optional "offset" value
+	if h.Offset != 0 {
+		name = append(name, fmt.Sprintf("offset::%s", h.Offset))
+	}
+	// optional "timezone" value
+	if h.Timezone != "" {
+		name = append(name, fmt.Sprintf("timezone::%s", h.Timezone))
 	}
 
 	// names of all sub-aggregations
@@ -187,116 +195,15 @@ func (h *DateHist) Add(data interface{}) error {
 	}
 
 	// convert string to timestamp
-	val, err := parseDateTime(val_, "")
+	val, err := parseDateTime(val_, h.Timezone, "")
 	if err != nil {
 		return fmt.Errorf("failed to parse datetime field: %s", err)
 	}
-	/*
-		   =======
-		   // Key counts name of a bucket where an element should fall into
-		   func (d DateHist) Key(data_ interface{}) (time.Time, error) {
-		   	var key time.Time
-		   	// find current `Field` and convert it into time.Time
-		   	field := d.Field.String()
-		   	data, err := utils.AsStringMap(data_)
-		   	if err != nil {
-		   		return key, fmt.Errorf("unable to create key: %s", err)
-		   	}
-		   	_, ok := data[field]
-		   	if !ok {
-		   		return key, fmt.Errorf("input data doesn't contain %s field", field)
-		   	}
-		   	v, err := utils.AsString(data[field])
-		   	if err != nil {
-		   		return key, fmt.Errorf("unable to create key: %s", err)
-		   	}
-		   	fieldDate, err := dateparse.ParseLocal(v)
-		   	if err != nil {
-		   		return key, fmt.Errorf("unable to create key: %s", err)
-		   	}
-
-		   	key, err = d.alignWithInterval(fieldDate)
-		   	if err != nil {
-		   		return key, fmt.Errorf("unable to create key: %s", err)
-		   	}
-		   	// find step (time.Time) and
-		   	return key, nil
-		   }
-
-		   func (d DateHist) alignWithInterval(t time.Time) (time.Time, error) {
-		   	var key time.Time
-		   	interval := d.Field.String()
-		   	// possible options: year, quarter, month, week, day, hour, minute, second
-		   	if interval == "year" {
-		   		key = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location())
-		   	} else if interval == "month" {
-		   		key = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
-		   	} else if interval == "quarter" {
-		   		month := t.Month()
-		   		if month <= 3 {
-		   			key = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location())
-		   		} else if month <= 6 {
-		   			key = time.Date(t.Year(), 4, 1, 0, 0, 0, 0, t.Location())
-		   		} else if month <= 9 {
-		   			key = time.Date(t.Year(), 7, 1, 0, 0, 0, 0, t.Location())
-		   		} else if month <= 12 {
-		   			key = time.Date(t.Year(), 10, 1, 0, 0, 0, 0, t.Location())
-		   		} else {
-		   			return key, fmt.Errorf("month number %s is out of [1:12] range", month)
-		   		}
-		   	} else if interval == "week" {
-		   		_, week := t.ISOWeek()
-		   		mondayAligned := (week-1)*7 + 1
-		   		key = time.Date(t.Year(), t.Month(), mondayAligned, 0, 0, 0, 0, t.Location())
-		   	} else if interval == "days" {
-		   		key = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-		   	} else if interval == "hour" {
-		   		key = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
-		   	} else if interval == "minute" {
-		   		key = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, t.Location())
-		   	} else if interval == "second" {
-		   		key = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, t.Location())
-		   	} else {
-		   		// if used time-units syntax (https://www.elastic.co/guide/en/elasticsearch/reference/current/common-options.html#time-units)
-		   		interval = strings.ToLower(interval)
-		   		interval = strings.Trim(interval, " +-")
-
-		   		compiledPattern, err := regexp.Compile(`^([\d]*)([\w]*)$`)
-		   		if err != nil {
-		   			return key, fmt.Errorf("failed to parse interval %s", err)
-		   		}
-		   		found := compiledPattern.FindAllStringSubmatch(interval, -1)
-		   		if len(found) == 0 || len(found[0]) < 3 {
-		   			return key, fmt.Errorf("failed to parse interval %s", interval)
-		   		}
-		   		amount, err := utils.AsInt64(found[0][1])
-		   		if err != nil {
-		   			return key, fmt.Errorf("failed to parse interval %s", interval)
-		   		}
-		   		timeunit := found[0][2]
-		   		switch timeunit {
-		   		case "d":
-		   			/*
-		   				timeInterval := amount * int64(24) * int64(time.Hour)
-						   diff := t.Unix()
-					**
-
-		   		case "h":
-		   		case "s":
-		   		case "ms":
-		   		case "micros":
-		   		case "nanos":
-		   		default:
-		   			return key, fmt.Errorf("time-unit of interval set incorrectly %s", timeunit)
-		   		}
-
-		   	}
-		   	return key, nil
-		   }
-		   >>>>>>> ryft_38_date_histogram_2
-	*/
+	key, err := h.getBucketKey(val, h.Offset, h.Interval, h.Timezone)
+	if err != nil {
+		return fmt.Errorf("failed to get bucket key: %s", err)
+	}
 	// TODO: convert val to timezone and add custom offset!
-	key := val.Truncate(h.Interval)
 
 	// populate bucket
 	bucket := h.getBucket(key.UTC())
@@ -438,29 +345,28 @@ func (f *dateHistFunc) clone() (Function, Engine) {
 
 // make new "date_histrogram" aggregation
 func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFunc, error) {
-	// field to get datetime from
 	field, err := getFieldOpt("field", opts, iNames)
 	if err != nil {
 		return nil, err
 	}
 
-	// rounding interval
-	interval_, err := getStringOpt("interval", opts)
+	interval, err := getStringOpt("interval", opts)
 	if err != nil {
 		return nil, err
 	}
-	interval, err := parseInterval(interval_)
-	if err != nil {
-		return nil, fmt.Errorf(`bad "interval": %s`, err)
+	if interval == "" {
+		return nil, fmt.Errorf(`bad "interval": cannot be empty`)
 	}
 
-	/*
-		timezone, _ := getStringOpt("timezone", opts)
-		format, err := getStringOpt("format", opts)
-		if err != nil {
-			format = time.RFC3339Nano
-		}
-	*/
+	timezone, err := getStringOpt("timezone", opts)
+	if err != nil {
+		return nil, fmt.Errorf(`bad "timezone" option: %s`, err)
+	}
+
+	format, err := getStringOpt("format", opts)
+	if err != nil {
+		format = time.RFC3339Nano
+	}
 
 	// keyed
 	var keyed bool
@@ -499,9 +405,9 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 		Field:    field,
 		Missing:  opts["missing"],
 		Interval: interval,
-		//Timezone: timezone,
-		//Format:   format,
-		subAggs: subAggs,
+		Timezone: timezone,
+		Format:   format,
+		subAggs:  subAggs,
 	}
 
 	return &dateHistFunc{
@@ -512,15 +418,20 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 }
 
 // parse the date-time field
-func parseDateTime(val interface{}, formatHint string) (time.Time, error) {
+func parseDateTime(val interface{}, timezone string, formatHint string) (time.Time, error) {
 	// get value as a string
 	s, err := utils.AsString(val)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get datetime field: %s", err)
 	}
 
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to detect timezone: %s", err)
+	}
+
 	// convert string to timestamp
-	t, err := dateparse.ParseLocal(s)
+	t, err := dateparse.ParseIn(s, loc)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse datetime field: %s", err)
 	}
@@ -528,10 +439,80 @@ func parseDateTime(val interface{}, formatHint string) (time.Time, error) {
 	return t, nil // OK
 }
 
-// parse the interval option
-func parseInterval(val string) (time.Duration, error) {
-	// TODO: support for years, month etc...
-	return time.ParseDuration(val)
+func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval string, timezone string) (time.Time, error) {
+	var tail time.Duration
+	var key time.Time
+	switch interval {
+	case "year":
+		key := time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+	case "month":
+		key := time.Date(val.Year(), val.Month(), 1, 0, 0, 0, 0, val.Location()).Add(offset)
+	case "quarter":
+		month := val.Month()
+		if month <= 3 {
+			key = time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		} else if month <= 6 {
+			key = time.Date(val.Year(), 4, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		} else if month <= 9 {
+			key = time.Date(val.Year(), 7, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		} else if month <= 12 {
+			key = time.Date(val.Year(), 10, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		} else {
+			return key, fmt.Errorf(`failed to align value with "quarter" interval`)
+		}
+	case "week":
+		_, week := val.ISOWeek()
+		mondayAligned := (week-1)*7 + 1
+		key = time.Date(val.Year(), val.Month(), mondayAligned, 0, 0, 0, 0, val.Location()).Add(offset)
+	case "day":
+		key = time.Date(val.Year(), val.Month(), val.Day(), 0, 0, 0, 0, val.Location()).Add(offset)
+	case "hour":
+		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), 0, 0, 0, val.Location()).Add(offset)
+	case "minute":
+		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), 0, 0, val.Location()).Add(offset)
+	case "second":
+		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), val.Second(), 0, val.Location()).Add(offset)
+	default:
+		tail, err := parseTimeUnitsInterval(interval)
+		if err != nil {
+			return key, fmt.Errorf(`failed to parse "interval": %s`, err)
+		}
+		tail += offset
+		key := val.Truncate(tail) // Caution: time.Duration can't be more than 290 years
+	}
+	return key, nil
+}
+
+func parseTimeUnitsInterval(v string) (time.Duration, error) {
+	var interval time.Duration
+	// interval is in time-units syntax (https://www.elastic.co/guide/en/elasticsearch/reference/current/common-options.html#time-units)
+	compiledPattern, err := regexp.Compile(`^([\d]*)([\w]*)$`)
+	if err != nil {
+		return interval, fmt.Errorf(`failed to parse "interval" %s: %s`, v, err)
+	}
+	found := compiledPattern.FindAllStringSubmatch(v, -1)
+	if len(found) == 0 || len(found[0]) < 3 {
+		return interval, fmt.Errorf(`"interval" has wrong format %s`, v)
+	}
+	amount, err := utils.AsInt64(found[0][1])
+	if err != nil {
+		return interval, fmt.Errorf("failed to parse interval %s", v)
+	}
+	timeunit := found[0][2]
+	switch timeunit {
+	case "d":
+		interval := time.Duration(amount * int64(24) * int64(time.Hour))
+	case "h":
+		interval := time.Duration(amount * int64(time.Hour))
+	case "s":
+	case "ms":
+	case "micros":
+	case "nanos":
+	default:
+		return key, fmt.Errorf("time-unit of interval set incorrectly %s", timeunit)
+	}
+
+	return interval, nil
 }
 
 // TimeSlice attaches the methods of sort.Interface to []time.Time, sorting in increasing order.
