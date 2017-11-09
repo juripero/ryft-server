@@ -199,7 +199,7 @@ func (h *DateHist) Add(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse datetime field: %s", err)
 	}
-	key, err := h.getBucketKey(val, h.Offset, h.Interval, h.Timezone)
+	key, err := h.getBucketKey(val, h.Offset, h.Interval)
 	if err != nil {
 		return fmt.Errorf("failed to get bucket key: %s", err)
 	}
@@ -439,14 +439,13 @@ func parseDateTime(val interface{}, timezone string, formatHint string) (time.Ti
 	return t, nil // OK
 }
 
-func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval string, timezone string) (time.Time, error) {
-	var tail time.Duration
+func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval string) (time.Time, error) {
 	var key time.Time
 	switch interval {
 	case "year":
-		key := time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		key = time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
 	case "month":
-		key := time.Date(val.Year(), val.Month(), 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		key = time.Date(val.Year(), val.Month(), 1, 0, 0, 0, 0, val.Location()).Add(offset)
 	case "quarter":
 		month := val.Month()
 		if month <= 3 {
@@ -478,7 +477,7 @@ func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval st
 			return key, fmt.Errorf(`failed to parse "interval": %s`, err)
 		}
 		tail += offset
-		key := val.Truncate(tail) // Caution: time.Duration can't be more than 290 years
+		key = val.Truncate(tail) // Caution: time.Duration can't be more than 290 years
 	}
 	return key, nil
 }
@@ -501,15 +500,19 @@ func parseTimeUnitsInterval(v string) (time.Duration, error) {
 	timeunit := found[0][2]
 	switch timeunit {
 	case "d":
-		interval := time.Duration(amount * int64(24) * int64(time.Hour))
+		interval = time.Duration(amount * int64(24) * int64(time.Hour))
 	case "h":
-		interval := time.Duration(amount * int64(time.Hour))
+		interval = time.Duration(amount * int64(time.Hour))
 	case "s":
+		interval = time.Duration(amount * int64(time.Second))
 	case "ms":
+		interval = time.Duration(amount * int64(time.Millisecond))
 	case "micros":
+		interval = time.Duration(amount * int64(time.Microsecond))
 	case "nanos":
+		interval = time.Duration(amount * int64(time.Nanosecond))
 	default:
-		return key, fmt.Errorf("time-unit of interval set incorrectly %s", timeunit)
+		return interval, fmt.Errorf("time-unit of interval set incorrectly %s", timeunit)
 	}
 
 	return interval, nil
