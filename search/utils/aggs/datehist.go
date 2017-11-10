@@ -213,6 +213,50 @@ func (h *DateHist) Add(data interface{}) error {
 	return nil // OK
 }
 
+func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval string) (time.Time, error) {
+	var key time.Time
+	switch interval {
+	case "year":
+		key = time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+	case "month":
+		key = time.Date(val.Year(), val.Month(), 1, 0, 0, 0, 0, val.Location()).Add(offset)
+	case "quarter":
+		month := val.Month()
+		if month <= 3 {
+			key = time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		} else if month <= 6 {
+			key = time.Date(val.Year(), 4, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		} else if month <= 9 {
+			key = time.Date(val.Year(), 7, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		} else if month <= 12 {
+			key = time.Date(val.Year(), 10, 1, 0, 0, 0, 0, val.Location()).Add(offset)
+		} else {
+			// impossible case
+			return key, fmt.Errorf(`failed to align value with "quarter" interval`)
+		}
+	case "week":
+		_, week := val.ISOWeek()
+		mondayAligned := (week-1)*7 + 1
+		key = time.Date(val.Year(), val.Month(), mondayAligned, 0, 0, 0, 0, val.Location()).Add(offset)
+	case "day":
+		key = time.Date(val.Year(), val.Month(), val.Day(), 0, 0, 0, 0, val.Location()).Add(offset)
+	case "hour":
+		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), 0, 0, 0, val.Location()).Add(offset)
+	case "minute":
+		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), 0, 0, val.Location()).Add(offset)
+	case "second":
+		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), val.Second(), 0, val.Location()).Add(offset)
+	default:
+		tail, err := parseTimeUnitsInterval(interval)
+		if err != nil {
+			return key, fmt.Errorf(`failed to parse "interval": %s`, err)
+		}
+		tail += offset
+		key = val.Truncate(tail) // Caution: time.Duration can't be more than 290 years
+	}
+	return key, nil
+}
+
 // Merge merge another aggregation engine
 func (h *DateHist) Merge(data_ interface{}) error {
 	switch data := data_.(type) {
@@ -295,7 +339,8 @@ func (f *dateHistFunc) ToJson() interface{} {
 			continue
 		}
 
-		keyAsString := k.String() // .Format(f.engine.Format)
+		keyAsString := k.Format(f.engine.Format)
+
 		b := map[string]interface{}{
 			"key_as_string": keyAsString,
 			"key":           k.UnixNano() / 1000000, // ns -> ms
@@ -364,7 +409,15 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 
 	format, err := getStringOpt("format", opts)
 	if err != nil {
-		format = time.RFC3339Nano
+		format = "2006-01-02T15:04:05.000Z"
+	}
+
+	offset := time.Duration(0)
+	if offset_, err := getStringOpt("offset", opts); err == nil {
+		offset, err = parseSignedTimeUnitsInterval(offset_)
+		if err != nil {
+			return nil, fmt.Errorf(`bad "offset": %s`, err)
+		}
 	}
 
 	// keyed
@@ -406,6 +459,7 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 		Interval: interval,
 		Timezone: timezone,
 		Format:   format,
+		Offset:   offset,
 		subAggs:  subAggs,
 	}
 
@@ -438,52 +492,24 @@ func parseDateTime(val interface{}, timezone string, formatHint string) (time.Ti
 	return t, nil // OK
 }
 
-func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval string) (time.Time, error) {
-	var key time.Time
-	switch interval {
-	case "year":
-		key = time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-	case "month":
-		key = time.Date(val.Year(), val.Month(), 1, 0, 0, 0, 0, val.Location()).Add(offset)
-	case "quarter":
-		month := val.Month()
-		if month <= 3 {
-			key = time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-		} else if month <= 6 {
-			key = time.Date(val.Year(), 4, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-		} else if month <= 9 {
-			key = time.Date(val.Year(), 7, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-		} else if month <= 12 {
-			key = time.Date(val.Year(), 10, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-		} else {
-			return key, fmt.Errorf(`failed to align value with "quarter" interval`)
-		}
-	case "week":
-		_, week := val.ISOWeek()
-		mondayAligned := (week-1)*7 + 1
-		key = time.Date(val.Year(), val.Month(), mondayAligned, 0, 0, 0, 0, val.Location()).Add(offset)
-	case "day":
-		key = time.Date(val.Year(), val.Month(), val.Day(), 0, 0, 0, 0, val.Location()).Add(offset)
-	case "hour":
-		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), 0, 0, 0, val.Location()).Add(offset)
-	case "minute":
-		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), 0, 0, val.Location()).Add(offset)
-	case "second":
-		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), val.Second(), 0, val.Location()).Add(offset)
-	default:
-		tail, err := parseTimeUnitsInterval(interval)
-		if err != nil {
-			return key, fmt.Errorf(`failed to parse "interval": %s`, err)
-		}
-		tail += offset
-		key = val.Truncate(tail) // Caution: time.Duration can't be more than 290 years
+// parseSignedTimeUnitsInterval process ElasticSearch time-units interval e.g.: "+6h" -> {6*time.Hour, error}; "-3m" -> {-3*time.Minute, error}
+func parseSignedTimeUnitsInterval(v string) (time.Duration, error) {
+	sign := int64(1)
+	if strings.HasPrefix(v, "-") {
+		sign = int64(-1)
 	}
-	return key, nil
+	interval, err := parseTimeUnitsInterval(strings.TrimLeft(v, "-+"))
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse time units interval with sign: %s", err)
+	}
+	interval = time.Duration(int64(interval) * sign)
+	return interval, nil
 }
 
+// parseTimeUnitsInterval parse ElasticSearch time-units interval
 func parseTimeUnitsInterval(v string) (time.Duration, error) {
-	var interval time.Duration
 	// interval is in time-units syntax (https://www.elastic.co/guide/en/elasticsearch/reference/current/common-options.html#time-units)
+	var interval time.Duration
 	compiledPattern, err := regexp.Compile(`^([\d]*)([\w]*)$`)
 	if err != nil {
 		return interval, fmt.Errorf(`failed to parse "interval" %s: %s`, v, err)
@@ -502,6 +528,8 @@ func parseTimeUnitsInterval(v string) (time.Duration, error) {
 		interval = time.Duration(int64(amount) * int64(24) * int64(time.Hour))
 	case "h":
 		interval = time.Duration(amount * int64(time.Hour))
+	case "m":
+		interval = time.Duration(amount * int64(time.Minute))
 	case "s":
 		interval = time.Duration(amount * int64(time.Second))
 	case "ms":
