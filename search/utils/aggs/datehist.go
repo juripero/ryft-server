@@ -203,7 +203,6 @@ func (h *DateHist) Add(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to get bucket key: %s", err)
 	}
-	// TODO: convert val to timezone and add custom offset!
 
 	// populate bucket
 	bucket := h.getBucket(key.UTC())
@@ -360,7 +359,7 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 
 	timezone, err := getStringOpt("timezone", opts)
 	if err != nil {
-		return nil, fmt.Errorf(`bad "timezone" option: %s`, err)
+		timezone = "UTC"
 	}
 
 	format, err := getStringOpt("format", opts)
@@ -500,7 +499,7 @@ func parseTimeUnitsInterval(v string) (time.Duration, error) {
 	timeunit := found[0][2]
 	switch timeunit {
 	case "d":
-		interval = time.Duration(amount * int64(24) * int64(time.Hour))
+		interval = time.Duration(int64(amount) * int64(24) * int64(time.Hour))
 	case "h":
 		interval = time.Duration(amount * int64(time.Hour))
 	case "s":

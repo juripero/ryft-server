@@ -3,7 +3,6 @@ package aggs
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -35,8 +34,9 @@ func testDateHistPopulate(t *testing.T, engine Engine) {
 func TestDateHistEngine(t *testing.T) {
 	check := func(field string, interval string, missing interface{}, expected string) {
 		hist := &DateHist{
-			Field:    mustParseField(field),
-			Interval: mustParseInterval(interval),
+			Field: mustParseField(field),
+			// Interval: mustParseInterval(interval),
+			Interval: interval,
 			Missing:  missing,
 		}
 
@@ -237,6 +237,7 @@ func TestDateHistFunc(t *testing.T) {
 	//check(`{"field":"Date", "interval":"", "missing":"TODO missing date"}`, `{"value": 1750}`)
 }
 
+/*
 // parse interval, panic in case of error
 func mustParseInterval(interval string) time.Duration {
 	if d, err := parseInterval(interval); err != nil {
@@ -245,3 +246,4 @@ func mustParseInterval(interval string) time.Duration {
 		return d
 	}
 }
+*/
