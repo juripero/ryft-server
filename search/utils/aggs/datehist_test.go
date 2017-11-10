@@ -108,22 +108,110 @@ func TestDateHistEngineIntervals(t *testing.T) {
 			assert.JSONEq(t, expected, string(data))
 		}
 	}
-	check("created", "year", nil, `{"buckets":{"2015-01-01T00:00:00Z":{"count":2},"2016-01-01T00:00:00Z":{"count":3}}}`)
-	check("created", "month", nil, `{"buckets":{"2015-10-01T00:00:00Z":{"count":2},"2016-10-01T00:00:00Z":{"count":2},"2016-11-01T00:00:00Z":{"count":1}}}`)
-	check("created", "quarter", nil, `{"buckets":{"2015-10-01T00:00:00Z":{"count":2},"2016-10-01T00:00:00Z":{"count":3}}}`)
-	check("created", "week", nil, `{"buckets":{"2016-06-30T00:00:00Z":{"count":2},"2017-06-24T00:00:00Z":{"count":1},"2017-07-01T00:00:00Z":{"count":1},"2017-08-29T00:00:00Z":{"count":1}}}`)
-	check("created", "day", nil, `{"buckets":{"2015-10-01T00:00:00Z":{"count":1},"2015-10-02T00:00:00Z":{"count":1},"2016-10-01T00:00:00Z":{"count":1},"2016-10-07T00:00:00Z":{"count":1},"2016-11-01T00:00:00Z":{"count":1}}}`)
-	check("updated", "hour", nil, `{"buckets":{"2016-01-01T03:00:00Z":{"count":3},"2016-10-08T03:00:00Z":{"count":1},"2017-11-01T03:00:00Z":{"count":1}}}`)
-	check("updated", "second", nil, `{"buckets":{"2016-01-01T03:15:01Z":{"count":2},"2016-01-01T03:15:02Z":{"count":1},"2016-10-08T03:15:01Z":{"count":1},"2017-11-01T03:15:01Z":{"count":1}}}`)
-	check("created", "15d", nil, `{"buckets":{"2015-09-30T00:00:00Z":{"count":2},"2016-09-24T00:00:00Z":{"count":2},"2016-10-24T00:00:00Z":{"count":1}}}`)
-	check("created", "160d", nil, `{"buckets":{"2015-08-31T00:00:00Z":{"count":2},"2016-07-16T00:00:00Z":{"count":3}}}`)
-	check("created", "72h", nil, `{"buckets":{"2015-09-30T00:00:00Z":{"count":2},"2016-09-30T00:00:00Z":{"count":1},"2016-10-06T00:00:00Z":{"count":1},"2016-10-30T00:00:00Z":{"count":1}}}`)
-	check("updated", "2m", nil, `{"buckets":{"2016-01-01T03:14:00Z":{"count":3},"2016-10-08T03:14:00Z":{"count":1},"2017-11-01T03:14:00Z":{"count":1}}}`)
-	check("created", "2s", nil, `{"buckets":{"2015-10-01T06:00:00Z":{"count":1},"2015-10-02T06:00:00Z":{"count":1},"2016-10-01T06:00:00Z":{"count":1},"2016-10-07T06:01:00Z":{"count":1},"2016-11-01T06:00:00Z":{"count":1}}}`)
-	check("updated", "2s", nil, `{"buckets":{"2016-01-01T03:15:00Z":{"count":2},"2016-01-01T03:15:02Z":{"count":1},"2016-10-08T03:15:00Z":{"count":1},"2017-11-01T03:15:00Z":{"count":1}}}`)
-	check("updated", "2ms", nil, `{"buckets":{"2016-01-01T03:15:01Z":{"count":2},"2016-01-01T03:15:02Z":{"count":1},"2016-10-08T03:15:01Z":{"count":1},"2017-11-01T03:15:01Z":{"count":1}}}`)
-	check("created", "2micros", nil, `{"buckets":{"2015-10-01T06:00:00Z":{"count":1},"2015-10-02T06:00:00Z":{"count":1},"2016-10-01T06:00:00Z":{"count":1},"2016-10-07T06:01:00Z":{"count":1},"2016-11-01T06:00:00Z":{"count":1}}}`)
-	check("updated", "10000000micros", nil, `{"buckets":{"2016-01-01T03:15:00Z":{"count":3},"2016-10-08T03:15:00Z":{"count":1},"2017-11-01T03:15:00Z":{"count":1}}}`)
+	check("created", "year", nil, `
+		{"buckets":{
+			"2015-01-01T00:00:00Z":{"count":2},
+			"2016-01-01T00:00:00Z":{"count":3}
+		}}`)
+	check("created", "month", nil, `
+		{"buckets":{
+			"2015-10-01T00:00:00Z":{"count":2},
+			"2016-10-01T00:00:00Z":{"count":2},
+			"2016-11-01T00:00:00Z":{"count":1}
+		}}`)
+	check("created", "quarter", nil, `
+		{"buckets":{
+			"2015-10-01T00:00:00Z":{"count":2},
+			"2016-10-01T00:00:00Z":{"count":3}
+		}}`)
+	check("created", "week", nil, `{
+		"buckets":{
+			"2016-06-30T00:00:00Z":{"count":2},
+			"2017-06-24T00:00:00Z":{"count":1},
+			"2017-07-01T00:00:00Z":{"count":1},
+			"2017-08-29T00:00:00Z":{"count":1}
+		}}`)
+	check("created", "day", nil, `
+		{"buckets":{
+			"2015-10-01T00:00:00Z":{"count":1},
+			"2015-10-02T00:00:00Z":{"count":1},
+			"2016-10-01T00:00:00Z":{"count":1},
+			"2016-10-07T00:00:00Z":{"count":1},
+			"2016-11-01T00:00:00Z":{"count":1}
+		}}`)
+	check("updated", "hour", nil, `
+		{"buckets":{
+			"2016-01-01T03:00:00Z":{"count":3},
+			"2016-10-08T03:00:00Z":{"count":1},
+			"2017-11-01T03:00:00Z":{"count":1}
+		}}`)
+	check("updated", "second", nil, `
+		{"buckets":{
+			"2016-01-01T03:15:01Z":{"count":2},
+			"2016-01-01T03:15:02Z":{"count":1},
+			"2016-10-08T03:15:01Z":{"count":1},
+			"2017-11-01T03:15:01Z":{"count":1}
+		}}`)
+	check("created", "15d", nil, `
+		{"buckets":{
+			"2015-09-30T00:00:00Z":{"count":2},
+			"2016-09-24T00:00:00Z":{"count":2},
+			"2016-10-24T00:00:00Z":{"count":1}
+		}}`)
+	check("created", "160d", nil, `
+		{"buckets":{
+			"2015-08-31T00:00:00Z":{"count":2},
+			"2016-07-16T00:00:00Z":{"count":3}
+		}}`)
+	check("created", "72h", nil, `
+		{"buckets":{
+			"2015-09-30T00:00:00Z":{"count":2},
+			"2016-09-30T00:00:00Z":{"count":1},
+			"2016-10-06T00:00:00Z":{"count":1},
+			"2016-10-30T00:00:00Z":{"count":1}
+		}}`)
+	check("updated", "2m", nil, `
+		{"buckets":{
+			"2016-01-01T03:14:00Z":{"count":3},
+			"2016-10-08T03:14:00Z":{"count":1},
+			"2017-11-01T03:14:00Z":{"count":1}
+		}}`)
+	check("created", "2s", nil, `
+		{"buckets":{
+			"2015-10-01T06:00:00Z":{"count":1},
+			"2015-10-02T06:00:00Z":{"count":1},
+			"2016-10-01T06:00:00Z":{"count":1},
+			"2016-10-07T06:01:00Z":{"count":1},
+			"2016-11-01T06:00:00Z":{"count":1}
+		}}`)
+	check("updated", "2s", nil, `
+		{"buckets":{
+			"2016-01-01T03:15:00Z":{"count":2},
+			"2016-01-01T03:15:02Z":{"count":1},
+			"2016-10-08T03:15:00Z":{"count":1},
+			"2017-11-01T03:15:00Z":{"count":1}
+		}}`)
+	check("updated", "2ms", nil, `
+		{"buckets":{
+			"2016-01-01T03:15:01Z":{"count":2},
+			"2016-01-01T03:15:02Z":{"count":1},
+			"2016-10-08T03:15:01Z":{"count":1},
+			"2017-11-01T03:15:01Z":{"count":1}
+		}}`)
+	check("created", "2micros", nil, `
+		{"buckets":{
+			"2015-10-01T06:00:00Z":{"count":1},
+			"2015-10-02T06:00:00Z":{"count":1},
+			"2016-10-01T06:00:00Z":{"count":1},
+			"2016-10-07T06:01:00Z":{"count":1},
+			"2016-11-01T06:00:00Z":{"count":1}
+		}}`)
+	check("updated", "10000000micros", nil, `
+		{"buckets":{
+			"2016-01-01T03:15:00Z":{"count":3},
+			"2016-10-08T03:15:00Z":{"count":1},
+			"2017-11-01T03:15:00Z":{"count":1}
+		}}`)
 }
 
 // check merging
