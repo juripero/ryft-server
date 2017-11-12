@@ -9,6 +9,7 @@ import (
 
 	"github.com/araddon/dateparse"
 	"github.com/getryft/ryft-server/search/utils"
+	"github.com/getryft/ryft-server/search/utils/datetime"
 )
 
 // DateHist date_histogram engine
@@ -402,7 +403,8 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 	if err != nil {
 		timezone_ = "UTC"
 	}
-	timezone, err := time.LoadLocation(timezone_)
+
+	timezone, err := datetime.LoadTimezone(timezone_)
 	if err != nil {
 		return nil, fmt.Errorf(`bad "timezone": %s`, err)
 	}
