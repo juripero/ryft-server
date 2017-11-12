@@ -10,14 +10,14 @@ import (
 // populate engine with stat data
 func testDateHistPopulate(t *testing.T, engine Engine) {
 	jsonData := `[
-{"foo": {"bar":1.1}, "created": "Tue, 07 Nov 2017 03:15:01 GMT", "updated": "Tue, 07 Nov 2017 04:15:01 GMT" },
-{"foo": {"bar":2.2}, "created": "Tue, 07 Nov 2017 04:15:02 GMT", "updated": "Tue, 07 Nov 2017 04:45:02 GMT" },
-{"foo": {"bar":3.3}, "created": "Tue, 07 Nov 2017 04:35:03 GMT", "updated": "Tue, 07 Nov 2017 05:30:03 GMT" },
-{"foo": {"bar":4.4}, "created": "Tue, 07 Nov 2017 04:46:04 GMT", "updated": "Tue, 07 Nov 2017 06:15:04 GMT" },
-{"foo": {"bar":5.5}, "created": "Tue, 07 Nov 2017 05:15:05 GMT", "updated": "Tue, 07 Nov 2017 06:30:05 GMT" },
-{"foo": {"bar":6.6}, "created": "Tue, 07 Nov 2017 05:31:06 GMT", "updated": "Tue, 07 Nov 2017 06:45:06 GMT" },
-{"foo": {"bar":7.7}, "created": "Tue, 07 Nov 2017 06:10:07 GMT", "updated": "Tue, 07 Nov 2017 07:10:07 GMT" },
-{"foo": {"bar":8.8},"?created": "Tue, 07 Nov 2017 21:10:08 GMT","?updated": "Tue, 07 Nov 2017 21:10:08 GMT" }
+		{"foo": {"bar":1.1}, "created": "Tue, 07 Nov 2017 03:15:01 GMT", "updated": "Tue, 07 Nov 2017 04:15:01 GMT" },
+		{"foo": {"bar":2.2}, "created": "Tue, 07 Nov 2017 04:15:02 GMT", "updated": "Tue, 07 Nov 2017 04:45:02 GMT" },
+		{"foo": {"bar":3.3}, "created": "Tue, 07 Nov 2017 04:35:03 GMT", "updated": "Tue, 07 Nov 2017 05:30:03 GMT" },
+		{"foo": {"bar":4.4}, "created": "Tue, 07 Nov 2017 04:46:04 GMT", "updated": "Tue, 07 Nov 2017 06:15:04 GMT" },
+		{"foo": {"bar":5.5}, "created": "Tue, 07 Nov 2017 05:15:05 GMT", "updated": "Tue, 07 Nov 2017 06:30:05 GMT" },
+		{"foo": {"bar":6.6}, "created": "Tue, 07 Nov 2017 05:31:06 GMT", "updated": "Tue, 07 Nov 2017 06:45:06 GMT" },
+		{"foo": {"bar":7.7}, "created": "Tue, 07 Nov 2017 06:10:07 GMT", "updated": "Tue, 07 Nov 2017 07:10:07 GMT" },
+		{"foo": {"bar":8.8},"?created": "Tue, 07 Nov 2017 21:10:08 GMT","?updated": "Tue, 07 Nov 2017 21:10:08 GMT" }
 	]`
 
 	var data []map[string]interface{}
@@ -48,39 +48,39 @@ func TestDateHistEngine(t *testing.T) {
 	}
 
 	check("created", "1h", nil, `
-{"buckets":{
-"2017-11-07T03:00:00Z":{"count":1},
-"2017-11-07T04:00:00Z":{"count":3},
-"2017-11-07T05:00:00Z":{"count":2},
-"2017-11-07T06:00:00Z":{"count":1}
-	}}`)
+		{"buckets":{
+			"2017-11-07T03:00:00Z":{"count":1},
+			"2017-11-07T04:00:00Z":{"count":3},
+			"2017-11-07T05:00:00Z":{"count":2},
+			"2017-11-07T06:00:00Z":{"count":1}
+		}}`)
 
 	check("created", "1h", "Tue, 07 Nov 2017 21:10:08 GMT", `
-{"buckets":{
-"2017-11-07T03:00:00Z":{"count":1},
-"2017-11-07T04:00:00Z":{"count":3},
-"2017-11-07T05:00:00Z":{"count":2},
-"2017-11-07T06:00:00Z":{"count":1},
-"2017-11-07T21:00:00Z":{"count":1}
-	}}`)
+		{"buckets":{
+			"2017-11-07T03:00:00Z":{"count":1},
+			"2017-11-07T04:00:00Z":{"count":3},
+			"2017-11-07T05:00:00Z":{"count":2},
+			"2017-11-07T06:00:00Z":{"count":1},
+			"2017-11-07T21:00:00Z":{"count":1}
+		}}`)
 
 	check("updated", "1h", nil, `
-{"buckets":{
-"2017-11-07T04:00:00Z":{"count":2},
-"2017-11-07T05:00:00Z":{"count":1},
-"2017-11-07T06:00:00Z":{"count":3},
-"2017-11-07T07:00:00Z":{"count":1}
-	}}`)
+		{"buckets":{
+			"2017-11-07T04:00:00Z":{"count":2},
+			"2017-11-07T05:00:00Z":{"count":1},
+			"2017-11-07T06:00:00Z":{"count":3},
+			"2017-11-07T07:00:00Z":{"count":1}
+		}}`)
 
 }
 
 func testDateHistPopulateIntervals(t *testing.T, engine Engine) {
 	jsonData := `[
-{"foo": {"bar": 1.1}, "created": "2015-10-01T06:00:00.000Z", "updated": "2016-01-01T03:15:01.123Z"},
-{"foo": {"bar": 1.2}, "created": "2015-10-02T06:00:00.000Z", "updated": "2016-01-01T03:15:01.123Z"},
-{"foo": {"bar": 2.11}, "created": "2016-10-01T06:00:00.000Z", "updated": "2016-01-01T03:15:02.123Z"},
-{"foo": {"bar": 2.12}, "created": "2016-11-01T06:00:00.000Z", "updated": "2017-11-01T03:15:01.123Z"},
-{"foo": {"bar": 2.21}, "created": "2016-10-07T06:01:00.000Z", "updated": "2016-10-08T03:15:01.567Z"}
+		{"foo": {"bar": 1.1}, "created": "2015-10-01T06:00:00.000Z", "updated": "2016-01-01T03:15:01.123Z"},
+		{"foo": {"bar": 1.2}, "created": "2015-10-02T06:00:00.000Z", "updated": "2016-01-01T03:15:01.123Z"},
+		{"foo": {"bar": 2.11}, "created": "2016-10-01T06:00:00.000Z", "updated": "2016-01-01T03:15:02.123Z"},
+		{"foo": {"bar": 2.12}, "created": "2016-11-01T06:00:00.000Z", "updated": "2017-11-01T03:15:01.123Z"},
+		{"foo": {"bar": 2.21}, "created": "2016-10-07T06:01:00.000Z", "updated": "2016-10-08T03:15:01.567Z"}
 	]`
 	var data []map[string]interface{}
 	if assert.NoError(t, json.Unmarshal([]byte(jsonData), &data)) {
@@ -216,14 +216,14 @@ func TestDateHistEngineIntervals(t *testing.T) {
 // check merging
 func TestDateHistEngineMerge(t *testing.T) {
 	jsonData := `[
-{"foo": {"bar":1.1}, "created": "Tue, 07 Nov 2017 03:15:01 GMT", "updated": "Tue, 07 Nov 2017 04:15:01 GMT" },
-{"foo": {"bar":2.2}, "created": "Tue, 07 Nov 2017 04:15:02 GMT", "updated": "Tue, 07 Nov 2017 04:45:02 GMT" },
-{"foo": {"bar":3.3}, "created": "Tue, 07 Nov 2017 04:35:03 GMT", "updated": "Tue, 07 Nov 2017 05:30:03 GMT" },
-{"foo": {"bar":4.4}, "created": "Tue, 07 Nov 2017 04:46:04 GMT", "updated": "Tue, 07 Nov 2017 06:15:04 GMT" },
-{"foo": {"bar":5.5}, "created": "Tue, 07 Nov 2017 05:15:05 GMT", "updated": "Tue, 07 Nov 2017 06:30:05 GMT" },
-{"foo": {"bar":6.6}, "created": "Tue, 07 Nov 2017 05:31:06 GMT", "updated": "Tue, 07 Nov 2017 06:45:06 GMT" },
-{"foo": {"bar":7.7}, "created": "Tue, 07 Nov 2017 06:10:07 GMT", "updated": "Tue, 07 Nov 2017 07:10:07 GMT" },
-{"foo": {"bar":8.8},"?created": "Tue, 07 Nov 2017 21:10:08 GMT","?updated": "Tue, 07 Nov 2017 21:10:08 GMT" }
+		{"foo": {"bar":1.1}, "created": "Tue, 07 Nov 2017 03:15:01 GMT", "updated": "Tue, 07 Nov 2017 04:15:01 GMT" },
+		{"foo": {"bar":2.2}, "created": "Tue, 07 Nov 2017 04:15:02 GMT", "updated": "Tue, 07 Nov 2017 04:45:02 GMT" },
+		{"foo": {"bar":3.3}, "created": "Tue, 07 Nov 2017 04:35:03 GMT", "updated": "Tue, 07 Nov 2017 05:30:03 GMT" },
+		{"foo": {"bar":4.4}, "created": "Tue, 07 Nov 2017 04:46:04 GMT", "updated": "Tue, 07 Nov 2017 06:15:04 GMT" },
+		{"foo": {"bar":5.5}, "created": "Tue, 07 Nov 2017 05:15:05 GMT", "updated": "Tue, 07 Nov 2017 06:30:05 GMT" },
+		{"foo": {"bar":6.6}, "created": "Tue, 07 Nov 2017 05:31:06 GMT", "updated": "Tue, 07 Nov 2017 06:45:06 GMT" },
+		{"foo": {"bar":7.7}, "created": "Tue, 07 Nov 2017 06:10:07 GMT", "updated": "Tue, 07 Nov 2017 07:10:07 GMT" },
+		{"foo": {"bar":8.8},"?created": "Tue, 07 Nov 2017 21:10:08 GMT","?updated": "Tue, 07 Nov 2017 21:10:08 GMT" }
 	]`
 
 	var data []map[string]interface{}
@@ -265,12 +265,12 @@ func TestDateHistEngineMerge(t *testing.T) {
 	}
 
 	check(h1.ToJson(), `
-{"buckets":[
-{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
-{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
-{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
-{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
-	]}`)
+		{"buckets":[
+			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
+			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
+			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
+			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
+		]}`)
 
 	// test merge
 	h2, err := newDateHistFunc(h_cfg, nil)
@@ -282,12 +282,12 @@ func TestDateHistEngineMerge(t *testing.T) {
 		return
 	}
 	check(h2.ToJson(), `
-{"buckets":[
-{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
-{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
-{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
-{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
-	]}`)
+		{"buckets":[
+			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
+			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
+			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
+			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
+		]}`)
 
 	// test merge (map[string]interface{})
 	binData, err := json.Marshal(h1.engine.ToJson())
@@ -309,12 +309,12 @@ func TestDateHistEngineMerge(t *testing.T) {
 		return
 	}
 	check(h3.ToJson(), `
-{"buckets":[
-{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
-{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
-{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
-{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
-	]}`)
+		{"buckets":[
+			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
+			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
+			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
+			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
+		]}`)
 }
 
 // check "date_histogram"
@@ -340,36 +340,36 @@ func TestDateHistFunc(t *testing.T) {
 	check(`{"field":"foo", "no-interval":"---"}`, `no "interval" option found`)
 
 	check(`{"field":"created", "interval":"1h"}`, `
-{"buckets": [
-{"key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "doc_count":1},
-{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
-{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2},
-{"key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "doc_count":1}
-	]}`)
+		{"buckets": [
+			{"key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "doc_count":1},
+			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
+			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2},
+			{"key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "doc_count":1}
+		]}`)
 
 	check(`{"field":"created", "interval":"1h", "min_doc_count":2}`, `
-{"buckets": [
-{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
-{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2}
-	]}`)
+		{"buckets": [
+			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
+			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2}
+		]}`)
 
 	check(`{"field":"created", "interval":"1h", "min_doc_count":2, "keyed":true}`, `
-{"buckets": {
-"2017-11-07T04:00:00.000Z": {"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
-"2017-11-07T05:00:00.000Z": {"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2}
-	}}`)
+		{"buckets": {
+			"2017-11-07T04:00:00.000Z": {"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
+			"2017-11-07T05:00:00.000Z": {"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2}
+		}}`)
 
 	check(`{"field":"created", "interval":"1h", "_aggs":{
-"my_min":{"min":{"field":"foo.bar"}},
-"my_max":{"max":{"field":"foo.bar"}},
-"my_sum":{"sum":{"field":"foo.bar"}}
-}}`,
+		"my_min":{"min":{"field":"foo.bar"}},
+		"my_max":{"max":{"field":"foo.bar"}},
+		"my_sum":{"sum":{"field":"foo.bar"}}
+		}}`,
 		`{"buckets": [
-{"key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "doc_count":1, "my_min":{"value":1.1}, "my_max":{"value":1.1}, "my_sum":{"value":1.1}},
-{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3, "my_min":{"value":2.2}, "my_max":{"value":4.4}, "my_sum":{"value":9.9}},
-{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2, "my_min":{"value":5.5}, "my_max":{"value":6.6}, "my_sum":{"value":12.1}},
-{"key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "doc_count":1, "my_min":{"value":7.7}, "my_max":{"value":7.7}, "my_sum":{"value":7.7}}
-	]}`)
+			{"key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "doc_count":1, "my_min":{"value":1.1}, "my_max":{"value":1.1}, "my_sum":{"value":1.1}},
+			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3, "my_min":{"value":2.2}, "my_max":{"value":4.4}, "my_sum":{"value":9.9}},
+			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2, "my_min":{"value":5.5}, "my_max":{"value":6.6}, "my_sum":{"value":12.1}},
+			{"key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "doc_count":1, "my_min":{"value":7.7}, "my_max":{"value":7.7}, "my_sum":{"value":7.7}}
+		]}`)
 
 	//check(`{"field":"Date", "interval":"24h", "missing": "TODO missing date"}`, `{"value": 1750}`)
 	//check(`{"field":"Date", "interval":"", "missing":"TODO missing date"}`, `{"value": 1750}`)

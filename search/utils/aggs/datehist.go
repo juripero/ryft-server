@@ -191,7 +191,6 @@ func (h *DateHist) Add(data interface{}) error {
 		return nil // do nothing if there is no value
 	}
 
-	// convert string to timestamp
 	val, err := parseDateTime(val_, h.Timezone, "")
 	if err != nil {
 		return fmt.Errorf("failed to parse datetime field: %s", err)
