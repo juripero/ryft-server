@@ -16,10 +16,10 @@ type DateHist struct {
 	Field   utils.Field `json:"-" msgpack:"-"` // field path
 	Missing interface{} `json:"-" msgpack:"-"` // missing value
 
-	Interval string        `json:"-" msgpack:"-"` // intervals like "month", "year" cannot be defined with time.Duration
-	Offset   time.Duration `json:"-" msgpack:"-"`
-	Timezone string        `json:"-" msgpack:"-"`
-	Format   string        `json:"-" msgpack:"-"`
+	Interval string         `json:"-" msgpack:"-"` // intervals like "month", "year" cannot be defined with time.Duration
+	Offset   time.Duration  `json:"-" msgpack:"-"`
+	Timezone *time.Location `json:"-" msgpack:"-"`
+	Format   string         `json:"-" msgpack:"-"`
 
 	Buckets map[time.Time]*Bucket `json:"buckets,omitempty" msgpack:"buckets,omitempty"`
 
@@ -113,6 +113,7 @@ func (h *DateHist) Name() string {
 		fmt.Sprintf("field::%s", h.Field),
 		fmt.Sprintf("interval::%s", h.Interval),
 		fmt.Sprintf("format::%s", h.Format),
+		fmt.Sprintf("timezone::%s", h.Timezone.String()),
 	}
 
 	// optional "missing" value
@@ -122,10 +123,6 @@ func (h *DateHist) Name() string {
 	// optional "offset" value
 	if h.Offset != 0 {
 		name = append(name, fmt.Sprintf("offset::%s", h.Offset))
-	}
-	// optional "timezone" value
-	if h.Timezone != "" {
-		name = append(name, fmt.Sprintf("timezone::%s", h.Timezone))
 	}
 
 	// names of all sub-aggregations
@@ -402,9 +399,13 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 		return nil, fmt.Errorf(`bad "interval": cannot be empty`)
 	}
 
-	timezone, err := getStringOpt("timezone", opts)
+	timezone_, err := getStringOpt("timezone", opts)
 	if err != nil {
-		timezone = "UTC"
+		timezone_ = "UTC"
+	}
+	timezone, err := time.LoadLocation(timezone_)
+	if err != nil {
+		return nil, fmt.Errorf(`bad "timezone": %s`, err)
 	}
 
 	format, err := getStringOpt("format", opts)
@@ -471,20 +472,15 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 }
 
 // parse the date-time field
-func parseDateTime(val interface{}, timezone string, formatHint string) (time.Time, error) {
+func parseDateTime(val interface{}, timezone *time.Location, formatHint string) (time.Time, error) {
 	// get value as a string
 	s, err := utils.AsString(val)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get datetime field: %s", err)
 	}
 
-	loc, err := time.LoadLocation(timezone)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to detect timezone: %s", err)
-	}
-
 	// convert string to timestamp
-	t, err := dateparse.ParseIn(s, loc)
+	t, err := dateparse.ParseIn(s, timezone)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse datetime field: %s", err)
 	}
@@ -508,7 +504,6 @@ func parseSignedTimeUnitsInterval(v string) (time.Duration, error) {
 
 // parseTimeUnitsInterval parse ElasticSearch time-units interval
 func parseTimeUnitsInterval(v string) (time.Duration, error) {
-	// interval is in time-units syntax (https://www.elastic.co/guide/en/elasticsearch/reference/current/common-options.html#time-units)
 	var interval time.Duration
 	compiledPattern, err := regexp.Compile(`^([\d]*)([\w]*)$`)
 	if err != nil {

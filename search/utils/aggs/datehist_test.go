@@ -90,7 +90,6 @@ func testDateHistPopulateIntervals(t *testing.T, engine Engine) {
 			}
 		}
 	}
-
 }
 
 func TestDateHistEngineIntervals(t *testing.T) {
