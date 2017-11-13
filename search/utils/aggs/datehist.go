@@ -17,10 +17,10 @@ type DateHist struct {
 	Field   utils.Field `json:"-" msgpack:"-"` // field path
 	Missing interface{} `json:"-" msgpack:"-"` // missing value
 
-	Interval string         `json:"-" msgpack:"-"` // intervals like "month", "year" cannot be defined with time.Duration
-	Offset   time.Duration  `json:"-" msgpack:"-"`
-	Timezone *time.Location `json:"-" msgpack:"-"`
-	Format   string         `json:"-" msgpack:"-"`
+	Interval datetime.Interval `json:"-" msgpack:"-"` // intervals like "month", "year" cannot be defined with time.Duration
+	Offset   time.Duration     `json:"-" msgpack:"-"`
+	Timezone *time.Location    `json:"-" msgpack:"-"`
+	Format   string            `json:"-" msgpack:"-"`
 
 	Buckets map[time.Time]*Bucket `json:"buckets,omitempty" msgpack:"buckets,omitempty"`
 
@@ -196,10 +196,7 @@ func (h *DateHist) Add(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse datetime field: %s", err)
 	}
-	key, err := h.getBucketKey(val, h.Offset, h.Interval)
-	if err != nil {
-		return fmt.Errorf("failed to get bucket key: %s", err)
-	}
+	key := h.getBucketKey(val, h.Offset, h.Interval)
 
 	// populate bucket
 	bucket := h.getBucket(key.UTC())
@@ -210,48 +207,10 @@ func (h *DateHist) Add(data interface{}) error {
 	return nil // OK
 }
 
-func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval string) (time.Time, error) {
-	var key time.Time
-	switch interval {
-	case "year":
-		key = time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-	case "month":
-		key = time.Date(val.Year(), val.Month(), 1, 0, 0, 0, 0, val.Location()).Add(offset)
-	case "quarter":
-		month := val.Month()
-		if month <= 3 {
-			key = time.Date(val.Year(), 1, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-		} else if month <= 6 {
-			key = time.Date(val.Year(), 4, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-		} else if month <= 9 {
-			key = time.Date(val.Year(), 7, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-		} else if month <= 12 {
-			key = time.Date(val.Year(), 10, 1, 0, 0, 0, 0, val.Location()).Add(offset)
-		} else {
-			// impossible case
-			return key, fmt.Errorf(`failed to align value with "quarter" interval`)
-		}
-	case "week":
-		_, week := val.ISOWeek()
-		mondayAligned := (week-1)*7 + 1
-		key = time.Date(val.Year(), val.Month(), mondayAligned, 0, 0, 0, 0, val.Location()).Add(offset)
-	case "day":
-		key = time.Date(val.Year(), val.Month(), val.Day(), 0, 0, 0, 0, val.Location()).Add(offset)
-	case "hour":
-		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), 0, 0, 0, val.Location()).Add(offset)
-	case "minute":
-		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), 0, 0, val.Location()).Add(offset)
-	case "second":
-		key = time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), val.Second(), 0, val.Location()).Add(offset)
-	default:
-		tail, err := parseTimeUnitsInterval(interval)
-		if err != nil {
-			return key, fmt.Errorf(`failed to parse "interval": %s`, err)
-		}
-		tail += offset
-		key = val.Truncate(tail) // Caution: time.Duration can't be more than 290 years
-	}
-	return key, nil
+func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval datetime.Interval) time.Time {
+	t := interval.Apply(val)
+	t.Add(offset)
+	return t
 }
 
 // Merge merge another aggregation engine
@@ -391,12 +350,17 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 		return nil, err
 	}
 
-	interval, err := getStringOpt("interval", opts)
+	interval_, err := getStringOpt("interval", opts)
 	if err != nil {
 		return nil, err
 	}
-	if interval == "" {
+	if interval_ == "" {
 		return nil, fmt.Errorf(`bad "interval": cannot be empty`)
+	}
+
+	interval := datetime.NewInterval(interval_)
+	if err := interval.Parse(); err != nil {
+		return nil, fmt.Errorf(`bad "interval": %s`, interval_)
 	}
 
 	timezone_, err := getStringOpt("timezone", opts)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/getryft/ryft-server/search/utils/datetime"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,9 +34,12 @@ func testDateHistPopulate(t *testing.T, engine Engine) {
 // date_histogram engine test
 func TestDateHistEngine(t *testing.T) {
 	check := func(field string, interval string, missing interface{}, expected string) {
+		i := datetime.NewInterval(interval)
+		err := i.Parse()
+		assert.NoError(t, err)
 		hist := &DateHist{
 			Field:    mustParseField(field),
-			Interval: interval,
+			Interval: i,
 			Missing:  missing,
 		}
 
@@ -94,9 +98,12 @@ func testDateHistPopulateIntervals(t *testing.T, engine Engine) {
 
 func TestDateHistEngineIntervals(t *testing.T) {
 	check := func(field string, interval string, missing interface{}, expected string) {
+		i := datetime.NewInterval(interval)
+		err := i.Parse()
+		assert.NoError(t, err)
 		hist := &DateHist{
 			Field:    mustParseField(field),
-			Interval: interval,
+			Interval: i,
 			Missing:  missing,
 		}
 
@@ -123,8 +130,8 @@ func TestDateHistEngineIntervals(t *testing.T) {
 			"2015-10-01T00:00:00Z":{"count":2},
 			"2016-10-01T00:00:00Z":{"count":3}
 		}}`)
-	check("created", "week", nil, `{
-		"buckets":{
+	check("created", "week", nil, `
+		{"buckets":{
 			"2016-06-30T00:00:00Z":{"count":2},
 			"2017-06-24T00:00:00Z":{"count":1},
 			"2017-07-01T00:00:00Z":{"count":1},
