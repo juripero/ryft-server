@@ -374,6 +374,7 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 
 	format, err := getStringOpt("format", opts)
 	if err != nil {
+		// default key format
 		format = "yyyy-MM-ddTHH:mm:ss.SSSZZ"
 	}
 

@@ -273,10 +273,10 @@ func TestDateHistEngineMerge(t *testing.T) {
 
 	check(h1.ToJson(), `
 		{"buckets":[
-			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
-			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
-			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
-			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
+			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000+00:00", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
+			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000+00:00", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
+			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000+00:00", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
+			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000+00:00", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
 		]}`)
 
 	// test merge
@@ -290,10 +290,10 @@ func TestDateHistEngineMerge(t *testing.T) {
 	}
 	check(h2.ToJson(), `
 		{"buckets":[
-			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
-			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
-			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
-			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
+			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000+00:00", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
+			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000+00:00", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
+			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000+00:00", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
+			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000+00:00", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
 		]}`)
 
 	// test merge (map[string]interface{})
@@ -317,10 +317,10 @@ func TestDateHistEngineMerge(t *testing.T) {
 	}
 	check(h3.ToJson(), `
 		{"buckets":[
-			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
-			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
-			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
-			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
+			{"doc_count":1, "key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000+00:00", "my_max":{"value":1.1}, "my_min":{"value":1.1}},
+			{"doc_count":3, "key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000+00:00", "my_max":{"value":4.4}, "my_min":{"value":2.2}},
+			{"doc_count":2, "key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000+00:00", "my_max":{"value":6.6}, "my_min":{"value":5.5}},
+			{"doc_count":1, "key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000+00:00", "my_max":{"value":7.7}, "my_min":{"value":7.7}}
 		]}`)
 }
 
@@ -348,22 +348,22 @@ func TestDateHistFunc(t *testing.T) {
 
 	check(`{"field":"created", "interval":"1h"}`, `
 		{"buckets": [
-			{"key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "doc_count":1},
-			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
-			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2},
-			{"key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "doc_count":1}
+			{"key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000+00:00", "doc_count":1},
+			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000+00:00", "doc_count":3},
+			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000+00:00", "doc_count":2},
+			{"key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000+00:00", "doc_count":1}
 		]}`)
 
 	check(`{"field":"created", "interval":"1h", "min_doc_count":2}`, `
 		{"buckets": [
-			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
-			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2}
+			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000+00:00", "doc_count":3},
+			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000+00:00", "doc_count":2}
 		]}`)
 
 	check(`{"field":"created", "interval":"1h", "min_doc_count":2, "keyed":true}`, `
 		{"buckets": {
-			"2017-11-07T04:00:00.000Z": {"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3},
-			"2017-11-07T05:00:00.000Z": {"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2}
+			"2017-11-07T04:00:00.000+00:00": {"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000+00:00", "doc_count":3},
+			"2017-11-07T05:00:00.000+00:00": {"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000+00:00", "doc_count":2}
 		}}`)
 
 	check(`{"field":"created", "interval":"1h", "_aggs":{
@@ -372,10 +372,10 @@ func TestDateHistFunc(t *testing.T) {
 		"my_sum":{"sum":{"field":"foo.bar"}}
 		}}`,
 		`{"buckets": [
-			{"key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000Z", "doc_count":1, "my_min":{"value":1.1}, "my_max":{"value":1.1}, "my_sum":{"value":1.1}},
-			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000Z", "doc_count":3, "my_min":{"value":2.2}, "my_max":{"value":4.4}, "my_sum":{"value":9.9}},
-			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000Z", "doc_count":2, "my_min":{"value":5.5}, "my_max":{"value":6.6}, "my_sum":{"value":12.1}},
-			{"key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000Z", "doc_count":1, "my_min":{"value":7.7}, "my_max":{"value":7.7}, "my_sum":{"value":7.7}}
+			{"key":1510023600000, "key_as_string":"2017-11-07T03:00:00.000+00:00", "doc_count":1, "my_min":{"value":1.1}, "my_max":{"value":1.1}, "my_sum":{"value":1.1}},
+			{"key":1510027200000, "key_as_string":"2017-11-07T04:00:00.000+00:00", "doc_count":3, "my_min":{"value":2.2}, "my_max":{"value":4.4}, "my_sum":{"value":9.9}},
+			{"key":1510030800000, "key_as_string":"2017-11-07T05:00:00.000+00:00", "doc_count":2, "my_min":{"value":5.5}, "my_max":{"value":6.6}, "my_sum":{"value":12.1}},
+			{"key":1510034400000, "key_as_string":"2017-11-07T06:00:00.000+00:00", "doc_count":1, "my_min":{"value":7.7}, "my_max":{"value":7.7}, "my_sum":{"value":7.7}}
 		]}`)
 
 	//check(`{"field":"Date", "interval":"24h", "missing": "TODO missing date"}`, `{"value": 1750}`)
