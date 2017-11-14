@@ -2,7 +2,6 @@ package aggs
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -376,10 +375,11 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 
 	offset := time.Duration(0)
 	if offset_, err := getStringOpt("offset", opts); err == nil {
-		offset, err = parseSignedTimeUnitsInterval(offset_)
-		if err != nil {
+		i := datetime.NewInterval(offset_)
+		if err = i.Parse(); err != nil {
 			return nil, fmt.Errorf(`bad "offset": %s`, err)
 		}
+		offset = i.TimeUnitOffset()
 	}
 
 	// keyed
@@ -447,58 +447,6 @@ func parseDateTime(val interface{}, timezone *time.Location, formatHint string) 
 	}
 
 	return t, nil // OK
-}
-
-// parseSignedTimeUnitsInterval process ElasticSearch time-units interval e.g.: "+6h" -> {6*time.Hour, error}; "-3m" -> {-3*time.Minute, error}
-func parseSignedTimeUnitsInterval(v string) (time.Duration, error) {
-	sign := int64(1)
-	if strings.HasPrefix(v, "-") {
-		sign = int64(-1)
-	}
-	interval, err := parseTimeUnitsInterval(strings.TrimLeft(v, "-+"))
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse time units interval with sign: %s", err)
-	}
-	interval = time.Duration(int64(interval) * sign)
-	return interval, nil
-}
-
-// parseTimeUnitsInterval parse ElasticSearch time-units interval
-func parseTimeUnitsInterval(v string) (time.Duration, error) {
-	var interval time.Duration
-	compiledPattern, err := regexp.Compile(`^([\d]*)([\w]*)$`)
-	if err != nil {
-		return interval, fmt.Errorf(`failed to parse "interval" %s: %s`, v, err)
-	}
-	found := compiledPattern.FindAllStringSubmatch(v, -1)
-	if len(found) == 0 || len(found[0]) < 3 {
-		return interval, fmt.Errorf(`"interval" has wrong format %s`, v)
-	}
-	amount, err := utils.AsInt64(found[0][1])
-	if err != nil {
-		return interval, fmt.Errorf("failed to parse interval %s", v)
-	}
-	timeunit := found[0][2]
-	switch timeunit {
-	case "d":
-		interval = time.Duration(int64(amount) * int64(24) * int64(time.Hour))
-	case "h":
-		interval = time.Duration(amount * int64(time.Hour))
-	case "m":
-		interval = time.Duration(amount * int64(time.Minute))
-	case "s":
-		interval = time.Duration(amount * int64(time.Second))
-	case "ms":
-		interval = time.Duration(amount * int64(time.Millisecond))
-	case "micros":
-		interval = time.Duration(amount * int64(time.Microsecond))
-	case "nanos":
-		interval = time.Duration(amount * int64(time.Nanosecond))
-	default:
-		return interval, fmt.Errorf("time-unit of interval set incorrectly %s", timeunit)
-	}
-
-	return interval, nil
 }
 
 // TimeSlice attaches the methods of sort.Interface to []time.Time, sorting in increasing order.
