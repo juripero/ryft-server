@@ -511,3 +511,40 @@ func TestDateHistFuncTimezone(t *testing.T) {
 		{"doc_count":1,"key":1510034400000,"key_as_string":"07:00+0100"}]}`)
 
 }
+
+func TestDateHistFuncFormat(t *testing.T) {
+	assert := assert.New(t)
+
+	check := func(opts map[string]interface{}, expected string) {
+		f, err := newDateHistFunc(opts, nil)
+		if err != nil {
+			assert.Contains(t, err.Error(), expected)
+		} else {
+			testDateHistPopulate(t, f.engine)
+
+			data, err := json.Marshal(f.ToJson())
+			if assert.NoError(err) {
+				assert.JSONEq(expected, string(data))
+			}
+		}
+	}
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+	}, `
+	{"buckets":[
+		{"doc_count":1,"key":1510023600000,"key_as_string":"2017-11-07T03:00:00.000+00:00"},
+		{"doc_count":3,"key":1510027200000,"key_as_string":"2017-11-07T04:00:00.000+00:00"},
+		{"doc_count":2,"key":1510030800000,"key_as_string":"2017-11-07T05:00:00.000+00:00"},
+		{"doc_count":1,"key":1510034400000,"key_as_string":"2017-11-07T06:00:00.000+00:00"}]}`)
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"format":   "yyyy-MM-dd",
+	}, `{"buckets":[
+			{"doc_count":1,"key":1510023600000,"key_as_string":"2017-11-07"},
+			{"doc_count":3,"key":1510027200000,"key_as_string":"2017-11-07"},
+			{"doc_count":2,"key":1510030800000,"key_as_string":"2017-11-07"},
+			{"doc_count":1,"key":1510034400000,"key_as_string":"2017-11-07"}]}`)
+
+}
