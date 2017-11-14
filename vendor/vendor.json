@@ -169,6 +169,12 @@
 			"revisionTime": "2017-06-20T10:48:52Z"
 		},
 		{
+			"checksumSHA1": "SqhDMoHYwafnWYlWxYJXfw7Dbbk=",
+			"path": "github.com/vjeantet/jodaTime",
+			"revision": "be924ce213fb35f66c810b61e051965eb78b82d0",
+			"revisionTime": "2017-08-16T15:02:30Z"
+		},
+		{
 			"checksumSHA1": "UWjVYmoHlIfHzVIskELHiJQtMOI=",
 			"path": "golang.org/x/crypto/bcrypt",
 			"revision": "2509b142fb2b797aa7587dad548f113b2c0f20ce",
