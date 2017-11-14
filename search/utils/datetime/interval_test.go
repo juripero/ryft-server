@@ -14,7 +14,7 @@ func TestInterval(t *testing.T) {
 		proc := NewInterval(i)
 		err := proc.Parse()
 		assert.NoError(err)
-		date := proc.Apply(date)
+		date := proc.Truncate(date)
 		assert.WithinDuration(expected, date, time.Millisecond)
 	}
 	check("year", time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC))

@@ -195,7 +195,9 @@ func (h *DateHist) Add(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse datetime field: %s", err)
 	}
-	key := h.getBucketKey(val, h.Offset, h.Interval)
+
+	key := h.Interval.Truncate(val)
+	key = key.Add(h.Offset)
 
 	// populate bucket
 	bucket := h.getBucket(key.UTC())
@@ -204,12 +206,6 @@ func (h *DateHist) Add(data interface{}) error {
 	}
 
 	return nil // OK
-}
-
-func (h *DateHist) getBucketKey(val time.Time, offset time.Duration, interval datetime.Interval) time.Time {
-	t := interval.Apply(val)
-	t.Add(offset)
-	return t
 }
 
 // Merge merge another aggregation engine

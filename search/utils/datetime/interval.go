@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/scanner"
 	"go/token"
-	"math"
 	"strconv"
 	"time"
 )
@@ -23,8 +22,6 @@ const (
 	UNIT_NANOSECOND
 )
 
-var x float64 = 365.242222 * 24 * float64(time.Hour)
-var y float64 = math.Ceil(x / 12)
 var timeUnitMap = map[int]int64{
 	UNIT_HOUR:        int64(time.Hour),
 	UNIT_MINUTE:      int64(time.Minute),
@@ -32,10 +29,8 @@ var timeUnitMap = map[int]int64{
 	UNIT_MILLISECOND: int64(time.Millisecond),
 	UNIT_MICROSECOND: int64(time.Microsecond),
 	UNIT_NANOSECOND:  int64(time.Nanosecond),
+	UNIT_DAY:         int64(time.Hour) * 24,
 	// naive
-	UNIT_DAY: int64(time.Hour) * 24,
-	//UNIT_MONTH: int64(y),
-	//UNIT_YEAR:  int64(x),
 	UNIT_MONTH: int64(365.25 * 24 * time.Hour / 12),
 	UNIT_YEAR:  int64(365.25 * 24 * time.Hour),
 }
@@ -82,6 +77,7 @@ type offsetDate struct {
 	Day     int64
 }
 
+// Parse input date query
 func (i *Interval) Parse() error {
 	src := []byte(i.val)
 	var s scanner.Scanner
@@ -148,7 +144,15 @@ func (i *Interval) Parse() error {
 	return nil
 }
 
-func (i Interval) Apply(t time.Time) time.Time {
+// TimeUnitOffset return offset in time-units
+func (i Interval) TimeUnitOffset() time.Duration {
+	offset := time.Duration(i.offsetDate.Day * UNIT_DAY)
+	offset += i.offsetTime
+	return offset
+}
+
+// Truncate evalute date query and truncate date with the result offset
+func (i Interval) Truncate(t time.Time) time.Time {
 	// Align to year
 	if i.offsetDate.Year == 1 {
 		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location())
