@@ -289,7 +289,7 @@ func (f *dateHistFunc) ToJson() interface{} {
 			continue
 		}
 
-		keyAsString := datetime.FormatAsISO8601(f.engine.Format, k)
+		keyAsString := datetime.FormatAsISO8601(f.engine.Format, k.In(f.engine.Timezone))
 
 		b := map[string]interface{}{
 			"key_as_string": keyAsString,

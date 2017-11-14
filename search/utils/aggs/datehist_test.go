@@ -434,3 +434,80 @@ func TestDateHistFuncOffset(t *testing.T) {
 			{"doc_count":2,"key":1510023600000,"key_as_string":"3"},
 			{"doc_count":1,"key":1510027200000,"key_as_string":"4"}]}`)
 }
+
+func TestDateHistFuncTimezone(t *testing.T) {
+	assert := assert.New(t)
+
+	check := func(opts map[string]interface{}, expected string) {
+		f, err := newDateHistFunc(opts, nil)
+		if err != nil {
+			assert.Contains(t, err.Error(), expected)
+		} else {
+			testDateHistPopulate(t, f.engine)
+
+			data, err := json.Marshal(f.ToJson())
+			if assert.NoError(err) {
+				assert.JSONEq(expected, string(data))
+			}
+		}
+	}
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"timezone": "",
+		"format":   "hh:mmZ",
+	}, `
+	{"buckets":[
+		{"doc_count":1,"key":1510023600000,"key_as_string":"03:00+0000"},
+		{"doc_count":3,"key":1510027200000,"key_as_string":"04:00+0000"},
+		{"doc_count":2,"key":1510030800000,"key_as_string":"05:00+0000"},
+		{"doc_count":1,"key":1510034400000,"key_as_string":"06:00+0000"}]}`)
+
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"timezone": "UTC",
+		"format":   "hh:mmZ",
+	}, `
+	{"buckets":[
+		{"doc_count":1,"key":1510023600000,"key_as_string":"03:00+0000"},
+		{"doc_count":3,"key":1510027200000,"key_as_string":"04:00+0000"},
+		{"doc_count":2,"key":1510030800000,"key_as_string":"05:00+0000"},
+		{"doc_count":1,"key":1510034400000,"key_as_string":"06:00+0000"}]}`)
+
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"timezone": "America/Los_Angeles",
+		"format":   "hh:mmZZ",
+	}, `
+	{"buckets":[
+		{"doc_count":1,"key":1510023600000,"key_as_string":"08:00-08:00"},
+		{"doc_count":3,"key":1510027200000,"key_as_string":"09:00-08:00"},
+		{"doc_count":2,"key":1510030800000,"key_as_string":"10:00-08:00"},
+		{"doc_count":1,"key":1510034400000,"key_as_string":"11:00-08:00"}]}`)
+
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"timezone": "Asia/Pontianak",
+		"format":   "hh:mmZ",
+	}, `
+	{"buckets":[
+		{"doc_count":1,"key":1510023600000,"key_as_string":"10:00+0700"},
+		{"doc_count":3,"key":1510027200000,"key_as_string":"11:00+0700"},
+		{"doc_count":2,"key":1510030800000,"key_as_string":"12:00+0700"},
+		{"doc_count":1,"key":1510034400000,"key_as_string":"02:00+0700"}]}`)
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"timezone": "+01:00",
+		"format":   "hh:mmZ",
+	}, `
+	{"buckets":[
+		{"doc_count":1,"key":1510023600000,"key_as_string":"04:00+0100"},
+		{"doc_count":3,"key":1510027200000,"key_as_string":"05:00+0100"},
+		{"doc_count":2,"key":1510030800000,"key_as_string":"06:00+0100"},
+		{"doc_count":1,"key":1510034400000,"key_as_string":"07:00+0100"}]}`)
+
+}
