@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/araddon/dateparse"
 	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/datetime"
 )
@@ -295,7 +294,7 @@ func (f *dateHistFunc) ToJson() interface{} {
 			continue
 		}
 
-		keyAsString := k.Format(f.engine.Format)
+		keyAsString := datetime.FormatAsISO8601(f.engine.Format, k)
 
 		b := map[string]interface{}{
 			"key_as_string": keyAsString,
@@ -375,7 +374,7 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 
 	format, err := getStringOpt("format", opts)
 	if err != nil {
-		format = "2006-01-02T15:04:05.000Z"
+		format = "yyyy-MM-ddTHH:mm:ss.SSSZZ"
 	}
 
 	offset := time.Duration(0)
@@ -445,7 +444,7 @@ func parseDateTime(val interface{}, timezone *time.Location, formatHint string) 
 	}
 
 	// convert string to timestamp
-	t, err := dateparse.ParseIn(s, timezone)
+	t, err := datetime.ParseIn(s, timezone)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse datetime field: %s", err)
 	}
