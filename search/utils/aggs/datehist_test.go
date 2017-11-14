@@ -381,3 +381,56 @@ func TestDateHistFunc(t *testing.T) {
 	//check(`{"field":"Date", "interval":"24h", "missing": "TODO missing date"}`, `{"value": 1750}`)
 	//check(`{"field":"Date", "interval":"", "missing":"TODO missing date"}`, `{"value": 1750}`)
 }
+
+func TestDateHistFuncOffset(t *testing.T) {
+	assert := assert.New(t)
+
+	check := func(opts map[string]interface{}, expected string) {
+		f, err := newDateHistFunc(opts, nil)
+		if err != nil {
+			assert.Contains(t, err.Error(), expected)
+		} else {
+			testDateHistPopulate(t, f.engine)
+
+			data, err := json.Marshal(f.ToJson())
+			if assert.NoError(err) {
+				assert.JSONEq(expected, string(data))
+			}
+		}
+	}
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"offset":   "0h",
+		"format":   "h",
+	},
+		`{"buckets":[
+			{"doc_count":1,"key":1510023600000,"key_as_string":"3"},
+			{"doc_count":3,"key":1510027200000,"key_as_string":"4"},
+			{"doc_count":2,"key":1510030800000,"key_as_string":"5"},
+			{"doc_count":1,"key":1510034400000,"key_as_string":"6"}]}`)
+
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"offset":   "1h",
+		"format":   "h",
+	},
+		`{"buckets":[
+			{"doc_count":1,"key":1510027200000,"key_as_string":"4"},
+			{"doc_count":3,"key":1510030800000,"key_as_string":"5"},
+			{"doc_count":2,"key":1510034400000,"key_as_string":"6"},
+			{"doc_count":1,"key":1510038000000,"key_as_string":"7"}]}`)
+
+	check(map[string]interface{}{
+		"field":    "created",
+		"interval": "hour",
+		"offset":   "-2h",
+		"format":   "h",
+	},
+		`{"buckets":[
+			{"doc_count":1,"key":1510016400000,"key_as_string":"1"},
+			{"doc_count":3,"key":1510020000000,"key_as_string":"2"},
+			{"doc_count":2,"key":1510023600000,"key_as_string":"3"},
+			{"doc_count":1,"key":1510027200000,"key_as_string":"4"}]}`)
+}
