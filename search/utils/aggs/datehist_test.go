@@ -119,6 +119,13 @@ func TestDateHistEngineIntervals(t *testing.T) {
 			"2015-01-01T00:00:00Z":{"count":2},
 			"2016-01-01T00:00:00Z":{"count":3}
 		}}`)
+	check("created", "2y", nil, `{"buckets":{"2015-01-01T00:00:00Z":{"count":5}}}`)
+	check("created", "3y", nil, `{"buckets":{"2014-01-01T00:00:00Z":{"count":5}}}`)
+	check("created", "3M", nil, `
+		{"buckets":{
+			"2015-07-01T00:00:00Z":{"count":2},
+			"2016-07-01T00:00:00Z":{"count":2},
+			"2016-10-01T00:00:00Z":{"count":1}}}`)
 	check("created", "month", nil, `
 		{"buckets":{
 			"2015-10-01T00:00:00Z":{"count":2},
@@ -130,13 +137,20 @@ func TestDateHistEngineIntervals(t *testing.T) {
 			"2015-10-01T00:00:00Z":{"count":2},
 			"2016-10-01T00:00:00Z":{"count":3}
 		}}`)
+	check("created", "3w", nil, `{
+		"buckets":{
+			"2015-09-27T00:00:00Z":{"count":2},
+			"2016-09-25T00:00:00Z":{"count":1},
+			"2016-10-02T00:00:00Z":{"count":1},
+			"2016-10-30T00:00:00Z":{"count":1}}}`)
+
 	check("created", "week", nil, `
 		{"buckets":{
-			"2016-06-30T00:00:00Z":{"count":2},
-			"2017-06-24T00:00:00Z":{"count":1},
-			"2017-07-01T00:00:00Z":{"count":1},
-			"2017-08-29T00:00:00Z":{"count":1}
-		}}`)
+			"2015-09-27T00:00:00Z":{"count":2},
+			"2016-09-25T00:00:00Z":{"count":1},
+			"2016-10-02T00:00:00Z":{"count":1},
+			"2016-10-30T00:00:00Z":{"count":1}}}`)
+
 	check("created", "day", nil, `
 		{"buckets":{
 			"2015-10-01T00:00:00Z":{"count":1},

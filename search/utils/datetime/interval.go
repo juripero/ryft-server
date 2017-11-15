@@ -159,7 +159,7 @@ func (i Interval) Truncate(t time.Time) time.Time {
 	}
 	if i.offsetDate.Year > 1 { // use naive year offset
 		v, _ := timeUnitMap[UNIT_YEAR]
-		v_ := t.Truncate(time.Duration(i.offsetDate.Month * v))
+		v_ := t.Truncate(time.Duration(i.offsetDate.Year * v))
 		return time.Date(v_.Year(), 1, 1, 0, 0, 0, 0, v_.Location())
 	}
 	// Align to quarter
@@ -169,8 +169,14 @@ func (i Interval) Truncate(t time.Time) time.Time {
 	}
 	// Align to week
 	if i.offsetDate.Week > 0 {
-		_, wn := t.ISOWeek()
-		return time.Date(t.Year(), t.Month(), (wn-1)*7+1, 0, 0, 0, 0, t.Location())
+		t := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+		weekday := int(t.Weekday())
+		d := time.Duration(-weekday) * 24 * time.Hour
+		t = t.Add(d)
+		if i.offsetDate.Week == 1 {
+			return t
+		}
+		return t.Truncate(time.Duration(UNIT_WEEK * i.offsetDate.Week))
 	}
 	// Align to month
 	if i.offsetDate.Month == 1 {
@@ -185,7 +191,7 @@ func (i Interval) Truncate(t time.Time) time.Time {
 	if i.offsetDate.Day == 1 {
 		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 	}
-	if i.offsetDate.Day > 1 { // use naive day offset:w
+	if i.offsetDate.Day > 1 { // use naive day offset
 		v, _ := timeUnitMap[UNIT_DAY]
 		v_ := t.Truncate(time.Duration(i.offsetDate.Day * v))
 		return time.Date(v_.Year(), v_.Month(), v_.Day(), 0, 0, 0, 0, v_.Location())
