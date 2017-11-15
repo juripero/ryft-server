@@ -219,24 +219,31 @@ func TestCatalogAddFilePart(t *testing.T) {
 	for i := 0; i < 2*count; i++ {
 		if res := <-resCh; len(res.Path) > 0 {
 			dataFiles[res.Path] = append(dataFiles[res.Path], res.Part)
-			assert.EqualValues(t, res.Delim, DefaultDataDelimiter)
+			if !assert.EqualValues(t, res.Delim, DefaultDataDelimiter) {
+				break // do not flood
+			}
 		} // omit empty files (errors)
 	}
 
 	// check all data files
 	dataFileList := make([]string, 0, len(dataFiles))
+AllFilesLoop:
 	for data, parts := range dataFiles {
 		dataFileList = append(dataFileList, data)
 		sort.Sort(parts)
 
 		// check all parts
 		a := parts[0]
-		assert.EqualValues(t, 0, a.Pos) // first part offset should be zero
+		if !assert.EqualValues(t, 0, a.Pos) { // first part offset should be zero
+			break AllFilesLoop // do not flood
+		}
 		atomic.AddInt64(&actualLen, a.Len)
 		for i := 1; i < len(parts); i++ {
 			b := parts[i]
 
-			assert.EqualValues(t, b.Pos, a.Pos+a.Len+int64(len(DefaultDataDelimiter)))
+			if !assert.EqualValues(t, b.Pos, a.Pos+a.Len+int64(len(DefaultDataDelimiter))) {
+				break AllFilesLoop // do not flood
+			}
 			atomic.AddInt64(&actualLen, b.Len)
 			a = b // next iteration
 		}

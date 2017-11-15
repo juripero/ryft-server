@@ -72,13 +72,13 @@ func TestApplyAggregations(t *testing.T) {
 		err := json.Unmarshal([]byte(opts), &params)
 		assert.NoError(t, err)
 
-		Aggs, err := aggs.MakeAggs(params)
+		Aggs, err := aggs.MakeAggs(params, format, nil)
 		if err != nil {
 			assert.Contains(t, err.Error(), expected)
 			return
 		}
 
-		err = ApplyAggregations(n, indexPath, dataPath, "\n", format, Aggs, true, nil)
+		err = ApplyAggregations(n, indexPath, dataPath, "\n", Aggs, true, nil)
 		if err != nil {
 			assert.Contains(t, err.Error(), expected)
 		} else {

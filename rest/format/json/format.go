@@ -80,7 +80,7 @@ func (f *Format) FromRecord(rec *search.Record) interface{} {
 	return FromRecord(rec, f.Fields)
 }
 
-// Convert JSON format spcific data to RECORD.
+// Convert JSON format specific data to RECORD.
 // WARN: will panic if argument is not of json.Record type!
 func (*Format) ToRecord(rec interface{}) *search.Record {
 	return ToRecord(rec.(*Record))

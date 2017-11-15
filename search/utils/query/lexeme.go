@@ -68,6 +68,11 @@ func (lex Lexeme) String() string {
 	return lex.literal
 }
 
+// Token gets token identifier.
+func (lex Lexeme) Token() Token {
+	return lex.token
+}
+
 // Unquoted get unquoted string.
 func (lex Lexeme) Unquoted() string {
 	if lex.token == STRING {

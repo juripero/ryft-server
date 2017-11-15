@@ -59,6 +59,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if cfg.Aggregations != nil {
 		bodyData["aggs"] = cfg.Aggregations.GetOpts()
 	}
+	if len(cfg.Tweaks.Format) != 0 {
+		bodyData["format"] = cfg.Tweaks.Format
+	}
 	var bodyRd io.Reader
 	if len(bodyData) != 0 {
 		if body, err := json.Marshal(bodyData); err != nil {
@@ -104,6 +107,9 @@ func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	bodyData := make(map[string]interface{})
 	if cfg.Aggregations != nil {
 		bodyData["aggs"] = cfg.Aggregations.GetOpts()
+	}
+	if len(cfg.Tweaks.Format) != 0 {
+		bodyData["format"] = cfg.Tweaks.Format
 	}
 	var bodyRd io.Reader
 	if len(bodyData) != 0 {

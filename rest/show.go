@@ -61,7 +61,14 @@ type SearchShowParams struct {
 	Transforms []string `form:"transform" json:"transform,omitempty" msgpack:"transform,omitempty"`
 
 	// aggregations
-	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
+
+	// tweaks
+	Tweaks struct {
+		Format map[string]interface{} `json:"format,omitempty" msgpack:"format,omitempty"`
+		// Cluster []interface{}          `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
+	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
@@ -136,12 +143,10 @@ func (server *Server) doSearchShow(ctx *gin.Context, params SearchShowParams) {
 	}
 
 	// setting up transcoder to convert raw data
-	// XML and JSON support additional fields filtration
-	var tcode format.Format
-	tcode_opts := map[string]interface{}{
-		"fields": params.Fields,
-	}
-	if tcode, err = format.New(params.Format, tcode_opts); err != nil {
+	// CSV, XML and JSON support additional fields filtration
+	tcode_opts := getFormatOptions(params.Tweaks.Format, params.Fields)
+	tcode, err := format.New(params.Format, tcode_opts)
+	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to get transcoder"))
 	}
@@ -183,15 +188,20 @@ func (server *Server) doSearchShow(ctx *gin.Context, params SearchShowParams) {
 			WithDetails("failed to parse transformations"))
 	}
 
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
-	if err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to prepare aggregations"))
-	}
 	if len(params.InternalFormat) != 0 {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
+	}
+	cfg.Tweaks.Format = tcode_opts
+
+	// aggregations
+	cfg.Aggregations, err = aggs.MakeAggs(
+		selectAggsOpts(params.ShortAggs, params.LongAggs),
+		cfg.DataFormat, tcode_opts)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
 	}
 
 	// get search engine
@@ -230,7 +240,7 @@ func (server *Server) doSearchShow(ctx *gin.Context, params SearchShowParams) {
 	server.drain(ctx, enc, tcode, cfg, res, errorPrefix)
 	transferStopTime := time.Now() // performance metric
 
-	if /*params.Stats &&*/ res.Stat != nil {
+	if /*params.Stats &&*/ res.Stat != nil && (cfg.Aggregations != nil || params.Performance) {
 		if server.Config.ExtraRequest {
 			res.Stat.Extra["request"] = &params
 		}

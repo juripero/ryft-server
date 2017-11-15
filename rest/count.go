@@ -79,7 +79,8 @@ type CountParams struct {
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
 
 	// aggregations
-	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 
@@ -195,15 +196,17 @@ func (server *Server) DoCount0(ctx *gin.Context) {
 	}
 
 	// aggregations
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
-	if err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to prepare aggregations"))
-	}
 	if len(params.InternalFormat) != 0 {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
+	}
+	cfg.Aggregations, err = aggs.MakeAggs(
+		selectAggsOpts(params.ShortAggs, params.LongAggs),
+		cfg.DataFormat, nil /*tcode_opts*/)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
 	}
 
 	// session preparation

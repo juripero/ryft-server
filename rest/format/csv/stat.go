@@ -28,66 +28,32 @@
  * ============
  */
 
-package raw
+package csv
 
 import (
 	"github.com/getryft/ryft-server/search"
 )
 
-// RAW format, does 1=1 mapping.
-// Support for JSON tags.
-type Format struct{}
+// Stat is format specific data for STAT.
+// the same as search.Stat
+type Stat search.Stat
 
-// New creates new RAW formatter.
-// No options supported.
-func New() (*Format, error) {
-	return new(Format), nil
-}
-
-// NewIndex creates new format specific data.
-func (*Format) NewIndex() interface{} {
-	return NewIndex()
-}
-
-// Convert INDEX to RAW format specific data.
-func (*Format) FromIndex(index *search.Index) interface{} {
-	return FromIndex(index)
-}
-
-// Convert RAW format specific data to INDEX.
-// WARN: will panic if argument is not of raw.Index type!
-func (*Format) ToIndex(index interface{}) *search.Index {
-	return ToIndex(index.(*Index))
-}
-
-// NewRecord creates new format specific data.
-func (*Format) NewRecord() interface{} {
-	return NewRecord()
-}
-
-// Convert RECORD to RAW format specific data.
-func (*Format) FromRecord(rec *search.Record) interface{} {
-	return FromRecord(rec)
-}
-
-// Convert RAW format specific data to RECORD.
-// WARN: will panic if argument is not of raw.Record type!
-func (*Format) ToRecord(rec interface{}) *search.Record {
-	return ToRecord(rec.(*Record))
+// MarshalCSV converts STAT into csv-encoder compatible format
+func (stat *Stat) MarshalCSV() ([]string, error) {
+	return (*search.Stat)(stat).MarshalCSV()
 }
 
 // NewStat creates new format specific data.
-func (*Format) NewStat() interface{} {
-	return NewStat()
+func NewStat() *Stat {
+	return FromStat(search.NewStat(""))
 }
 
-// Convert STATISTICS to RAW format specific data.
-func (f *Format) FromStat(stat *search.Stat) interface{} {
-	return FromStat(stat)
+// FromStat converts STAT to format specific data.
+func FromStat(stat *search.Stat) *Stat {
+	return (*Stat)(stat)
 }
 
-// Convert RAW format specific data to STATISTICS.
-// WARN: will panic if argument is not of raw.Statistics type!
-func (f *Format) ToStat(stat interface{}) *search.Stat {
-	return ToStat(stat.(*Stat))
+// ToStat converts format specific data to STAT.
+func ToStat(stat *Stat) *search.Stat {
+	return (*search.Stat)(stat)
 }

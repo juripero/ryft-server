@@ -33,6 +33,10 @@ package aggs
 import (
 	"fmt"
 
+	"github.com/getryft/ryft-server/rest/format/csv"
+	"github.com/getryft/ryft-server/rest/format/json"
+	"github.com/getryft/ryft-server/rest/format/xml"
+	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/utils"
 )
 
@@ -58,10 +62,15 @@ type Function interface {
 
 	// bind to another engine
 	bind(e Engine)
+
+	// clone function and engine
+	clone() (Function, Engine)
 }
 
 // Aggregations is a set of functions and related engines.
 type Aggregations struct {
+	parseRawData func([]byte) (interface{}, error)
+
 	functions map[string]Function
 	engines   map[string]Engine
 	options   map[string]interface{} // source options
@@ -73,16 +82,44 @@ func (a *Aggregations) GetOpts() map[string]interface{} {
 }
 
 // Clone clones the aggregation engines and functions
-func (a *Aggregations) Clone() *Aggregations {
-	n, _ := MakeAggs(a.options)
+func (a *Aggregations) Clone() search.Aggregations {
+	if a == nil {
+		return nil // nothing to clone
+	}
+
+	n := &Aggregations{
+		parseRawData: a.parseRawData,
+		functions:    make(map[string]Function),
+		engines:      make(map[string]Engine),
+		options:      a.options,
+	}
+
+	// clone functions and engines
+	for k, v := range a.functions {
+		f, e := v.clone()
+
+		// check existing engine
+		if ee, ok := n.engines[e.Name()]; ok {
+			ee.Join(e) // join existing engine
+			f.bind(ee) // replace engine
+		} else {
+			n.engines[e.Name()] = e // add new engine
+		}
+
+		n.functions[k] = f
+	}
+
 	return n
 }
 
 // ToJson saves all aggregations to JSON
 // if final is true then all functions are reported
 // otherwise the all engines are reported (cluster mode).
-func (a *Aggregations) ToJson(final bool) map[string]interface{} {
+func (a *Aggregations) ToJson(final bool) interface{} {
 	res := make(map[string]interface{})
+	if a == nil {
+		return res // empty
+	}
 
 	if final {
 		for name, f := range a.functions {
@@ -98,7 +135,18 @@ func (a *Aggregations) ToJson(final bool) map[string]interface{} {
 }
 
 // Add adds new DATA record to all engines
-func (a *Aggregations) Add(data interface{}) error {
+func (a *Aggregations) Add(rawData []byte) error {
+	if a == nil {
+		return nil // nothing to do
+	}
+
+	// first prepare data to process
+	data, err := a.parseRawData(rawData)
+	if err != nil {
+		return fmt.Errorf("failed to parse data: %s", err)
+	}
+
+	// then add parsed data to engines
 	for _, engine := range a.engines {
 		if err := engine.Add(data); err != nil {
 			return err
@@ -141,12 +189,70 @@ func getStringOpt(name string, opts map[string]interface{}) (string, error) {
 	return "", fmt.Errorf(`no "%s" option found`, name)
 }
 
+// get field option
+func getFieldOpt(name string, opts map[string]interface{}, iNames []string) (utils.Field, error) {
+	if field, err := getStringOpt(name, opts); err != nil {
+		return nil, err
+	} else {
+		f, err := utils.ParseField(field)
+		if err != nil {
+			return nil, err
+		}
+		return f.StringToIndex(iNames), nil
+	}
+}
+
 // MakeAggs makes set of aggregation engines
-func MakeAggs(params map[string]interface{}) (*Aggregations, error) {
+func MakeAggs(params map[string]interface{}, format string, formatOpts map[string]interface{}) (search.Aggregations, error) {
+	a, err := makeAggs(params, format, formatOpts)
+	if err != nil {
+		return nil, err
+	}
+	if a == nil {
+		return nil, err
+	}
+	return a, err
+}
+
+// MakeAggs makes set of aggregation engines
+func makeAggs(params map[string]interface{}, format string, formatOpts map[string]interface{}) (*Aggregations, error) {
 	a := &Aggregations{
 		functions: make(map[string]Function),
 		engines:   make(map[string]Engine),
 		options:   params,
+	}
+
+	var strToIdx []string // for CSV data
+
+	// format
+	switch format {
+	case "xml":
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return xml.ParseXml(raw, nil)
+		}
+
+	case "json":
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return json.ParseRaw(raw)
+		}
+
+	case "csv":
+		csvFmt, err := csv.New(formatOpts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare CSV format")
+		}
+		strToIdx = csvFmt.Columns
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return csvFmt.ParseRaw(raw)
+		}
+
+	case "utf8", "utf-8":
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return string(raw), nil
+		}
+
+	default:
+		// see failure check at the end
 	}
 
 	// name: {type: {opts}}
@@ -167,13 +273,17 @@ func MakeAggs(params map[string]interface{}) (*Aggregations, error) {
 			}
 
 			// parse and add function and corresponding engine
-			if err := a.addFunc(name, t, opts); err != nil {
+			if err := a.addFunc(name, t, opts, strToIdx); err != nil {
 				return nil, err
 			}
 		}
 	}
 
 	if len(a.engines) != 0 {
+		if a.parseRawData == nil {
+			return nil, fmt.Errorf("%q is unknown data format", format)
+		}
+
 		return a, nil // OK
 	}
 
@@ -181,8 +291,8 @@ func MakeAggs(params map[string]interface{}) (*Aggregations, error) {
 }
 
 // add aggregation function
-func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interface{}) error {
-	f, e, err := newFunc(aggType, opts)
+func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interface{}, iNames []string) error {
+	f, e, err := newFunc(aggType, opts, iNames)
 	if err != nil {
 		return err
 	}
@@ -202,66 +312,66 @@ func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interfac
 }
 
 // factory method: creates aggregation function and corresponding engine
-func newFunc(aggType string, opts map[string]interface{}) (Function, Engine, error) {
+func newFunc(aggType string, opts map[string]interface{}, iNames []string) (Function, Engine, error) {
 	switch aggType {
 	case "sum":
-		if f, err := newSumFunc(opts); err == nil {
+		if f, err := newSumFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "min":
-		if f, err := newMinFunc(opts); err == nil {
+		if f, err := newMinFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "max":
-		if f, err := newMaxFunc(opts); err == nil {
+		if f, err := newMaxFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "value_count", "count":
-		if f, err := newCountFunc(opts); err == nil {
+		if f, err := newCountFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "average", "avg":
-		if f, err := newAvgFunc(opts); err == nil {
+		if f, err := newAvgFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "stats":
-		if f, err := newStatsFunc(opts); err == nil {
+		if f, err := newStatsFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "extended_stats", "extended-stats", "e-stats":
-		if f, err := newExtendedStatsFunc(opts); err == nil {
+		if f, err := newExtendedStatsFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "geo_bounds", "geo-bounds":
-		if f, err := newGeoBoundsFunc(opts); err == nil {
+		if f, err := newGeoBoundsFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed
 		}
 
 	case "geo_centroid", "geo-centroid":
-		if f, err := newGeoCentroidFunc(opts); err == nil {
+		if f, err := newGeoCentroidFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed

@@ -37,7 +37,6 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search/utils"
-	"github.com/getryft/ryft-server/search/utils/aggs"
 )
 
 // Config is a search configuration.
@@ -67,7 +66,7 @@ type Config struct {
 	Transforms []Transform
 
 	// set of aggregations engines
-	Aggregations *aggs.Aggregations
+	Aggregations Aggregations
 	DataFormat   string // used for aggregations
 
 	// processing control
@@ -93,11 +92,25 @@ type Config struct {
 		Mode string
 	}
 
+	// fine tune options
+	Tweaks struct {
+		Format map[string]interface{} // format specific options (column names for CSV, etc)
+	}
+
 	// report performance metrics
 	Performance bool
 
 	// report debug internal info
-	DebugInternals bool
+	DebugInternals bool // TODO: move to Tweaks
+}
+
+// absstract aggregations
+type Aggregations interface {
+	Clone() Aggregations
+	GetOpts() map[string]interface{}
+	Merge(other interface{}) error
+	Add(raw []byte) error
+	ToJson(final bool) interface{}
 }
 
 // NewEmptyConfig creates new empty search configuration.

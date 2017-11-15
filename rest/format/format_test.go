@@ -31,6 +31,7 @@ func TestFormat(t *testing.T) {
 	check("none", nil, true)
 	check("raw", nil, false)
 	check("xml", nil, false)
+	check("csv", nil, false)
 
 	bad("bad", nil, "is unsupported format")
 }

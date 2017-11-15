@@ -81,11 +81,13 @@ type SearchParams struct {
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
 
 	// aggregations
-	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 
 	// tweaks
 	Tweaks struct {
-		Cluster []interface{} `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
+		Format  map[string]interface{} `json:"format,omitempty" msgpack:"format,omitempty"`
+		Cluster []interface{}          `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
 	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
@@ -149,12 +151,10 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	}
 
 	// setting up transcoder to convert raw data
-	// XML and JSON support additional fields filtration
-	var tcode format.Format
-	tcode_opts := map[string]interface{}{
-		"fields": params.Fields,
-	}
-	if tcode, err = format.New(params.Format, tcode_opts); err != nil {
+	// CSV, XML and JSON support additional fields filtration
+	tcode_opts := getFormatOptions(params.Tweaks.Format, params.Fields)
+	tcode, err := format.New(params.Format, tcode_opts)
+	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to get transcoder"))
 	}
@@ -218,16 +218,20 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 			WithDetails("failed to parse transformations"))
 	}
 
-	// aggregations
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
-	if err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to prepare aggregations"))
-	}
 	if len(params.InternalFormat) != 0 {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
+	}
+	cfg.Tweaks.Format = tcode_opts
+
+	// aggregations
+	cfg.Aggregations, err = aggs.MakeAggs(
+		selectAggsOpts(params.ShortAggs, params.LongAggs),
+		cfg.DataFormat, tcode_opts)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
 	}
 
 	// get search engine
@@ -521,6 +525,17 @@ func parseNameAndArgs(s string) (string, []string, error) {
 	return "", nil, fmt.Errorf("no script name found")
 }
 
+// get format options: combine tweaks and "fields"
+func getFormatOptions(tweaks map[string]interface{}, fields string) map[string]interface{} {
+	res := mapClone(tweaks)
+
+	if fields != "" {
+		res["fields"] = fields
+	}
+
+	return res
+}
+
 // update Session token based on provided session data
 func updateSession(session *Session, stat *search.Stat) {
 	data := []interface{}{}
@@ -547,8 +562,22 @@ func updateSession(session *Session, stat *search.Stat) {
 	stat.ClearSessionData(true)
 }
 
+// select one of "aggs" or "aggregations"
+func selectAggsOpts(a, b map[string]interface{}) map[string]interface{} {
+	if a != nil && b != nil {
+		panic(NewError(http.StatusBadRequest, "invalid aggregation configuration").
+			WithDetails(`both "aggs" and "aggregations" connot be provided`))
+	}
+
+	if a != nil {
+		return a
+	}
+
+	return b // might be nil
+}
+
 // update aggregations in cluster mode
-func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) error {
+func updateAggregations(aggregations search.Aggregations, stat *search.Stat) error {
 	// get main aggregations (in case if one node in cluster)
 	if d := stat.Extra[search.ExtraAggregations]; d != nil {
 		log.Debugf("[%s/aggs]: merging main aggregations: %+v", CORE, d)

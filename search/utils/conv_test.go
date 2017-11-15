@@ -225,3 +225,56 @@ func TestAsFloat64(t *testing.T) {
 	bad("aaa", "invalid syntax")
 	bad([]byte{0x01}, "is not a float64")
 }
+
+// AsStringSlice tests
+func TestAsStringSlice(t *testing.T) {
+	// parse a slice
+	check := func(val interface{}, expected ...string) {
+		ss, err := AsStringSlice(val)
+		if assert.NoError(t, err) {
+			assert.Equal(t, expected, ss, "bad string slice [%v]", val)
+		}
+	}
+
+	// parse a "bad" slice
+	bad := func(val interface{}, expectedError string) {
+		_, err := AsStringSlice(val)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), expectedError, "unexpected error [%v]", val)
+		}
+	}
+
+	check(nil)
+	check([]string{"a"}, "a")
+	check([]interface{}{"b", "c"}, "b", "c")
+
+	bad([]byte{0x01}, "not a []string")
+	bad([]interface{}{123}, "not a string")
+}
+
+// AsStringMap tests
+func TestAsStringMap(t *testing.T) {
+	// parse a map
+	check := func(val interface{}, expected map[string]interface{}) {
+		ss, err := AsStringMap(val)
+		if assert.NoError(t, err) {
+			assert.Equal(t, expected, ss, "bad string map [%v]", val)
+		}
+	}
+
+	// parse a "bad" map
+	bad := func(val interface{}, expectedError string) {
+		_, err := AsStringMap(val)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), expectedError, "unexpected error [%v]", val)
+		}
+	}
+
+	check(nil, nil)
+	check(map[string]interface{}{"a": 123}, map[string]interface{}{"a": 123})
+	check(map[interface{}]interface{}{"b": 456, "c": 789},
+		map[string]interface{}{"b": 456, "c": 789})
+
+	bad([]byte{0x01}, "not a map[string]interface{}")
+	bad(map[interface{}]interface{}{123: 456}, "bad key")
+}

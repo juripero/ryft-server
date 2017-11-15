@@ -78,29 +78,29 @@ func TestGeoEngine(t *testing.T) {
 		}
 	}
 
-	check(&Geo{LocField: "Location", flags: GeoCentroidW},
+	check(&Geo{LocField: mustParseField("Location"), flags: GeoCentroidW},
 		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
-	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoCentroidW},
+	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoCentroidW},
 		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
 
-	check(&Geo{LocField: "Location", flags: GeoCentroid},
+	check(&Geo{LocField: mustParseField("Location"), flags: GeoCentroid},
 		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
-	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoCentroid},
+	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoCentroid},
 		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
 
-	check(&Geo{LocField: "Location", flags: GeoBounds},
+	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds},
 		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
-	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoBounds},
+	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds},
 		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 
-	check(&Geo{LocField: "Location", flags: GeoBounds | GeoCentroidW | GeoCentroid},
+	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds | GeoCentroidW | GeoCentroid},
 		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
-	check(&Geo{LatField: "Latitude", LonField: "Longitude", flags: GeoBounds | GeoCentroidW | GeoCentroid},
+	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds | GeoCentroidW | GeoCentroid},
 		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
 
-	check(&Geo{LocField: "miss-Location", flags: GeoBounds | GeoCentroidW},
+	check(&Geo{LocField: mustParseField("missLocation"), flags: GeoBounds | GeoCentroidW},
 		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
-	check(&Geo{LatField: "miss-Latitude", LonField: "miss-Longitude", flags: GeoBounds | GeoCentroidW},
+	check(&Geo{LatField: mustParseField("missLatitude"), LonField: mustParseField("missLongitude"), flags: GeoBounds | GeoCentroidW},
 		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 }
 
@@ -109,7 +109,7 @@ func TestGeoBoundsWrapLongitudeFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newGeoBoundsFunc(opts)
+			f, err := newGeoBoundsFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -137,7 +137,7 @@ func TestGeoBoundsNegativeLonFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newGeoBoundsFunc(opts)
+			f, err := newGeoBoundsFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -159,7 +159,7 @@ func TestGeoBoundsPositiveLonFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newGeoBoundsFunc(opts)
+			f, err := newGeoBoundsFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -182,7 +182,7 @@ func TestGeoCentroidFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newGeoCentroidFunc(opts)
+			f, err := newGeoCentroidFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -256,17 +256,17 @@ func TestGeoElastic(t *testing.T) {
 		return
 	}
 
-	c1, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": true})
+	c1, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": true}, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	c2, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": false})
+	c2, err := newGeoCentroidFunc(map[string]interface{}{"field": "pos", "weighted": false}, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	b, err := newGeoBoundsFunc(map[string]interface{}{"field": "pos"})
+	b, err := newGeoBoundsFunc(map[string]interface{}{"field": "pos"}, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -326,7 +326,7 @@ func TestGeoElastic2(t *testing.T) {
 	}
 
 	b_cfg := map[string]interface{}{"field": "location"}
-	b, err := newGeoBoundsFunc(b_cfg)
+	b, err := newGeoBoundsFunc(b_cfg, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -352,7 +352,7 @@ func TestGeoElastic2(t *testing.T) {
 	                                  "top_left":{"lat":50.939502, "lon":30.011016}}}`)
 
 	// test merge
-	b2, err := newGeoBoundsFunc(b_cfg)
+	b2, err := newGeoBoundsFunc(b_cfg, nil)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -375,7 +375,7 @@ func TestGeoElastic2(t *testing.T) {
 		return
 	}
 
-	b3, err := newGeoBoundsFunc(b_cfg)
+	b3, err := newGeoBoundsFunc(b_cfg, nil)
 	if !assert.NoError(t, err) {
 		return
 	}

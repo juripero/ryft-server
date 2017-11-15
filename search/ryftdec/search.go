@@ -370,8 +370,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 
 			if err := ryftprim.ApplyAggregations(engine.getBackendAggConcurrency(),
 				opts.atHome(keepIndexAs), opts.atHome(keepDataAs),
-				delimiter, cfg.DataFormat, cfg.Aggregations,
-				isJsonArray, func() bool { return mux.IsCancelled() }); err != nil {
+				delimiter, cfg.Aggregations, isJsonArray,
+				func() bool { return mux.IsCancelled() }); err != nil {
 				task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
 				mux.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
 				return

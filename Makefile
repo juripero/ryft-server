@@ -75,6 +75,7 @@ test-cover:
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/utf8/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/json/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/xml/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/format/csv/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/ || true
 

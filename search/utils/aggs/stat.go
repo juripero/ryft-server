@@ -49,7 +49,7 @@ const (
 type Stat struct {
 	flags int `json:"-"msgpack:"-"` // StatSum|StatSum2|StatMin|StatMax
 
-	Field   string      `json:"-" msgpack:"-"` // field path
+	Field   utils.Field `json:"-" msgpack:"-"` // field path
 	Missing interface{} `json:"-" msgpack:"-"` // missing value
 
 	Count uint64  `json:"count" msgpack:"count"` // number of values
@@ -57,6 +57,12 @@ type Stat struct {
 	Sum2  float64 `json:"sum2" msgpack:"sum2"`   // sum of squared values
 	Min   float64 `json:"min" msgpack:"min"`     // minimum value
 	Max   float64 `json:"max" msgpack:"max"`     // maximum value
+}
+
+// clone the engine
+func (s *Stat) clone() *Stat {
+	n := *s
+	return &n
 }
 
 // get engine name/identifier
@@ -84,7 +90,7 @@ func (s *Stat) ToJson() interface{} {
 // add data to the aggregation
 func (s *Stat) Add(data interface{}) error {
 	// extract field
-	val_, err := utils.AccessValue(data, s.Field)
+	val_, err := s.Field.GetValue(data)
 	if err != nil {
 		if err == utils.ErrMissed {
 			val_ = s.Missing // use provided value
@@ -258,9 +264,16 @@ type sumFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *sumFunc) clone() (Function, Engine) {
+	n := &sumFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "sum" aggregation
-func newSumFunc(opts map[string]interface{}) (*sumFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+func newSumFunc(opts map[string]interface{}, iNames []string) (*sumFunc, error) {
+	if field, err := getFieldOpt("field", opts, iNames); err != nil {
 		return nil, err
 	} else {
 		return &sumFunc{statFunc{
@@ -285,9 +298,16 @@ type minFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *minFunc) clone() (Function, Engine) {
+	n := &minFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "min" aggregation
-func newMinFunc(opts map[string]interface{}) (*minFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+func newMinFunc(opts map[string]interface{}, iNames []string) (*minFunc, error) {
+	if field, err := getFieldOpt("field", opts, iNames); err != nil {
 		return nil, err
 	} else {
 		return &minFunc{statFunc{
@@ -318,9 +338,16 @@ type maxFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *maxFunc) clone() (Function, Engine) {
+	n := &maxFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "max" aggregation
-func newMaxFunc(opts map[string]interface{}) (*maxFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+func newMaxFunc(opts map[string]interface{}, iNames []string) (*maxFunc, error) {
+	if field, err := getFieldOpt("field", opts, iNames); err != nil {
 		return nil, err
 	} else {
 		return &maxFunc{statFunc{
@@ -351,9 +378,16 @@ type countFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *countFunc) clone() (Function, Engine) {
+	n := &countFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "count" aggregation
-func newCountFunc(opts map[string]interface{}) (*countFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+func newCountFunc(opts map[string]interface{}, iNames []string) (*countFunc, error) {
+	if field, err := getFieldOpt("field", opts, iNames); err != nil {
 		return nil, err
 	} else {
 		return &countFunc{statFunc{
@@ -377,9 +411,16 @@ type avgFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *avgFunc) clone() (Function, Engine) {
+	n := &avgFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "avg" aggregation
-func newAvgFunc(opts map[string]interface{}) (*avgFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+func newAvgFunc(opts map[string]interface{}, iNames []string) (*avgFunc, error) {
+	if field, err := getFieldOpt("field", opts, iNames); err != nil {
 		return nil, err
 	} else {
 		return &avgFunc{statFunc{
@@ -410,9 +451,16 @@ type statsFunc struct {
 	statFunc
 }
 
+// clone the function
+func (f *statsFunc) clone() (Function, Engine) {
+	n := &statsFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "stats" aggregation
-func newStatsFunc(opts map[string]interface{}) (*statsFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+func newStatsFunc(opts map[string]interface{}, iNames []string) (*statsFunc, error) {
+	if field, err := getFieldOpt("field", opts, iNames); err != nil {
 		return nil, err
 	} else {
 		return &statsFunc{statFunc{
@@ -452,9 +500,16 @@ type extendedStatsFunc struct {
 	sigma float64
 }
 
+// clone the function
+func (f *extendedStatsFunc) clone() (Function, Engine) {
+	n := &extendedStatsFunc{sigma: f.sigma}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "extended_stats" aggregation
-func newExtendedStatsFunc(opts map[string]interface{}) (*extendedStatsFunc, error) {
-	if field, err := getStringOpt("field", opts); err != nil {
+func newExtendedStatsFunc(opts map[string]interface{}, iNames []string) (*extendedStatsFunc, error) {
+	if field, err := getFieldOpt("field", opts, iNames); err != nil {
 		return nil, err
 	} else {
 		sigma := 2.0 // by default
