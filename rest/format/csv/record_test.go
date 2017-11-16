@@ -43,7 +43,7 @@ func TestFormatRecord(t *testing.T) {
 
 		f.Columns = nil // if no columns: then indexes will be used as keys
 		testRecordMarshal(t, f.FromRecord(rec),
-			`{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},"0":"123", "1":"456", "2":"789"}`)
+			`{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},"1":"123", "2":"456", "3":"789"}`)
 
 		f.Columns = []string{"a", "b", "c"} // all columns are provided, use them
 		testRecordMarshal(t, f.FromRecord(rec),
@@ -51,7 +51,7 @@ func TestFormatRecord(t *testing.T) {
 
 		f.Columns = []string{"a", "b"} // less columns are provided, use them and then indexes
 		testRecordMarshal(t, f.FromRecord(rec),
-			`{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},"a":"123", "b":"456", "2":"789"}`)
+			`{"_index":{"file":"foo.txt", "offset":123, "length":456, "fuzziness":7},"a":"123", "b":"456", "3":"789"}`)
 
 		// fields option
 		f.Columns = []string{"a", "b", "c"} // all columns are provided
@@ -90,7 +90,7 @@ func TestRecord_MarshalCSV(t *testing.T) {
 	rec.Index.UpdateHost("localhost")
 
 	if r, err := FromRecord(rec, ",", nil, nil, false).MarshalCSV(); assert.NoError(t, err) {
-		assert.EqualValues(t, []string{"foo.txt", "123", "456", "7", "localhost", `{"0":"123","1":"456","2":"789"}`}, r)
+		assert.EqualValues(t, []string{"foo.txt", "123", "456", "7", "localhost", `{"1":"123","2":"456","3":"789"}`}, r)
 	}
 	if r, err := FromRecord(rec, ",", []string{"a", "b", "c"}, []int{0, 2}, false).MarshalCSV(); assert.NoError(t, err) {
 		assert.EqualValues(t, []string{"foo.txt", "123", "456", "7", "localhost", `{"a":"123","c":"789"}`}, r)

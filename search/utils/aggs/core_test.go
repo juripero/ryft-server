@@ -90,11 +90,11 @@ func TestMakeAggs(t *testing.T) {
 	check(`{}`, "utf-8", ``, `{}`, `{}`)
 	check(`{}`, "utf8", ``, `{}`, `{}`)
 
-	bad(`{"my":{"sum":{"field":"[0]"}}}`, "msgpack", ``, "is unknown data format")
+	bad(`{"my":{"sum":{"field":"[1]"}}}`, "msgpack", ``, "is unknown data format")
 	bad(`{"my":5}`, "utf8", ``, "bad type of aggregation object")
 	bad(`{"my":{"a":1, "b":2}}`, "utf8", ``, "contains invalid aggregation object")
 	bad(`{"my":{"a":1}}`, "utf8", ``, "bad type of aggregation options")
-	bad(`{"my":{"sum":{"field":"[0]"}}}`, "csv", `{"separator":"zzz"}`, "failed to prepare CSV format")
+	bad(`{"my":{"sum":{"field":"[1]"}}}`, "csv", `{"separator":"zzz"}`, "failed to prepare CSV format")
 
 	bad(`{"my":{"bad":{}}}`, "utf8", ``, "is unsupported aggregation")
 
@@ -309,9 +309,9 @@ func TestAggsAdd(t *testing.T) {
 	// csv (column "b" -> index #1
 	check(`{"my":{"stats":{"field":"b"}}}`, "csv", `{"separator":":", "columns":["a","b","c"]}`,
 		[]string{`1:1.1:2}`, `3`, `4:9.9:4`},
-		`{"stat.[1]":{"min":1.1, "max":9.9, "count":2, "sum":11, "sum2":0}}`,
+		`{"stat.[2]":{"min":1.1, "max":9.9, "count":2, "sum":11, "sum2":0}}`,
 		`{"my":{"max":9.9, "min":1.1, "sum":11, "avg":5.5, "count":2}}`)
-	bad(`{"my":{"stats":{"field":"[1]"}}}`, "csv", ``,
+	bad(`{"my":{"stats":{"field":"[2]"}}}`, "csv", ``,
 		[]string{`1:2:3`, `{"a"}`, `4:5:6`},
 		`failed to parse data`)
 
