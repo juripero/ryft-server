@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y git dpkg
 # manage dependencies
 RUN go get -u github.com/kardianos/govendor
 
-# predifined source path
+# predefined source path
 ENV RYFTPATH ${GOPATH}/src/github.com/getryft/ryft-server
 RUN mkdir -p ${RYFTPATH}
 WORKDIR ${RYFTPATH}

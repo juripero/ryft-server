@@ -45,7 +45,8 @@ type Parser struct {
 	baseOpts Options
 	lexBuf   []Lexeme // last read lexem
 
-	replaceRecord string // replace RECORD with
+	replaceRecord string            // replace RECORD with
+	replaceFields map[string]string // replace RECORD."name" to RECORD.123
 }
 
 // NewParser returns a new instance of Parser.
@@ -70,19 +71,20 @@ func ParseQuery(query string) (res Query, err error) {
 
 // ParseQueryOpt parses a query from input string using non-default base options.
 func ParseQueryOpt(query string, opts Options) (res Query, err error) {
-	return parseQueryOpt(query, opts, "")
+	return parseQueryOpt(query, opts, "", nil)
 }
 
 // ParseQueryOptEx parses a query from input string and replaces RECORD with provided keyword.
-func ParseQueryOptEx(query string, opts Options, newRecord string) (res Query, err error) {
-	return parseQueryOpt(query, opts, newRecord)
+func ParseQueryOptEx(query string, opts Options, newRecord string, newFields map[string]string) (res Query, err error) {
+	return parseQueryOpt(query, opts, newRecord, newFields)
 }
 
 // parseQueryOpt parses a query from input string using non-default base options.
-func parseQueryOpt(query string, opts Options, newRecord string) (res Query, err error) {
+func parseQueryOpt(query string, opts Options, newRecord string, newFields map[string]string) (res Query, err error) {
 	p := NewParserString(query)
 	p.SetBaseOptions(opts)
 	p.replaceRecord = newRecord
+	p.replaceFields = newFields
 	res, err = p.ParseQuery()
 	if err == nil && !p.EOF() {
 		// check all data parsed, no more queries expected
@@ -279,7 +281,11 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 				switch lex := p.scan(); lex.token {
 				case IDENT, STRING: // RECORD.name or RECORD."name"
 					buf.WriteString(dot.literal)
-					buf.WriteString(lex.literal)
+					if newField, ok := p.replaceFields[lex.Unquoted()]; ok {
+						buf.WriteString(newField)
+					} else {
+						buf.WriteString(lex.literal)
+					}
 				case LBRACK:
 					// for JSON fields it's possible to specify array
 					// as "field.[].subfield"
