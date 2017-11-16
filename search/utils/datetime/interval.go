@@ -139,6 +139,7 @@ func (i *Interval) Parse() error {
 			neg = false
 			num = 1
 		}
+		// TODO: default should fail if met unexpected token
 	}
 	i.offsetTime = time.Duration(offset)
 	return nil

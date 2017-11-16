@@ -466,10 +466,10 @@ func TestDateHistFuncTimezone(t *testing.T) {
 		}
 	}
 	check(map[string]interface{}{
-		"field":    "created",
-		"interval": "hour",
-		"timezone": "",
-		"format":   "hh:mmZ",
+		"field":     "created",
+		"interval":  "hour",
+		"time_zone": "",
+		"format":    "hh:mmZ",
 	}, `
 	{"buckets":[
 		{"doc_count":1,"key":1510023600000,"key_as_string":"03:00+0000"},
@@ -478,10 +478,10 @@ func TestDateHistFuncTimezone(t *testing.T) {
 		{"doc_count":1,"key":1510034400000,"key_as_string":"06:00+0000"}]}`)
 
 	check(map[string]interface{}{
-		"field":    "created",
-		"interval": "hour",
-		"timezone": "UTC",
-		"format":   "hh:mmZ",
+		"field":     "created",
+		"interval":  "hour",
+		"time_zone": "UTC",
+		"format":    "hh:mmZ",
 	}, `
 	{"buckets":[
 		{"doc_count":1,"key":1510023600000,"key_as_string":"03:00+0000"},
@@ -490,10 +490,10 @@ func TestDateHistFuncTimezone(t *testing.T) {
 		{"doc_count":1,"key":1510034400000,"key_as_string":"06:00+0000"}]}`)
 
 	check(map[string]interface{}{
-		"field":    "created",
-		"interval": "hour",
-		"timezone": "America/Los_Angeles",
-		"format":   "hh:mmZZ",
+		"field":     "created",
+		"interval":  "hour",
+		"time_zone": "America/Los_Angeles",
+		"format":    "hh:mmZZ",
 	}, `
 	{"buckets":[
 		{"doc_count":1,"key":1510023600000,"key_as_string":"08:00-08:00"},
@@ -502,10 +502,10 @@ func TestDateHistFuncTimezone(t *testing.T) {
 		{"doc_count":1,"key":1510034400000,"key_as_string":"11:00-08:00"}]}`)
 
 	check(map[string]interface{}{
-		"field":    "created",
-		"interval": "hour",
-		"timezone": "Asia/Pontianak",
-		"format":   "hh:mmZ",
+		"field":     "created",
+		"interval":  "hour",
+		"time_zone": "Asia/Pontianak",
+		"format":    "hh:mmZ",
 	}, `
 	{"buckets":[
 		{"doc_count":1,"key":1510023600000,"key_as_string":"10:00+0700"},
@@ -513,10 +513,10 @@ func TestDateHistFuncTimezone(t *testing.T) {
 		{"doc_count":2,"key":1510030800000,"key_as_string":"12:00+0700"},
 		{"doc_count":1,"key":1510034400000,"key_as_string":"02:00+0700"}]}`)
 	check(map[string]interface{}{
-		"field":    "created",
-		"interval": "hour",
-		"timezone": "+01:00",
-		"format":   "hh:mmZ",
+		"field":     "created",
+		"interval":  "hour",
+		"time_zone": "+01:00",
+		"format":    "hh:mmZ",
 	}, `
 	{"buckets":[
 		{"doc_count":1,"key":1510023600000,"key_as_string":"04:00+0100"},

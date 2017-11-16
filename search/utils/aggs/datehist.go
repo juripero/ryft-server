@@ -357,7 +357,7 @@ func newDateHistFunc(opts map[string]interface{}, iNames []string) (*dateHistFun
 		return nil, fmt.Errorf(`bad "interval": %s`, interval_)
 	}
 
-	timezone_, err := getStringOpt("timezone", opts)
+	timezone_, err := getStringOpt("time_zone", opts)
 	if err != nil {
 		timezone_ = "UTC"
 	}
