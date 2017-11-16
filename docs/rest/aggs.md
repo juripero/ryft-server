@@ -8,6 +8,7 @@ The ryft server supports the following set of aggregation functions:
 - [Extended Stats](#extended-stats-aggregation)
 - [Geo Bounds](#geo-bounds-aggregation)
 - [Geo Centroid](#geo-centroid-aggregation)
+- [Date histogram](#date-histogram-aggregation)
 
 The aggregations can be requested via corresponding `POST /search` or `POST /count`
 methods. There should be POST body JSON object containing all required information.
@@ -375,3 +376,26 @@ converted to 3D space and then averaged. Averaged point is converted back
 to latitude/longitude to get centroid point.
 This algorithm consumes CPU resources since we need to
 calculate a lot of `sin/cos` values, but the centroid point is more precisely.
+
+# Date histogram aggregation
+
+Date histogram splits search results on buckets and counts number of rows inside. Key of a bucket is interval and its values are rows, each contains datetime field from the interval. It is also possible to apply sub-aggregaton to each bucket.
+
+`field` (required) - name of a field that contains date.
+
+`interval` (required) - time interval. Possible values: `year`, `quarter`, `month`, `week`, `day`, `hour`, `minute`, `second`.
+
+    It may also be specified with time-units: `d`, `h`, `m`, `s`, `ms`, `micros`, `nanos`.
+    Fractional time values are not supported.
+
+`offset` (optional) - the offset parameter is used to change the start value of each bucket by the specified positive (+) or negative offset (-) duration.
+
+`time_zone` (optional) - date-times are stored in `UTC`. By default, all bucketing and rounding is also done in `UTC`. The `time_zone` parameter can be used to indicate that bucketing should use a different time zone. It may be set as UTC offset (e.g. +01:00, -08:00) or as time zone id in TZ database.
+
+`format` (optional) - the response has `key_as_string` field, that represents time interval formatted with the `format` value. It supports jodaDate notation. E.g. "yyyy-MM-dd".
+
+`keyed` (optional) - show buckets as a list or as a map.
+
+`min_doc_count` (optional) - show aggregation results only for buckets that have number of documents not less then value of this parameter.
+
+`_aggs` (optional) - sub-aggregations. You can use any single-bucket aggregaton described above.
