@@ -180,7 +180,7 @@ ryftrest -q '(RECORD CONTAINS "11")' -f datehist.json --count --format=json --bo
 }
 ```
 
-## timezone
+## time_zone
 
 `time_zone` in  ISO 8601 UTC offset
 ```{.sh}
