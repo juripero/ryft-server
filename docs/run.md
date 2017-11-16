@@ -16,7 +16,7 @@ To run another server instance on `9000` port just pass "address" argument:
 ```{.sh}
 ./ryft-server --address=0.0.0.0:9000
 # or
-./ryft-server -l=:9000
+./ryft-server -l:9000
 ```
 
 So it's possible to run multiple server instances on the same machine.
