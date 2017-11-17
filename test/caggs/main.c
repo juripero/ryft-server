@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <math.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -52,9 +53,9 @@ static void signal_handler(int signo)
  * `filename,offset,length,fuzziness`.
  * The `filename`, `offset` and `fuzziness` are ignored.
  *
- * @param[in] idx The begin of INDEX line.
- * @param[in] idx_len The length of INDEX line in bytes.
- * @param[out] data_len The DATA record length in bytes.
+ * @param[in] idx Begin of INDEX.
+ * @param[in] idx_len Length of INDEX in bytes.
+ * @param[out] data_len Length of DATA in bytes.
  * @return Zero on success.
  */
 static int parse_index(const uint8_t *idx, uint64_t idx_len, uint64_t *data_len)
@@ -71,6 +72,99 @@ static int parse_index(const uint8_t *idx, uint64_t idx_len, uint64_t *data_len)
     *data_len = strtoull((const char*)c3+1, &end, 10);
     if ((const uint8_t*)end != c4)
         return -3; // failed to parse length
+
+    return 0; // OK
+}
+
+
+// TODO: abstract classes, dedicated files, etc
+struct Stat {
+    uint64_t count;
+    double sum, sum2;
+    double min, max;
+};
+
+// calculate statistics
+void stat_add(struct Stat *s, double x)
+{
+    if (!s->count || x < s->min)
+        s->min = x;
+    if (!s->count || x > s->max)
+        s->max = x;
+    s->sum += x;
+    s->sum2 += x*x;
+    s->count += 1;
+}
+
+// print statistics to STDOUT
+void stat_print(const struct Stat *s)
+{
+    if (s->count)
+    {
+        const double avg = s->sum/s->count;
+//        const double var = s->sum2/s->count - avg*avg;
+//        const double stdev = sqrt(var);
+//        const double sigma = 2.0;
+
+        vlog("{\"avg\":%f, \"sum\":%f, \"min\":%f, \"max\":%f, \"count\":%llu}\n",
+             avg, s->sum, s->min, s->max, s->count);
+    }
+    else
+    {
+        vlog("{\"avg\":null, \"sum\":0, \"min\":null, \"max\":null, \"count\":0}\n");
+    }
+}
+
+struct Stat g_stat;
+
+
+/**
+ * @brief Process DATA record.
+ * @param[in] cfg Application configuration.
+ * @param[in] dat Begin of DATA.
+ * @param[in] len Length of DATA in bytes.
+ * @return Zero on success.
+ */
+static int process_record(const struct Conf *cfg, const uint8_t *dat, uint64_t len)
+{
+    (void)cfg; // not used yet
+
+//    printf("  RECORD[%llu]:", len);
+//    for (; len > 0; --len)
+//        printf("%c", *dat++);
+//    printf("\n");
+
+    const char *field = "foo\"";
+
+    while (len > 0)
+    {
+        const uint8_t *f = (const uint8_t*)memchr(dat, field[0], len);
+        if (!f)
+            return -1; // field not found
+
+        if (0 != memcmp(f, field, 4))
+        {
+            len -= (f-dat + 1);
+            dat = f+1;
+            continue; // try again
+        }
+
+        len -= f-dat+4;
+        dat = f+4;
+        for (; len > 0; --len)
+        {
+            if (*dat++ == ':')
+                break;
+        }
+
+        if (!len)
+            return -2; // no data found
+
+        double x = strtod((const char*)dat, NULL);
+        // vlog(" %g ", x);
+        stat_add(&g_stat, x);
+        break; // done
+    }
 
     return 0; // OK
 }
@@ -120,33 +214,46 @@ static int do_work(const struct Conf *cfg,
     {
         // try to find the NEWLINE '\n' character
         const uint8_t *eol = (const uint8_t*)memchr(idx_p, '\n', idx_len);
-        const uint64_t len = eol ? (uint64_t)(eol - idx_p + 1) : idx_len;
+        const uint64_t i_len = eol ? (uint64_t)(eol - idx_p + 1) : idx_len;
 
-        uint64_t data_len = 0;
-        int res = parse_index(idx_p, len, &data_len);
+        uint64_t d_len = 0;
+        int res = parse_index(idx_p, i_len, &d_len);
         if (res != 0)
         {
             verr("ERROR: failed to parse INDEX: %d\n", res); // TODO: add "at" information from idx_p
             return -2; // failed
         }
 
-        vlog("  new INDEX#%llu (%llu bytes) with %llu bytes of DATA\n",
-             idx_count, len, data_len);
+        // TODO: concurrency!!!
+        if (d_len < dat_len)
+        {
+            int res = process_record(cfg, dat_p, d_len);
+            if (res != 0)
+            {
+                verr("ERROR: failed to process RECORD: %s\n", res);// TODO: add "at" information from dat_p
+                return -3; // failed
+            }
+
+            // go to next record...
+            dat_p += d_len + cfg->delim_len;
+            dat_len -= d_len + cfg->delim_len;
+        }
+        else
+        {
+            verr("ERROR: no DATA found\n"); // TODO: add "at" information from dat_p
+            return -4; // failed
+        }
 
         // go to next line
-        idx_p += len;
-        idx_len -= len;
+        idx_p += i_len;
+        idx_len -= i_len;
         idx_count += 1;
 
         if (g_stopped != 0)
             break;
     }
 
-    vlog2("total INDEXes: %d\n", idx_count);
-
-    // TODO: read DATA record-by-record
-    // TODO: process records
-
+    vlog2("total records processed: %llu\n", idx_count);
     return 0; // OK
 }
 
@@ -236,6 +343,9 @@ int main(int argc, const char *argv[])
     // do actual processing
     do_work(&cfg, (const uint8_t*)idx_p, idx_stat.st_size,
             (const uint8_t*)dat_p, dat_stat.st_size);
+
+    // print global statistics
+    stat_print(&g_stat);
 
     // release resources
     munmap(idx_p, idx_stat.st_size);
