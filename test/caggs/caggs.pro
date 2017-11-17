@@ -3,6 +3,8 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
+DEFINES += _GNU_SOURCE
+
 SOURCES += main.c
 HEADERS += conf.h
 SOURCES += conf.c
