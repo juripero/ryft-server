@@ -61,6 +61,7 @@ logging-options:
     core/pending-jobs: debug
   debug:
     core: debug
+    core/safe: debug
     core/catalogs: debug
     core/pending-jobs: debug
     core/busyness: debug
