@@ -54,11 +54,15 @@ dependencies.
 ## Version
 
 Note the `ryft-server` version - it's automatically generated using current git commit.
-Simple `make` will produce the following output (exact numbers may differ):
+Simple `make` is equivalent to `go build` execution with specified keys. It will will produce the 
+following output (exact numbers may differ):
 
 ```{.sh}
 $ make
 go build -ldflags "-X main.Version=0.6.1-139-g51fcf47 -X main.GitHash=51fcf47f0de217b0dfba4c4e2ed83ed172e123ae"
+
+Version: 0.6.1-139-g51fcf47
+GitHash: 51fcf47f0de217b0dfba4c4e2ed83ed172e123ae
 ```
 
 where `main.Version` is the server's version and `main.GitHash` is corresponding git commit hash.
