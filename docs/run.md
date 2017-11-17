@@ -78,8 +78,9 @@ configuration. There is special command line argument `--logging` which also
 could be used to change logging configuration.
 
 The logging configuration itself consists of logger names and corresponding
-logging levels. By default all loggers have "info" level. It is very easy to
-create any logging configuration with fine-tunes logging levels.
+logging levels. By default all loggers have "info" level. The possible logging
+level values are: "panic", "fatal", "error", "warn" or "warning", "info" and
+"debug". It is very easy to create any logging configuration with fine-tunes logging levels.
 
 
 ## Keeping search results
