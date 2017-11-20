@@ -935,7 +935,8 @@
           "description": "Processing details",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/CountResponse"
+            "type": "object",
+            "properties": {}
           }
         },
         "extra": {
