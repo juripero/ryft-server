@@ -935,7 +935,8 @@
           "description": "Processing details",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/CountResponse"
+            "type": "object",
+            "properties": {}
           }
         },
         "extra": {
@@ -1141,31 +1142,125 @@
     "SearchRequest": {
       "type": "object",
       "properties": {
-        "query": { "$ref": "#/parameters/SearchQuery" },
-        "files": { "$ref": "#/parameters/SearchFile" },
-        "ignore-missing-files": { "$ref": "#/parameters/IgnoreMissingFiles" },
-        "mode": { "$ref": "#/parameters/SearchMode" },
-        "surrounding": { "$ref": "#/parameters/Surrounding" },
-        "fuzziness": { "$ref": "#/parameters/Fuzziness" },
-        "format": { "$ref": "#/parameters/SearchFormat" },
-        "cs": { "$ref": "#/parameters/SearchCase" },
-        "reduce": { "$ref": "#/parameters/SearchReduce" },
-        "fields": { "$ref": "#/parameters/SearchFields" },
-        "backend": { "$ref": "#/parameters/SearchBackend" },
-        "backend-mode": { "$ref": "#/parameters/SearchBackendMode" },
-        "backend-option": { "$ref": "#/parameters/SearchBackendOption" },
-        "data": { "$ref": "#/parameters/SaveData" },
-        "index": { "$ref": "#/parameters/SaveIndex" },
-        "view": { "$ref": "#/parameters/SaveView" },
-        "delimiter": { "$ref": "#/parameters/Delimiter" },
-        "lifetime": { "$ref": "#/parameters/Lifetime" },
-        "share-mode": { "$ref": "#/parameters/ReadShareMode" },
-        "nodes": { "$ref": "#/parameters/SearchNodes" },
-        "local": { "$ref": "#/parameters/Local" },
-        "stats": { "$ref": "#/parameters/SearchStat" },
-        "performance": { "$ref": "#/parameters/Performance" },
-        "limit": { "$ref": "#/parameters/SearchLimit" },
-        "transform": { "$ref": "#/parameters/Transform" },
+        "query": {
+          "type": "string",
+          "description": "What to search. Could be simple pain text like `hello` or Ryft search query like `(RECORD.body CONTAINS \"night\")`."
+        },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Set of files or catalogs to search. The path should be designated relative to `/ryftone`. Wildcards are supported, for example: `*.txt`"
+        },
+        "ignore-missing-files": {
+          "type": "boolean",
+          "description": "If `true` report empty statistics instead of error."
+        },
+        "mode": {
+          "type": "string",
+          "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search",
+          "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2" ]
+        },
+        "surrounding": {
+          "type": "string",
+          "description": "Number of characters before the match and after the match that will be returned. Can be `line` to get whole line. This parameter is used with RAW text search."
+        },
+        "fuzziness": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "description": "Fuzziness of the search. Measured as the maximum Hamming distance for `fhs` mode or edit distance for `feds` mode."
+        },
+        "format": {
+          "type": "string",
+          "description": "Input data format. Parameter is used with structured or RAW text search.",
+          "enum": [ "raw", "xml", "json", "utf8", "null" ]
+        },
+        "cs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Case sensitivity flag."
+         },
+        "reduce": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reduce flag for fuzzy edit distance search."
+        },
+        "fields": {
+          "type": "string",
+          "description": "Coma-separated list of requested fields. If omitted all fields are used. Parameter is used with structured search to minimize output."
+        },
+        "backend": {
+          "type": "string",
+          "description": "Optional backend tool to run search.",
+          "enum": [ "ryftprim", "ryftx", "ryftpcre2" ]
+        },
+        "backend-mode": {
+          "type": "string",
+          "description": "Backend mode (default, high-performance, etc)."
+        },
+        "backend-options": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional list of backend options"
+        },
+        "data": {
+          "type": "string",
+          "description": "Name of DATA file to keep. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+        },
+        "index": {
+          "type": "string",
+          "description": "Name of INDEX file to keep. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+        },
+        "view": {
+          "type": "string",
+          "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+        },
+        "delimiter": {
+          "type": "string",
+          "description": "The delimiter is used to place between records in DATA file."
+        },
+        "lifetime": {
+          "type": "string",
+          "description": "The output files lifetime (DATA, INDEX, VIEW), for example `2h`."
+        },
+        "share-mode": {
+          "type": "string",
+          "description": "Sharing mode used to access data files. Can be `wait-10s`, `skip` or `ignore`. By default `wait-0s` is used."
+        },
+        "nodes": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 4,
+          "minimum": 0,
+          "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
+          "enum": [ 1, 2, 3, 4 ]
+        },
+        "local": {
+          "type": "boolean",
+          "default": false,
+          "description": "Perform search only on this cluster node."
+        },
+        "stats": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include search statistics in response."
+        },
+        "performance": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include performance metrics in response."
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint64",
+          "description": "Limit the total number of records reported."
+        },
+        "transforms": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Additional data transformation. Could be:\n- `match(\"^.*$\")` to match text,\n- `replace(\"^(.*)apple(.*)$\", \"$1orange$2\")` to replace text,\n- `script(\"filter_position\")` to run custom script"
+        },
         "aggs": {
           "description": "Custom aggregations",
           "type": "object"
@@ -1175,26 +1270,101 @@
     "CountRequest": {
       "type": "object",
       "properties": {
-        "query": { "$ref": "#/parameters/SearchQuery" },
-        "files": { "$ref": "#/parameters/SearchFile" },
-        "ignore-missing-files": { "$ref": "#/parameters/IgnoreMissingFiles" },
-        "mode": { "$ref": "#/parameters/SearchMode" },
-        "surrounding": { "$ref": "#/parameters/Surrounding" },
-        "fuzziness": { "$ref": "#/parameters/Fuzziness" },
-        "cs": { "$ref": "#/parameters/SearchCase" },
-        "reduce": { "$ref": "#/parameters/SearchReduce" },
-        "backend": { "$ref": "#/parameters/SearchBackend" },
-        "backend-mode": { "$ref": "#/parameters/SearchBackendMode" },
-        "backend-option": { "$ref": "#/parameters/SearchBackendOption" },
-        "data": { "$ref": "#/parameters/SaveData" },
-        "index": { "$ref": "#/parameters/SaveIndex" },
-        "view": { "$ref": "#/parameters/SaveView" },
-        "delimiter": { "$ref": "#/parameters/Delimiter" },
-        "lifetime": { "$ref": "#/parameters/Lifetime" },
-        "share-mode": { "$ref": "#/parameters/ReadShareMode" },
-        "nodes": { "$ref": "#/parameters/SearchNodes" },
-        "local": { "$ref": "#/parameters/Local" },
-        "performance": { "$ref": "#/parameters/Performance" },
+        "query": {
+          "type": "string",
+          "description": "What to search. Could be simple pain text like `hello` or Ryft search query like `(RECORD.body CONTAINS \"night\")`."
+         },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Set of files or catalogs to search. The path should be designated relative to `/ryftone`. Wildcards are supported, for example: `*.txt`"
+        },
+        "ignore-missing-files": {
+          "type": "boolean",
+          "description": "If `true` report empty statistics instead of error."
+        },
+        "mode": {
+          "type": "string",
+          "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search",
+          "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2" ]
+        },
+        "surrounding": {
+          "type": "string",
+          "description": "Number of characters before the match and after the match that will be returned. Can be `line` to get whole line. This parameter is used with RAW text search."
+        },
+        "fuzziness": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "description": "Fuzziness of the search. Measured as the maximum Hamming distance for `fhs` mode or edit distance for `feds` mode."
+        },
+        "cs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Case sensitivity flag."
+        },
+        "reduce": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reduce flag for fuzzy edit distance search."
+        },
+        "backend": {
+          "type": "string",
+          "description": "Optional backend tool to run search.",
+          "enum": [ "ryftprim", "ryftx", "ryftpcre2" ]
+        },
+        "backend-mode": {
+          "type": "string",
+          "description": "Backend mode (default, high-performance, etc)."
+        },
+        "backend-options": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional list of backend options"
+        },
+        "data": {
+          "type": "string",
+          "description": "Name of DATA file to keep. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+        },
+        "index": {
+          "type": "string",
+          "description": "Name of INDEX file to keep. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+        },
+        "view": {
+          "type": "string",
+          "description": "Name of VIEW file (cache to access DATA&INDEX) to produce. `{{random}}` keyword is replaced with unique number. **WARNING**: file will be overriden!"
+        },
+        "delimiter": {
+          "type": "string",
+          "description": "The delimiter is used to place between records in DATA file."
+        },
+        "lifetime": {
+          "type": "string",
+          "description": "The output files lifetime (DATA, INDEX, VIEW), for example `2h`."
+        },
+        "share-mode": {
+          "type": "string",
+          "description": "Sharing mode used to access data files. Can be `wait-10s`, `skip` or `ignore`. By default `wait-0s` is used."
+        },
+        "nodes": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 4,
+          "minimum": 0,
+          "description": "Specifies 1-4 RCAB processing nodes to use. If omitted all nodes are used.",
+          "enum": [ 1, 2, 3, 4 ]
+        },
+        "local": {
+          "type": "boolean",
+          "default": false,
+          "description": "Perform search only on this cluster node."
+        },
+        "performance": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include performance metrics in response."
+        },
         "aggs": {
           "description": "Custom aggregations",
           "type": "object"
@@ -1204,13 +1374,37 @@
     "AggregationRequest": {
       "type": "object",
       "properties": {
-        "format": { "$ref": "#/parameters/SearchFormat" },
-        "session": { "$ref": "#/parameters/UseSession" },
-        "data": { "$ref": "#/parameters/UseData" },
-        "index": { "$ref": "#/parameters/UseIndex" },
-        "delimiter": { "$ref": "#/parameters/Delimiter" },
-        "local": { "$ref": "#/parameters/Local" },
-        "performance": { "$ref": "#/parameters/Performance" },
+        "format": {
+          "type": "string",
+          "description": "Input data format. Parameter is used with structured or RAW text search.",
+          "enum": [ "raw", "xml", "json", "utf8", "null" ]
+        },
+        "session": {
+          "type": "string",
+          "description": "Session token to access search results. Can be used to specify DATA,INDEX,VIEW files and delimiter instead of corresponding parameters."
+        },
+        "data": {
+          "type": "string",
+          "description": "Name of DATA file to read."
+        },
+        "index": {
+          "type": "string",
+          "description": "Name of INDEX file to read."
+        },
+        "delimiter": {
+          "type": "string",
+          "description": "The delimiter is used to place between records in DATA file."
+        },
+        "local": {
+          "type": "boolean",
+          "default": false,
+          "description": "Perform search only on this cluster node."
+        },
+        "performance": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include performance metrics in response."
+        },
         "aggs": {
           "description": "Custom aggregations",
           "type": "object"
