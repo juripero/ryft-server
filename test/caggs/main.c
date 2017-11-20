@@ -5,8 +5,9 @@
 #include "misc.h"
 
 #include <signal.h>
-#include <string.h>
+#include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <math.h>
@@ -49,28 +50,36 @@ static void signal_handler(int signo)
 /**
  * @brief Parse the INDEX information.
  *
- * Tries to parse the line in the following format:
+ * Tries to parse the INDEX line in the following format:
  * `filename,offset,length,fuzziness`.
  * The `filename`, `offset` and `fuzziness` are ignored.
+ * So just `length` is parsed to the `data_len`.
  *
- * @param[in] idx Begin of INDEX.
- * @param[in] idx_len Length of INDEX in bytes.
+ * @param[in] idx_beg Begin of INDEX.
+ * @param[in] idx_end End of INDEX.
  * @param[out] data_len Length of DATA in bytes.
  * @return Zero on success.
  */
-static int parse_index(const uint8_t *idx, uint64_t idx_len, uint64_t *data_len)
+static int parse_index(const uint8_t *idx_beg, const uint8_t *idx_end, uint64_t *data_len)
 {
-    const uint8_t *c4 = (const uint8_t*)memrchr(idx, ',', idx_len);
+    const int COMMA = ',';
+
+    // find ",fuzziness"
+    const uint8_t *c4 = (const uint8_t*)memrchr(idx_beg, COMMA,
+                                                idx_end - idx_beg);
     if (!c4)
         return -1; // no ",fuzziness" found
 
-    const uint8_t *c3 = (const uint8_t*)memrchr(idx, ',', c4-idx);
+    // find ",length"
+    const uint8_t *c3 = (const uint8_t*)memrchr(idx_beg, COMMA,
+                                                c4 - idx_beg);
     if (!c3)
         return -2; // no ",length" found
 
-    char *end = 0;
-    *data_len = strtoull((const char*)c3+1, &end, 10);
-    if ((const uint8_t*)end != c4)
+    uint8_t *end = 0;
+    *data_len = strtoull((const char*)c3+1, // +1 to skip comma
+                         (char**)&end, 10);
+    if (end != c4)
         return -3; // failed to parse length
 
     return 0; // OK
@@ -125,7 +134,7 @@ struct Stat g_stat;
  * @param[in] len Length of DATA in bytes.
  * @return Zero on success.
  */
-static int process_record(const struct Conf *cfg, const uint8_t *dat, uint64_t len)
+static int process_record(const struct Conf *cfg, const uint8_t *beg, const uint8_t *end)
 {
     (void)cfg; // not used yet
 
@@ -136,31 +145,29 @@ static int process_record(const struct Conf *cfg, const uint8_t *dat, uint64_t l
 
     const char *field = "foo\"";
 
-    while (len > 0)
+    while ((end - beg) > 0)
     {
-        const uint8_t *f = (const uint8_t*)memchr(dat, field[0], len);
+        const uint8_t *f = (const uint8_t*)memchr(beg, field[0], end - beg);
         if (!f)
             return -1; // field not found
 
         if (0 != memcmp(f, field, 4))
         {
-            len -= (f-dat + 1);
-            dat = f+1;
+            beg = f+1;
             continue; // try again
         }
 
-        len -= f-dat+4;
-        dat = f+4;
-        for (; len > 0; --len)
+        beg = f+4;
+        while ((end - beg) > 0)
         {
-            if (*dat++ == ':')
+            if (*beg++ == ':')
                 break;
         }
 
-        if (!len)
+        if (!(end - beg))
             return -2; // no data found
 
-        double x = strtod((const char*)dat, NULL);
+        double x = strtod((const char*)beg, NULL);
         // vlog(" %g ", x);
         stat_add(&g_stat, x);
         break; // done
@@ -180,44 +187,40 @@ static int process_record(const struct Conf *cfg, const uint8_t *dat, uint64_t l
  * @return Zero on success.
  */
 static int do_work(const struct Conf *cfg,
-                   const uint8_t *idx_p, uint64_t idx_len,
-                   const uint8_t *dat_p, uint64_t dat_len)
+                   const uint8_t *idx_beg, const uint8_t *idx_end,
+                   const uint8_t *dat_beg, const uint8_t *dat_end)
 {
     // remove DATA header
-    if (cfg->header_len <= dat_len)
-    {
-        dat_p += cfg->header_len;
-        dat_len -= cfg->header_len;
-    }
+    if ((ptrdiff_t)cfg->header_len <= (dat_end - dat_beg))
+        dat_beg += cfg->header_len;
     else
     {
-        verr("ERROR: no DATA avaialbe (%d) to skip header (%d)\n",
-             dat_len, cfg->header_len);
+        verr("ERROR: no DATA available (%d) to skip header (%d)\n",
+             (dat_end - dat_beg), cfg->header_len);
         return -1; // failed
     }
 
     // remove DATA footer
-    if (cfg->footer_len <= dat_len)
-    {
-        dat_len -= cfg->footer_len;
-    }
+    if ((off_t)cfg->footer_len <= (dat_end - dat_beg))
+        dat_end -= cfg->footer_len;
     else
     {
-        verr("ERROR: no DATA avaialbe (%d) to skip footer (%d)\n",
-             dat_len, cfg->footer_len);
+        verr("ERROR: no DATA available (%d) to skip footer (%d)\n",
+             dat_end - dat_beg, cfg->footer_len);
         return -1; // failed
     }
 
     // read INDEX line by line
-    uint64_t idx_count = 0;
-    while (idx_len > 0)
+    uint64_t count = 0;
+    while ((idx_end - idx_beg) > 0)
     {
         // try to find the NEWLINE '\n' character
-        const uint8_t *eol = (const uint8_t*)memchr(idx_p, '\n', idx_len);
-        const uint64_t i_len = eol ? (uint64_t)(eol - idx_p + 1) : idx_len;
+        const uint8_t *eol = (const uint8_t*)memchr(idx_beg, '\n',
+                                                    idx_end - idx_beg);
+        const uint8_t *next = eol ? (eol + 1) : idx_end;
 
         uint64_t d_len = 0;
-        int res = parse_index(idx_p, i_len, &d_len);
+        int res = parse_index(idx_beg, next, &d_len);
         if (res != 0)
         {
             verr("ERROR: failed to parse INDEX: %d\n", res); // TODO: add "at" information from idx_p
@@ -225,9 +228,10 @@ static int do_work(const struct Conf *cfg,
         }
 
         // TODO: concurrency!!!
-        if (d_len < dat_len)
+        if ((ptrdiff_t)d_len <= (dat_end - dat_beg))
         {
-            int res = process_record(cfg, dat_p, d_len);
+            int res = process_record(cfg, dat_beg,
+                                     dat_beg + d_len);
             if (res != 0)
             {
                 verr("ERROR: failed to process RECORD: %s\n", res);// TODO: add "at" information from dat_p
@@ -235,8 +239,7 @@ static int do_work(const struct Conf *cfg,
             }
 
             // go to next record...
-            dat_p += d_len + cfg->delim_len;
-            dat_len -= d_len + cfg->delim_len;
+            dat_beg += d_len + cfg->delim_len;
         }
         else
         {
@@ -245,15 +248,14 @@ static int do_work(const struct Conf *cfg,
         }
 
         // go to next line
-        idx_p += i_len;
-        idx_len -= i_len;
-        idx_count += 1;
+        idx_beg = next;
+        count += 1;
 
         if (g_stopped != 0)
             break;
     }
 
-    vlog2("total records processed: %llu\n", idx_count);
+    vlog2("total records processed: %llu\n", count);
     return 0; // OK
 }
 
@@ -341,8 +343,8 @@ int main(int argc, const char *argv[])
     }
 
     // do actual processing
-    do_work(&cfg, (const uint8_t*)idx_p, idx_stat.st_size,
-            (const uint8_t*)dat_p, dat_stat.st_size);
+    do_work(&cfg, (const uint8_t*)idx_p, (const uint8_t*)idx_p + idx_stat.st_size,
+            (const uint8_t*)dat_p, (const uint8_t*)dat_p + dat_stat.st_size);
 
     // print global statistics
     stat_print(&g_stat);
