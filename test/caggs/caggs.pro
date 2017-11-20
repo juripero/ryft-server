@@ -10,6 +10,8 @@ HEADERS += conf.h
 SOURCES += conf.c
 HEADERS += misc.h
 SOURCES += misc.c
+HEADERS += json.h
+SOURCES += json.c
 
 OTHER_FILES += README.md
 OTHER_FILES += Makefile

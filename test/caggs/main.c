@@ -3,6 +3,7 @@
  */
 #include "conf.h"
 #include "misc.h"
+#include "json.h"
 
 #include <signal.h>
 #include <stddef.h>
@@ -268,6 +269,13 @@ static int do_work(const struct Conf *cfg,
  */
 int main(int argc, const char *argv[])
 {
+    if (1)
+    {
+        extern void json_test(void);
+        json_test();
+        return 0; // OK
+    }
+
     // setup signal handlers
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
@@ -357,4 +365,111 @@ int main(int argc, const char *argv[])
     conf_free(&cfg);
 
     return 0;
+}
+
+#include <stdarg.h>
+#include "misc.h"
+
+// print buffer
+static void print_buf(const void *beg_, const void *end_)
+{
+    const char *beg = (const char*)beg_;
+    const char *end = (const char*)end_;
+
+    printf("<");
+    while (beg != end)
+        printf("%c", *beg++);
+    printf(">");
+}
+
+// test token parsing
+static int json_test_token(const char *json, ...)
+{
+    struct JSON_Parser p;
+    json_init(&p, json, json + strlen(json));
+
+    const int trace = 0;
+    if (trace)
+    {
+        printf("parsing JSON:");
+        print_buf(p.beg, p.end);
+        printf("\n");
+    }
+
+    va_list args;
+    va_start(args, json);
+
+    while (1)
+    {
+        // parse token
+        struct JSON_Token t;
+        if (!!json_next(&p, &t))
+        {
+            printf("  FAILED\n");
+            break;
+        }
+
+        if (t.type == JSON_EOF)
+        {
+            if (trace)
+            printf("  #EOF\n");
+            break;
+        }
+
+        if (trace)
+        {
+            printf("  #%d ", t.type);
+            print_buf(t.beg, t.end);
+            printf("\n");
+        }
+
+        const int expected_type = va_arg(args, int);
+        const char *expected_token = va_arg(args, const char*);
+
+        if ((int)t.type != expected_type)
+        {
+            verr("FAILED: bad token type: %d != %d\n", t.type, expected_type);
+            return -1;
+        }
+
+        if (0 != memcmp(expected_token, t.beg, t.end - t.beg))
+        {
+            verr("FAILED: bad token\n");
+            return -1;
+        }
+    }
+
+    va_end(args);
+    return 0; // OK
+}
+
+/**
+ * @brief Do the JSON parser tests.
+ */
+void json_test(void)
+{
+    json_test_token("");
+    json_test_token("  false  \t", JSON_FALSE, "false");
+    json_test_token("  \t  true  ", JSON_TRUE, "true");
+    json_test_token("  \t  null \t\n\r ", JSON_NULL, "null");
+
+    json_test_token(" { ", JSON_OBJECT_BEG, "{");
+    json_test_token(" } ", JSON_OBJECT_END, "}");
+    json_test_token(" [ ", JSON_ARRAY_BEG, "[");
+    json_test_token(" ] ", JSON_ARRAY_END, "]");
+    json_test_token(" : , ", JSON_COLON, ":", JSON_COMMA, ",");
+
+    json_test_token(" 123  ", JSON_NUMBER, "123");
+    json_test_token("123", JSON_NUMBER, "123");
+    json_test_token("123.456", JSON_NUMBER, "123.456");
+    json_test_token("123e10,", JSON_NUMBER, "123e10", JSON_COMMA, ",");
+
+    json_test_token("\"\"", JSON_STRING, "");
+    json_test_token(" \"a\"", JSON_STRING, "a");
+    json_test_token(" \"b\" ", JSON_STRING, "b");
+    json_test_token(" \"c\\n\" ", JSON_STRING, "c\\n");
+    json_test_token(" \"d\\u1234\" ", JSON_STRING, "d\\u1234");
+    json_test_token("\"key\":\"val\"", JSON_STRING, "key", JSON_COLON, ":", JSON_STRING, "val");
+
+    printf("OK\n");
 }
