@@ -50,6 +50,21 @@ deb package is created - `ryft-server` is not rebuilt, just used from your `$GOP
 It's recommended to run `make update` periodically to update all 3rd-party
 dependencies.
 
+The command `docker-build` or `docker_build` allows to build `ryft-servers` inside Docker container
+using environment with fixed versions of side auxiliary packages. The side package parameters are listed
+in `vendor/vendor.json` file. The build process inside Docker container performs by compiler with
+fixed version and takes a time.
+
+First of all, it is necessary to install Docker from official repository using
+[installation notes](file:///home/newbie/curwork/2017/dataart/ryft/sw/server/src/github.com/getryft/ryft-server/ryft-server.conf).
+
+Then it should be started the Debian package build inside Docker container:
+
+```{.sh}
+make docker-build
+```
+
+The results are packed to Debian package which can be found under `debian/` subdirectory.
 
 ## Version
 
