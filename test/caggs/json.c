@@ -25,6 +25,7 @@ void json_init(struct JSON_Parser *parser,
     parser->beg = (const uint8_t*)json_beg;
     parser->end = (const uint8_t*)json_end;
     parser->state = JSON_PARSER_STATE_VALUE;
+    parser->no_tokens = 0;
 }
 
 
@@ -195,6 +196,14 @@ static inline int json_next_number(struct JSON_Parser *parser,
 int json_next(struct JSON_Parser *parser,
               struct JSON_Token *token)
 {
+    // check the buffered tokens first
+    if (parser->no_tokens)
+    {
+        struct JSON_Token *b_tok = &parser->tokens[--parser->no_tokens];
+        memcpy(token, b_tok, sizeof(*token));
+        return 0; // OK, use buffered token
+    }
+
     // ignore whitespaces
     if (!json_skip_ws(parser))
     {
@@ -300,15 +309,20 @@ int json_next(struct JSON_Parser *parser,
 
 
 /*
- * json_parse() implementation.
+ * json_put_back() implementation.
  */
-int json_parse(struct JSON_Parser *parser,
-               struct JSON_Token *token)
+int json_put_back(struct JSON_Parser *parser,
+                  const struct JSON_Token *token)
 {
-    // get the next token
-    int res = json_next(parser, token);
-    if (!!res)
-        return res; // failed
+    const int cap = sizeof(parser->tokens) / sizeof(parser->tokens[0]);
+    if (parser->no_tokens >= cap)
+        return -1; // no space
+
+    struct JSON_Token *b_tok = &parser->tokens[parser->no_tokens++];
+    memcpy(b_tok, token, sizeof(*token));
+    return 0; // OK, buffered
+}
+
 
     return 0; // OK
 }

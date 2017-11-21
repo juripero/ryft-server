@@ -53,6 +53,10 @@ struct JSON_Parser {
     const uint8_t *beg; ///< @brief Begin of JSON data.
     const uint8_t *end; ///< @brief End of JSON data.
     int state; ///< @brief Parser's state.
+
+    // buffered tokens
+    struct JSON_Token tokens[32];   ///< @brief Buffer of tokens.
+    int            no_tokens;       ///< @brief Number of buffered tokens.
 };
 
 
@@ -80,7 +84,14 @@ int json_next(struct JSON_Parser *parser,
 
 
 /**
- * @brief Parse JSON data.
+ * @brief Put the token backto parser.
+ * @param parser JSON parser.
+ * @param token The token to revert.
+ * @return Zero on success.
+ */
+int json_put_back(struct JSON_Parser *parser,
+                  const struct JSON_Token *token);
+
  *
  * Validate JSON data.
  *
