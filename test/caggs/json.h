@@ -84,7 +84,7 @@ int json_next(struct JSON_Parser *parser,
 
 
 /**
- * @brief Put the token backto parser.
+ * @brief Put the token back to parser.
  * @param parser JSON parser.
  * @param token The token to revert.
  * @return Zero on success.
@@ -92,14 +92,56 @@ int json_next(struct JSON_Parser *parser,
 int json_put_back(struct JSON_Parser *parser,
                   const struct JSON_Token *token);
 
- *
- * Validate JSON data.
- *
- * @param[in] parser JSON parser.
- * @param[out] token The parsed token.
+
+/**
+ * @brief JSON fields to access data.
+ */
+struct JSON_Field
+{
+    int by_index;       ///< @brief Array index or -1 (by field name).
+    char by_name[64];   ///< @brief Field name. Up to 63 bytes.
+
+    /// @brief Corresponding JSON token.
+    struct JSON_Token token;
+
+    // sub-fields
+    int no_fields;                  ///< @brief Number of sub-fields.
+    struct JSON_Field* fields[32];  ///< @brief Array of sub-fields.
+};
+
+/**
+ * @brief Special index to indicate access "by name".
+ */
+static const int JSON_FIELD_BY_NAME = -1;
+
+
+/**
+ * @brief Parse the JSON field.
+ * @param f Parsed field.
+ * @param path Path to parse.
  * @return Zero on success.
  */
-int json_parse(struct JSON_Parser *parser,
-               struct JSON_Token *token);
+int json_field_parse(struct JSON_Field **f,
+                     const char *path);
+
+
+/**
+ * @brief Release the JSON field.
+ * @param f Field to release.
+ */
+void json_field_free(struct JSON_Field *f);
+
+
+/**
+ * @brief Get JSON data.
+ *
+ * Validate JSON and gets corresponding fields.
+ *
+ * @param[in] parser JSON parser.
+ * @param[int] field Fields to get.
+ * @return Zero on success.
+ */
+int json_get(struct JSON_Parser *parser,
+             struct JSON_Field *field);
 
 #endif // __CAGGS_JSON_H__

@@ -443,11 +443,124 @@ static int json_test_token(const char *json, ...)
     return 0; // OK
 }
 
+// test get by name
+static int json_test_get_by_name1(const char *json, const char *name, int expected_type, const char *expected_token)
+{
+    struct JSON_Parser p;
+    json_init(&p, json, json + strlen(json));
+
+    const int trace = 0;
+    if (trace)
+    {
+        printf("parsing JSON:");
+        print_buf(p.beg, p.end);
+        printf("\n");
+    }
+
+    struct JSON_Field field;
+    memset(&field, 0, sizeof(field));
+    strcpy(field.by_name, name);
+
+    struct JSON_Field root;
+    memset(&root, 0, sizeof(root));
+    root.by_index = JSON_FIELD_BY_NAME;
+    root.fields[root.no_fields++] = &field;
+
+    if (!!json_get(&p, &root))
+    {
+        printf("  FAILED\n");
+    }
+
+    struct JSON_Token *t = &field.token;
+
+    if (trace)
+    {
+        printf("  #%d ", t->type);
+        print_buf(t->beg, t->end);
+        printf("\n");
+    }
+
+    if ((int)t->type != expected_type)
+    {
+        verr("FAILED: bad token type: %d != %d\n", t->type, expected_type);
+        return -1;
+    }
+
+    if (0 != memcmp(expected_token, t->beg, t->end - t->beg))
+    {
+        verr("FAILED: bad token\n");
+        return -1;
+    }
+
+    return 0; // OK
+}
+
+
+// test get by name
+static int json_test_get_by_name11(const char *json, const char *name1, const char *name2, int expected_type, const char *expected_token)
+{
+    struct JSON_Parser p;
+    json_init(&p, json, json + strlen(json));
+
+    const int trace = 1;
+    if (trace)
+    {
+        printf("parsing JSON:");
+        print_buf(p.beg, p.end);
+        printf("\n");
+    }
+
+    struct JSON_Field field;
+    memset(&field, 0, sizeof(field));
+    strcpy(field.by_name, name2);
+
+    struct JSON_Field sub_field;
+    memset(&sub_field, 0, sizeof(sub_field));
+    strcpy(sub_field.by_name, name1);
+    sub_field.by_index = JSON_FIELD_BY_NAME;
+    sub_field.fields[sub_field.no_fields++] = &field;
+
+    struct JSON_Field root;
+    memset(&root, 0, sizeof(root));
+    root.by_index = JSON_FIELD_BY_NAME;
+    root.fields[root.no_fields++] = &sub_field;
+
+    if (!!json_get(&p, &root))
+    {
+        printf("  FAILED\n");
+    }
+
+    struct JSON_Token *t = &field.token;
+
+    if (trace)
+    {
+        printf("  #%d ", t->type);
+        print_buf(t->beg, t->end);
+        printf("\n");
+    }
+
+    if ((int)t->type != expected_type)
+    {
+        verr("FAILED: bad token type: %d != %d\n", t->type, expected_type);
+        return -1;
+    }
+
+    if (0 != memcmp(expected_token, t->beg, t->end - t->beg))
+    {
+        verr("FAILED: bad token\n");
+        return -1;
+    }
+
+    return 0; // OK
+}
+
 /**
  * @brief Do the JSON parser tests.
  */
 void json_test(void)
 {
+    if (0)
+    {
     json_test_token("");
     json_test_token("  false  \t", JSON_FALSE, "false");
     json_test_token("  \t  true  ", JSON_TRUE, "true");
@@ -470,6 +583,42 @@ void json_test(void)
     json_test_token(" \"c\\n\" ", JSON_STRING, "c\\n");
     json_test_token(" \"d\\u1234\" ", JSON_STRING, "d\\u1234");
     json_test_token("\"key\":\"val\"", JSON_STRING, "key", JSON_COLON, ":", JSON_STRING, "val");
+    }
+
+    if (0)
+    {
+    json_test_get_by_name1("{}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":false}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":true}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":null}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":123}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":123.456}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":\"str\"}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":\"str\\u1234\"}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":[]}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":[0]}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":[0,1,2]}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":{}}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":{\"a\":\"b\"}}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":{\"a\":\"b\", \"c\":[{}]}}", "foo", JSON_EOF, "");
+    json_test_get_by_name1("{\"test\":{\"a\":\"b\", \"c\":[0,1,2,3,[],[4,5],{\"a\":[]} ]}}", "foo", JSON_EOF, "");
+
+    json_test_get_by_name1("{\"foo\":false}", "foo", JSON_FALSE, "false");
+    json_test_get_by_name1("{\"foo\":true}", "foo", JSON_TRUE, "true");
+    json_test_get_by_name1("{\"foo\":null}", "foo", JSON_NULL, "null");
+    json_test_get_by_name1("{\"foo\":123}", "foo", JSON_NUMBER, "123");
+    json_test_get_by_name1("{\"foo\":123.456}", "foo", JSON_NUMBER, "123.456");
+    json_test_get_by_name1("{\"foo\":\"str\"}", "foo", JSON_STRING, "str");
+    json_test_get_by_name1("{\"foo\":\"str\\u1234\"}", "foo", JSON_STRING_ESC, "str\\u1234");
+    json_test_get_by_name1("{\"foo\":[]}", "foo", JSON_ARRAY, "[]");
+    json_test_get_by_name1("{\"foo\":[0]}", "foo", JSON_ARRAY, "[0]");
+    json_test_get_by_name1("{\"foo\":[0,1,2]}", "foo", JSON_ARRAY, "[0,1,2]");
+    json_test_get_by_name1("{\"foo\":{}}", "foo", JSON_OBJECT, "{}");
+    json_test_get_by_name1("{\"foo\":{\"a\":\"b\"}}", "foo", JSON_OBJECT, "{\"a\":\"b\"}");
+    json_test_get_by_name1("{\"foo\":{\"a\":\"b\", \"c\":[{}]}}", "foo", JSON_OBJECT, "{\"a\":\"b\", \"c\":[{}]}");
+    }
+
+    json_test_get_by_name11("{ \"foo\" : { \"bar\" : [0,1,2] } } ", "foo", "bar", JSON_ARRAY, "[0,1,2]");
 
     printf("OK\n");
 }

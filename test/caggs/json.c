@@ -1,6 +1,7 @@
 #include "json.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 
 /**
@@ -35,7 +36,7 @@ void json_init(struct JSON_Parser *parser,
  * @return Zero on success.
  *   Non-zero if parser is empty.
  */
-static inline int json_skip_ws(struct JSON_Parser *parser)
+static int json_skip_ws(struct JSON_Parser *parser)
 {
     // iterate over JSON data
     while ((parser->end - parser->beg) > 0)
@@ -55,6 +56,135 @@ static inline int json_skip_ws(struct JSON_Parser *parser)
     }
 
     return 0; // no more data
+}
+
+static int json_skip_object(struct JSON_Parser *parser);
+static int json_skip_array(struct JSON_Parser *parser);
+
+/**
+ * @brief Skip the OBJECT.
+ *
+ * The JSON_OBJECT_BEG should be already skipped.
+ *
+ * @param parser JSON parser.
+ * @return Zero on success.
+ */
+static int json_skip_object(struct JSON_Parser *parser)
+{
+    while (1)
+    {
+        // we expects string as a key
+        struct JSON_Token token;
+        if (!!json_next(parser, &token))
+            return -1; // failed
+        if (JSON_OBJECT_END == token.type)
+            break; // done
+        if (JSON_STRING != token.type  && JSON_STRING_ESC != token.type)
+            return -1; // failed, string key expected
+
+        // we expects string as a key
+        if (!!json_next(parser, &token))
+            return -1; // failed
+        if (JSON_COLON != token.type)
+            return -1; // failed, colon expected
+
+        // get value
+        if (!!json_next(parser, &token))
+            return -1; // failed
+        switch (token.type)
+        {
+            case JSON_OBJECT_BEG:
+                if (!!json_skip_object(parser))
+                    return -1; // failed
+                break;
+
+            case JSON_ARRAY_BEG:
+                if (!!json_skip_array(parser))
+                    return -1; // failed
+                break;
+
+            // primitive
+            case JSON_STRING:
+            case JSON_STRING_ESC:
+            case JSON_NUMBER:
+            case JSON_FALSE:
+            case JSON_TRUE:
+            case JSON_NULL:
+                // just ignored
+                break;
+
+            default:
+                return -1; // failed
+        }
+
+        // we expects comma between elements
+        if (!!json_next(parser, &token))
+            return -1; // failed
+        if (JSON_OBJECT_END == token.type)
+            break; // done
+        if (JSON_COMMA != token.type)
+            return -1; // failed, comma expected
+    }
+
+    return 0; // OK
+}
+
+
+/**
+ * @brief Skip the ARRAY.
+ *
+ * The JSON_ARRAY_BEG should be already skipped.
+ *
+ * @param parser JSON parser.
+ * @return Zero on success.
+ */
+static int json_skip_array(struct JSON_Parser *parser)
+{
+    while (1)
+    {
+        // get array element
+        struct JSON_Token token;
+        if (!!json_next(parser, &token))
+            return -1; // failed
+        if (JSON_ARRAY_END == token.type)
+            break; // done
+
+        switch (token.type)
+        {
+            case JSON_OBJECT_BEG:
+                if (!!json_skip_object(parser))
+                    return -1; // failed
+                break;
+
+            case JSON_ARRAY_BEG:
+                if (!!json_skip_array(parser))
+                    return -1; // failed
+                break;
+
+            // primitive
+            case JSON_STRING:
+            case JSON_STRING_ESC:
+            case JSON_NUMBER:
+            case JSON_FALSE:
+            case JSON_TRUE:
+            case JSON_NULL:
+                // just ignored
+                break;
+
+            default:
+                return -1; // failed
+        }
+
+        // we expects comma between elements
+        if (!!json_next(parser, &token))
+            return -1; // failed
+        if (JSON_ARRAY_END == token.type)
+            break; // done
+        if (JSON_COMMA != token.type)
+            return -1; // failed, comma expected
+    }
+
+    return 0; // OK
 }
 
 
@@ -323,6 +453,339 @@ int json_put_back(struct JSON_Parser *parser,
     return 0; // OK, buffered
 }
 
+
+/*
+ * json_field_parse() implementation.
+ */
+int json_field_parse(struct JSON_Field **f,
+                     const char *path)
+{
+    return -1; // not implemented yet
+
+    const char *p = path;
+    while (p && *p)
+    switch (*p)
+    {
+        case '[': // by index
+        {
+            char *end = 0;
+            unsigned int index = strtoul(p+1, &end, 0);
+            if (!end || end == p+1 || *end != ']')
+            {
+                return -1; // bad index parsed
+            }
+            f[0]->by_index = index;
+        } break;
+
+        case '\"': // by name
+        {
+
+        }
+
+        case '.':
+            // next field
+
+        default:
+            // simple field name
+            p += 1;
+            break;
+    }
+
+    return 0; // OK
+}
+
+
+/**
+ * @brief Find sub-field by name.
+ * @return Sub-field or NULL if not found.
+ */
+static struct JSON_Field* json_field_by_name(const struct JSON_Field *field,
+                                             const uint8_t *name_beg,
+                                             const uint8_t *name_end)
+{
+    for (int i = 0; i < field->no_fields; ++i)
+    {
+        struct JSON_Field *sf = field->fields[i];
+        if (0 == memcmp(sf->by_name, name_beg, name_end - name_beg))
+            return sf;
+    }
+
+    return 0; // not found
+}
+
+
+/**
+ * @brief Find sub-field by index.
+ * @return Sub-field or NULL if not found.
+ */
+static struct JSON_Field* json_field_by_index(const struct JSON_Field *field, int index)
+{
+    for (int i = 0; i < field->no_fields; ++i)
+    {
+        struct JSON_Field *sf = field->fields[i];
+        if (sf->by_index == index)
+            return sf;
+    }
+
+    return 0; // not found
+}
+
+
+/*
+ * json_get() implementation.
+ */
+int json_get(struct JSON_Parser *parser,
+             struct JSON_Field *field)
+{
+    if (field->by_index == JSON_FIELD_BY_NAME)
+    {
+        // look into JSON object
+        struct JSON_Token token;
+        int res = json_next(parser, &token);
+        if (!!res)
+            return res; // failed
+        if (token.type != JSON_OBJECT_BEG)
+            return -1; // failed, object expected
+
+        // iterate over all fields
+        for (int i = 0; ; ++i)
+        {
+            struct JSON_Token key;
+            if (!!json_next(parser, &key))
+                return -1; // failed
+            if (JSON_OBJECT_END == key.type)
+                break; // done
+            if (JSON_STRING != key.type && JSON_STRING_ESC != key.type)
+                return -1; // string key expected
+
+            if (!!json_next(parser, &token))
+                return -1; // failed
+            if (JSON_COLON != token.type)
+                return -1; // colon expected
+
+            if (!!json_next(parser, &token))
+                return -1; // failed
+            switch (token.type)
+            {
+                // primitive types
+                case JSON_STRING:
+                case JSON_STRING_ESC:
+                case JSON_NUMBER:
+                case JSON_FALSE:
+                case JSON_TRUE:
+                case JSON_NULL:
+                {
+                    struct JSON_Field *sf = json_field_by_name(field, key.beg, key.end);
+                    if (sf) // sub-field matched?
+                    {
+                        // assign current token to sub-field
+                        // if (sf.no_field) return -1; ???
+                        memcpy(&sf->token, &token, sizeof(token));
+                    }
+                    else
+                    {
+                        // token is just ignored...
+                    }
+                } break;
+
+                // inner OBJECT
+                case JSON_OBJECT_BEG:
+                {
+                    struct JSON_Field *sf = json_field_by_name(field, key.beg, key.end);
+                    if (sf) // sub-field matched?
+                    {
+                        sf->token.type = JSON_OBJECT;
+                        sf->token.beg = token.beg;
+
+                        if (sf->no_fields)
+                        {
+                            if (!!json_put_back(parser, &token))
+                                return -1; // failed, buffer is full
+                            if (!!json_get(parser, sf))
+                                return -1; // failed
+                        }
+                        else
+                        {
+                            // ignore the inner OBJECT
+                            if (!!json_skip_object(parser))
+                                return -1; // failed, bad OBJECT
+                        }
+
+                        sf->token.end = parser->beg;
+                    }
+                    else
+                    {
+                        // ignore the inner OBJECT
+                        if (!!json_skip_object(parser))
+                            return -1; // failed, bad OBJECT
+                    }
+                } break;
+
+                // inner ARRAY
+                case JSON_ARRAY_BEG:
+                {
+                    struct JSON_Field *sf = json_field_by_name(field, key.beg, key.end);
+                    if (sf) // sub-field matched?
+                    {
+                        sf->token.type = JSON_ARRAY;
+                        sf->token.beg = token.beg;
+
+                        if (sf->no_fields)
+                        {
+                            if (!!json_put_back(parser, &token))
+                                return -1; // failed, buffer is full
+                            if (!!json_get(parser, sf))
+                                return -1; // failed
+                        }
+                        else
+                        {
+                            // ignore the inner ARRAY
+                            if (!!json_skip_array(parser))
+                                return -1; // failed, bad ARRAY
+                        }
+
+                        sf->token.end = parser->beg;
+                    }
+                    else
+                    {
+                        // ignore the inner ARRAY
+                        if (!!json_skip_array(parser))
+                            return -1; // failed, bad ARRAY
+                    }
+                } break;
+
+                // bad tokens
+                default:
+                    return -1; // failed, unexpected token
+            }
+
+            // ensure we have "," between array elements
+            res = json_next(parser, &token);
+            if (JSON_OBJECT_END == token.type)
+                break; // done
+            if (JSON_COMMA != token.type)
+                return -1; // failed, comma expected
+        }
+    }
+    else
+    {
+        // look into JSON array
+        struct JSON_Token token;
+        int res = json_next(parser, &token);
+        if (!!res)
+            return res; // failed
+        if (token.type != JSON_ARRAY_BEG)
+            return -1; // failed, array expected
+
+        for (int i = 0; ; ++i)
+        {
+            if (!!json_next(parser, &token))
+                return -1; // failed
+            if (JSON_ARRAY_END == token.type)
+                break; // done
+
+            switch (token.type)
+            {
+                // primitive types
+                case JSON_STRING:
+                case JSON_STRING_ESC:
+                case JSON_NUMBER:
+                case JSON_FALSE:
+                case JSON_TRUE:
+                case JSON_NULL:
+                {
+                    struct JSON_Field *sf = json_field_by_index(field, i);
+                    if (sf) // sub-field matched?
+                    {
+                        // assign current token to sub-field
+                        // if (sf.no_field) return -1; ???
+                        memcpy(&sf->token, &token, sizeof(token));
+                    }
+                    else
+                    {
+                        // token is just ignored...
+                    }
+                } break;
+
+                // inner OBJECT
+                case JSON_OBJECT_BEG:
+                {
+                    struct JSON_Field *sf = json_field_by_index(field, i);
+                    if (sf) // sub-field matched?
+                    {
+                        sf->token.type = JSON_OBJECT;
+                        sf->token.beg = token.beg;
+
+                        if (sf->no_fields)
+                        {
+                            if (!!json_put_back(parser, &token))
+                                return -1; // failed, buffer is full
+                            if (!!json_get(parser, sf))
+                                return -1; // failed
+                        }
+                        else
+                        {
+                            // ignore the inner OBJECT
+                            if (!!json_skip_object(parser))
+                                return -1; // failed, bad OBJECT
+                        }
+
+                        sf->token.end = parser->beg;
+                    }
+                    else
+                    {
+                        // ignore the inner OBJECT
+                        if (!!json_skip_object(parser))
+                            return -1; // failed, bad OBJECT
+                    }
+                } break;
+
+                // inner ARRAY
+                case JSON_ARRAY_BEG:
+                {
+                    struct JSON_Field *sf = json_field_by_index(field, i);
+                    if (sf) // sub-field matched?
+                    {
+                        sf->token.type = JSON_ARRAY;
+                        sf->token.beg = token.beg;
+
+                        if (sf->no_fields)
+                        {
+                            if (!!json_put_back(parser, &token))
+                                return -1; // failed, buffer is full
+                            if (!!json_get(parser, sf))
+                                return -1; // failed
+                        }
+                        else
+                        {
+                            // ignore the inner ARRAY
+                            if (!!json_skip_array(parser))
+                                return -1; // failed, bad ARRAY
+                        }
+
+                        sf->token.end = parser->beg;
+                    }
+                    else
+                    {
+                        // ignore the inner ARRAY
+                        if (!!json_skip_array(parser))
+                            return -1; // failed, bad ARRAY
+                    }
+                } break;
+
+                // bad tokens
+                default:
+                    return -1; // failed, unexpected token
+            }
+
+            // ensure we have "," between array elements
+            res = json_next(parser, &token);
+            if (JSON_ARRAY_END == token.type)
+                break; // done
+            if (JSON_COMMA != token.type)
+                return -1; // failed, comma expected
+        }
+    }
 
     return 0; // OK
 }
