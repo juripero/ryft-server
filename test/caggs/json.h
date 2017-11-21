@@ -11,13 +11,19 @@
 enum JSON_TokenType {
     JSON_EOF,
 
-    JSON_OBJECT_BEG,    // {
-    JSON_OBJECT_END,    // }
-    JSON_ARRAY_BEG,     // [
-    JSON_ARRAY_END,     // ]
     JSON_COLON,         // :
     JSON_COMMA,         // ,
+
+    JSON_OBJECT,        // { ... }
+    JSON_OBJECT_BEG,    // {
+    JSON_OBJECT_END,    // }
+
+    JSON_ARRAY,         // [ ... ]
+    JSON_ARRAY_BEG,     // [
+    JSON_ARRAY_END,     // ]
+
     JSON_STRING,        // "val"
+    JSON_STRING_ESC,    // "val-\u1234" (with escaped symbols)
     JSON_NUMBER,        // 123.456
     JSON_FALSE,         // false
     JSON_TRUE,          // true

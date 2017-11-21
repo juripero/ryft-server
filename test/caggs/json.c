@@ -86,8 +86,8 @@ static inline int json_next_string(struct JSON_Parser *parser,
 {
     const uint8_t *p = parser->beg+1; // skip starting quote
 
-    int done = 0;
-    while (!done && (parser->end - p) > 0)
+    int escaped = 0;
+    while ((parser->end - p) > 0)
     {
         // end of string
         if (*p == '\"')
@@ -112,6 +112,7 @@ static inline int json_next_string(struct JSON_Parser *parser,
                 // special escaped symbols
                 case '\"': case '/': case 'b': case 'f':
                 case '\\': case 'r': case 'n': case 't':
+                    escaped = 1;
                     break;
 
                 // \uXXXX escaped symbol
@@ -128,6 +129,7 @@ static inline int json_next_string(struct JSON_Parser *parser,
                             // bad escaped symbol
                             return -1; // failed
                         }
+                    escaped = 1;
                     break;
 
                 default:
@@ -143,7 +145,8 @@ static inline int json_next_string(struct JSON_Parser *parser,
 
     token->beg = parser->beg+1; // without quote
     token->end = p-1;           // without quote
-    token->type = JSON_STRING;
+    token->type = escaped ? JSON_STRING_ESC
+                          : JSON_STRING;
     parser->beg = p;
     return 0; // OK
 }
