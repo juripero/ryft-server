@@ -127,7 +127,6 @@ backend-options:
 `search-backend` is the search engine name and can be one of the following:
 
 - `ryftprim` uses *ryftprim* command line tool to access Ryft hardware (is used by default)
-- `ryftone` uses *libryftone* library to access Ryft hardware
 - `ryfthttp` uses another `ryft-server` instance to access Ryft hardware
 
 `backend-options` is search engine specific options. For example `ryftprim` engine
