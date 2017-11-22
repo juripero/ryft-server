@@ -155,3 +155,27 @@ $ ryftrest -q hello -f test.csv --line --format=csv --search --body '{"tweaks":{
 ```
 
 The `".d"` field will be internally converted to the column index `#3`.
+
+
+## Notes about CSV header problem
+
+REST service cannot properly handle the output DATA files with CSV header
+included. There are a non-trivial rules implemented in `ryftprim` when
+this CSV header is added or not.
+
+The CSV header is added at least if search query contains column names
+like `(RECORD."First Name" CONTAINS ...)`. REST service is able to
+automatically replace "First Name" column name with corresponding
+column index to avoid CSV header addition. But all column names
+should be provided with `tweaks.format`.
+
+The rule is simple, if column names are used in the search queries
+then appropriate `tweaks.format.columns` should be provided.
+
+For example, the following two queries are the same:
+
+```{.sh}
+$ ryftrest -q '(RECORD."First Name" CONTAINS "bob")' -i -f test/employees.ryftcsv --format=csv --search --body '{"tweaks":{"format":{"columns":["First Name","Last Name","Nickname","Address","City","State","Zip","Local,Remote"]}}}' -vvv
+
+$ ryftrest -q '(RECORD.1 CONTAINS "bob")' -i -f test/employees.ryftcsv --format=csv --search -vvv
+```
