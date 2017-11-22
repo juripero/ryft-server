@@ -117,7 +117,9 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 							// task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG) // FIXME: DEBUG
 							rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 							mux.ReportRecord(rec)
-						} else {
+						} else if false {
+							// we should not cancel the request here because
+							// we still need statistics and aggregations!!!
 							task.log().WithField("limit", recordsLimit).Infof("[%s]: stopped by limit", TAG)
 							errors, records := res.Cancel()
 							if errors > 0 || records > 0 {
@@ -143,7 +145,9 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 							// task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG) // FIXME: DEBUG
 							rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 							mux.ReportRecord(rec)
-						} else {
+						} else if false {
+							// we should not cancel the request here because
+							// we still need statistics and aggregations!!!
 							task.log().WithField("limit", recordsLimit).Infof("[%s]: *** stopped by limit", TAG)
 							errors, records := res.Cancel()
 							if errors > 0 || records > 0 {
