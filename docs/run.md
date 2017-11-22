@@ -16,7 +16,7 @@ To run another server instance on `9000` port just pass "address" argument:
 ```{.sh}
 ./ryft-server --address=0.0.0.0:9000
 # or
-./ryft-server -l=:9000
+./ryft-server -l:9000
 ```
 
 So it's possible to run multiple server instances on the same machine.
@@ -61,11 +61,11 @@ logging-options:
     core/pending-jobs: debug
   debug:
     core: debug
+    core/safe: debug
     core/catalogs: debug
     core/pending-jobs: debug
     core/busyness: debug
     search/ryftprim: debug
-    search/ryftone: debug
     search/ryfthttp: debug
     search/ryftmux: debug
     search/ryftdec: debug
@@ -78,8 +78,9 @@ configuration. There is special command line argument `--logging` which also
 could be used to change logging configuration.
 
 The logging configuration itself consists of logger names and corresponding
-logging levels. By default all loggers have "info" level. It is very easy to
-create any logging configuration with fine-tunes logging levels.
+logging levels. By default all loggers have "info" level. The possible logging
+level values are: "panic", "fatal", "error", "warn" or "warning", "info" and
+"debug". It is very easy to create any logging configuration with fine-tunes logging levels.
 
 
 ## Keeping search results
@@ -126,7 +127,6 @@ backend-options:
 `search-backend` is the search engine name and can be one of the following:
 
 - `ryftprim` uses *ryftprim* command line tool to access Ryft hardware (is used by default)
-- `ryftone` uses *libryftone* library to access Ryft hardware
 - `ryfthttp` uses another `ryft-server` instance to access Ryft hardware
 
 `backend-options` is search engine specific options. For example `ryftprim` engine
