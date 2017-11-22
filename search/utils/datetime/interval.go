@@ -172,6 +172,10 @@ func (i Interval) Truncate(t time.Time) time.Time {
 	if i.offsetDate.Week > 0 {
 		t := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 		weekday := int(t.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		weekday = weekday - 1
 		d := time.Duration(-weekday) * 24 * time.Hour
 		t = t.Add(d)
 		if i.offsetDate.Week == 1 {
