@@ -133,7 +133,7 @@ func FromRecord(rec *search.Record, separator string, columns []string, fields [
 						if i < len(columns) {
 							name = columns[i]
 						} else {
-							name = fmt.Sprintf("%d", i)
+							name = fmt.Sprintf("%d", i+1)
 						}
 
 						res[name] = v

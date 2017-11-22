@@ -39,6 +39,7 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftprim"
+	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/getryft/ryft-server/search/utils/query"
 )
@@ -176,6 +177,46 @@ func hasRecord(q query.Query) bool {
 	return false // not a RECORD
 }
 
+// get CSV column names from tweaks
+// see corresponding rest/format/csv package!!!
+func getCsvColumns(opts map[string]interface{}) ([]string, error) {
+	if opt, ok := opts["columns"]; ok {
+		switch v := opt.(type) {
+		case string:
+			sep, err := utils.AsString(opts["separator"])
+			if err != nil {
+				return nil, fmt.Errorf("failed to get separator: %s", err)
+			}
+			return strings.Split(v, sep), nil // OK
+
+		case []string:
+			return v, nil // OK
+
+		case []interface{}:
+			return utils.AsStringSlice(opt)
+
+		default:
+			return nil, fmt.Errorf("%T is unsupported option type, should be string or array of strings", opt)
+		}
+	}
+
+	return nil, nil // OK, no columns
+}
+
+// convert columns names to replace field map
+func getCsvNewFields(columns []string) map[string]string {
+	if len(columns) == 0 {
+		return nil // nothing to replace
+	}
+
+	fields := make(map[string]string)
+	for i, name := range columns {
+		fields[name] = fmt.Sprintf("%d", i+1) // one-based indexes
+	}
+
+	return fields
+}
+
 // Search starts asynchronous "/search" with RyftDEC engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	taskStartTime := time.Now() // performance metrics
@@ -239,21 +280,27 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		} else {
 			newRecord = query.IN_XRECORD
 		}
-		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), newRecord)
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), newRecord, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose XML query: %s", err)
 		}
 		task.rootQuery = engine.Optimize(q)
 	} else if strings.EqualFold(autoFormat, "JSON") {
 		task.log().Debugf("[%s]: converting query to JSON-based JRECORD", TAG)
-		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_JRECORD)
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_JRECORD, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose JSON query: %s", err)
 		}
 		task.rootQuery = engine.Optimize(q)
 	} else if strings.EqualFold(autoFormat, "CSV") {
 		task.log().Debugf("[%s]: converting query to CSV-based CRECORD", TAG)
-		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_CRECORD)
+		var newFields map[string]string
+		if columns, err := getCsvColumns(cfg.Tweaks.Format); err != nil {
+			return nil, fmt.Errorf("failed to get CSV column names: %s", err)
+		} else {
+			newFields = getCsvNewFields(columns)
+		}
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_CRECORD, newFields)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose CSV query: %s", err)
 		}

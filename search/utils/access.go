@@ -82,8 +82,10 @@ func ParseField(field string) (Field, error) {
 				if end := s.Scan(); end.Token() == query.RBRACK {
 					if x, err := strconv.ParseInt(idx.String(), 10, 32); err != nil {
 						return nil, fmt.Errorf("failed to parse field index: %s", err)
+					} else if x <= 0 {
+						return nil, fmt.Errorf("index must be >= 1, found %d", x)
 					} else {
-						res = append(res, fieldInt(int(x)))
+						res = append(res, fieldInt(int(x-1)))
 					}
 				} else {
 					return nil, fmt.Errorf("%s found instead of ]", end.String())
@@ -109,7 +111,7 @@ func (field Field) String() string {
 		case fieldStr:
 			res = append(res, fmt.Sprintf("%s", t))
 		case fieldInt:
-			res = append(res, fmt.Sprintf("[%d]", t))
+			res = append(res, fmt.Sprintf("[%d]", t+1))
 		}
 	}
 

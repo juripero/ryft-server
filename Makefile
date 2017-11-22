@@ -63,8 +63,10 @@ test-cover:
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftmux/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftprim/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/utils/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/aggs/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/utils/catalog/ || true
-	@go test -tags "${GO_TAGS}" -cover ./search/utils/query || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/query/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/view/ || true
 
 	@go test -tags "${GO_TAGS}" -cover ./rest/codec/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/codec/json/ || true
