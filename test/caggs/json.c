@@ -455,76 +455,23 @@ int json_put_back(struct JSON_Parser *parser,
 
 
 /*
- * json_field_parse() implementation.
+ * json_field_by_name() implementation.
  */
-int json_field_parse(struct JSON_Field **f,
-                     const char *path)
+struct JSON_Field* json_field_by_name(struct JSON_Field *field,
+                                      const uint8_t *name_beg,
+                                      const uint8_t *name_end)
 {
-    return -1; // not implemented yet
+    const size_t name_len = (name_end - name_beg);
+    if (name_len >= sizeof(field->by_name))
+        return 0; // name too big
 
-    const char *p = path;
-    while (p && *p)
-    switch (*p)
+    // check all sibling fields
+    while (field != 0)
     {
-        case '[': // by index
-        {
-            char *end = 0;
-            unsigned int index = strtoul(p+1, &end, 0);
-            if (!end || end == p+1 || *end != ']')
-            {
-                return -1; // bad index parsed
-            }
-            f[0]->by_index = index;
-        } break;
+        if (0 == memcmp(field->by_name, name_beg, name_len))
+            return field;
 
-        case '\"': // by name
-        {
-
-        }
-
-        case '.':
-            // next field
-
-        default:
-            // simple field name
-            p += 1;
-            break;
-    }
-
-    return 0; // OK
-}
-
-
-/**
- * @brief Find sub-field by name.
- * @return Sub-field or NULL if not found.
- */
-static struct JSON_Field* json_field_by_name(const struct JSON_Field *field,
-                                             const uint8_t *name_beg,
-                                             const uint8_t *name_end)
-{
-    for (int i = 0; i < field->no_fields; ++i)
-    {
-        struct JSON_Field *sf = field->fields[i];
-        if (0 == memcmp(sf->by_name, name_beg, name_end - name_beg))
-            return sf;
-    }
-
-    return 0; // not found
-}
-
-
-/**
- * @brief Find sub-field by index.
- * @return Sub-field or NULL if not found.
- */
-static struct JSON_Field* json_field_by_index(const struct JSON_Field *field, int index)
-{
-    for (int i = 0; i < field->no_fields; ++i)
-    {
-        struct JSON_Field *sf = field->fields[i];
-        if (sf->by_index == index)
-            return sf;
+        field = field->siblings; // goto next
     }
 
     return 0; // not found
@@ -532,21 +479,199 @@ static struct JSON_Field* json_field_by_index(const struct JSON_Field *field, in
 
 
 /*
+ * json_field_by_index() implementation.
+ */
+struct JSON_Field* json_field_by_index(struct JSON_Field *field,
+                                       int index)
+{
+    // check all sibling fields
+    while (field != 0)
+    {
+        if (field->by_index == index)
+            return field;
+
+        field = field->siblings; // goto next
+    }
+
+    return 0; // not found
+}
+
+
+/**
+ * @brief Create empty field.
+ */
+static struct JSON_Field* json_field_make(void)
+{
+    struct JSON_Field *f = (struct JSON_Field*)malloc(sizeof(*f));
+    if (f)
+        memset(f, 0, sizeof(*f));
+    return f;
+}
+
+
+//#define JSON_INDEX_BASE 0
+#define JSON_INDEX_BASE 1
+
+/*
+ * json_field_parse() implementation.
+ */
+int json_field_parse(struct JSON_Field **fields,
+                     const char *path)
+{
+    struct JSON_Field *root = 0;
+    struct JSON_Field *last = 0;
+
+    while (path && *path)
+    {
+        // [X] index
+        if ('[' == *path)
+        {
+            char *end = 0;
+            long index = strtol(path+1, &end, 0);
+            if (!end || end == path+1 || *end != ']')
+                return -1; // bad index parsed
+            if (index < JSON_INDEX_BASE)
+                return -1; // index out of range
+            path = end+1; // go to next fields
+
+            // create new field
+            struct JSON_Field *f = json_field_make();
+            if (!f)
+                return -1; // out of memory
+            f->by_index = index - JSON_INDEX_BASE;
+
+            if (!root)
+                root = f;
+            if (last)
+                last->children = f;
+            last = f;
+        }
+
+        // quoted "name"
+        else if ('\"' == *path)
+        {
+            const char *name = ++path; // ignore "
+            int done = 0;
+            while (!done && *path)
+            switch (*path)
+            {
+                case '\"':
+                {
+                    size_t len = path - name;
+                    ++path;
+
+                    // create new field
+                    struct JSON_Field *f = json_field_make();
+                    if (!f)
+                        return -1; // out of memory
+                    if (len >= sizeof(f->by_name))
+                        return -1; // name too long
+                    memcpy(f->by_name, name, len);
+                    f->by_index = -1;
+
+                    if (!root)
+                        root = f;
+                    if (last)
+                        last->children = f;
+                    last = f;
+                    done = 1; // stop
+                } break;
+
+                case '\\':
+                    ++path;
+                    if (!*path)
+                        return -1; // bad escaping
+                    ++path;
+                    break;
+
+                default:
+                    ++path;
+                    break;
+            }
+
+            if (!done)
+                return -1; // bad quoted name
+        }
+
+        else if ('.' == *path)
+        {
+            ++path; // go to next field
+        }
+
+        else
+        {
+            // simple field name
+            const char *name = path;
+            size_t len = 0;
+            int done = 0;
+            while (!done && *path)
+            switch (*path)
+            {
+                case '.':
+                    ++path; // ignore '.'
+                    done = 1; // stop
+                    break;
+
+                default:
+                    ++path;
+                    ++len;
+                    break;
+            }
+
+            if (len)
+            {
+                // create new field
+                struct JSON_Field *f = json_field_make();
+                if (!f)
+                    return -1; // out of memory
+                if (len >= sizeof(f->by_name))
+                    return -1; // name too long
+                memcpy(f->by_name, name, len);
+                f->by_index = -1;
+
+                if (!root)
+                    root = f;
+                if (last)
+                    last->children = f;
+                last = f;
+            }
+        }
+    }
+
+    if (!root)
+        return -1; // empty fields
+    *fields = root;
+    return 0; // OK
+}
+
+
+/*
+ * json_fields_free() implementation.
+ */
+void json_field_free(struct JSON_Field *fields)
+{
+    if (!fields)
+        return;
+
+    json_field_free(fields->children);
+    json_field_free(fields->siblings);
+    free(fields); // release
+}
+
+
+/*
  * json_get() implementation.
  */
 int json_get(struct JSON_Parser *parser,
-             struct JSON_Field *field)
+             struct JSON_Field *fields)
 {
-    if (field->by_index == JSON_FIELD_BY_NAME)
-    {
-        // look into JSON object
-        struct JSON_Token token;
-        int res = json_next(parser, &token);
-        if (!!res)
-            return res; // failed
-        if (token.type != JSON_OBJECT_BEG)
-            return -1; // failed, object expected
+    // look into JSON object
+    struct JSON_Token token;
+    if (!!json_next(parser, &token))
+        return -1; // failed
 
+    if (JSON_OBJECT_BEG == token.type)
+    {
         // iterate over all fields
         for (int i = 0; ; ++i)
         {
@@ -575,8 +700,9 @@ int json_get(struct JSON_Parser *parser,
                 case JSON_TRUE:
                 case JSON_NULL:
                 {
-                    struct JSON_Field *sf = json_field_by_name(field, key.beg, key.end);
-                    if (sf) // sub-field matched?
+                    // TODO: unescape key if JSON_STRING_ESC == key.type
+                    struct JSON_Field *sf = json_field_by_name(fields, key.beg, key.end);
+                    if (sf) // sub-field matched
                     {
                         // assign current token to sub-field
                         // if (sf.no_field) return -1; ???
@@ -591,17 +717,18 @@ int json_get(struct JSON_Parser *parser,
                 // inner OBJECT
                 case JSON_OBJECT_BEG:
                 {
-                    struct JSON_Field *sf = json_field_by_name(field, key.beg, key.end);
-                    if (sf) // sub-field matched?
+                    // TODO: unescape key if JSON_STRING_ESC == key.type
+                    struct JSON_Field *sf = json_field_by_name(fields, key.beg, key.end);
+                    if (sf) // sub-field matched
                     {
                         sf->token.type = JSON_OBJECT;
                         sf->token.beg = token.beg;
 
-                        if (sf->no_fields)
+                        if (sf->children)
                         {
                             if (!!json_put_back(parser, &token))
                                 return -1; // failed, buffer is full
-                            if (!!json_get(parser, sf))
+                            if (!!json_get(parser, sf->children))
                                 return -1; // failed
                         }
                         else
@@ -624,17 +751,18 @@ int json_get(struct JSON_Parser *parser,
                 // inner ARRAY
                 case JSON_ARRAY_BEG:
                 {
-                    struct JSON_Field *sf = json_field_by_name(field, key.beg, key.end);
-                    if (sf) // sub-field matched?
+                    // TODO: unescape key if JSON_STRING_ESC == key.type
+                    struct JSON_Field *sf = json_field_by_name(fields, key.beg, key.end);
+                    if (sf) // sub-field matched
                     {
                         sf->token.type = JSON_ARRAY;
                         sf->token.beg = token.beg;
 
-                        if (sf->no_fields)
+                        if (sf->children)
                         {
                             if (!!json_put_back(parser, &token))
                                 return -1; // failed, buffer is full
-                            if (!!json_get(parser, sf))
+                            if (!!json_get(parser, sf->children))
                                 return -1; // failed
                         }
                         else
@@ -659,24 +787,18 @@ int json_get(struct JSON_Parser *parser,
                     return -1; // failed, unexpected token
             }
 
-            // ensure we have "," between array elements
-            res = json_next(parser, &token);
+            // ensure we have "," between fields
+            if (!!json_next(parser, &token))
+                return -1; // failed
             if (JSON_OBJECT_END == token.type)
                 break; // done
             if (JSON_COMMA != token.type)
                 return -1; // failed, comma expected
         }
     }
-    else
+    else if (JSON_ARRAY_BEG == token.type)
     {
-        // look into JSON array
-        struct JSON_Token token;
-        int res = json_next(parser, &token);
-        if (!!res)
-            return res; // failed
-        if (token.type != JSON_ARRAY_BEG)
-            return -1; // failed, array expected
-
+        // iterate over all elements
         for (int i = 0; ; ++i)
         {
             if (!!json_next(parser, &token))
@@ -694,8 +816,8 @@ int json_get(struct JSON_Parser *parser,
                 case JSON_TRUE:
                 case JSON_NULL:
                 {
-                    struct JSON_Field *sf = json_field_by_index(field, i);
-                    if (sf) // sub-field matched?
+                    struct JSON_Field *sf = json_field_by_index(fields, i);
+                    if (sf) // sub-field matched
                     {
                         // assign current token to sub-field
                         // if (sf.no_field) return -1; ???
@@ -710,17 +832,17 @@ int json_get(struct JSON_Parser *parser,
                 // inner OBJECT
                 case JSON_OBJECT_BEG:
                 {
-                    struct JSON_Field *sf = json_field_by_index(field, i);
-                    if (sf) // sub-field matched?
+                    struct JSON_Field *sf = json_field_by_index(fields, i);
+                    if (sf) // sub-field matched
                     {
                         sf->token.type = JSON_OBJECT;
                         sf->token.beg = token.beg;
 
-                        if (sf->no_fields)
+                        if (sf->children)
                         {
                             if (!!json_put_back(parser, &token))
                                 return -1; // failed, buffer is full
-                            if (!!json_get(parser, sf))
+                            if (!!json_get(parser, sf->children))
                                 return -1; // failed
                         }
                         else
@@ -743,17 +865,17 @@ int json_get(struct JSON_Parser *parser,
                 // inner ARRAY
                 case JSON_ARRAY_BEG:
                 {
-                    struct JSON_Field *sf = json_field_by_index(field, i);
-                    if (sf) // sub-field matched?
+                    struct JSON_Field *sf = json_field_by_index(fields, i);
+                    if (sf) // sub-field matched
                     {
                         sf->token.type = JSON_ARRAY;
                         sf->token.beg = token.beg;
 
-                        if (sf->no_fields)
+                        if (sf->children)
                         {
                             if (!!json_put_back(parser, &token))
                                 return -1; // failed, buffer is full
-                            if (!!json_get(parser, sf))
+                            if (!!json_get(parser, sf->children))
                                 return -1; // failed
                         }
                         else
@@ -779,13 +901,16 @@ int json_get(struct JSON_Parser *parser,
             }
 
             // ensure we have "," between array elements
-            res = json_next(parser, &token);
+            if (!!json_next(parser, &token))
+                return -1; // failed
             if (JSON_ARRAY_END == token.type)
                 break; // done
             if (JSON_COMMA != token.type)
                 return -1; // failed, comma expected
         }
     }
+    else
+        return -1; // only OBJECT or ARRAY are supported
 
     return 0; // OK
 }

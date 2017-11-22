@@ -98,38 +98,57 @@ int json_put_back(struct JSON_Parser *parser,
  */
 struct JSON_Field
 {
-    int by_index;       ///< @brief Array index or -1 (by field name).
     char by_name[64];   ///< @brief Field name. Up to 63 bytes.
+    int by_index;       ///< @brief Array index or -1 (by field name).
 
     /// @brief Corresponding JSON token.
     struct JSON_Token token;
 
-    // sub-fields
-    int no_fields;                  ///< @brief Number of sub-fields.
-    struct JSON_Field* fields[32];  ///< @brief Array of sub-fields.
+    /// @brief Custom data.
+    void *data;
+
+    struct JSON_Field *children;  ///< @brief List of child fields.
+    struct JSON_Field *siblings;  ///< @brief List of sibling fields.
 };
 
-/**
- * @brief Special index to indicate access "by name".
- */
-static const int JSON_FIELD_BY_NAME = -1;
-
 
 /**
- * @brief Parse the JSON field.
- * @param f Parsed field.
- * @param path Path to parse.
+ * @brief Parse the fields tree from path.
+ * @param[in,out] fields Head of parsed fields tree.
+ * @param[in] path Path to parse, for example "foo.bar".
  * @return Zero on success.
  */
-int json_field_parse(struct JSON_Field **f,
+int json_field_parse(struct JSON_Field **field,
                      const char *path);
 
 
 /**
- * @brief Release the JSON field.
- * @param f Field to release.
+ * @brief Release the JSON fields tree.
+ * @param[in] fields Head of fields tree.
  */
-void json_field_free(struct JSON_Field *f);
+void json_field_free(struct JSON_Field *fields);
+
+
+/**
+ * @brief Find sibling field by name.
+ * @param[in] field Head of fields tree.
+ * @param[in] name_beg Begin of name to search.
+ * @param[in] name_end End of name to search.
+ * @return Sibling field or `NULL` if not found.
+ */
+struct JSON_Field* json_field_by_name(struct JSON_Field *field,
+                                      const uint8_t *name_beg,
+                                      const uint8_t *name_end);
+
+
+/**
+ * @brief Find sibling field by index.
+ * @param[in] field Head of fields tree.
+ * @param[in] index Index to search.
+ * @return Sibling field or `NULL` if not found.
+ */
+struct JSON_Field* json_field_by_index(struct JSON_Field *field,
+                                       int index);
 
 
 /**
@@ -138,10 +157,10 @@ void json_field_free(struct JSON_Field *f);
  * Validate JSON and gets corresponding fields.
  *
  * @param[in] parser JSON parser.
- * @param[int] field Fields to get.
+ * @param[in] fields Fields tree to get.
  * @return Zero on success.
  */
 int json_get(struct JSON_Parser *parser,
-             struct JSON_Field *field);
+             struct JSON_Field *fields);
 
 #endif // __CAGGS_JSON_H__
