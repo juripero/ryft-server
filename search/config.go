@@ -110,7 +110,7 @@ type Aggregations interface {
 	GetOpts() map[string]interface{}
 	Merge(other interface{}) error
 	Add(raw []byte) error
-	ToJson(final bool) interface{}
+	ToJson(final bool) map[string]interface{}
 }
 
 // NewEmptyConfig creates new empty search configuration.
