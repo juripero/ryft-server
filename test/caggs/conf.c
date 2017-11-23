@@ -29,6 +29,7 @@ static void usage(void)
 
     vlog("-i<path>, --index=<path> path to INDEX file\n");
     vlog("-d<path>, --data=<path>  path to DATA file\n");
+    vlog("-f<path>, --field=<path> field to access JSON data\n");
     vlog("\n");
 
     vlog("-H<N>, --header=<N> size of DATA header in bytes\n");
@@ -57,6 +58,7 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
     {
         {"index", required_argument, 0, 'i' },
         {"data", required_argument, 0, 'd' },
+        {"field", required_argument, 0, 'f' },
         {"header", no_argument, 0, 'H' },
         {"delimiter", no_argument, 0, 'D' },
         {"delim", no_argument, 0, 'D' },
@@ -75,7 +77,7 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
     {
         // parse options
         int res = getopt_long(argc, (char* const*)argv,
-                              "i:d:H:D:F:P:hVqv", opts, 0);
+                              "i:d:f:H:D:F:P:hVqv", opts, 0);
         if (res < 0)
             break; // done
 
@@ -117,6 +119,10 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
             cfg->dat_path = optarg; // TODO: do we need to copy?
             break;
 
+        case 'f': // field
+            cfg->field = optarg; // TODO: do we need to copy?
+            break;
+
         case 'H': // header length
             cfg->header_len = strtoul(optarg, NULL, 0); // TODO: check errors
             break;
@@ -152,6 +158,13 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
         return -1; // failed
     }
 
+    if (!cfg->field)
+    {
+        verr("ERROR: no FIELD provided\n");
+        // usage();
+        return -1; // failed
+    }
+
     return 0; // OK
 }
 
@@ -180,6 +193,7 @@ void conf_print(const struct Conf *cfg)
          cfg->header_len,
          cfg->delim_len,
          cfg->footer_len);
+    vlog("field: %s\n", cfg->field);
     vlog("concurrency: x%d\n", cfg->concurrency);
     vlog("  verbosity: %d\n", verbose);
 }

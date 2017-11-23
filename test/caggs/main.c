@@ -135,7 +135,10 @@ struct Stat g_stat;
  * @param[in] len Length of DATA in bytes.
  * @return Zero on success.
  */
-static int process_record(const struct Conf *cfg, const uint8_t *beg, const uint8_t *end)
+static int process_record(const struct Conf *cfg,
+                          struct JSON_Field *root,
+                          const uint8_t *beg,
+                          const uint8_t *end)
 {
     (void)cfg; // not used yet
 
@@ -144,35 +147,29 @@ static int process_record(const struct Conf *cfg, const uint8_t *beg, const uint
 //        printf("%c", *dat++);
 //    printf("\n");
 
-    const char *field = "foo\"";
+    struct JSON_Field *field = root;
+    while (field->children != 0)
+        field = field->children;
+    field->token.type = JSON_EOF;
 
-    while ((end - beg) > 0)
+    struct JSON_Parser parser;
+    json_init(&parser, beg, end);
+
+    if (!!json_get(&parser, root))
     {
-        const uint8_t *f = (const uint8_t*)memchr(beg, field[0], end - beg);
-        if (!f)
-            return -1; // field not found
-
-        if (0 != memcmp(f, field, 4))
-        {
-            beg = f+1;
-            continue; // try again
-        }
-
-        beg = f+4;
-        while ((end - beg) > 0)
-        {
-            if (*beg++ == ':')
-                break;
-        }
-
-        if (!(end - beg))
-            return -2; // no data found
-
-        double x = strtod((const char*)beg, NULL);
-        // vlog(" %g ", x);
-        stat_add(&g_stat, x);
-        break; // done
+        verr("ERROR: failed to get JSON field\n");
+        return -1;
     }
+
+    if (JSON_NUMBER != field->token.type)
+    {
+        verr("WARN: bad value found, ignored\n");
+        return 0;
+    }
+
+    double x = strtod((const char*)field->token.beg, NULL);
+    // vlog(" %g ", x);
+    stat_add(&g_stat, x);
 
     return 0; // OK
 }
@@ -181,13 +178,14 @@ static int process_record(const struct Conf *cfg, const uint8_t *beg, const uint
 /**
  * @brief Do the work.
  * @param[in] cfg Application configuration.
+ * @param[in] field Head of JSON fields tree.
  * @param[in] idx_p The begin of INDEX file.
  * @param[in] idx_len The length of INDEX file in bytes.
  * @param[in] dat_p The begin of DATA file.
  * @param[in] dat_len The length of DATA file in bytes.
  * @return Zero on success.
  */
-static int do_work(const struct Conf *cfg,
+static int do_work(const struct Conf *cfg, struct JSON_Field *field,
                    const uint8_t *idx_beg, const uint8_t *idx_end,
                    const uint8_t *dat_beg, const uint8_t *dat_end)
 {
@@ -231,7 +229,7 @@ static int do_work(const struct Conf *cfg,
         // TODO: concurrency!!!
         if ((ptrdiff_t)d_len <= (dat_end - dat_beg))
         {
-            int res = process_record(cfg, dat_beg,
+            int res = process_record(cfg, field, dat_beg,
                                      dat_beg + d_len);
             if (res != 0)
             {
@@ -269,7 +267,7 @@ static int do_work(const struct Conf *cfg,
  */
 int main(int argc, const char *argv[])
 {
-    if (1)
+    if (0)
     {
         extern void json_test(void);
         json_test();
@@ -288,6 +286,13 @@ int main(int argc, const char *argv[])
     // print current configuration
     if (verbose >= 3)
         conf_print(&cfg);
+
+    struct JSON_Field *field = 0;
+    if (!!json_field_parse(&field, cfg.field))
+    {
+        verr("ERROR: failed to parse field \"%s\"\n", cfg.field);
+        return -1;
+    }
 
     // try to open INDEX file
     vlog2("opening INDEX file: %s\n", cfg.idx_path);
@@ -351,7 +356,8 @@ int main(int argc, const char *argv[])
     }
 
     // do actual processing
-    do_work(&cfg, (const uint8_t*)idx_p, (const uint8_t*)idx_p + idx_stat.st_size,
+    do_work(&cfg, field,
+            (const uint8_t*)idx_p, (const uint8_t*)idx_p + idx_stat.st_size,
             (const uint8_t*)dat_p, (const uint8_t*)dat_p + dat_stat.st_size);
 
     // print global statistics
@@ -634,7 +640,7 @@ static int json_test_field(const char *path, int no_fields, ...)
             verr("FAILED: no field\n");
             break;
         }
-        const char *expected_index = va_arg(args, int);
+        const int expected_index = va_arg(args, int);
         if (ff->by_index != expected_index)
         {
             verr("FAILED: bad index\n");
