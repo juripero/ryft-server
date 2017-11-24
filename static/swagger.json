@@ -953,11 +953,15 @@
             },
             "aggregations": {
               "type": "object",
-              "additionalProperties": {}
+              "additionalProperties": {
+                "type": "object"
+              }
             },
             "debug": {
               "type": "object",
-              "additionalProperties": {}
+              "additionalProperties": {
+                "type": "object"
+              }
             }
           }
         }
