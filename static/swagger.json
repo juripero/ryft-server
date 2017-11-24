@@ -450,13 +450,13 @@
     "/version": {
       "get": {
         "tags": [ "misc" ],
-        "summary": "Get server's version",
-        "description": "Endpoint to query current build version",
+        "summary": "Get server's version.",
+        "description": "This endpoint reports the version of the REST service.",
         "operationId": "version",
         "responses": {
           "200": {
-            "description": "Hash and version",
-            "schema": { "$ref": "#/definitions/VersionResponse" }
+            "description": "REST service version.",
+            "schema": { "$ref": "#/definitions/Version" }
           },
           "default": {
             "description": "Error response.",
@@ -1019,13 +1019,16 @@
         }
       }
     },
-    "VersionResponse": {
+    "Version": {
+      "description": "REST service version information.",
       "type": "object",
       "properties": {
         "git-hash": {
+          "description": "Git hash of the source tree the REST service is built on.",
           "type": "string"
         },
         "version": {
+          "description": "REST service version.",
           "type": "string"
         }
       }
