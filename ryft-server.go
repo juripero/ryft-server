@@ -192,19 +192,17 @@ func main() {
 	router := gin.New()
 
 	// default 404 error
-	router.NoRoute(func(c *gin.Context) {
-		c.JSON(404, gin.H{
-			"code":    "404",
-			"message": "Page not found",
-		})
+	router.NoRoute(func(ctx *gin.Context) {
+		defer rest.RecoverFromPanic(ctx)
+		panic(rest.NewError(http.StatusNotFound,
+			"Page not found"))
 	})
 
 	// default 405 error
-	router.NoMethod(func(c *gin.Context) {
-		c.JSON(405, gin.H{
-			"code":    "405",
-			"message": "Method not allowed",
-		})
+	router.NoMethod(func(ctx *gin.Context) {
+		defer rest.RecoverFromPanic(ctx)
+		panic(rest.NewError(http.StatusMethodNotAllowed,
+			"Method not allowed"))
 	})
 
 	// /version API endpoint (without logging!)

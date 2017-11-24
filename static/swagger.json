@@ -47,7 +47,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -71,7 +71,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -112,7 +112,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -135,7 +135,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -167,7 +167,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -193,7 +193,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -239,7 +239,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -270,7 +270,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -297,7 +297,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -331,7 +331,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -360,7 +360,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -403,7 +403,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -442,7 +442,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -460,7 +460,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -488,7 +488,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         },
         "security": []
@@ -507,7 +507,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -531,7 +531,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -558,7 +558,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -584,7 +584,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
 
@@ -607,7 +607,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -1055,18 +1055,27 @@
         }
       }
     },
-    "ErrorResponse": {
+    "Error": {
+      "description": "Detailed error information.",
       "type": "object",
-      "additionalProperties": {
-        "type": "object"
-      },
       "properties": {
         "message": {
+          "description": "Short error message.",
           "type": "string"
         },
-        "code": {
+        "details": {
+          "description": "Detailed error description.",
           "type": "string"
+        },
+        "status": {
+          "description": "Corresponding HTTP status code.",
+          "type": "integer",
+          "required": true
         }
+      },
+      "additionalProperties": {
+        "description": "Extensions.",
+        "type": "object"
       }
     },
     "RenameResponse": {

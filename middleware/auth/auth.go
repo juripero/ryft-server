@@ -235,7 +235,7 @@ func (mw *Middleware) putUserToCache(username string, user *UserInfo) {
 // report unauthorized access
 func (mw *Middleware) unauthorized(c *gin.Context, code int, message string) {
 	c.JSON(code, gin.H{
-		"code":    code,
+		"status":  code,
 		"message": message,
 	})
 }
