@@ -39,6 +39,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getryft/ryft-server/search/utils"
+
 	"github.com/gin-gonic/gin"
 	"gopkg.in/appleboy/gin-jwt.v1"
 )
@@ -212,10 +214,10 @@ func getUserFromJwt(userId string, ctx *gin.Context) *UserInfo {
 	if ival, ok := ctx.Get("JWT_PAYLOAD"); ok && ival != nil {
 		if val, ok := ival.(map[string]interface{}); ok {
 			user := new(UserInfo)
-			user.Name, _ = val["id"].(string) // userId
-			user.Roles, _ = val[tokenAttrRoles].([]string)
-			user.HomeDir, _ = val[tokenAttrHomeDir].(string)
-			user.ClusterTag, _ = val[tokenAttrCluster].(string)
+			user.Name, _ = utils.AsString(val["id"]) // userId
+			user.Roles, _ = utils.AsStringSlice(val[tokenAttrRoles])
+			user.HomeDir, _ = utils.AsString(val[tokenAttrHomeDir])
+			user.ClusterTag, _ = utils.AsString(val[tokenAttrCluster])
 			return user
 		}
 	}
