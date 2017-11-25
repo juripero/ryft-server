@@ -16,10 +16,12 @@ ifeq (${GITHASH},)
   GITHASH=$(shell git log -1 --format='%H')
 endif
 
-.PHONY: version
+.PHONY: version version-q
 version:
 	@echo "Version: ${VERSION}"
 	@echo "GitHash: ${GITHASH}"
+version-q:
+	@echo "${VERSION}"
 
 $(GOBINDATA):
 	@go get -u github.com/jteeuwen/go-bindata/...
