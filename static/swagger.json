@@ -453,6 +453,7 @@
         "summary": "Get server's version.",
         "description": "This endpoint reports the version of the REST service.",
         "operationId": "version",
+        "security": [],
         "responses": {
           "200": {
             "description": "REST service version.",
@@ -471,20 +472,25 @@
         "summary": "Authentication",
         "description": "Endpoint to authenticate an user",
         "operationId": "login",
+        "security": [],
         "consumes": ["application/json"],
         "parameters": [
           {
             "in": "body",
-            "name": "body",
+            "name": "credentials",
             "description": "User's credentials",
             "required": true,
-            "schema": { "$ref": "#/definitions/LoginRequest" }
+            "schema": { "$ref": "#/definitions/Credentials" }
           }
         ],
         "responses": {
           "200": {
             "description": "JWT",
-            "schema": { "$ref": "#/definitions/LoginResponse" }
+            "schema": { "$ref": "#/definitions/JwtToken" }
+          },
+          "404": {
+            "description": "Authentication is disabled.",
+            "schema": { "$ref": "#/definitions/Error" }
           },
           "default": {
             "description": "Error response.",
@@ -500,10 +506,15 @@
         "summary": "Refresh authentication",
         "description": "Endpoint to refresh existing authentication token",
         "operationId": "token_refresh",
+        "security": [ {"jwt":[]} ],
         "responses": {
           "200": {
             "description": "JWT",
-            "schema": { "$ref": "#/definitions/LoginResponse" }
+            "schema": { "$ref": "#/definitions/JwtToken" }
+          },
+          "404": {
+            "description": "Authentication is disabled.",
+            "schema": { "$ref": "#/definitions/Error" }
           },
           "default": {
             "description": "Error response.",
@@ -1033,24 +1044,31 @@
         }
       }
     },
-    "LoginRequest": {
+    "Credentials": {
+      "description": "User's credentials: name and password.",
       "type": "object",
       "properties": {
         "username": {
+          "description": "User's name.",
           "type": "string"
         },
         "password": {
+          "description": "User's password.",
           "type": "string"
         }
       }
     },
-    "LoginResponse": {
+    "JwtToken": {
+      "description": "JWT token information.",
       "type": "object",
       "properties": {
         "expire": {
-          "type": "string"
+          "description": "Token expiration datetime (RFC-3339).",
+          "type": "string",
+          "format": "date-time"
         },
         "token": {
+          "description": "JWT token.",
           "type": "string"
         }
       }
