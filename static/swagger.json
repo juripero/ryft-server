@@ -534,7 +534,7 @@
         ],
         "responses": {
           "200": {
-            "description": "List of requested users",
+            "description": "List of requested users.",
             "schema": {
               "type": "array",
               "items": { "$ref": "#/definitions/UserInfo" }
@@ -555,7 +555,7 @@
         "parameters": [
           {
             "in": "body",
-            "name": "body",
+            "name": "user",
             "description": "User's properties",
             "required": true,
             "schema": { "$ref": "#/definitions/UserInfo" }
@@ -581,7 +581,7 @@
         "parameters": [
           {
             "in": "body",
-            "name": "body",
+            "name": "user",
             "description": "User's properties",
             "required": true,
             "schema": { "$ref": "#/definitions/UserInfo" }
@@ -1449,24 +1449,24 @@
       "type": "object",
       "properties": {
         "username": {
-          "description": "Unique user name",
+          "description": "Unique user name.",
           "type": "string"
         },
         "password": {
-          "description": "User's password",
+          "description": "User's password.",
           "type": "string"
         },
         "roles": {
-          "description": "Set of user's roles",
+          "description": "Set of user's roles.",
           "type": "array",
           "items": { "type": "string" }
         },
         "home": {
-          "description": "User's home directory inside `/ryftone` partition",
+          "description": "User's home directory inside `/ryftone` partition.",
           "type": "string"
         },
         "cluster-tag": {
-          "description": "Partitioning tag used in cluster mode",
+          "description": "Partitioning tag used in cluster mode.",
           "type": "string"
         }
       }
