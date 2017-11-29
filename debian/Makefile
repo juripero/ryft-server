@@ -1,4 +1,3 @@
-# support for VERSION AND GITHASH environment variables
 HINT=ryft-server/debian
 
 all: package
@@ -15,7 +14,7 @@ version:
 	@echo "Version: ${VERSION}"
 	@echo "githash: ${GITHASH}"
 
-RYFT_SERVER_BIN=${GOPATH}/bin/ryft-server
+RYFT_SERVER_BIN=${CURDIR}/../ryft-server
 DEBNAME=ryft-server-${VERSION}_amd64.deb
 DESTDIR=.build
 
