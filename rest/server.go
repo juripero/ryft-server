@@ -138,6 +138,7 @@ type ServerConfig struct {
 		TempDirectory     string        `yaml:"temp-dir"`
 	} `yaml:"catalogs,omitempty"`
 
+	InstanceHome string `yaml:"instance-home,omitempty"` // TODO: move to some tweaks
 	SettingsPath string `yaml:"settings-path,omitempty"`
 	HostName     string `yaml:"hostname,omitempty"`
 
@@ -334,6 +335,9 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 			userTag = user.ClusterTag
 		}
 	}
+
+	// update HOME with custom prefix (usually empty)
+	homeDir = filepath.Join(s.Config.InstanceHome, homeDir)
 
 	return
 }
