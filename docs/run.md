@@ -335,7 +335,7 @@ There is Consul-related configuration section:
 ```{.yaml}
 consul:
   address: http://127.0.0.1:8500
-  datacenter: dc1
+  data-center: dc1
 ```
 
 The `consul.address` specifies the remote consul address including schema and

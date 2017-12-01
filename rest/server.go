@@ -105,7 +105,7 @@ type ServerConfig struct {
 	// Consul related options
 	Consul struct {
 		Address    string `yaml:"address,omitempty"`
-		Datacenter string `yaml:"datacenter,omitempty"`
+		Datacenter string `yaml:"data-center,omitempty"`
 	} `yaml:"consul,omitempty"`
 
 	TLS struct {
