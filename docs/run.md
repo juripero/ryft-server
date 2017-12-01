@@ -198,6 +198,9 @@ keep-results: false
 busyness-tolerance: 0
 http-timeout: 1h
 processing-threads: 8
+settings-path: /var/ryft/server.settings
+# hostname: node-1
+# instance-home: /
 ```
 
 `local-only` is used to run `ryft-server` outside cluster. No consult dependency,
@@ -219,6 +222,14 @@ It's `1h` (one hour) by default.
 `processing-threads` is the number of parallel threads used to handle all requests.
 If zero the default system value is used. This value is used internally by Go runtime.
 See [GOMAXPROCS](https://golang.org/pkg/runtime/#GOMAXPROCS) for more details.
+
+`settings-path` is used to specify local `ryft-server` storage.
+
+`hostname` is used to customize the hostname provided by the `ryft-server`.
+By default the system's hostname is used.
+
+`instance-home` is used to specify common home directory which is prefixed to
+user's home directory or is used by default if authentication is disabled.
 
 
 #### TLS server configuration
