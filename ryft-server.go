@@ -71,6 +71,7 @@ type serverConfigValue struct {
 // set server's configuration file
 func (f *serverConfigValue) Set(s string) error {
 	f.v = s
+	log.WithField("file", s).Info("parsing configuration file...")
 	return f.s.ParseConfig(f.v)
 }
 
