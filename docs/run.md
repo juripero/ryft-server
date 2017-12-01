@@ -328,6 +328,26 @@ define these `insecure-*` options in production.
 See [authentication](./auth.md) document for more details.
 
 
+### Consul configuration
+
+There is Consul-related configuration section:
+
+```{.yaml}
+consul:
+  address: http://127.0.0.1:8500
+  datacenter: dc1
+```
+
+The `consul.address` specifies the remote consul address including schema and
+port number. By default it is `http://127.0.0.1:8500`.
+
+The `consul.datacenter` specifies the consul's data center name.
+By default it is `dc1`.
+
+Note, that consul address also can be specified via environment variable
+`CONSUL_HTTP_ADDR=127.0.0.1:8500`.
+
+
 ### Catalog configuration
 
 Some catalog related options can be customized via the following configuration

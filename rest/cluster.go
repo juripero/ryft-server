@@ -80,10 +80,25 @@ func (server *Server) getConsulClient() (*consul.Client, error) {
 		return server.consulClient.(*consul.Client), nil // cached
 	}
 
-	// create new client
+	// prepare configuration
 	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration?
-	config.Datacenter = "dc1"
+	if addr := server.Config.Consul.Address; addr != "" {
+		if u, err := url.Parse(addr); err != nil {
+			return nil, fmt.Errorf("failed to parse consul's address: %s", err)
+		} else {
+			config.Scheme = u.Scheme
+			config.Address = u.Host
+			log.WithField("address", fmt.Sprintf("%s://%s", config.Scheme, config.Address)).
+				Info("custom consul location is used")
+		}
+	}
+	if dc := server.Config.Consul.Datacenter; dc != "" {
+		config.Datacenter = dc
+	} else {
+		config.Datacenter = "dc1" // default
+	}
+
+	// create new client
 	client, err := consul.NewClient(config)
 	if err != nil {
 		return nil, err

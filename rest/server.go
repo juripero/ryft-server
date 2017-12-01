@@ -102,6 +102,12 @@ type ServerConfig struct {
 
 	ProcessingThreads int `yaml:"processing-threads"`
 
+	// Consul related options
+	Consul struct {
+		Address    string `yaml:"address,omitempty"`
+		Datacenter string `yaml:"datacenter,omitempty"`
+	} `yaml:"consul,omitempty"`
+
 	TLS struct {
 		Enabled       bool   `yaml:"enabled,omitempty"`
 		ListenAddress string `yaml:"address,omitempty"`
