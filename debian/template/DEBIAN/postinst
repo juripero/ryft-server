@@ -50,9 +50,9 @@ if [ -z `which systemctl` ]; then
 	# start service
 	service $NAME start
 else
-	# yes systemd 
+	# yes systemd
 	chown root:root -f /etc/systemd/system/ryft-server-d.service
-        systemctl enable ryft-server-d
+	systemctl enable ryft-server-d
 
 	# no upstart
 	rm -f /etc/init/ryft-server-d.conf
