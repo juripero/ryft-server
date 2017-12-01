@@ -31,6 +31,7 @@
 package main
 
 import (
+	"fmt"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -84,6 +85,8 @@ func main() {
 	defer server.Close()
 
 	// parse command line arguments
+	showVersion := false
+	kingpin.Flag("version", "Show server version and exit.").BoolVar(&showVersion)
 	kingpin.Flag("config", "Server configuration in YML format.").SetValue(&serverConfigValue{s: server})
 	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&server.Config.LocalOnly)
 	kingpin.Flag("keep", "Keep temporary search result files (debug mode).").Short('k').BoolVar(&server.Config.KeepResults)
@@ -110,6 +113,13 @@ func main() {
 	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups. Required for --auth=ldap.").StringVar(&server.Config.AuthLdap.BaseDN)
 
 	kingpin.Parse()
+
+	// show version and exit
+	if showVersion {
+		fmt.Printf("Version: %s\n", Version)
+		fmt.Printf("GitHash: %s\n", GitHash)
+		return
+	}
 
 	// check extra dependencies logic not handled by kingpin
 	switch strings.ToLower(server.Config.AuthType) {
