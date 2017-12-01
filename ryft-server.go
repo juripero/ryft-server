@@ -92,6 +92,7 @@ func main() {
 	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&server.Config.LocalOnly)
 	kingpin.Flag("keep", "Keep temporary search result files (debug mode).").Short('k').BoolVar(&server.Config.KeepResults)
 	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&server.Config.DebugMode)
+	kingpin.Flag("instance-home", "Instance home directory.").StringVar(&server.Config.InstanceHome)
 	kingpin.Flag("logging", "Fine-tuned logging levels.").StringVar(&server.Config.Logging)
 	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&server.Config.Busyness.Tolerance)
 
@@ -184,6 +185,7 @@ func main() {
 		"logging":       server.Config.Logging,
 		"address":       server.Config.ListenAddress,
 		"settings-path": server.Config.SettingsPath,
+		"instance-home": server.Config.InstanceHome,
 		"max-threads":   runtime.GOMAXPROCS(0),
 	}).Info("main configuration")
 	log.WithFields(map[string]interface{}{
