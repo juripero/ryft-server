@@ -447,7 +447,7 @@ curl -s "http://ryft-host:8765/files?file=.ryft-user.yaml&offset=0" \
 
 By default the `default-user-config` section from main configuration file used.
 But if the `/ryftone/${RYFTUSER}/.ryft-user.yaml` or `/ryftone/${RYFTUSER}/.ryft-user.json`
-file is present, then it will be used instead of `default-user-config` secion.
+file is present, then it will be used instead of `default-user-config` section.
 
 Please note, if you change parameters in main configuration file and nothing is happened
 then probably there is Ryft user configuration file which overrides all parameters

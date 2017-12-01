@@ -58,7 +58,7 @@ $ curl -u test:test -s "http://localhost:8765/run?image=ubuntu&command=bash&arg=
 hello from Bash
 ```
 
-The set of allowed Docker images is specified via corresponding [configuration secion](../run.md#docker-configuration):
+The set of allowed Docker images is specified via corresponding [configuration section](../run.md#docker-configuration):
 
 ```{.yaml}
 docker:
@@ -91,10 +91,10 @@ Inside Docker container we have access to Ryft user home directory
 so we can upload any script:
 
 ```{.sh}
-$ cat test.sh 
+$ cat test.sh
 #!/bin/sh
 
-for i in 1 2 3 4 5 ; do 
+for i in 1 2 3 4 5 ; do
   echo $i
 done
 
@@ -132,7 +132,7 @@ $ curl -u test:test -s "http://localhost:8765/run?command=./test.sh"
 The python script can be run in the same way. First upload script:
 
 ```{.sh}
-$ cat test.py 
+$ cat test.py
 #!/usr/bin/python
 
 if __name__ == "__main__":
