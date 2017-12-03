@@ -229,18 +229,22 @@ func (s *Server) isLocalService(service *consul.CatalogService) bool {
 		return false
 	}
 
-	// get all interfaces
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		log.WithError(err).Warnf("failed to get interface addresses")
-		return false
-	}
-
 	var address string
 	if service.ServiceAddress != "" {
 		address = service.ServiceAddress
 	} else {
 		address = service.Address
+	}
+
+	if address == s.Config.HostName {
+		return true // same host
+	}
+
+	// get all interfaces
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.WithError(err).Warnf("failed to get interface addresses")
+		return false
 	}
 
 	// check each interface without mask
@@ -261,6 +265,10 @@ func (s *Server) isLocalServiceUrl(serviceUrl *url.URL) bool {
 	// service port must match
 	if len(parts) < 2 || parts[1] != fmt.Sprintf("%d", s.listenAddress.Port) {
 		return false
+	}
+
+	if parts[0] == s.Config.HostName {
+		return true // same host
 	}
 
 	// get all interfaces
