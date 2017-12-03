@@ -66,6 +66,7 @@ func (server *Server) DoClusterMembers(ctx *gin.Context) {
 			"service-port":    s.ServicePort,
 			"service-id":      s.ServiceID,
 			"service-tags":    s.ServiceTags,
+			"local":           server.isLocalService(s),
 		}
 	}
 
