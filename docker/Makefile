@@ -1,7 +1,7 @@
 HINT = ryft-server/docker
 
 SOURCE ?= $(abspath $(dir ${CURDIR}))
-VERSION ?= latest
+BUILD_TAG ?= latest
 
 all: debian
 
@@ -16,14 +16,14 @@ build: image
 		-v /etc/group:/etc/group:ro -v /etc/passwd:/etc/passwd:ro \
 		--user $(shell id -u ${USER}):$(shell id -g ${USER}) \
 		-v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
-		ryft/build:${VERSION} make all
+		ryft/server/build:${BUILD_TAG} make all
 
 # build Debian package
 debian: build
 	@echo "[${HINT}]: building Debian package (as root)..."
 	docker run --rm \
 		-v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
-		ryft/build:${VERSION} make -C debian all
+		ryft/server/build:${BUILD_TAG} make -C debian all
 
 # run /bin/bash in Docker container
 # run as $USER, not as root
@@ -33,9 +33,9 @@ cli: image
 		-v /etc/group:/etc/group:ro -v /etc/passwd:/etc/passwd:ro \
 		--user $(shell id -u ${USER}):$(shell id -g ${USER}) \
 		-v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
-		ryft/build:${VERSION} /bin/bash
+		ryft/server/build:${BUILD_TAG} /bin/bash
 
 # create image to build sources
 image:
 	@echo "[${HINT}]: building Docker image..."
-	docker build -q -t=ryft/build:${VERSION} build
+	docker build -q -t=ryft/server/build:${BUILD_TAG} build
