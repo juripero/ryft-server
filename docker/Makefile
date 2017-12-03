@@ -1,7 +1,7 @@
 HINT = ryft-server/docker
 
 SOURCE ?= $(abspath $(dir ${CURDIR}))
-BUILD_TAG ?= latest
+BUILD_IMAGE_TAG ?= latest
 
 all: debian
 
@@ -12,30 +12,28 @@ all: debian
 # update vendor and build as $USER, not as root
 build: image
 	@echo "[${HINT}]: building ryft-server (as ${USER})..."
-	docker run --rm \
-		-v /etc/group:/etc/group:ro -v /etc/passwd:/etc/passwd:ro \
-		--user $(shell id -u ${USER}):$(shell id -g ${USER}) \
+	docker run --rm --user $(shell id -u ${USER}):$(shell id -g ${USER}) \
+		-v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro \
 		-v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
-		ryft/server/build:${BUILD_TAG} make all
+		ryft/server/build:${BUILD_IMAGE_TAG} make all
 
 # build Debian package
 debian: build
 	@echo "[${HINT}]: building Debian package (as root)..."
 	docker run --rm \
 		-v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
-		ryft/server/build:${BUILD_TAG} make -C debian all
+		ryft/server/build:${BUILD_IMAGE_TAG} make -C debian all
 
 # run /bin/bash in Docker container
 # run as $USER, not as root
 cli: image
 	@echo "[${HINT}]: running CLI (as ${USER})..."
-	docker run --rm -it \
-		-v /etc/group:/etc/group:ro -v /etc/passwd:/etc/passwd:ro \
-		--user $(shell id -u ${USER}):$(shell id -g ${USER}) \
+	docker run --rm -it --user $(shell id -u ${USER}):$(shell id -g ${USER}) \
+		-v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro \
 		-v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
-		ryft/server/build:${BUILD_TAG} /bin/bash
+		ryft/server/build:${BUILD_IMAGE_TAG} /bin/bash
 
 # create image to build sources
 image:
 	@echo "[${HINT}]: building Docker image..."
-	docker build -q -t=ryft/server/build:${BUILD_TAG} build
+	docker build -q -t=ryft/server/build:${BUILD_IMAGE_TAG} build
