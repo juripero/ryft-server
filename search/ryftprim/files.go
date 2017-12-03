@@ -64,9 +64,12 @@ func ReadDir(mountPoint, dirPath string, hidden, details bool, host string) (*se
 	// need to hide catalog's data directory
 	dirsToHide := make([]string, 0)
 
+	// and some catalog's worker files
+	filesToHide := make([]string, 0)
+
 	// useful files and directories
 	catalogs := make([]string, 0)
-	files := make([]string, 0)
+	files := make(map[string]int)
 	dirs := make(map[string]int)
 	nodes := make(map[string]search.NodeInfo)
 
@@ -91,7 +94,7 @@ func ReadDir(mountPoint, dirPath string, hidden, details bool, host string) (*se
 		} else {
 			// Note, we report here catalogs too for backward compatibility
 			// also catalogs are reported via "catalogs" field
-			files = append(files, name)
+			files[name]++
 
 			// try to detect catalogs
 			if cat, err := catalog.OpenCatalogReadOnly(filepath.Join(mountPoint, dirPath, name)); err == nil {
@@ -104,6 +107,11 @@ func ReadDir(mountPoint, dirPath string, hidden, details bool, host string) (*se
 				if dir, err := filepath.Rel(filepath.Join(mountPoint, dirPath), dataDir); err == nil {
 					dirsToHide = append(dirsToHide, dir)
 				}
+
+				// SQLite uses these files for internal purposes
+				filesToHide = append(filesToHide,
+					fmt.Sprintf("%s-shm", name),
+					fmt.Sprintf("%s-wal", name))
 
 				info.Type = "catalog"
 				info.Length, err = cat.GetTotalDataSize()
@@ -127,9 +135,17 @@ func ReadDir(mountPoint, dirPath string, hidden, details bool, host string) (*se
 		delete(dirs, dir)
 	}
 
+	// hide catalog's internal files
+	for _, file := range filesToHide {
+		delete(nodes, file)
+		delete(files, file)
+	}
+
 	// populate result
 	res := search.NewDirInfo(dirPath, "")
-	res.AddFile(files...)
+	for name := range files {
+		res.AddFile(name)
+	}
 	res.AddCatalog(catalogs...)
 	for name := range dirs {
 		res.AddDir(name)
