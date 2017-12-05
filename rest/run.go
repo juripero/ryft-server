@@ -122,14 +122,16 @@ func (server *Server) DoRun(ctx *gin.Context) {
 		}
 	}
 
+	var user_args []string
 	if len(params.Command) != 0 {
-		args = append(args, params.Command)
+		user_args = append(user_args, params.Command)
 	}
-	args = append(args, params.Args...)
-	if len(args) == 0 || len(args[0]) == 0 {
+	user_args = append(user_args, params.Args...)
+	if len(user_args) == 0 || len(user_args[0]) == 0 {
 		panic(NewError(http.StatusBadRequest,
 			"no command or argument provided"))
 	}
+	args = append(args, user_args...)
 
 	log.WithFields(map[string]interface{}{
 		"args": args,
@@ -142,7 +144,7 @@ func (server *Server) DoRun(ctx *gin.Context) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		panic(NewError(http.StatusInternalServerError, err.Error()).
-			WithDetails("failed to execute"))
+			WithDetails(string(out)))
 	}
 
 	ctx.Data(http.StatusOK, "application/octet-stream", out)
