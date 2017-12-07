@@ -61,7 +61,7 @@ func TestRyftCall(t *testing.T) {
 		Width:     3,
 	}
 
-	assert.EqualValues(t, `RyftCall{data:1.dat, index:1.txt, delim:#0a, width:3}`, rc.String())
+	assert.EqualValues(t, `RyftCall{data:1.dat, index:1.txt, delim:#0a, width:3, json-array:false}`, rc.String())
 }
 
 // search result test

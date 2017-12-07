@@ -39,13 +39,10 @@ func TestOptions(t *testing.T) {
 			"open-poll":               "100ms",
 			"read-poll":               "100ms",
 			"read-limit":              50,
+			"aggregation-concurrency": 1,
 			"keep-files":              true,
 			"minimize-latency":        true,
 			"index-host":              "localhost",
-			"ryftprim-opts":           []string{},
-			"ryftx-opts":              []string{},
-			"ryftpcre2-opts":          []string{},
-			"ryft-all-opts":           []string{},
 		}
 
 		if len(name) != 0 {
@@ -70,13 +67,10 @@ func TestOptions(t *testing.T) {
 			"open-poll":               "50ms",
 			"read-poll":               "50ms",
 			"read-limit":              100,
+			"aggregation-concurrency": 1,
 			"keep-files":              false,
 			"minimize-latency":        false,
 			"index-host":              "",
-			"ryftprim-opts":           []string{},
-			"ryftx-opts":              []string{},
-			"ryftpcre2-opts":          []string{},
-			"ryft-all-opts":           []string{},
 		}, engine.Options())
 
 		assert.EqualValues(t, `ryftprim{instance:"", ryftone:"/ryftone", home:"/", ryftprim:"/usr/bin/ryftprim", ryftx:""}`, engine.String())

@@ -61,10 +61,10 @@ type Geo struct {
 	// the following formats are supported:
 	// - "location": "<lat>,<lon>" or "location":"(<lat>,<lon>)"
 	// "lat": <lat>, "lon": <lon>
-	LocField     string `json:"-" msgpack:"-"` // "location" field
-	LonField     string `json:"-" msgpack:"-"` // "latitude" field
-	LatField     string `json:"-" msgpack:"-"` // "longitude" field
-	WrapLonField bool   `json:"-" msgpack:"-"` // "wrap_longitude" field
+	LocField     utils.Field `json:"-" msgpack:"-"` // "location" field
+	LonField     utils.Field `json:"-" msgpack:"-"` // "latitude" field
+	LatField     utils.Field `json:"-" msgpack:"-"` // "longitude" field
+	WrapLonField bool        `json:"-" msgpack:"-"` // "wrap_longitude" field
 
 	Count        uint64  `json:"count" msgpack:"count"` // number of points
 	TopLeft      Point   `json:"top_left" msgpack:"top_left"`
@@ -73,6 +73,12 @@ type Geo struct {
 	CentroidSum  Point   `json:"centroid_sum" msgpack:"centroid_sum"`
 
 	posLeft, negLeft, posRight, negRight float64
+}
+
+// clone the engine
+func (g *Geo) clone() *Geo {
+	n := *g
+	return &n
 }
 
 // Point represents a physical point in geographic notation [lat, lon].
@@ -90,6 +96,9 @@ type Point3D struct {
 
 // get engine name/identifier
 func (g *Geo) Name() string {
+	if len(g.LonField) > 0 && len(g.LatField) > 0 {
+		return fmt.Sprintf("geo.%s/%s", g.LatField, g.LonField)
+	}
 	return fmt.Sprintf("geo.%s", g.LocField)
 }
 
@@ -115,7 +124,7 @@ func (g *Geo) Add(data interface{}) error {
 		// get "lat" and "lon" separated
 
 		// latitude
-		lat_, err = utils.AccessValue(data, g.LatField)
+		lat_, err = g.LatField.GetValue(data)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
@@ -124,7 +133,7 @@ func (g *Geo) Add(data interface{}) error {
 		}
 
 		// longitude
-		lon_, err = utils.AccessValue(data, g.LonField)
+		lon_, err = g.LonField.GetValue(data)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
@@ -134,7 +143,7 @@ func (g *Geo) Add(data interface{}) error {
 	} else {
 		// get "location" combined
 
-		latlon_, err := utils.AccessValue(data, g.LocField)
+		latlon_, err := g.LocField.GetValue(data)
 		if err != nil {
 			if err == utils.ErrMissed {
 				return nil // do nothing if there is no value
@@ -198,11 +207,19 @@ func (g *Geo) Add(data interface{}) error {
 
 // merge another intermediate aggregation
 func (g *Geo) Merge(data_ interface{}) error {
-	data, ok := data_.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("no valid data")
+	switch data := data_.(type) {
+	case *Geo:
+		return g.merge(data)
+
+	case map[string]interface{}:
+		return g.mergeMap(data)
 	}
 
+	return fmt.Errorf("no valid data")
+}
+
+// merge another intermediate aggregation (map)
+func (g *Geo) mergeMap(data map[string]interface{}) error {
 	// count is important
 	count, err := utils.AsUint64(data["count"])
 	if err != nil {
@@ -277,7 +294,9 @@ func (g *Geo) Merge(data_ interface{}) error {
 		if err != nil {
 			return err
 		}
+		g.Count += 1 // tricky way to avoid g.Count == 0 check inside updateBounds()
 		g.updateBounds(lat, lon)
+		g.Count -= 1
 	}
 
 	// geo_centroid weighted
@@ -305,6 +324,39 @@ func (g *Geo) Merge(data_ interface{}) error {
 
 	// count
 	g.Count += count
+
+	return nil // OK
+}
+
+// merge another intermediate aggregation (native)
+func (g *Geo) merge(other *Geo) error {
+	if other.Count == 0 {
+		return nil // nothing to merge
+	}
+
+	// geo_bounds
+	if (g.flags & GeoBounds) != 0 {
+		g.updateBounds(other.TopLeft.Lat, other.TopLeft.Lon)
+		g.Count += 1 // tricky way to avoid g.Count == 0 check inside updateBounds()
+		g.updateBounds(other.BottomRight.Lat, other.BottomRight.Lon)
+		g.Count -= 1
+	}
+
+	// geo_centroid weighted
+	if (g.flags & GeoCentroidW) != 0 {
+		g.CentroidSumW.X += other.CentroidSumW.X
+		g.CentroidSumW.Y += other.CentroidSumW.Y
+		g.CentroidSumW.Z += other.CentroidSumW.Z
+	}
+
+	// geo_centroid simple
+	if (g.flags & GeoCentroid) != 0 {
+		g.CentroidSum.Lat += other.CentroidSum.Lat
+		g.CentroidSum.Lon += other.CentroidSum.Lon
+	}
+
+	// count
+	g.Count += other.Count
 
 	return nil // OK
 }
@@ -412,8 +464,8 @@ func (g *Geo) getCentroid() Point {
 }
 
 // parse "wrap_longitude" in additional to other Geo options
-func parseGeoBoundsOpts(opts map[string]interface{}) (field, lat, lon string, wrapLon bool, err error) {
-	field, lat, lon, err = parseGeoOpts(opts)
+func parseGeoBoundsOpts(opts map[string]interface{}, iNames []string) (field, lat, lon utils.Field, wrapLon bool, err error) {
+	field, lat, lon, err = parseGeoOpts(opts, iNames)
 	if err != nil {
 		return
 	}
@@ -426,21 +478,19 @@ func parseGeoBoundsOpts(opts map[string]interface{}) (field, lat, lon string, wr
 }
 
 // parse "field" or "lat"/"lon" fields
-func parseGeoOpts(opts map[string]interface{}) (field string, lat, lon string, err error) {
+func parseGeoOpts(opts map[string]interface{}, iNames []string) (field, lat, lon utils.Field, err error) {
 	if _, ok := opts["field"]; ok {
-		field, err = getStringOpt("field", opts)
+		field, err = getFieldOpt("field", opts, iNames)
 	} else {
 		// fallback to "lat" and "lon" fields
-		lat, err = getStringOpt("lat", opts)
+		lat, err = getFieldOpt("lat", opts, iNames)
 		if err != nil {
 			return
 		}
-		lon, err = getStringOpt("lon", opts)
+		lon, err = getFieldOpt("lon", opts, iNames)
 		if err != nil {
 			return
 		}
-
-		field = fmt.Sprintf("%s/%s", lat, lon)
 	}
 
 	return
@@ -463,9 +513,16 @@ type geoBoundsFunc struct {
 	geoFunc
 }
 
+// clone the function
+func (f *geoBoundsFunc) clone() (Function, Engine) {
+	n := &geoBoundsFunc{}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "geo_bounds" aggregation
-func newGeoBoundsFunc(opts map[string]interface{}) (*geoBoundsFunc, error) {
-	field, lat, lon, wrapLon, err := parseGeoBoundsOpts(opts)
+func newGeoBoundsFunc(opts map[string]interface{}, iNames []string) (*geoBoundsFunc, error) {
+	field, lat, lon, wrapLon, err := parseGeoBoundsOpts(opts, iNames)
 	if err != nil {
 		return nil, err
 	}
@@ -511,9 +568,16 @@ type geoCentroidFunc struct {
 	weighted bool
 }
 
+// clone the function
+func (f *geoCentroidFunc) clone() (Function, Engine) {
+	n := &geoCentroidFunc{weighted: f.weighted}
+	n.engine = f.engine.clone() // copy engine
+	return n, n.engine
+}
+
 // make new "geo_centroid" aggregation
-func newGeoCentroidFunc(opts map[string]interface{}) (*geoCentroidFunc, error) {
-	if field, lat, lon, err := parseGeoOpts(opts); err != nil {
+func newGeoCentroidFunc(opts map[string]interface{}, iNames []string) (*geoCentroidFunc, error) {
+	if field, lat, lon, err := parseGeoOpts(opts, iNames); err != nil {
 		return nil, err
 	} else {
 		weighted := false // by default

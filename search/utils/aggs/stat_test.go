@@ -22,7 +22,7 @@ func TestStatEngine(t *testing.T) {
 	check := func(flags int, missing interface{}, expected string) {
 		stat := &Stat{
 			flags:   flags,
-			Field:   "foo",
+			Field:   mustParseField("foo"),
 			Missing: missing,
 		}
 
@@ -61,7 +61,7 @@ func TestSumFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newSumFunc(opts)
+			f, err := newSumFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -87,7 +87,7 @@ func TestMinFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newMinFunc(opts)
+			f, err := newMinFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -114,7 +114,7 @@ func TestMaxFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newMaxFunc(opts)
+			f, err := newMaxFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -141,7 +141,7 @@ func TestCountFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newCountFunc(opts)
+			f, err := newCountFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -167,7 +167,7 @@ func TestAvgFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newAvgFunc(opts)
+			f, err := newAvgFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -193,7 +193,7 @@ func TestStatsFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newStatsFunc(opts)
+			f, err := newStatsFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {
@@ -219,7 +219,7 @@ func TestExtendedStatsFunc(t *testing.T) {
 	check := func(jsonOpts string, expected string) {
 		var opts map[string]interface{}
 		if assert.NoError(t, json.Unmarshal([]byte(jsonOpts), &opts)) {
-			f, err := newExtendedStatsFunc(opts)
+			f, err := newExtendedStatsFunc(opts, nil)
 			if err != nil {
 				assert.Contains(t, err.Error(), expected)
 			} else {

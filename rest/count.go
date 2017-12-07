@@ -38,7 +38,8 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/rest/codec"
-	format "github.com/getryft/ryft-server/rest/format/raw"
+	"github.com/getryft/ryft-server/rest/format"
+	raw_format "github.com/getryft/ryft-server/rest/format/raw"
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftdec"
 	"github.com/getryft/ryft-server/search/utils"
@@ -54,7 +55,9 @@ type CountParams struct {
 	Query    string   `form:"query" json:"query" msgpack:"query" binding:"required"`
 	OldFiles []string `form:"files" json:"-" msgpack:"-"`   // obsolete: will be deleted
 	Catalogs []string `form:"catalog" json:"-" msgpack:"-"` // obsolete: will be deleted
-	Files    []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
+
+	Files              []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
+	IgnoreMissingFiles bool     `form:"ignore-missing-files" json:"ignore-missing-files,omitempty" msgpack:"ignore-missing-files,omitempty"`
 
 	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`                      // optional, "" for generic mode
 	Width  string `form:"surrounding" json:"surrounding,omitempty" msgpack:"surrounding,omitempty"` // surrounding width or "line"
@@ -65,6 +68,7 @@ type CountParams struct {
 
 	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
 	BackendOpts []string `form:"backend-option" json:"backend-options,omitempty" msgpack:"backend-options,omitempty"` // search engine parameters (useless without "backend")
+	BackendMode string   `form:"backend-mode" json:"backend-mode,omitempty" msgpack:"backend-mode,omitempty"`
 	KeepDataAs  string   `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string   `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	KeepViewAs  string   `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
@@ -75,14 +79,14 @@ type CountParams struct {
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
 
 	// aggregations
-	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 
-	Local     bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
-	ShareMode string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
-
-	Performance bool `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
+	Local       bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
+	ShareMode   string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
+	Performance bool   `form:"performance" json:"performance,omitempty" msgpack:"performance,omitempty"`
 
 	// internal parameters
 	//InternalErrorPrefix bool `form:"--internal-error-prefix" json:"-" msgpack:"-"` // include host prefixes for error messages
@@ -92,6 +96,17 @@ type CountParams struct {
 
 // Handle /count endpoint.
 func (server *Server) DoCount(ctx *gin.Context) {
+	server.doSearch(ctx, SearchParams{
+		Format: format.NULL,
+		Case:   true,
+		Reduce: true,
+		Limit:  0,    // no records
+		Stats:  true, // need stats!
+	})
+}
+
+// Handle /count endpoint. [COMPATIBILITY MODE, not used yet]
+func (server *Server) DoCount0(ctx *gin.Context) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
@@ -117,9 +132,9 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	params.OldFiles = nil // reset
 	params.Files = append(params.Files, params.Catalogs...)
 	params.Catalogs = nil // reset
-	if len(params.Files) == 0 {
+	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
-			"no any file or catalog provided"))
+			"no file or catalog provided"))
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
@@ -143,14 +158,16 @@ func (server *Server) DoCount(ctx *gin.Context) {
 
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
+	cfg.DebugInternals = server.Config.DebugInternals
 	cfg.Mode = params.Mode
 	cfg.Width = mustParseWidth(params.Width)
 	cfg.Dist = uint(params.Dist)
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.BackendTool = params.Backend
-	cfg.BackendOpts = params.BackendOpts
+	cfg.Backend.Tool = params.Backend
+	cfg.Backend.Opts = params.BackendOpts
+	cfg.Backend.Mode = params.BackendMode
 	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
@@ -163,7 +180,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	}
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
-	// cfg.Limit = 0
+	cfg.Limit = 0
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	cfg.Performance = params.Performance
 	if err != nil {
@@ -179,15 +196,17 @@ func (server *Server) DoCount(ctx *gin.Context) {
 	}
 
 	// aggregations
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
-	if err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to prepare aggregations"))
-	}
 	if len(params.InternalFormat) != 0 {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
+	}
+	cfg.Aggregations, err = aggs.MakeAggs(
+		selectAggsOpts(params.ShortAggs, params.LongAggs),
+		cfg.DataFormat, nil /*tcode_opts*/)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
 	}
 
 	// session preparation
@@ -301,7 +320,7 @@ func (server *Server) DoCount(ctx *gin.Context) {
 					res.Stat.Extra[search.ExtraAggregations] = cfg.Aggregations.ToJson(!params.InternalNoSessionId)
 				}
 
-				xstat := format.FromStat(res.Stat)
+				xstat := raw_format.FromStat(res.Stat)
 				ctx.JSON(http.StatusOK, xstat)
 			} else {
 				panic(NewError(http.StatusInternalServerError,
@@ -321,7 +340,7 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := CountParams{
+	params := SearchParams{
 		Case:   true,
 		Reduce: true,
 	}
@@ -339,9 +358,9 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	params.OldFiles = nil // reset
 	params.Files = append(params.Files, params.Catalogs...)
 	params.Catalogs = nil // reset
-	if len(params.Files) == 0 {
+	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
-			"no any file or catalog provided"))
+			"no file or catalog provided"))
 	}
 
 	accept := ctx.NegotiateFormat(codec.GetSupportedMimeTypes()...)
@@ -371,14 +390,17 @@ func (server *Server) DoCountDryRun(ctx *gin.Context) {
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.BackendTool = params.Backend
+	cfg.Backend.Tool = params.Backend
+	cfg.Backend.Opts = params.BackendOpts
+	cfg.Backend.Mode = params.BackendMode
 	cfg.KeepDataAs = params.KeepDataAs
 	cfg.KeepIndexAs = params.KeepIndexAs
 	cfg.KeepViewAs = params.KeepViewAs
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
 	cfg.ReportIndex = false // /count
 	cfg.ReportData = false
-	// cfg.Limit = 0
+	cfg.SkipMissing = params.IgnoreMissingFiles
+	cfg.Limit = params.Limit
 
 	// parse post-process transformations
 	cfg.Transforms, err = parseTransforms(params.Transforms, server.Config)

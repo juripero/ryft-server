@@ -100,6 +100,8 @@ type ServerConfig struct {
 	ShutdownTimeout_ TimeDuration  `yaml:"shutdown-timeout,omitempty"`
 	ShutdownTimeout  time.Duration `yaml:"-"`
 
+	ProcessingThreads int `yaml:"processing-threads"`
+
 	TLS struct {
 		Enabled       bool   `yaml:"enabled,omitempty"`
 		ListenAddress string `yaml:"address,omitempty"`
@@ -136,6 +138,7 @@ type ServerConfig struct {
 		TempDirectory     string        `yaml:"temp-dir"`
 	} `yaml:"catalogs,omitempty"`
 
+	InstanceHome string `yaml:"instance-home,omitempty"` // TODO: move to some tweaks
 	SettingsPath string `yaml:"settings-path,omitempty"`
 	HostName     string `yaml:"hostname,omitempty"`
 
@@ -159,13 +162,20 @@ type ServerConfig struct {
 	} `yaml:"docker,omitempty"`
 
 	DefaultUserConfig map[string]interface{} `yaml:"default-user-config"`
+
+	// expose debug info in REST API response
+	DebugInternals bool `yaml:"debug-internals"`
 }
 
 // Server instance
 type Server struct {
 	Config ServerConfig
 
+	// lsiten address (parsed)
 	listenAddress *net.TCPAddr
+
+	// auth manager
+	AuthManager auth.Manager
 
 	// the number of active search requests on this node
 	// is used as a metric for "busyness"
@@ -321,10 +331,13 @@ func (s *Server) parseAuthAndHome(ctx *gin.Context) (userName string, authToken 
 	if v, exists := ctx.Get(gin.AuthUserKey); exists && v != nil {
 		if user, ok := v.(*auth.UserInfo); ok {
 			userName = user.Name
-			homeDir = user.Home
+			homeDir = user.HomeDir
 			userTag = user.ClusterTag
 		}
 	}
+
+	// update HOME with custom prefix (usually empty)
+	homeDir = filepath.Join(s.Config.InstanceHome, homeDir)
 
 	return
 }

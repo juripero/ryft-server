@@ -16,7 +16,7 @@ To run another server instance on `9000` port just pass "address" argument:
 ```{.sh}
 ./ryft-server --address=0.0.0.0:9000
 # or
-./ryft-server -l=:9000
+./ryft-server -l:9000
 ```
 
 So it's possible to run multiple server instances on the same machine.
@@ -43,7 +43,7 @@ Just pass `--local-only` command line argument:
 ./ryft-server --local-only
 ```
 
-There is also no any load balancing enabled in local mode.
+There is also no load balancing enabled in local mode.
 
 
 ## Logging
@@ -61,11 +61,11 @@ logging-options:
     core/pending-jobs: debug
   debug:
     core: debug
+    core/safe: debug
     core/catalogs: debug
     core/pending-jobs: debug
     core/busyness: debug
     search/ryftprim: debug
-    search/ryftone: debug
     search/ryfthttp: debug
     search/ryftmux: debug
     search/ryftdec: debug
@@ -78,8 +78,9 @@ configuration. There is special command line argument `--logging` which also
 could be used to change logging configuration.
 
 The logging configuration itself consists of logger names and corresponding
-logging levels. By default all loggers have "info" level. It is very easy to
-create any logging configuration with fine-tunes logging levels.
+logging levels. By default all loggers have "info" level. The possible logging
+level values are: "panic", "fatal", "error", "warn" or "warning", "info" and
+"debug". It is very easy to create any logging configuration with fine-tunes logging levels.
 
 
 ## Keeping search results
@@ -126,7 +127,6 @@ backend-options:
 `search-backend` is the search engine name and can be one of the following:
 
 - `ryftprim` uses *ryftprim* command line tool to access Ryft hardware (is used by default)
-- `ryftone` uses *libryftone* library to access Ryft hardware
 - `ryfthttp` uses another `ryft-server` instance to access Ryft hardware
 
 `backend-options` is search engine specific options. For example `ryftprim` engine
@@ -197,6 +197,7 @@ debug-mode: false
 keep-results: false
 busyness-tolerance: 0
 http-timeout: 1h
+processing-threads: 8
 ```
 
 `local-only` is used to run `ryft-server` outside cluster. No consult dependency,
@@ -214,6 +215,10 @@ It's equivalent to `--busyness-tolerance` command line option.
 
 `http-timeout` is used as read request/write response timeout for HTTP/HTTPS connections.
 It's `1h` (one hour) by default.
+
+`processing-threads` is the number of parallel threads used to handle all requests.
+If zero the default system value is used. This value is used internally by Go runtime.
+See [GOMAXPROCS](https://golang.org/pkg/runtime/#GOMAXPROCS) for more details.
 
 
 #### TLS server configuration
@@ -524,5 +529,5 @@ It works with replace but not merge strategy because otherwise it would be impos
 Example:
 
     ryftprim-opts: ["-v"]
-    ryftx-opts: ["--rx-shard-size", "64M", "--rx-max-spawns", "14"]
+    ryftx-opts: ["--rx-shard-size", "64M", "--rx-max-spawns", "14"]
 

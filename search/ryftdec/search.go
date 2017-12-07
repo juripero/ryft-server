@@ -39,6 +39,7 @@ import (
 
 	"github.com/getryft/ryft-server/search"
 	"github.com/getryft/ryft-server/search/ryftprim"
+	"github.com/getryft/ryft-server/search/utils"
 	"github.com/getryft/ryft-server/search/utils/catalog"
 	"github.com/getryft/ryft-server/search/utils/query"
 )
@@ -176,6 +177,46 @@ func hasRecord(q query.Query) bool {
 	return false // not a RECORD
 }
 
+// get CSV column names from tweaks
+// see corresponding rest/format/csv package!!!
+func getCsvColumns(opts map[string]interface{}) ([]string, error) {
+	if opt, ok := opts["columns"]; ok {
+		switch v := opt.(type) {
+		case string:
+			sep, err := utils.AsString(opts["separator"])
+			if err != nil {
+				return nil, fmt.Errorf("failed to get separator: %s", err)
+			}
+			return strings.Split(v, sep), nil // OK
+
+		case []string:
+			return v, nil // OK
+
+		case []interface{}:
+			return utils.AsStringSlice(opt)
+
+		default:
+			return nil, fmt.Errorf("%T is unsupported option type, should be string or array of strings", opt)
+		}
+	}
+
+	return nil, nil // OK, no columns
+}
+
+// convert columns names to replace field map
+func getCsvNewFields(columns []string) map[string]string {
+	if len(columns) == 0 {
+		return nil // nothing to replace
+	}
+
+	fields := make(map[string]string)
+	for i, name := range columns {
+		fields[name] = fmt.Sprintf("%d", i+1) // one-based indexes
+	}
+
+	return fields
+}
+
 // Search starts asynchronous "/search" with RyftDEC engine.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	taskStartTime := time.Now() // performance metrics
@@ -226,8 +267,8 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to check for catalogs", TAG)
 		return nil, fmt.Errorf("failed to check for catalogs: %s", err)
 	}
-	if len(cfg.Files) == 0 {
-		return nil, fmt.Errorf("no any valid file or catalog found")
+	if len(cfg.Files) == 0 && !cfg.SkipMissing {
+		return nil, fmt.Errorf("no valid file or catalog found")
 	}
 
 	// automatic RECORD to XRECORD or CRECORD...
@@ -239,21 +280,27 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		} else {
 			newRecord = query.IN_XRECORD
 		}
-		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), newRecord)
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), newRecord, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose XML query: %s", err)
 		}
 		task.rootQuery = engine.Optimize(q)
 	} else if strings.EqualFold(autoFormat, "JSON") {
 		task.log().Debugf("[%s]: converting query to JSON-based JRECORD", TAG)
-		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_JRECORD)
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_JRECORD, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose JSON query: %s", err)
 		}
 		task.rootQuery = engine.Optimize(q)
 	} else if strings.EqualFold(autoFormat, "CSV") {
 		task.log().Debugf("[%s]: converting query to CSV-based CRECORD", TAG)
-		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_CRECORD)
+		var newFields map[string]string
+		if columns, err := getCsvColumns(cfg.Tweaks.Format); err != nil {
+			return nil, fmt.Errorf("failed to get CSV column names: %s", err)
+		} else {
+			newFields = getCsvNewFields(columns)
+		}
+		q, err = query.ParseQueryOptEx(cfg.Query, ConfigToOptions(cfg), query.IN_CRECORD, newFields)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose CSV query: %s", err)
 		}
@@ -299,6 +346,27 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		keepViewAs := cfg.KeepViewAs
 		delimiter := cfg.Delimiter
 
+		// save final results for aggregations (even if not requested)
+		if cfg.Aggregations != nil {
+			// keep INDEX file
+			if len(keepIndexAs) == 0 {
+				keepIndexAs = filepath.Join(opts.InstanceName, fmt.Sprintf(".temp-idx-%s-%d%s",
+					task.Identifier, 0, ".txt"))
+				if !engine.KeepResultFiles {
+					defer os.RemoveAll(opts.atHome(keepIndexAs))
+				}
+			}
+
+			// keep DATA file
+			if len(keepDataAs) == 0 {
+				keepDataAs = filepath.Join(opts.InstanceName, fmt.Sprintf(".temp-dat-%s-%d%s",
+					task.Identifier, 0, task.extension))
+				if !engine.KeepResultFiles {
+					defer os.RemoveAll(opts.atHome(keepDataAs))
+				}
+			}
+		}
+
 		searchStart := time.Now()
 		res, err := engine.doSearch(task, opts, task.rootQuery, cfg, mux)
 		if err != nil {
@@ -318,24 +386,15 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		// post-processing
 		task.log().WithField("output", res.Output).Infof("[%s]: final results", TAG)
 		addingStart := time.Now()
+		isJsonArray := true
 		for _, out := range res.Output {
+			isJsonArray = isJsonArray && out.isJsonArray
 			if err := task.result.AddRyftResults(
 				opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
-				out.Delimiter, out.Width, 1 /*final*/); err != nil {
+				out.Delimiter, out.Width, 1 /*final*/, out.isJsonArray); err != nil {
 				task.log().WithError(err).Errorf("[%s]: failed to add final Ryft results", TAG)
 				mux.ReportError(fmt.Errorf("failed to add final Ryft results: %s", err))
 				return
-			}
-
-			if cfg.Aggregations != nil {
-				// TODO: move this code to final results, becase there is no transformation applied yet
-				if err := ryftprim.ApplyAggregations(opts.atHome(out.IndexFile), opts.atHome(out.DataFile),
-					out.Delimiter, cfg.DataFormat, cfg.Aggregations,
-					func() bool { return mux.IsCancelled() }); err != nil {
-					task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
-					mux.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
-					return
-				}
 			}
 		}
 
@@ -350,6 +409,23 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			return
 		}
 		drainStop := time.Now()
+
+		// aggregations
+		var aggsTime time.Duration
+		if cfg.Aggregations != nil {
+			start := time.Now()
+
+			if err := ryftprim.ApplyAggregations(engine.getBackendAggConcurrency(),
+				opts.atHome(keepIndexAs), opts.atHome(keepDataAs),
+				delimiter, cfg.Aggregations, isJsonArray,
+				func() bool { return mux.IsCancelled() }); err != nil {
+				task.log().WithError(err).Errorf("[%s]: failed to apply aggregations", TAG)
+				mux.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
+				return
+			}
+
+			aggsTime = time.Since(start)
+		}
 
 		// performance metrics
 		if mux.Stat != nil && cfg.Performance {
@@ -366,6 +442,10 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 				"prepare":            searchStart.Sub(taskStartTime).String(),
 				"intermediate-steps": task.callPerfStat,
 				"final-post-proc":    task.procPerfStat,
+			}
+
+			if cfg.Aggregations != nil {
+				metrics["aggregations"] = aggsTime.String()
 			}
 
 			mux.Stat.AddPerfStat("ryftdec", metrics)
@@ -428,16 +508,24 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 		return nil, err
 	}
 
-	var result SearchResult
-	result.Output = append(result.Output, RyftCall{
+	rc := RyftCall{
 		DataFile:  cfg.KeepDataAs,
 		IndexFile: cfg.KeepIndexAs,
 		Delimiter: cfg.Delimiter,
 		Width:     cfg.Width,
-	})
+	}
 
 	task.drainResults(mux, res)
+	var result SearchResult
 	result.Stat = res.Stat
+	if cfg.IsRecord {
+		// for RECORD search we have to check the JSON array format
+		if err := rc.checkJsonArray(opts); err != nil {
+			return nil, fmt.Errorf("failed to check JSON array: %s", err)
+		}
+	}
+	result.Output = append(result.Output, rc)
+
 	task.log().WithField("output", result).Infof("Ryft call result")
 	stopTime := time.Now()
 
@@ -474,10 +562,10 @@ func getHostPerfStat(stat *search.Stat) map[string]interface{} {
 func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.log().Infof("[%s/%d]: running AND", TAG, task.subtaskId)
 
-	tempCfg := *cfg
+	tempCfg := cfg.Clone()
 	tempCfg.Delimiter = catalog.DefaultDataDelimiter
 	tempCfg.ReportData, tempCfg.ReportIndex = false, false // /count
-	res1, err1 := engine.doSearch(task, opts, query.Arguments[0], &tempCfg, mux)
+	res1, err1 := engine.doSearch(task, opts, query.Arguments[0], tempCfg, mux)
 	if err1 != nil {
 		return nil, err1
 	}
@@ -514,7 +602,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			for _, out := range res1.Output {
 				if err := task.result.AddRyftResults(
 					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
-					out.Delimiter, out.Width, 1 /*final*/); err != nil {
+					out.Delimiter, out.Width, 1 /*final*/, out.isJsonArray); err != nil {
 					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
 				}
 			}
@@ -555,7 +643,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			for _, out := range res1.Output {
 				if err := task.result.AddRyftResults(
 					opts.atHome(out.DataFile), opts.atHome(out.IndexFile),
-					out.Delimiter, out.Width, 0 /*intermediate*/); err != nil {
+					out.Delimiter, out.Width, 0 /*intermediate*/, out.isJsonArray); err != nil {
 					task.log().WithError(err).Warnf("[%s]: failed to add Ryft intermediate results", TAG)
 					return nil, fmt.Errorf("failed to add Ryft intermediate results: %s", err)
 				}
@@ -576,7 +664,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 			tempCfg.Delimiter = cfg.Delimiter
 		}
 
-		res2, err2 := engine.doSearch(task, opts, q2, &tempCfg, mux)
+		res2, err2 := engine.doSearch(task, opts, q2, tempCfg, mux)
 		if err2 != nil {
 			return nil, err2
 		}
@@ -599,7 +687,7 @@ func (engine *Engine) doAnd(task *Task, opts backendOptions, query query.Query, 
 func (engine *Engine) doOr(task *Task, opts backendOptions, query query.Query, cfg *search.Config, mux *search.Result) (*SearchResult, error) {
 	task.log().Infof("[%s/%d]: running OR", TAG, task.subtaskId)
 
-	tempCfg := *cfg
+	tempCfg := cfg.Clone()
 	// tempCfg.Delimiter
 
 	var result SearchResult
@@ -611,7 +699,7 @@ func (engine *Engine) doOr(task *Task, opts backendOptions, query query.Query, c
 			break // stop
 		}
 
-		res1, err1 := engine.doSearch(task, opts, query.Arguments[i], &tempCfg, mux)
+		res1, err1 := engine.doSearch(task, opts, query.Arguments[i], tempCfg, mux)
 		if err1 != nil {
 			return nil, err1
 		}

@@ -34,6 +34,7 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -146,6 +147,11 @@ func main() {
 		}
 	}
 
+	// set number of processing threads
+	if n := server.Config.ProcessingThreads; n > 0 {
+		runtime.GOMAXPROCS(n)
+	}
+
 	// prepare server to start
 	if err := server.Prepare(); err != nil {
 		log.WithError(err).Fatal("failed to prepare server configuration")
@@ -167,6 +173,7 @@ func main() {
 		"logging":       server.Config.Logging,
 		"address":       server.Config.ListenAddress,
 		"settings-path": server.Config.SettingsPath,
+		"max-threads":   runtime.GOMAXPROCS(0),
 	}).Info("main configuration")
 	log.WithFields(map[string]interface{}{
 		"search-backend":     server.Config.SearchBackend,
@@ -295,6 +302,7 @@ func main() {
 	// main API endpoints
 	private.GET("/search", server.DoSearch)
 	private.GET("/search/show", server.DoSearchShow)
+	private.GET("/search/aggs", server.DoAggregations)
 	private.GET("/count", server.DoCount)
 	private.GET("/cluster/members", server.DoClusterMembers)
 	private.GET("/run", server.DoRun)
@@ -302,8 +310,12 @@ func main() {
 	// POST & PUT aliases for requests with JSON body
 	private.POST("/search", server.DoSearch)
 	private.POST("/count", server.DoCount)
+	private.POST("/search/show", server.DoSearchShow)
+	private.POST("/search/aggs", server.DoAggregations)
 	private.PUT("/search", server.DoSearch)
 	private.PUT("/count", server.DoCount)
+	private.PUT("/search/show", server.DoSearchShow)
+	private.PUT("/search/aggs", server.DoAggregations)
 
 	// need to provide both URLs to disable redirecting
 	private.GET("/files", server.DoGetFiles)
@@ -322,6 +334,15 @@ func main() {
 	private.POST("/file/*path", server.DoPostFiles)
 	private.POST("/raw", server.DoPostFiles)
 	private.POST("/raw/*path", server.DoPostFiles)
+
+	// user management (file-based only)
+	if am, ok := authProvider.(auth.Manager); ok {
+		server.AuthManager = am // keep it for operations
+		private.GET("/user", server.DoUserGet)
+		private.POST("/user", server.DoUserPost)
+		private.PUT("/user", server.DoUserPut)
+		private.DELETE("/user", server.DoUserDelete)
+	}
 
 	// debug API endpoints
 	if server.Config.DebugMode {
@@ -352,37 +373,53 @@ func main() {
 	})
 
 	// start listening on HTTPS port
+	var httpsServer *graceful.Server
 	if tls := server.Config.TLS; tls.Enabled {
-		ep := &http.Server{Addr: tls.ListenAddress, Handler: router}
-		ep.ReadTimeout = server.Config.HttpTimeout
-		ep.WriteTimeout = server.Config.HttpTimeout
+		httpsServer = &graceful.Server{
+			Timeout: server.Config.ShutdownTimeout,
+			Server: &http.Server{
+				Addr: tls.ListenAddress, Handler: router,
+				ReadTimeout:  server.Config.HttpTimeout,
+				WriteTimeout: server.Config.HttpTimeout,
+			},
+		}
 
 		go func() {
-			worker := &graceful.Server{
-				Timeout: server.Config.ShutdownTimeout,
-				Server:  ep,
-			}
-
-			if err := worker.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
+			defer log.Debugf("HTTPS server has stopped")
+			log.WithField("address", tls.ListenAddress).Debugf("starting HTTPS server")
+			if err := httpsServer.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != nil {
 				log.WithError(err).WithField("address", tls.ListenAddress).Fatal("failed to listen HTTPS")
 			}
 		}()
 	}
 
 	// start listening on HTTP port
+	var httpServer *graceful.Server
 	if addr := server.Config.ListenAddress; len(addr) != 0 {
-		ep := &http.Server{Addr: addr, Handler: router}
-		ep.ReadTimeout = server.Config.HttpTimeout
-		ep.WriteTimeout = server.Config.HttpTimeout
-
-		worker := &graceful.Server{
+		httpServer = &graceful.Server{
 			Timeout: server.Config.ShutdownTimeout,
-			Server:  ep,
+			Server: &http.Server{
+				Addr: addr, Handler: router,
+				ReadTimeout:  server.Config.HttpTimeout,
+				WriteTimeout: server.Config.HttpTimeout,
+			},
 		}
 
-		if err := worker.ListenAndServe(); err != nil {
-			log.WithError(err).WithField("address", addr).Fatal("failed to listen HTTP")
-		}
+		go func() {
+			defer log.Debugf("HTTP server has stopped")
+			log.WithField("address", addr).Debugf("starting HTTP server")
+			if err := httpServer.ListenAndServe(); err != nil {
+				log.WithError(err).WithField("address", addr).Fatal("failed to listen HTTP")
+			}
+		}()
+	}
+
+	// wait servers
+	if httpServer != nil {
+		<-httpServer.StopChan()
+	}
+	if httpsServer != nil {
+		<-httpsServer.StopChan()
 	}
 
 	log.Info("server stopped")

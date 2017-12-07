@@ -82,11 +82,6 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	// server URL should be parsed in engine initialization
 	// so we can omit error checking here
 	u, _ := url.Parse(engine.ServerURL)
-	if cfg.ReportIndex {
-		u.Path += "/search"
-	} else {
-		u.Path += "/count"
-	}
 
 	// prepare query
 	q := url.Values{}
@@ -117,6 +112,9 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	q.Set("local", fmt.Sprintf("%t", engine.LocalOnly))
 	q.Set("stats", fmt.Sprintf("%t", !engine.SkipStat))
 	q.Set("stream", fmt.Sprintf("%t", true))
+	if cfg.SkipMissing {
+		q.Set("ignore-missing-files", fmt.Sprintf("%t", cfg.SkipMissing))
+	}
 
 	q.Set("--internal-error-prefix", fmt.Sprintf("%t", true))  // enable error prefixes!
 	q.Set("--internal-no-session-id", fmt.Sprintf("%t", true)) // disable sessions!
@@ -124,11 +122,14 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 		q.Set("--internal-format", cfg.DataFormat)
 	}
 
-	if len(cfg.BackendTool) != 0 {
-		q.Set("backend", cfg.BackendTool)
+	if len(cfg.Backend.Tool) != 0 {
+		q.Set("backend", cfg.Backend.Tool)
 	}
-	for _, opt := range cfg.BackendOpts {
+	for _, opt := range cfg.Backend.Opts {
 		q.Add("backend-option", opt)
+	}
+	if len(cfg.Backend.Mode) != 0 {
+		q.Set("backend-mode", cfg.Backend.Mode)
 	}
 	if len(cfg.KeepDataAs) != 0 {
 		q.Set("data", cfg.KeepDataAs)
@@ -145,7 +146,7 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	if cfg.Lifetime != 0 {
 		q.Set("lifetime", cfg.Lifetime.String())
 	}
-	if cfg.Limit > 0 {
+	if cfg.Limit >= 0 {
 		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
 	}
 	if cfg.Offset > 0 {

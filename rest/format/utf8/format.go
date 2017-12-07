@@ -68,7 +68,7 @@ func (f *Format) FromRecord(rec *search.Record) interface{} {
 	return FromRecord(rec)
 }
 
-// Convert UTF8 format spcific data to RECORD.
+// Convert UTF8 format specific data to RECORD.
 // WARN: will panic if argument is not of utf8.Record type!
 func (*Format) ToRecord(rec interface{}) *search.Record {
 	return ToRecord(rec.(*Record))

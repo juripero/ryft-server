@@ -34,6 +34,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -207,6 +208,95 @@ func (s *Server) getLocalSearchEngine(homeDir string, nodeName, nodeAddr string)
 	}
 
 	return ryftdec.NewEngine(backend, opts)
+}
+
+// get search.Engine (including overrides) from the tweaks/cluster option
+func (server *Server) getClusterTweakEngine(authToken, homeDir string,
+	baseCfg *search.Config, clusterNodes []interface{}) (search.Engine, error) {
+
+	// target node
+	type Node struct {
+		Cfg  *search.Config
+		Url  string // empty for local
+		Name string // node name
+	}
+
+	nodes := make([]Node, 0, len(clusterNodes))
+	for _, node_ := range clusterNodes {
+		info, err := utils.AsStringMap(node_)
+		if err != nil {
+			return nil, fmt.Errorf("bad info data format: %s", err)
+		}
+
+		node := Node{
+			Cfg: baseCfg.Clone(),
+			Url: "", // local by default
+		}
+
+		// parse node location
+		if location, err := utils.AsString(info["location"]); err != nil {
+			return nil, fmt.Errorf("failed to get location: %s", err)
+		} else if len(location) != 0 {
+			u, err := url.Parse(location)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse location: %s", err)
+			}
+			if !server.isLocalServiceUrl(u) {
+				node.Url = u.String()
+			}
+		}
+
+		// parse node name
+		if node.Name, err = utils.AsString(info["node"]); err != nil {
+			return nil, fmt.Errorf("failed to get node name: %s", err)
+		}
+
+		// get files from info
+		if files_, ok := info["files"]; ok {
+			files, err := utils.AsStringSlice(files_)
+			if err != nil {
+				return nil, fmt.Errorf(`failed to get files: %s`, err)
+			}
+			node.Cfg.Files = files
+		}
+
+		nodes = append(nodes, node)
+	}
+
+	// prepare MUX engine
+	mux, err := ryftmux.NewEngine()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create MUX engine: %s", err)
+	}
+
+	for _, node := range nodes {
+		if node.Url == "" /*is local*/ {
+			local, err := server.getLocalSearchEngine(homeDir, "", "")
+			if err != nil {
+				return nil, err
+			}
+			mux.AddBackend(local, node.Cfg)
+		} else {
+			// remote node: use RyftHTTP backend (see server.getClusterSearchEngine)
+			opts := map[string]interface{}{
+				"--cluster-node-name": node.Name,
+				"--cluster-node-addr": node.Url,
+				"server-url":          node.Url,
+				"auth-token":          authToken,
+				"local-only":          true,
+				"skip-stat":           false,
+				"index-host":          node.Url,
+			}
+
+			remote, err := search.NewEngine("ryfthttp", opts)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create HTTP engine: %s", err)
+			}
+			mux.AddBackend(remote, node.Cfg)
+		}
+	}
+
+	return mux, nil // OK
 }
 
 // deep map clone

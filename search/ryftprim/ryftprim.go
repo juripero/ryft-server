@@ -65,30 +65,31 @@ func (engine *Engine) prepare(task *Task) error {
 	// select search mode
 	genericMode := false
 	switch strings.ToLower(cfg.Mode) {
-	case "", "g", "generic", "g/es", "g/fhs", "g/feds", "g/ds",
-		"g/ts", "g/ns", "g/cs", "g/ipv4", "g/ipv6", "g/pcre2":
+	case "", "g", "g/es",
+		"g/fhs", "g/feds", "g/ds", "g/ts",
+		"g/ns", "g/cs", "g/ipv4", "g/ipv6", "g/pcre2":
 		args = append(args, "-p", "g")
 		genericMode = true
-	case "es", "exact", "exact_search":
+	case "es":
 		args = append(args, "-p", "es")
-	case "fhs", "hamming", "fuzzy_hamming", "fuzzy_hamming_search":
+	case "fhs":
 		args = append(args, "-p", "fhs")
-	case "feds", "edit_distance", "fuzzy_edit_distance", "fuzzy_edit_distance_search":
+	case "feds":
 		args = append(args, "-p", "feds")
-	case "ds", "date", "date_search":
+	case "ds":
 		args = append(args, "-p", "ds")
-	case "ts", "time", "time_search":
+	case "ts":
 		args = append(args, "-p", "ts")
-	case "ns", "num", "number_search":
+	case "ns":
 		args = append(args, "-p", "ns")
-	case "cs", "currency", "currency_search":
+	case "cs":
 		// currency is a kind of numeric search!
 		args = append(args, "-p", "ns")
-	case "ipv4", "ipv4_search":
+	case "ipv4":
 		args = append(args, "-p", "ipv4")
-	case "ipv6", "ipv6_search":
+	case "ipv6":
 		args = append(args, "-p", "ipv6")
-	case "pcre2", "pcre2_search", "regex", "regex_search", "regexp", "regexp_search":
+	case "pcre2":
 		args = append(args, "-p", "pcre2")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
@@ -242,13 +243,12 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	// backend options (should be added to the END)
 	// define them here because need to know which engine will be used
 	var backendOpts []string
-	if len(task.config.BackendOpts) > 0 { // options from request
-		backendOpts = task.config.BackendOpts
+	if len(task.config.Backend.Opts) > 0 { // options from request
+		backendOpts = task.config.Backend.Opts
 	} else if len(engineOpts) > 0 { // engine default options
 		backendOpts = engineOpts
-	} else {
-		backendOpts = engine.RyftAllOpts // default options for all engines
 	}
+
 	// assign command line
 	task.toolArgs = append(task.toolArgs, backendOpts...)
 
@@ -334,48 +334,58 @@ func (engine *Engine) process(task *Task, res *search.Result, minimizeLatency bo
 	}
 }
 
+// Finish the `ryftprim` task processing.
+func (task *Task) finish(res *search.Result) {
+	if res.Stat != nil && task.config.Performance {
+		metrics := make(map[string]interface{})
+
+		if !task.toolStartTime.IsZero() {
+			metrics["prepare"] = task.toolStartTime.Sub(task.taskStartTime).String()
+			metrics["tool-exec"] = task.toolStopTime.Sub(task.toolStartTime).String()
+		}
+
+		if !task.readStartTime.IsZero() {
+			// for /count operation there is no "read-data"
+			metrics["read-data"] = time.Since(task.readStartTime).String()
+		}
+
+		if !task.aggsStartTime.IsZero() {
+			metrics["aggregations"] = task.aggsStopTime.Sub(task.aggsStartTime).String()
+		}
+
+		res.Stat.AddPerfStat("ryftprim", metrics)
+	}
+
+	if res.Stat != nil {
+		if len(task.config.KeepIndexAs) != 0 {
+			res.Stat.AddSessionData("index", task.config.KeepIndexAs)
+		}
+		if len(task.config.KeepDataAs) != 0 {
+			res.Stat.AddSessionData("data", task.config.KeepDataAs)
+		}
+		if len(task.config.KeepViewAs) != 0 {
+			res.Stat.AddSessionData("view", task.config.KeepViewAs)
+		}
+		res.Stat.AddSessionData("delim", task.config.Delimiter)
+		res.Stat.AddSessionData("width", task.config.Width)
+		res.Stat.AddSessionData("matches", res.Stat.Matches)
+
+		// save backend tool used
+		if _, tool := filepath.Split(task.toolPath); len(tool) != 0 {
+			res.Stat.Extra["backend"] = tool
+		}
+	}
+
+	res.ReportDone()
+	res.Close()
+}
+
 // Finish the `ryftprim` tool processing.
 func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	task.toolStopTime = time.Now() // performance metric
 
 	// some futher cleanup
-	defer func() {
-		if res.Stat != nil && task.config.Performance {
-			metrics := make(map[string]interface{})
-
-			if !task.toolStartTime.IsZero() {
-				metrics["prepare"] = task.toolStartTime.Sub(task.taskStartTime).String()
-				metrics["tool-exec"] = task.toolStopTime.Sub(task.toolStartTime).String()
-			}
-
-			if !task.readStartTime.IsZero() {
-				// for /count operation there is no "read-data"
-				metrics["read-data"] = time.Since(task.readStartTime).String()
-			}
-
-			if !task.aggsStartTime.IsZero() {
-				metrics["aggregations"] = task.aggsStopTime.Sub(task.aggsStartTime).String()
-			}
-
-			res.Stat.AddPerfStat("ryftprim", metrics)
-		}
-
-		if res.Stat != nil {
-			res.Stat.AddSessionData("index", task.config.KeepIndexAs)
-			res.Stat.AddSessionData("data", task.config.KeepDataAs)
-			res.Stat.AddSessionData("view", task.config.KeepViewAs)
-			res.Stat.AddSessionData("delim", task.config.Delimiter)
-			res.Stat.AddSessionData("width", task.config.Width)
-			res.Stat.AddSessionData("matches", res.Stat.Matches)
-
-			// save backend tool used
-			_, tool := filepath.Split(task.toolPath)
-			res.Stat.Extra["backend"] = tool
-		}
-
-		res.ReportDone()
-		res.Close()
-	}()
+	defer task.finish(res)
 
 	// ryftprim is finished we can release locked files
 	task.lockInProgress = false
@@ -409,6 +419,10 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
 			err = fmt.Errorf("failed to parse statistics: %s", err)
 		} else {
+			if task.config.DebugInternals {
+				res.Stat.AddDebugData("tool", task.toolPath)
+				res.Stat.AddDebugData("args", task.toolArgs)
+			}
 			task.log().WithField("stat", res.Stat).
 				Infof("[%s]: parsed statistics", TAG)
 		}
@@ -473,7 +487,16 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	} else if !task.isShow {
 		// it's /count, check if we have to create VIEW file
 		if len(task.ViewFileName) != 0 {
-			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter); err != nil {
+			isJsonArray := false
+			if task.config.IsRecord && len(task.DataFileName) != 0 {
+				if jarr, err := IsJsonArrayFile(task.DataFileName); err != nil {
+					res.ReportError(fmt.Errorf("failed to check JSON array: %s", err))
+				} else {
+					isJsonArray = jarr
+				}
+			}
+
+			if err := CreateViewFile(task.IndexFileName, task.ViewFileName, task.config.Delimiter, isJsonArray); err != nil {
 				task.log().WithError(err).WithField("path", task.ViewFileName).
 					Warnf("[%s]: failed to create VIEW file", TAG)
 				res.ReportError(fmt.Errorf("failed to create VIEW file: %s", err))
@@ -485,8 +508,9 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 	// apply aggregations
 	if task.config.Aggregations != nil {
 		task.aggsStartTime = time.Now()
-		err := ApplyAggregations(task.IndexFileName, task.DataFileName,
-			task.config.Delimiter, task.config.DataFormat, task.config.Aggregations,
+		err := ApplyAggregations(engine.AggregationConcurrency,
+			task.IndexFileName, task.DataFileName, task.config.Delimiter,
+			task.config.Aggregations, task.config.IsRecord,
 			func() bool { return res.IsCancelled() })
 		if err != nil {
 			task.log().WithError(err).
@@ -494,6 +518,11 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			res.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
 		}
 		task.aggsStopTime = time.Now()
+
+		if res.Stat == nil {
+			// create dummy statistics to report aggregations here
+			res.Stat = search.NewStat(engine.IndexHost)
+		}
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing

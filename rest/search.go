@@ -56,7 +56,9 @@ type SearchParams struct {
 	Query    string   `form:"query" json:"query" msgpack:"query" binding:"required"`
 	OldFiles []string `form:"files" json:"-" msgpack:"-"`   // obsolete: will be deleted
 	Catalogs []string `form:"catalog" json:"-" msgpack:"-"` // obsolete: will be deleted
-	Files    []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
+
+	Files              []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
+	IgnoreMissingFiles bool     `form:"ignore-missing-files" json:"ignore-missing-files,omitempty" msgpack:"ignore-missing-files,omitempty"`
 
 	Mode   string `form:"mode" json:"mode,omitempty" msgpack:"mode,omitempty"`                      // optional, "" for generic mode
 	Width  string `form:"surrounding" json:"surrounding,omitempty" msgpack:"surrounding,omitempty"` // surrounding width or "line"
@@ -67,18 +69,26 @@ type SearchParams struct {
 
 	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
 	BackendOpts []string `form:"backend-option" json:"backend-options,omitempty" msgpack:"backend-options,omitempty"` // search engine parameters (useless without "backend")
+	BackendMode string   `form:"backend-mode" json:"backend-mode,omitempty" msgpack:"backend-mode,omitempty"`
 	KeepDataAs  string   `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
 	KeepIndexAs string   `form:"index" json:"index,omitempty" msgpack:"index,omitempty"`
 	KeepViewAs  string   `form:"view" json:"view,omitempty" msgpack:"view,omitempty"`
 	Delimiter   string   `form:"delimiter" json:"delimiter,omitempty" msgpack:"delimiter,omitempty"`
 	Lifetime    string   `form:"lifetime" json:"lifetime,omitempty" msgpack:"lifetime,omitempty"` // output lifetime (DATA, INDEX, VIEW)
-	Limit       int      `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
+	Limit       int64    `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	// post-process transformations
 	Transforms []string `form:"transform" json:"transforms,omitempty" msgpack:"transforms,omitempty"`
 
 	// aggregations
-	Aggregations map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
+
+	// tweaks
+	Tweaks struct {
+		Format  map[string]interface{} `json:"format,omitempty" msgpack:"format,omitempty"`
+		Cluster []interface{}          `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
+	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
@@ -97,6 +107,17 @@ type SearchParams struct {
 
 // Handle /search endpoint.
 func (server *Server) DoSearch(ctx *gin.Context) {
+	server.doSearch(ctx, SearchParams{
+		Format: format.RAW,
+		Case:   true,
+		Reduce: true,
+		Limit:  -1, // no limit
+		Stats:  false,
+	})
+}
+
+// Handle /search endpoint.
+func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	// recover from panics if any
 	defer RecoverFromPanic(ctx)
 
@@ -104,11 +125,6 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	var err error
 
 	// parse request parameters
-	params := SearchParams{
-		Format: format.RAW,
-		Case:   true,
-		Reduce: true,
-	}
 	if err := bindOptionalJson(ctx.Request, &params); err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to parse request JSON parameters"))
@@ -118,23 +134,27 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			WithDetails("failed to parse request parameters"))
 	}
 
+	// error prefix
+	var errorPrefix string
+	if params.InternalErrorPrefix {
+		errorPrefix = server.Config.HostName
+	}
+
 	// backward compatibility old files and catalogs (just aliases)
 	params.Files = append(params.Files, params.OldFiles...)
 	params.OldFiles = nil // reset
 	params.Files = append(params.Files, params.Catalogs...)
 	params.Catalogs = nil // reset
-	if len(params.Files) == 0 {
+	if len(params.Files) == 0 && !params.IgnoreMissingFiles {
 		panic(NewError(http.StatusBadRequest,
-			"no any file or catalog provided"))
+			"no file or catalog provided"))
 	}
 
 	// setting up transcoder to convert raw data
-	// XML and JSON support additional fields filtration
-	var tcode format.Format
-	tcode_opts := map[string]interface{}{
-		"fields": params.Fields,
-	}
-	if tcode, err = format.New(params.Format, tcode_opts); err != nil {
+	// CSV, XML and JSON support additional fields filtration
+	tcode_opts := getFormatOptions(params.Tweaks.Format, params.Fields)
+	tcode, err := format.New(params.Format, tcode_opts)
+	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to get transcoder"))
 	}
@@ -157,24 +177,18 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	}
 	ctx.Set("encoder", enc) // to recover from panic in appropriate format
 
-	// get search engine
-	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	engine, err := server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
-	if err != nil {
-		panic(NewError(http.StatusInternalServerError, err.Error()).
-			WithDetails("failed to get search engine"))
-	}
-
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
+	cfg.DebugInternals = server.Config.DebugInternals
 	cfg.Mode = params.Mode
 	cfg.Width = mustParseWidth(params.Width)
 	cfg.Dist = uint(params.Dist)
 	cfg.Case = params.Case
 	cfg.Reduce = params.Reduce
 	cfg.Nodes = uint(params.Nodes)
-	cfg.BackendTool = params.Backend
-	cfg.BackendOpts = params.BackendOpts
+	cfg.Backend.Tool = params.Backend
+	cfg.Backend.Opts = params.BackendOpts
+	cfg.Backend.Mode = params.BackendMode
 	cfg.KeepDataAs = randomizePath(params.KeepDataAs)
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
@@ -185,10 +199,11 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 				WithDetails("failed to parse lifetime"))
 		}
 	}
-	cfg.ReportIndex = true // /search
-	cfg.ReportData = !format.IsNull(params.Format)
+	cfg.ReportIndex = params.Limit != 0 // -1 or >0
+	cfg.ReportData = params.Limit != 0 && !format.IsNull(params.Format)
+	cfg.SkipMissing = params.IgnoreMissingFiles
 	cfg.Offset = 0
-	cfg.Limit = uint(params.Limit)
+	cfg.Limit = params.Limit
 	cfg.Performance = params.Performance
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	if err != nil {
@@ -203,16 +218,34 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 			WithDetails("failed to parse transformations"))
 	}
 
-	// aggregations
-	cfg.Aggregations, err = aggs.MakeAggs(params.Aggregations)
-	if err != nil {
-		panic(NewError(http.StatusBadRequest, err.Error()).
-			WithDetails("failed to prepare aggregations"))
-	}
 	if len(params.InternalFormat) != 0 {
 		cfg.DataFormat = params.InternalFormat
 	} else {
 		cfg.DataFormat = params.Format
+	}
+	cfg.Tweaks.Format = tcode_opts
+
+	// aggregations
+	cfg.Aggregations, err = aggs.MakeAggs(
+		selectAggsOpts(params.ShortAggs, params.LongAggs),
+		cfg.DataFormat, tcode_opts)
+	if err != nil {
+		panic(NewError(http.StatusBadRequest, err.Error()).
+			WithDetails("failed to prepare aggregations"))
+	}
+
+	// get search engine
+	var engine search.Engine
+	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
+	if !server.Config.LocalOnly && !params.Local && len(params.Tweaks.Cluster) != 0 {
+		log.WithField("config", params.Tweaks.Cluster).Debugf("[%s]: create tweaked search engine", CORE)
+		engine, err = server.getClusterTweakEngine(authToken, homeDir, cfg, params.Tweaks.Cluster)
+	} else {
+		engine, err = server.getSearchEngine(params.Local, params.Files, authToken, homeDir, userTag)
+	}
+	if err != nil {
+		panic(NewError(http.StatusInternalServerError, err.Error()).
+			WithDetails("failed to get search engine"))
 	}
 
 	// session preparation
@@ -232,6 +265,9 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 	searchStartTime := time.Now() // performance metric
 	res, err := engine.Search(cfg)
 	if err != nil {
+		if len(errorPrefix) != 0 {
+			err = fmt.Errorf("[%s]: %s", errorPrefix, err)
+		}
 		panic(NewError(http.StatusInternalServerError, err.Error()).
 			WithDetails("failed to start search"))
 	}
@@ -244,12 +280,6 @@ func (server *Server) DoSearch(ctx *gin.Context) {
 
 	server.onSearchStarted(cfg)
 	defer server.onSearchStopped(cfg)
-
-	// error prefix
-	var errorPrefix string
-	if params.InternalErrorPrefix {
-		errorPrefix = server.Config.HostName
-	}
 
 	// drain all results
 	transferStartTime := time.Now() // performance metric
@@ -495,6 +525,17 @@ func parseNameAndArgs(s string) (string, []string, error) {
 	return "", nil, fmt.Errorf("no script name found")
 }
 
+// get format options: combine tweaks and "fields"
+func getFormatOptions(tweaks map[string]interface{}, fields string) map[string]interface{} {
+	res := mapClone(tweaks)
+
+	if fields != "" {
+		res["fields"] = fields
+	}
+
+	return res
+}
+
 // update Session token based on provided session data
 func updateSession(session *Session, stat *search.Stat) {
 	data := []interface{}{}
@@ -521,12 +562,37 @@ func updateSession(session *Session, stat *search.Stat) {
 	stat.ClearSessionData(true)
 }
 
+// select one of "aggs" or "aggregations"
+func selectAggsOpts(a, b map[string]interface{}) map[string]interface{} {
+	if a != nil && b != nil {
+		panic(NewError(http.StatusBadRequest, "invalid aggregation configuration").
+			WithDetails(`both "aggs" and "aggregations" cannot be provided`))
+	}
+
+	if a != nil {
+		return a
+	}
+
+	return b // might be nil
+}
+
 // update aggregations in cluster mode
-func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) error {
+func updateAggregations(aggregations search.Aggregations, stat *search.Stat) error {
+	// get main aggregations (in case if one node in cluster)
+	if d := stat.Extra[search.ExtraAggregations]; d != nil {
+		log.Debugf("[%s/aggs]: merging main aggregations: %+v", CORE, d)
+		if err := aggregations.Merge(d); err != nil {
+			return err
+		}
+
+		// cleanup intermediate aggergations
+		delete(stat.Extra, search.ExtraAggregations)
+	}
+
 	// get aggregations from details
 	for _, dstat := range stat.Details {
 		if d := dstat.Extra[search.ExtraAggregations]; d != nil {
-			log.Debugf("merging %v aggregations", d)
+			log.Debugf("[%s/aggs]: merging other aggregations: %+v", CORE, d)
 			if err := aggregations.Merge(d); err != nil {
 				return err
 			}
@@ -535,7 +601,7 @@ func updateAggregations(aggregations *aggs.Aggregations, stat *search.Stat) erro
 			delete(dstat.Extra, search.ExtraAggregations)
 		}
 	}
-	log.Debugf("merged %v", aggregations.ToJson(true))
+	log.Debugf("[%s/aggs]: merged: %+v", CORE, aggregations.ToJson(true))
 
 	return nil // OK
 }

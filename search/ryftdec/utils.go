@@ -41,6 +41,7 @@ import (
 	"strings"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/ryftprim"
 	"github.com/getryft/ryft-server/search/utils/query"
 )
 
@@ -50,12 +51,21 @@ type RyftCall struct {
 	IndexFile string // output INDEX file
 	Delimiter string // delimiter string
 	Width     int    // surrounding width, -1 for LINE=true
+
+	isJsonArray bool // to check output file
 }
 
 // get string
 func (rc RyftCall) String() string {
-	return fmt.Sprintf("RyftCall{data:%s, index:%s, delim:#%x, width:%d}",
-		rc.DataFile, rc.IndexFile, rc.Delimiter, rc.Width)
+	return fmt.Sprintf("RyftCall{data:%s, index:%s, delim:#%x, width:%d, json-array:%t}",
+		rc.DataFile, rc.IndexFile, rc.Delimiter, rc.Width, rc.isJsonArray)
+}
+
+// check if output is in JSON array format
+func (rc *RyftCall) checkJsonArray(opts backendOptions) error {
+	var err error
+	rc.isJsonArray, err = ryftprim.IsJsonArrayFile(opts.atHome(rc.DataFile))
+	return err // OK
 }
 
 // SearchResult - intermediate search results

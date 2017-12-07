@@ -27,6 +27,12 @@
 			"revisionTime": "2015-10-22T06:55:26Z"
 		},
 		{
+			"checksumSHA1": "sMNGYak6MM8KcTSbVRS4ADbuauM=",
+			"path": "github.com/araddon/dateparse",
+			"revision": "ca7e753bd149dae747d76fa7d52b20b920f3a814",
+			"revisionTime": "2017-10-07T16:34:59Z"
+		},
+		{
 			"checksumSHA1": "Y9anndxw8wlCmbcT1Wx05q57y7U=",
 			"path": "github.com/clbanning/mxj",
 			"revision": "1cda74d18ebbb04f525b355309c16d594e1f8f77",
@@ -163,13 +169,31 @@
 			"revisionTime": "2017-06-20T10:48:52Z"
 		},
 		{
+			"checksumSHA1": "SqhDMoHYwafnWYlWxYJXfw7Dbbk=",
+			"path": "github.com/vjeantet/jodaTime",
+			"revision": "be924ce213fb35f66c810b61e051965eb78b82d0",
+			"revisionTime": "2017-08-16T15:02:30Z"
+		},
+		{
+			"checksumSHA1": "UWjVYmoHlIfHzVIskELHiJQtMOI=",
+			"path": "golang.org/x/crypto/bcrypt",
+			"revision": "2509b142fb2b797aa7587dad548f113b2c0f20ce",
+			"revisionTime": "2017-10-23T14:45:55Z"
+		},
+		{
+			"checksumSHA1": "oVPHWesOmZ02vLq2fglGvf+AMgk=",
+			"path": "golang.org/x/crypto/blowfish",
+			"revision": "2509b142fb2b797aa7587dad548f113b2c0f20ce",
+			"revisionTime": "2017-10-23T14:45:55Z"
+		},
+		{
 			"checksumSHA1": "dr5+PfIRzXeN+l1VG+s0lea9qz8=",
 			"path": "golang.org/x/net/context",
 			"revision": "f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f",
 			"revisionTime": "2017-07-19T21:11:51Z"
 		},
 		{
-			"checksumSHA1": "tyXdQ4OdVQelQdsil6fXUtKKIRw=",
+			"checksumSHA1": "K3C9lD5XgLfXd25MtZe3Uw5BRoA=",
 			"path": "golang.org/x/sys/unix",
 			"revision": "35ef4487ce0a1ea5d4b616ffe71e34febe723695",
 			"revisionTime": "2017-07-27T13:28:57Z"

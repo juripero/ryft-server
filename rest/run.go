@@ -128,7 +128,7 @@ func (server *Server) DoRun(ctx *gin.Context) {
 	args = append(args, params.Args...)
 	if len(args) == 0 || len(args[0]) == 0 {
 		panic(NewError(http.StatusBadRequest,
-			"no any command or argument provided"))
+			"no command or argument provided"))
 	}
 
 	log.WithFields(map[string]interface{}{

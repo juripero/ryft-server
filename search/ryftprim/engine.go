@@ -69,14 +69,14 @@ type Engine struct {
 	ReadFilePollTimeout time.Duration
 	ReadFilePollLimit   int
 
+	// number of parallel threads to calculate aggregations on
+	AggregationConcurrency int
+
 	IndexHost string // optional host (cluster mode)
 
-	RyftxOpts     []string // options for ryftx backend
-	RyftprimOpts  []string // options for ryftprim backendg
-	Ryftpcre2Opts []string // options for pcre2 backend
-	RyftAllOpts   []string // common options for all backends
+	Tweaks *Tweaks // backend tweaks
 
-	options map[string]interface{}
+	options map[string]interface{} // base options
 }
 
 // NewEngine creates new RyftPrim search engine.
@@ -134,6 +134,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	res := search.NewResult()
+	if len(cfg.Files) == 0 && cfg.SkipMissing {
+		// report empty stat!
+		res.Stat = search.NewStat(engine.IndexHost)
+		task.finish(res)
+		return res, nil // OK
+	}
+
 	err = engine.run(task, res)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to run", TAG)

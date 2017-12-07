@@ -5,6 +5,7 @@ HINT = ryft-server
 APP_VERSION ?= latest
 RYFT_DOCKER_BRANCH ?= master
 RYFT_INTEGRATION_TEST ?= develop
+BUILDER_VERSION ?= latest
 
 all: $(ASSETS) build version
 
@@ -62,8 +63,10 @@ test-cover:
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftmux/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftprim/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/utils/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/aggs/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/utils/catalog/ || true
-	@go test -tags "${GO_TAGS}" -cover ./search/utils/query || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/query/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/view/ || true
 
 	@go test -tags "${GO_TAGS}" -cover ./rest/codec/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/codec/json/ || true
@@ -74,6 +77,7 @@ test-cover:
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/utf8/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/json/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/xml/ || true
+	@go test -tags "${GO_TAGS}" -cover ./rest/format/csv/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/format/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/ || true
 
@@ -108,7 +112,7 @@ pull_ryft_integration_test: clone_ryft_integration_test
 .PHONY: build_container
 build_container: pull_ryft_docker
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR}/ build
-	@make -C ./ryft-docker/ryft-server-cluster VERSION=${APP_VERSION} app
+	@make -C ./ryft-docker/ryft-server-cluster APP_VERSION=${APP_VERSION} app
 
 # run integration tests
 .PHONY: integration_test
@@ -121,5 +125,5 @@ unit_test: pull_ryft_docker
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} unit_test
 
 .PHONY: cli
-cli:
+cli: pull_ryft_docker
 	@make -C ./ryft-docker/ryft-server-cluster SOURCE_PATH=${CURDIR} cli

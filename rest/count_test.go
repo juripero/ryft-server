@@ -57,10 +57,7 @@ func TestCountUsual(t *testing.T) {
 			"failed to parse request parameters")
 
 		check("/count?query=hello", "", TO, http.StatusBadRequest,
-			"no any file or catalog provided")
-
-		check("/count?query=hello&file=*.txt", "application/msgpack", TO,
-			http.StatusUnsupportedMediaType, "only JSON format is supported for now")
+			"no file or catalog provided")
 
 		check("/count?query=hello&file=*.txt&surrounding=bad", "", TO,
 			http.StatusBadRequest, "failed to parse surrounding width", "invalid syntax")
@@ -80,7 +77,7 @@ func TestCountUsual(t *testing.T) {
 		delete(fs.server.Config.BackendOptions, "search-report-error")
 	}
 
-	if all {
+	if all && false {
 		fs.server.Config.BackendOptions["search-no-stat"] = true
 		check("/count?query=hello&file=*.txt&surrounding=line", "", TO,
 			http.StatusInternalServerError, "no search statistics available")
@@ -91,7 +88,7 @@ func TestCountUsual(t *testing.T) {
 		fs.server.Config.BackendOptions["search-report-records"] = 0
 		fs.server.Config.BackendOptions["search-report-errors"] = 1
 		check("/count?query=hello&file=*.txt&surrounding=0", "application/json",
-			TO, http.StatusInternalServerError, `"message": "error-1"`)
+			TO, http.StatusOK, `"errors":["error-1"]`)
 		delete(fs.server.Config.BackendOptions, "search-report-records")
 		delete(fs.server.Config.BackendOptions, "search-report-errors")
 	}

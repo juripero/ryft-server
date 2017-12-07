@@ -88,7 +88,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 	task.log().Debugf("[%s]: start subtask processing...", TAG)
 	var recordsReported uint64 // for all subtasks, atomic
 	var recordsLimit uint64
-	if task.config.Limit != 0 {
+	if task.config.Limit >= 0 {
 		recordsLimit = uint64(task.config.Limit)
 	} else {
 		recordsLimit = math.MaxUint64
@@ -108,7 +108,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					if ok && err != nil {
 						// TODO: mark error with subtask's tag?
 						// task.log().WithError(err).Debugf("[%s]: new error received", TAG) // FIXME: DEBUG
-						mux.ReportError(err)
+						mux.ReportError(fmt.Errorf("%s%s", err, getBackendInfo(backend)))
 					}
 
 				case rec, ok := <-res.RecordChan:
@@ -117,7 +117,9 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 							// task.log().WithField("rec", rec).Debugf("[%s]: new record received", TAG) // FIXME: DEBUG
 							rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 							mux.ReportRecord(rec)
-						} else {
+						} else if false {
+							// we should not cancel the request here because
+							// we still need statistics and aggregations!!!
 							task.log().WithField("limit", recordsLimit).Infof("[%s]: stopped by limit", TAG)
 							errors, records := res.Cancel()
 							if errors > 0 || records > 0 {
@@ -134,7 +136,7 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 					// drain the whole errors channel
 					for err := range res.ErrorChan {
 						// task.log().WithError(err).Debugf("[%s]: *** new error received", TAG) // FIXME: DEBUG
-						mux.ReportError(err)
+						mux.ReportError(fmt.Errorf("%s%s", err, getBackendInfo(backend)))
 					}
 
 					// drain the whole records channel
@@ -143,7 +145,9 @@ func (engine *Engine) run(task *Task, mux *search.Result) {
 							// task.log().WithField("rec", rec).Debugf("[%s]: *** new record received", TAG) // FIXME: DEBUG
 							rec.Index.UpdateHost(engine.IndexHost) // cluster mode!
 							mux.ReportRecord(rec)
-						} else {
+						} else if false {
+							// we should not cancel the request here because
+							// we still need statistics and aggregations!!!
 							task.log().WithField("limit", recordsLimit).Infof("[%s]: *** stopped by limit", TAG)
 							errors, records := res.Cancel()
 							if errors > 0 || records > 0 {

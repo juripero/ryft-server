@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/getryft/ryft-server/rest/format/csv"
 	"github.com/getryft/ryft-server/rest/format/json"
 	"github.com/getryft/ryft-server/rest/format/null"
 	"github.com/getryft/ryft-server/rest/format/raw"
@@ -48,6 +49,7 @@ const (
 	NULL = "null"
 	RAW  = "raw"
 	XML  = "xml"
+	CSV  = "csv"
 )
 
 // Abstract Format interface.
@@ -68,7 +70,7 @@ type Format interface {
 }
 
 // New creates new formatter instance.
-// XML and JSON formats supports some options.
+// CSV, XML and JSON formats supports some options.
 func New(format string, opts map[string]interface{}) (Format, error) {
 	switch strings.ToLower(format) {
 	case JSON:
@@ -81,6 +83,8 @@ func New(format string, opts map[string]interface{}) (Format, error) {
 		return raw.New()
 	case XML:
 		return xml.New(opts)
+	case CSV:
+		return csv.New(opts)
 	}
 
 	return nil, fmt.Errorf("%q is unsupported format", format)
