@@ -41,6 +41,7 @@ import (
 // Transform is an abstract transformation rule
 type Transform interface {
 	Process(in []byte) (out []byte, skip bool, err error)
+	String() string
 }
 
 // regexp-match transformation
