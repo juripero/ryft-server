@@ -36,6 +36,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 )
 
 // Transform is an abstract transformation rule
@@ -101,10 +102,14 @@ func (t *regexpReplace) String() string {
 type scriptCall struct {
 	path []string // path + args
 	wdir string   // working directory
+
+	// used to restore script transformation in cluster mode
+	name string
+	args []string
 }
 
 // NewScriptCall created new "script-call" transformation.
-func NewScriptCall(pathAndArgs []string, workDir string) (*scriptCall, error) {
+func NewScriptCall(pathAndArgs []string, workDir string, name string, args []string) (*scriptCall, error) {
 	if len(pathAndArgs) == 0 {
 		return nil, fmt.Errorf("no script path provided")
 	}
@@ -114,7 +119,12 @@ func NewScriptCall(pathAndArgs []string, workDir string) (*scriptCall, error) {
 	}
 	// TODO: check script is executable
 
-	return &scriptCall{path: pathAndArgs, wdir: workDir}, nil // OK
+	return &scriptCall{
+		path: pathAndArgs,
+		wdir: workDir,
+		name: name,
+		args: args,
+	}, nil // OK
 }
 
 // do script-call transformation
@@ -136,5 +146,7 @@ func (t *scriptCall) Process(in []byte) ([]byte, bool, error) {
 
 // get string expression
 func (t *scriptCall) String() string {
-	return fmt.Sprintf(`script(%s)`, t.path)
+	args := []string{t.name}
+	args = append(args, t.args...)
+	return fmt.Sprintf(`script(%s)`, strings.Join(args, ","))
 }
