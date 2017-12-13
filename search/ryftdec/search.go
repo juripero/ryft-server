@@ -88,7 +88,8 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 					if autoRecord {
 						format, root, err := engine.detectFileFormat(filePath)
 						if err != nil {
-							return 0, nil, "", "", fmt.Errorf("failed to detect %q file format: %s", filePath, err)
+							return 0, nil, "", "", fmt.Errorf("failed to detect %q file format: %s\n(%s)", filePath, err,
+								`Automatic RECORD replacement is enabled but there is no corresponding extension pattern found. Please review the default "default-user-config" section or user's configuration located at /ryftone/$RYFTUSER/.ryft-user.yaml.`)
 						}
 						if len(autoFormat) == 0 {
 							autoFormat = format
