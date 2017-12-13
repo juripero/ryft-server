@@ -3,6 +3,9 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
+QMAKE_CFLAGS += -std=c++0x -pthread
+LIBS += -pthread
+
 DEFINES += _GNU_SOURCE
 
 SOURCES += main.c

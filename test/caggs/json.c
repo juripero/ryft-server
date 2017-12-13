@@ -646,6 +646,26 @@ int json_field_parse(struct JSON_Field **fields,
 
 
 /*
+ * json_field_clone() implementation.
+ */
+struct JSON_Field* json_field_clone(struct JSON_Field *fields)
+{
+    if (!fields)
+        return 0; // nothing to clone
+
+    struct JSON_Field *res = json_field_make();
+    memcpy(res->by_name, fields->by_name, sizeof(res->by_name));
+    res->by_index = fields->by_index;
+    res->token = fields->token;
+    res->data = fields->data;
+
+    res->children = json_field_clone(fields->children);
+    res->siblings = json_field_clone(fields->siblings);
+    return res;
+}
+
+
+/*
  * json_fields_free() implementation.
  */
 void json_field_free(struct JSON_Field *fields)

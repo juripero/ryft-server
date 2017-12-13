@@ -123,6 +123,14 @@ int json_field_parse(struct JSON_Field **field,
 
 
 /**
+ * @brief Clone the fields tree.
+ * @param[in] fields Head of fields tree to clone.
+ * @return Cloned fields tree.
+ */
+struct JSON_Field* json_field_clone(struct JSON_Field *fields);
+
+
+/**
  * @brief Release the JSON fields tree.
  * @param[in] fields Head of fields tree.
  */

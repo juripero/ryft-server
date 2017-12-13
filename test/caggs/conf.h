@@ -20,7 +20,7 @@ struct Conf
     uint64_t delim_len;     ///< @brief DATA delimiter in bytes.
     uint64_t footer_len;    ///< @brief DATA footer in bytes.
 
-    uint32_t concurrency;   ///< @brief Number of processing threads.
+    int concurrency;   ///< @brief Number of processing threads.
 };
 
 

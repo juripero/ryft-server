@@ -13,11 +13,14 @@
 #include <errno.h>
 #include <math.h>
 
+#include <stdatomic.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+#include <pthread.h>
 
 
 // some global variables
@@ -95,7 +98,7 @@ struct Stat {
 };
 
 // calculate statistics
-void stat_add(struct Stat *s, double x)
+static void stat_add(struct Stat *s, double x)
 {
     if (!s->count || x < s->min)
         s->min = x;
@@ -107,7 +110,7 @@ void stat_add(struct Stat *s, double x)
 }
 
 // print statistics to STDOUT
-void stat_print(const struct Stat *s)
+static void stat_print(const struct Stat *s)
 {
     if (s->count)
     {
@@ -125,6 +128,39 @@ void stat_print(const struct Stat *s)
     }
 }
 
+// clone statistics engine
+static struct Stat* stat_clone(struct Stat *base)
+{
+    struct Stat *s = (struct Stat*)malloc(sizeof(*s));
+    if (!s)
+        return 0; // failed
+
+    memcpy(s, base, sizeof(*s));
+    return s;
+}
+
+// merge statistics
+static void stat_merge(struct Stat *to, struct Stat *from)
+{
+    if (!from->count)
+        return; // nothing to merge
+
+    if (!to->count || from->min < to->min)
+        to->min = from->min;
+    if (!to->count || from->max > to->max)
+        to->max = from->max;
+    to->sum += from->sum;
+    to->sum2 += from->sum2;
+    to->count += from->count;
+}
+
+// release statistics
+static void stat_free(struct Stat *s)
+{
+    free(s);
+}
+
+// global instance, TODO: remove this
 struct Stat g_stat;
 
 
@@ -138,7 +174,8 @@ struct Stat g_stat;
 static int process_record(const struct Conf *cfg,
                           struct JSON_Field *root,
                           const uint8_t *beg,
-                          const uint8_t *end)
+                          const uint8_t *end,
+                          struct Stat *s)
 {
     (void)cfg; // not used yet
 
@@ -169,9 +206,64 @@ static int process_record(const struct Conf *cfg,
 
     double x = strtod((const char*)field->token.beg, NULL);
     // vlog(" %g ", x);
-    stat_add(&g_stat, x);
+    stat_add(s, x);
 
     return 0; // OK
+}
+
+// concurrency processing variables
+struct {
+    const struct Conf *cfg;
+    struct JSON_Field *base_field;
+    volatile int stopped;
+    atomic_ptrdiff_t rpos; // read position, atomic
+    atomic_ptrdiff_t wpos; // write position, atomic
+    struct {
+        const uint8_t *dat_beg;
+        const uint8_t *dat_end;
+    } buf[4*1024*1024];
+} X;
+
+// processing thread
+static void* x_thread(void *p)
+{
+    struct Stat *s = (struct Stat*)p;
+    struct JSON_Field *field = json_field_clone(X.base_field); // need to release at the end!
+    // TODO: pass dedicated Task structure containing clone of Stat and clone of Field
+
+    // TODO: count the number of processed records by this thread!
+    int count = 0;
+
+    while (1)
+    {
+        // get next processing index
+        ptrdiff_t rpos = atomic_fetch_add(&X.rpos, 1);
+
+        // busy-wait available data
+        while (1)
+        {
+            ptrdiff_t wpos = atomic_load(&X.wpos);
+            if (rpos < wpos)
+                break; // finally have data to process
+            if (X.stopped)
+            {
+                vlog1("processed records by x-thread: %d\n", count);
+                return p; // done
+            }
+            pthread_yield(); // try again a bit later
+        }
+
+        const uint8_t *dat_beg = X.buf[rpos % (sizeof(X.buf)/sizeof(X.buf[0]))].dat_beg;
+        const uint8_t *dat_end = X.buf[rpos % (sizeof(X.buf)/sizeof(X.buf[0]))].dat_end;
+        int res = process_record(X.cfg, field, dat_beg, dat_end, s);
+        if (res != 0)
+        {
+            verr("ERROR: failed to process RECORD: %s\n", res);// TODO: add "at" information from dat_p
+            return 0; // failed
+        }
+
+        count += 1;
+    }
 }
 
 
@@ -209,6 +301,30 @@ static int do_work(const struct Conf *cfg, struct JSON_Field *field,
         return -1; // failed
     }
 
+    // initialize concurrency stuff
+    struct {
+        pthread_t thread_id;
+        struct Stat *stat;
+    } *xx = 0;
+    if (cfg->concurrency > 1)
+    {
+        vlog2("run with %d threads\n", cfg->concurrency);
+        X.cfg = cfg;
+        X.base_field = field;
+        X.stopped = 0;
+        X.rpos = 0;
+        X.wpos = 0;
+
+        xx = malloc(cfg->concurrency * sizeof(*xx));
+        for (int i = 0; i < cfg->concurrency; ++i)
+        {
+            xx[i].stat = stat_clone(&g_stat);
+            pthread_create(&xx[i].thread_id,
+                           NULL/*attributes*/,
+                           x_thread, xx[i].stat);
+        }
+    }
+
     // read INDEX line by line
     uint64_t count = 0;
     while ((idx_end - idx_beg) > 0)
@@ -229,12 +345,24 @@ static int do_work(const struct Conf *cfg, struct JSON_Field *field,
         // TODO: concurrency!!!
         if ((ptrdiff_t)d_len <= (dat_end - dat_beg))
         {
+            if (cfg->concurrency > 1)
+            {
+                // put data to buffer for a processing thread
+                ptrdiff_t wpos = atomic_load(&X.wpos);
+                X.buf[wpos % (sizeof(X.buf)/sizeof(X.buf[0]))].dat_beg = dat_beg;
+                X.buf[wpos % (sizeof(X.buf)/sizeof(X.buf[0]))].dat_end = dat_beg + d_len;
+                atomic_fetch_add(&X.wpos, 1);
+            }
+            else
+            {
             int res = process_record(cfg, field, dat_beg,
-                                     dat_beg + d_len);
+                                     dat_beg + d_len,
+                                     &g_stat);
             if (res != 0)
             {
                 verr("ERROR: failed to process RECORD: %s\n", res);// TODO: add "at" information from dat_p
                 return -3; // failed
+            }
             }
 
             // go to next record...
@@ -252,6 +380,20 @@ static int do_work(const struct Conf *cfg, struct JSON_Field *field,
 
         if (g_stopped != 0)
             break;
+    }
+
+    // merge concurrency engines if needed
+    if (cfg->concurrency > 1)
+    {
+        X.stopped = 1; // stop all processing threads
+
+        for (int i = 0; i < cfg->concurrency; ++i)
+        {
+            pthread_join(xx[i].thread_id, NULL);
+            stat_merge(&g_stat, xx[i].stat);
+            stat_free(xx[i].stat);
+        }
+        free(xx);
     }
 
     vlog2("total records processed: %llu\n", count);
