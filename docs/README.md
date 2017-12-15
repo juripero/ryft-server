@@ -18,5 +18,3 @@ related to cluster mode.
 
 [Search engines](./search/engine.md) document contains detailed description
 of some ryft-server internals.
-
-[Backend tweaks](./tweaks.md) document contains description of possible fine tunings for ryft-server.

@@ -290,7 +290,7 @@ is selected automatically.
 ### Search `backend-mode` parameter
 
 The set of preconfigured backend options can be selected via corresponding mode.
-Please see [backend options tweaks](../tweaks.md) for more details.
+Please see [backend options tweaks](../run.md#default-backend-options) for more details.
 
 
 ### Search `backend-option` parameter
