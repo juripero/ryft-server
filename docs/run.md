@@ -471,6 +471,18 @@ The following lists of file patterns customize extension-based file type detecti
 Note, the file pattern may include directory filter, the `json: ["foo/*.json"]`
 matches all JSON files in `foo` directory.
 
+There is special case for the XML data. The XML file should be in valid format,
+i.e. it should contain `<?xml ... ?>` header and a root element. For example:
+
+```{.xml}
+<?xml version = "1.0" encoding = "UTF-8" ?>
+<xml_root>
+  <r><c01>
+    ...
+```
+
+In this case the `RECORD.c01` will be automatically replaced to `XRECORD.r.c01`.
+
 
 # Debian package
 
