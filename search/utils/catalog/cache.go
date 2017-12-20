@@ -34,6 +34,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/getryft/ryft-server/search"
 )
 
 // global cache instance
@@ -116,6 +118,39 @@ func (cc *Cache) drop(path string) bool {
 	}
 
 	return false // does not exist
+}
+
+// DropFromCache removes all the catalogs starting with path.
+func DropFromCache(path string) int {
+	return globalCache.DropAll(path)
+}
+
+// DropAll removes all the catalogs starting with path.
+func (cc *Cache) DropAll(path string) int {
+	cc.Lock()
+	defer cc.Unlock()
+
+	return cc.dropAll(path)
+}
+
+// dropAll removes all the catalogs starting with path (unsynchronized).
+func (cc *Cache) dropAll(path string) int {
+	n := 0
+
+	// try to drop existing catalogs
+	for cpath, cat := range cc.cached {
+		if search.IsRelativeToHome(path, cpath) {
+			cat.log().Debugf("[%s]: *** drop from cache", TAG)
+			delete(cc.cached, cpath)
+			cat.cache = nil
+
+			atomic.StoreInt32(&cat.cacheRef, 0)
+			cc.stopDropTimerSync(cat)
+			n += 1
+		}
+	}
+
+	return n
 }
 
 // release catalog reference
