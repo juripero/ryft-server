@@ -154,6 +154,15 @@ func (cat *Catalog) RenameAndClose(newPath string) error {
 		// os.Rename(newPath, oldPath) // rollback?
 		return fmt.Errorf("failed to move catalog data: %s", err)
 	}
+	// SQLite auxiliary files
+	if err := os.Rename(oldPath+"-shm", newPath+"-shm"); err != nil {
+		log.Warnf("[%s]: failed to rename SHM file for %s", TAG, oldPath)
+		// return fmt.Errorf("failed to move catalog: %s", err)
+	}
+	if err := os.Rename(oldPath+"-wal", newPath+"-wal"); err != nil {
+		log.Warnf("[%s]: failed to rename WAL file for %s", TAG, oldPath)
+		// return fmt.Errorf("failed to move catalog: %s", err)
+	}
 
 	return nil // OK
 }
@@ -203,6 +212,11 @@ func OpenCatalogNoCache(path string) (*Catalog, error) {
 	}
 
 	// update database scheme
+	cat.log().Debugf("[%s]: updating journal mode...", TAG)
+	if err := cat.updateJournalModeSync(); err != nil {
+		cat.Close()
+		return nil, err
+	}
 	cat.log().Debugf("[%s]: updating scheme...", TAG)
 	if err := cat.updateSchemeSync(); err != nil {
 		cat.Close()
@@ -219,7 +233,7 @@ func getCatalog(path string, readOnly bool) (*Catalog, bool, error) {
 
 	// try to get existing catalog
 	if cat := globalCache.get(path); cat != nil {
-		return cat, true, nil // OK
+		return cat, true, nil // OK, cached
 	}
 
 	if readOnly {
