@@ -43,6 +43,10 @@ type Engine interface {
 	// if cfg.ReportIndex == false then "/count" is assumed.
 	Search(cfg *Config) (*Result, error)
 
+	// Run asynchronous "/pcap/search" or "/pcap/count" operation.
+	// if cfg.ReportIndex == false then "/pcap/count" is assumed.
+	PcapSearch(cfg *Config) (*Result, error)
+
 	// Run asynchronous "/search/show" operation.
 	Show(cfg *Config) (*Result, error)
 

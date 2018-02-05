@@ -149,6 +149,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return res, nil // OK
 }
 
+// Search starts asynchronous "/pcap/search" operation.
+func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
+	return engine.Search(cfg)
+}
+
 // Show implements "/search/show" endpoint
 func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	if cfg.ReportData && !cfg.ReportIndex {

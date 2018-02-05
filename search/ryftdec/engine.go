@@ -258,6 +258,11 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 	return nil // OK
 }
 
+// PcapSearch starts asynchronous "/pcap/search" operation.
+func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
+	return engine.Backend.PcapSearch(cfg)
+}
+
 // Show starts asynchronous "/search/show" operation.
 func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	return engine.Backend.Show(cfg)
