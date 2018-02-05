@@ -31,6 +31,7 @@
 package main
 
 import (
+	"fmt"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -70,6 +71,7 @@ type serverConfigValue struct {
 // set server's configuration file
 func (f *serverConfigValue) Set(s string) error {
 	f.v = s
+	log.WithField("file", s).Info("parsing configuration file...")
 	return f.s.ParseConfig(f.v)
 }
 
@@ -84,10 +86,13 @@ func main() {
 	defer server.Close()
 
 	// parse command line arguments
+	showVersion := false
+	kingpin.Flag("version", "Show server version and exit.").BoolVar(&showVersion)
 	kingpin.Flag("config", "Server configuration in YML format.").SetValue(&serverConfigValue{s: server})
 	kingpin.Flag("local-only", "Run server is local mode (no cluster).").BoolVar(&server.Config.LocalOnly)
 	kingpin.Flag("keep", "Keep temporary search result files (debug mode).").Short('k').BoolVar(&server.Config.KeepResults)
 	kingpin.Flag("debug", "Run server in debug mode (more log messages).").Short('d').BoolVar(&server.Config.DebugMode)
+	kingpin.Flag("instance-home", "Instance home directory.").StringVar(&server.Config.InstanceHome)
 	kingpin.Flag("logging", "Fine-tuned logging levels.").StringVar(&server.Config.Logging)
 	kingpin.Flag("busyness-tolerance", "Cluster busyness tolerance.").Default("0").IntVar(&server.Config.Busyness.Tolerance)
 
@@ -110,6 +115,13 @@ func main() {
 	kingpin.Flag("ldap-basedn", "LDAP BaseDN for lookups. Required for --auth=ldap.").StringVar(&server.Config.AuthLdap.BaseDN)
 
 	kingpin.Parse()
+
+	// show version and exit
+	if showVersion {
+		fmt.Printf("Version: %s\n", Version)
+		fmt.Printf("GitHash: %s\n", GitHash)
+		return
+	}
 
 	// check extra dependencies logic not handled by kingpin
 	switch strings.ToLower(server.Config.AuthType) {
@@ -173,6 +185,7 @@ func main() {
 		"logging":       server.Config.Logging,
 		"address":       server.Config.ListenAddress,
 		"settings-path": server.Config.SettingsPath,
+		"instance-home": server.Config.InstanceHome,
 		"max-threads":   runtime.GOMAXPROCS(0),
 	}).Info("main configuration")
 	log.WithFields(map[string]interface{}{
@@ -192,19 +205,17 @@ func main() {
 	router := gin.New()
 
 	// default 404 error
-	router.NoRoute(func(c *gin.Context) {
-		c.JSON(404, gin.H{
-			"code":    "404",
-			"message": "Page not found",
-		})
+	router.NoRoute(func(ctx *gin.Context) {
+		defer rest.RecoverFromPanic(ctx)
+		panic(rest.NewError(http.StatusNotFound,
+			"Page not found"))
 	})
 
 	// default 405 error
-	router.NoMethod(func(c *gin.Context) {
-		c.JSON(405, gin.H{
-			"code":    "405",
-			"message": "Method not allowed",
-		})
+	router.NoMethod(func(ctx *gin.Context) {
+		defer rest.RecoverFromPanic(ctx)
+		panic(rest.NewError(http.StatusMethodNotAllowed,
+			"Method not allowed"))
 	})
 
 	// /version API endpoint (without logging!)

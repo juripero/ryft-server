@@ -253,7 +253,7 @@ func (r catalogRename) Rename() (string, error) {
 	if err := os.MkdirAll(newDir, 0755); err != nil {
 		return r.path, err
 	}
-	cat, err := catalog.OpenCatalogNoCache(path)
+	cat, err := catalog.OpenCatalog(path)
 	if err != nil {
 		return r.path, err
 	}
@@ -294,7 +294,7 @@ func (r catalogFileRename) GetPath() string {
 func (r catalogFileRename) Rename() (string, error) {
 	path := filepath.Join(r.mountPoint, r.catalogPath)
 	// rename file in the catalog
-	c, err := catalog.OpenCatalogNoCache(path)
+	c, err := catalog.OpenCatalog(path)
 	if err != nil {
 		return r.path, err
 	}

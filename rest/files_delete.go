@@ -376,6 +376,7 @@ func deleteAll(mountPoint string, items []string) map[string]error {
 			}
 
 			res[rel] = os.RemoveAll(file)
+			catalog.DropFromCache(file)
 		}
 	}
 

@@ -198,6 +198,9 @@ keep-results: false
 busyness-tolerance: 0
 http-timeout: 1h
 processing-threads: 8
+settings-path: /var/ryft/server.settings
+# hostname: node-1
+# instance-home: /
 ```
 
 `local-only` is used to run `ryft-server` outside cluster. No consult dependency,
@@ -219,6 +222,14 @@ It's `1h` (one hour) by default.
 `processing-threads` is the number of parallel threads used to handle all requests.
 If zero the default system value is used. This value is used internally by Go runtime.
 See [GOMAXPROCS](https://golang.org/pkg/runtime/#GOMAXPROCS) for more details.
+
+`settings-path` is used to specify local `ryft-server` storage.
+
+`hostname` is used to customize the hostname provided by the `ryft-server`.
+By default the system's hostname is used.
+
+`instance-home` is used to specify common home directory which is prefixed to
+user's home directory or is used by default if authentication is disabled.
 
 
 #### TLS server configuration
@@ -315,6 +326,26 @@ certificate) just set `insecure-skip-verify: true`. It is not recommended to
 define these `insecure-*` options in production.
 
 See [authentication](./auth.md) document for more details.
+
+
+### Consul configuration
+
+There is Consul-related configuration section:
+
+```{.yaml}
+consul:
+  address: http://127.0.0.1:8500
+  data-center: dc1
+```
+
+The `consul.address` specifies the remote consul address including schema and
+port number. By default it is `http://127.0.0.1:8500`.
+
+The `consul.datacenter` specifies the consul's data center name.
+By default it is `dc1`.
+
+Note, that consul address also can be specified via environment variable
+`CONSUL_HTTP_ADDR=127.0.0.1:8500`.
 
 
 ### Catalog configuration
@@ -436,7 +467,7 @@ curl -s "http://ryft-host:8765/files?file=.ryft-user.yaml&offset=0" \
 
 By default the `default-user-config` section from main configuration file used.
 But if the `/ryftone/${RYFTUSER}/.ryft-user.yaml` or `/ryftone/${RYFTUSER}/.ryft-user.json`
-file is present, then it will be used instead of `default-user-config` secion.
+file is present, then it will be used instead of `default-user-config` section.
 
 Please note, if you change parameters in main configuration file and nothing is happened
 then probably there is Ryft user configuration file which overrides all parameters

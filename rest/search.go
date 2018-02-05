@@ -489,7 +489,7 @@ func parseTransforms(rules []string, cfg ServerConfig) ([]search.Transform, erro
 				pathAndArgs := make([]string, 0, len(info.ExecPath)+len(args))
 				pathAndArgs = append(pathAndArgs, info.ExecPath...)
 				pathAndArgs = append(pathAndArgs, args...)
-				tx, err = search.NewScriptCall(pathAndArgs, "/tmp")
+				tx, err = search.NewScriptCall(pathAndArgs, "/tmp", name, args)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create script-call transformation: %s", err)
 				}
