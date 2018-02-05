@@ -572,6 +572,11 @@ if [[ ! -z "$DRYRUN" ]]; then
     JQ_STR="."
 fi
 
+# PCAP search
+if [[ "$MODE" = "pcap" ]]; then
+    ENDPOINT="/pcap$ENDPOINT"
+fi
+
 # do the search and print error/results
 if [[ -z "$PRETTY" ]]; then
     # Flat output for feeding into other processes
