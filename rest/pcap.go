@@ -50,8 +50,7 @@ type PcapSearchParams struct {
 	Files              []string `form:"file" json:"files,omitempty" msgpack:"files,omitempty"`
 	IgnoreMissingFiles bool     `form:"ignore-missing-files" json:"ignore-missing-files,omitempty" msgpack:"ignore-missing-files,omitempty"`
 
-	Width string `form:"surrounding" json:"surrounding,omitempty" msgpack:"surrounding,omitempty"` // surrounding width or "line"
-	Nodes uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
+	Nodes uint8 `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
 
 	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
 	BackendOpts []string `form:"backend-option" json:"backend-options,omitempty" msgpack:"backend-options,omitempty"` // search engine parameters (useless without "backend")
@@ -63,9 +62,9 @@ type PcapSearchParams struct {
 	Limit       int64    `form:"limit" json:"limit,omitempty" msgpack:"limit,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
-	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
-	Stats  bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
-	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
+	//Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
+	Stats  bool `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"` // include statistics
+	Stream bool `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 
 	Local       bool   `form:"local" json:"local,omitempty" msgpack:"local,omitempty"`
 	ShareMode   string `form:"share-mode" json:"share-mode,omitempty" msgpack:"share-mode,omitempty"` // share mode to use
@@ -125,11 +124,17 @@ func (server *Server) doPcapSearch(ctx *gin.Context, params PcapSearchParams) {
 			"no file or catalog provided"))
 	}
 
-	// setting up transcoder to convert raw data
+	// PCAP limitations
 	if !format.IsNull(params.Format) {
 		panic(NewError(http.StatusBadRequest,
 			"only NULL format is supported for PCAP"))
 	}
+	if params.Limit != 0 {
+		panic(NewError(http.StatusBadRequest,
+			"no records can be requested, only limit=0 is supported"))
+	}
+
+	// setting up transcoder to convert raw data
 	tcode, err := format.New(params.Format, nil)
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
@@ -158,7 +163,7 @@ func (server *Server) doPcapSearch(ctx *gin.Context, params PcapSearchParams) {
 	cfg := search.NewConfig(params.Query, params.Files...)
 	cfg.DebugInternals = server.Config.DebugInternals
 	cfg.Mode = "pcap"
-	cfg.Width = mustParseWidth(params.Width)
+	cfg.Width = 0 // PCAP is some kind of RECORD search
 	cfg.Nodes = uint(params.Nodes)
 	cfg.Backend.Tool = params.Backend
 	cfg.Backend.Opts = params.BackendOpts

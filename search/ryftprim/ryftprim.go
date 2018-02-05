@@ -91,6 +91,8 @@ func (engine *Engine) prepare(task *Task) error {
 		args = append(args, "-p", "ipv6")
 	case "pcre2":
 		args = append(args, "-p", "pcre2")
+	case "pcap":
+		args = append(args, "-p", "pcap")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
