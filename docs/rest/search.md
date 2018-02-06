@@ -4,6 +4,8 @@ There are a few REST API endpoints related to search:
 - [/count](#count)
 - [/search/show](#show)
 - [/search/aggs](#aggregations)
+- [/pcap/search](#pcap-search)
+- [/pcap/count](#pcap-search)
 
 First one reports the data found. The seconds one reports
 just search statistics, but no found records.
@@ -12,7 +14,7 @@ The `search/show` endpoint is used to access already existing results.
 The `search/aggs` endpoint is used to run custom aggregations on
 already existing results.
 
-Note, although the main methods `/search` and `/count` are GET
+Note, although the main methods `/search` and `/count` are GET,
 the POST is also supported. All parameters can be passed within
 request's body. See [POST Search](#post-search) for more details.
 
@@ -858,3 +860,35 @@ This feature is used by some plugins to override cluster rules.
 
 Under the `"aggs"` key the [aggregation](#aggregations) configuration is placed.
 See [aggregations document](./aggs.md) for more details.
+
+
+# PCAP Search
+
+The GET `/pcap/search` and `/pcap/count` endpoints are used to search PCAP data on Ryft boxes.
+They are very similar to corresponding `/search` and `/count` methods but have
+the following limitations:
+- no complex queries are supported
+- no results are provided, only statistics
+- no cluster mode is supported
+
+Note, this endpoint is protected and user should provide valid credentials.
+See [authentication](../auth.md) for more details.
+
+## PCAP Search query parameters
+
+The list of supported query parameters are the following (check detailed description below):
+
+| Parameter     | Type    | Description |
+| ------------- | ------- | ----------- |
+| `query`       | string  | **Required**. [The PCAP search expression](#search-query-parameter). |
+| `file`        | string  | **Required**. [The set of PCAP files to search](#search-file-parameter). |
+| `backend`     | string  | [The backend tool](#search-backend-parameter). |
+| `backend-mode` | string | [The backend mode](#search-backend-mode-parameter). |
+| `backend-option`| string | [The backend tool options](#search-backend-option-parameter). |
+| `data`        | string  | [The name of DATA file to keep](#search-data-and-index-parameters). |
+| `lifetime`    | string  | [The output files lifetime](#search-lifetime-parameter). |
+| `share-mode`  | string  | [The share mode used to access data files](#search-share-mode-parameter). |
+| `nodes`       | int     | [The number of processing nodes](#search-nodes-parameter). |
+| `stats`       | boolean | [The statistics flag](#search-stats-parameter). |
+| `performance` | boolean | [Flag to report performance metrics](#search-performance-parameter). |
+| `stream`      | boolean | **Internal** [The stream output format flag](#search-stream-parameters). |

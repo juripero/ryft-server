@@ -198,6 +198,121 @@
         }
       }
     },
+    "/pcap/search": {
+      "get": {
+        "operationId": "pcapSearch",
+        "description": "Endpoint for the PCAP search. Does the PCAP binary file search.",
+        "summary": "PCAP binary file search",
+        "tags": [ "search" ],
+        "produces": [ "application/json", "text/csv" ],
+        "parameters": [
+          { "$ref": "#/parameters/SearchQuery" },
+          { "$ref": "#/parameters/SearchFile" },
+          { "$ref": "#/parameters/IgnoreMissingFiles" },
+          { "$ref": "#/parameters/SearchBackend" },
+          { "$ref": "#/parameters/SearchBackendMode" },
+          { "$ref": "#/parameters/SearchBackendOption" },
+          { "$ref": "#/parameters/SaveData" },
+          { "$ref": "#/parameters/SaveIndex" },
+          { "$ref": "#/parameters/Lifetime" },
+          { "$ref": "#/parameters/ReadShareMode" },
+          { "$ref": "#/parameters/SearchNodes" },
+          { "$ref": "#/parameters/SearchStat" },
+          { "$ref": "#/parameters/Performance" },
+          { "$ref": "#/parameters/SearchLimit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains search statistics.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/Error" }
+          }
+        }
+      },
+      "post": {
+        "description": "Does the PCAP search. The same as `GET /pcap/search` but uses JSON object in request's body to specify search parameters.",
+        "tags": [ "search" ],
+        "produces": [ "application/json", "text/csv" ],
+        "summary": "PCAP binary file search",
+        "operationId": "pcapSearchPost",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "schema": { "$ref": "#/definitions/SearchRequest" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains search statistics.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/Error" }
+          }
+        }
+      }
+    },
+    "/pcap/count": {
+      "get": {
+        "description": "Endpoint for the count. Does the PCAP search but returns just statistics.",
+        "tags": [ "search" ],
+        "summary": "Count the number of matches in PCAP file",
+        "operationId": "pcapCount",
+        "produces": [ "application/json", "text/csv" ],
+        "parameters": [
+          { "$ref": "#/parameters/SearchQuery" },
+          { "$ref": "#/parameters/SearchFile" },
+          { "$ref": "#/parameters/IgnoreMissingFiles" },
+          { "$ref": "#/parameters/SearchBackend" },
+          { "$ref": "#/parameters/SearchBackendMode" },
+          { "$ref": "#/parameters/SearchBackendOption" },
+          { "$ref": "#/parameters/SaveData" },
+          { "$ref": "#/parameters/SaveIndex" },
+          { "$ref": "#/parameters/Lifetime" },
+          { "$ref": "#/parameters/ReadShareMode" },
+          { "$ref": "#/parameters/SearchNodes" },
+          { "$ref": "#/parameters/Performance" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains search statistics only.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/Error" }
+          }
+        }
+      },
+      "post": {
+        "description": "Does the search but returns just statistics. The same as `GET /pcap/count` but uses JSON object in request's body to specify search parameters.",
+        "tags": [ "search" ],
+        "summary": "Count the number of matches",
+        "operationId": "pcapCountPost",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "schema": { "$ref": "#/definitions/CountRequest" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains search statistics only.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/Error" }
+          }
+        }
+      }
+    },
     "/run": {
       "get": {
         "tags": [ "misc" ],
