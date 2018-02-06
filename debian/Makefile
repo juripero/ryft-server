@@ -26,6 +26,7 @@ package-content: control
 	@cp "../ryft-users.yaml" "${DESTDIR}/etc/ryft-users.yaml"
 	@echo "/etc/ryft-server.conf" > "${DESTDIR}/DEBIAN/conffiles"
 	@echo "/etc/ryft-users.yaml" >> "${DESTDIR}/DEBIAN/conffiles"
+	@cp -R "../docker/tshark" "${DESTDIR}/usr/share/ryft/docker/"
 	@rm "${DESTDIR}/var/log/ryft/.keep"
 	@rm "${DESTDIR}/var/ryft/.keep"
 	@echo "Installed-Size: $$(du -k -s ${DESTDIR} | awk '{print $$1}')" >> "${CONTROLFILE}"
@@ -44,6 +45,7 @@ template:
 	@mkdir -p ${DESTDIR}
 	@cp -r template/* ${DESTDIR}/
 	@mkdir -p ${DESTDIR}/usr/bin
+	@mkdir -p ${DESTDIR}/usr/share/ryft/docker
 
 # create DEBIAN control file
 CONTROLFILE=${DESTDIR}/DEBIAN/control
