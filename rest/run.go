@@ -87,6 +87,14 @@ func (server *Server) DoRun(ctx *gin.Context) {
 				return filepath.Join(mountPoint, homeDir)
 			case "RYFTONE":
 				return mountPoint
+			case "UID":
+				return fmt.Sprintf("%d", os.Getuid())
+			case "GID":
+				return fmt.Sprintf("%d", os.Getgid())
+			case "EUID":
+				return fmt.Sprintf("%d", os.Geteuid())
+			case "EGID":
+				return fmt.Sprintf("%d", os.Getegid())
 			}
 			return os.Getenv(name) // system fallback
 		}
