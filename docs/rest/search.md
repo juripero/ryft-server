@@ -864,7 +864,8 @@ See [aggregations document](./aggs.md) for more details.
 
 # PCAP Search
 
-The GET `/pcap/search` and `/pcap/count` endpoints are used to search PCAP data on Ryft boxes.
+The GET `/pcap/search` and `/pcap/count` endpoints are used to search
+[PCAP data](../search/PCAP.md) on Ryft boxes.
 They are very similar to corresponding `/search` and `/count` methods but have
 the following limitations:
 - no complex queries are supported
