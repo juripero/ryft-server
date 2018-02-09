@@ -131,7 +131,11 @@ func (server *Server) doPcapSearch(ctx *gin.Context, params PcapSearchParams) {
 	}
 	if params.Limit != 0 {
 		panic(NewError(http.StatusBadRequest,
-			"no records can be requested, only limit=0 is supported"))
+			"no records can be requested, only limit=0 is supported for PCAP"))
+	}
+	if !params.Local {
+		panic(NewError(http.StatusBadRequest,
+			"cluster mode is not supported for PCAP"))
 	}
 
 	// setting up transcoder to convert raw data
