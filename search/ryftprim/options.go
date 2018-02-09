@@ -41,8 +41,8 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
-// getExecPath get backend path (ryftprim, ryftx or pcre2) and its options
-func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) {
+// getExecTool get backend tool name (ryftprim, ryftx or pcre2)
+func (engine *Engine) getExecTool(cfg *search.Config) (string, string, string, error) {
 	// search primitive (check aliases)
 	prim := strings.ToLower(cfg.Mode)
 	switch prim {
@@ -99,7 +99,17 @@ func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) 
 	case "re", "regex", "regexp", "pcre2", "ryftpcre2":
 		path, tool = engine.Ryftpcre2Exec, "ryftpcre2"
 	default:
-		return "", nil, fmt.Errorf(`"%s" is unknown backend tool`, tool)
+		return "", "", "", fmt.Errorf(`"%s" is unknown backend tool`, tool)
+	}
+
+	return tool, path, prim, nil // OK
+}
+
+// getExecPath get backend path (ryftprim, ryftx or pcre2) and its options
+func (engine *Engine) getExecPath(cfg *search.Config) (string, []string, error) {
+	tool, path, prim, err := engine.getExecTool(cfg)
+	if err != nil {
+		return "", nil, err
 	}
 
 	opts := engine.Tweaks.GetOptions(cfg.Backend.Mode, tool, prim)
@@ -135,6 +145,9 @@ func (engine *Engine) Options() map[string]interface{} {
 	}
 	if len(engine.Tweaks.Router) != 0 {
 		btweaks["router"] = engine.Tweaks.Router
+	}
+	if len(engine.Tweaks.UseAbsPath) != 0 {
+		btweaks["abs-path"] = engine.Tweaks.UseAbsPath
 	}
 	if len(btweaks) != 0 {
 		opts["backend-tweaks"] = btweaks

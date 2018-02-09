@@ -44,6 +44,9 @@ type Tweaks struct {
 
 	// routing table: [primitive] => backend
 	Router map[string]string
+
+	// absolute path: [backend] => flag
+	UseAbsPath map[string]bool
 }
 
 // ParseTweaks parses tweaks from engine options
@@ -51,6 +54,7 @@ func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
 	t := new(Tweaks)
 	t.Options = make(map[string][]string)
 	t.Router = make(map[string]string)
+	t.UseAbsPath = make(map[string]bool)
 
 	if true { // [backward compatibility]
 		// default options for all engines
@@ -134,6 +138,22 @@ func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
 						t.Router[mode] = tool
 					}
 				}
+			}
+		}
+	}
+
+	// backend-tweaks.abs-path
+	if absPath_, ok := opts["abs-path"]; ok {
+		absPath, err := utils.AsStringMap(absPath_)
+		if err != nil {
+			return nil, fmt.Errorf(`failed to parse "backend-tweaks.abs-path": %s`, err)
+		}
+
+		for k, v := range absPath {
+			if flag, err := utils.AsBool(v); err != nil {
+				return nil, fmt.Errorf(`bad "backend-tweaks.abs-path" value for key "%s": %s`, k, err)
+			} else {
+				t.UseAbsPath[k] = flag
 			}
 		}
 	}

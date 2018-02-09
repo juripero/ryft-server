@@ -58,7 +58,7 @@ func (task *Task) releaseLockedFiles() {
 // Prepare `ryftprim` command line arguments.
 // This function converts search configuration to `ryftprim` command line arguments.
 // See `ryftprim -h` for option description.
-func (engine *Engine) prepare(task *Task) error {
+func (engine *Engine) prepare(backend string, task *Task) error {
 	args := []string{}
 	cfg := task.config
 
@@ -141,7 +141,7 @@ func (engine *Engine) prepare(task *Task) error {
 		}
 
 		if !skip {
-			args = append(args, "-f", engine.getFilePath(path))
+			args = append(args, "-f", engine.getFilePath(backend, path))
 		}
 	}
 
@@ -184,7 +184,7 @@ func (engine *Engine) prepare(task *Task) error {
 				Warnf("[%s]: index filename was updated to have TXT extension", TAG)
 		}
 
-		args = append(args, "-oi", engine.getFilePath(task.IndexFileName))
+		args = append(args, "-oi", engine.getFilePath(backend, task.IndexFileName))
 	}
 
 	// DATA output file
@@ -198,7 +198,7 @@ func (engine *Engine) prepare(task *Task) error {
 				engine.Instance, fmt.Sprintf(".dat-%s.bin", task.Identifier))
 		}
 
-		args = append(args, "-od", engine.getFilePath(task.DataFileName))
+		args = append(args, "-od", engine.getFilePath(backend, task.DataFileName))
 	}
 
 	// VIEW output file
@@ -554,8 +554,18 @@ func (engine *Engine) relativeToMountPoint(path string) string {
 }
 
 // get a file path (relative or absolute)
-func (engine *Engine) getFilePath(path string) string {
-	if engine.UseAbsPath {
+func (engine *Engine) getFilePath(backend string, path string) string {
+	useAbsPath := engine.UseAbsPath // default
+	if backend != "" {
+		// get tweaks[backend]
+		if a, ok := engine.Tweaks.UseAbsPath[backend]; ok {
+			useAbsPath = a
+		} else if b, ok := engine.Tweaks.UseAbsPath["default"]; ok {
+			useAbsPath = b
+		}
+	}
+
+	if useAbsPath {
 		return path
 	}
 

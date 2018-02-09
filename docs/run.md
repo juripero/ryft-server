@@ -566,6 +566,8 @@ backend-options:
       ...
     router:
       ...
+    abs-path:
+      ...
 ```
 
 
@@ -585,7 +587,6 @@ backend-options:
 ```
 
 `/search` and `/count` endpoints accept `backend` parameter, but if it is not set explicetly `router` may be used for choosing backend that fits better for current search primitive. If search primitive is ommited in the `router` table value of the `default` key will be used.
-
 
 ### options
 
@@ -619,3 +620,22 @@ Search order in config defined above:
 - create `options` key using pattern `[backend-mode].[backend].[search primitive]` and search it in `options`.
 If nothing found in `options` try `[backend].[search primitive]`, then `[search primitive]`, `[backend]`, `[backend mode]`. Finally, if nothing found use value for the `default` key.
 - execute `backend` tool with a `query` and found options. E.g. `/usr/bin/ryftprim [query] ... [backend-options]`
+
+
+### absolute path
+
+This section describes the usage of absolute/relative path for the backend tool.
+Only `ryftprim` tool accepts path relative to `/ryftone` patrition. The
+`ryftx` and `ryftpcre2` tools accept absolute path.
+
+If no tool is specified the `default` flag is used.
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path:
+      default: false
+      ryftprim: false
+      ryftx: true
+      ryftpcre2: true
+```

@@ -54,7 +54,7 @@ type Engine struct {
 	Ryftpcre2Exec    string // "/usr/bin/ryftprim" by default
 	LegacyMode       bool   // legacy mode to get machine readable statistics
 	KillToolOnCancel bool   // flag to kill ryftprim if cancelled
-	UseAbsPath       bool   // flag to use absolute path
+	UseAbsPath       bool   // flag to use absolute path (fallback for tweaks)
 	MountPoint       string // "/ryftone" by default
 	HomeDir          string // subdir of mountpoint
 
@@ -127,9 +127,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}()
 
 	// prepare command line arguments
-	err := engine.prepare(task)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
+	if tool, _, _, err := engine.getExecTool(cfg); err == nil {
+		err := engine.prepare(tool, task)
+		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
+			return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
+		}
+	} else {
 		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
 	}
 
@@ -141,7 +145,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return res, nil // OK
 	}
 
-	err = engine.run(task, res)
+	err := engine.run(task, res)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to run", TAG)
 		return nil, fmt.Errorf("failed to run %s: %s", TAG, err)
@@ -172,9 +176,13 @@ func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	}
 
 	// prepare command line arguments
-	err := engine.prepare(task)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
+	if tool, _, _, err := engine.getExecTool(cfg); err == nil {
+		err := engine.prepare(tool, task)
+		if err != nil {
+			task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
+			return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
+		}
+	} else {
 		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
 	}
 
