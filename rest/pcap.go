@@ -82,6 +82,7 @@ func (server *Server) DoPcapSearch(ctx *gin.Context) {
 		Format: format.NULL,
 		Limit:  -1, // no limit
 		Stats:  false,
+		Local:  true,
 	})
 }
 
@@ -91,6 +92,7 @@ func (server *Server) DoPcapCount(ctx *gin.Context) {
 		Format: format.NULL,
 		Limit:  0,    // no records
 		Stats:  true, // need stats!
+		Local:  true,
 	})
 }
 
