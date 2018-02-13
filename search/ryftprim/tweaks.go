@@ -144,16 +144,57 @@ func ParseTweaks(opts_ map[string]interface{}) (*Tweaks, error) {
 
 	// backend-tweaks.abs-path
 	if absPath_, ok := opts["abs-path"]; ok {
-		absPath, err := utils.AsStringMap(absPath_)
-		if err != nil {
-			return nil, fmt.Errorf(`failed to parse "backend-tweaks.abs-path": %s`, err)
+		var asMap map[string]interface{}
+		var asSlice []string
+
+		// multi-type option
+		switch vv := absPath_.(type) {
+		case nil:
+			break // no configuration
+
+		case map[string]interface{}:
+			asMap = vv // map
+
+		case map[interface{}]interface{}:
+			if m, err := utils.AsStringMap(vv); err != nil {
+				return nil, fmt.Errorf(`failed to parse "backend-tweaks.abs-path": %s`, err)
+			} else {
+				asMap = m
+			}
+
+		case []string:
+			asSlice = vv // slice
+
+		case []interface{}:
+			if a, err := utils.AsStringSlice(vv); err != nil {
+				return nil, fmt.Errorf(`failed to parse "backend-tweaks.abs-path": %s`, err)
+			} else {
+				asSlice = a
+			}
+
+		case string:
+			asSlice = []string{vv} // slice of one element
+
+		case bool:
+			asMap = map[string]interface{}{
+				"default": vv,
+			}
+
+		default:
+			return nil, fmt.Errorf(`unknown "backend-tweaks.abs-path" option type: %T`, absPath_)
 		}
 
-		for k, v := range absPath {
-			if flag, err := utils.AsBool(v); err != nil {
-				return nil, fmt.Errorf(`bad "backend-tweaks.abs-path" value for key "%s": %s`, k, err)
-			} else {
-				t.UseAbsPath[k] = flag
+		if asMap != nil {
+			for k, v := range asMap {
+				if flag, err := utils.AsBool(v); err != nil {
+					return nil, fmt.Errorf(`bad "backend-tweaks.abs-path" value for key "%s": %s`, k, err)
+				} else {
+					t.UseAbsPath[k] = flag
+				}
+			}
+		} else if asSlice != nil {
+			for _, k := range asSlice {
+				t.UseAbsPath[k] = true
 			}
 		}
 	}

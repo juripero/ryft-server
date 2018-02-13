@@ -639,3 +639,19 @@ backend-options:
       ryftx: true
       ryftpcre2: true
 ```
+
+Other formats are also supported:
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path:
+    - ryftx
+    - ryftpcre2
+```
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path: [ ryftx, ryftpcre2 ]
+```

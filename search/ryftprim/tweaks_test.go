@@ -27,6 +27,7 @@ func TestTweakOpts(t *testing.T) {
 		assert.EqualValues(t, []string(nil), opts.GetOptions("", "ryftprim", "es"))
 	}
 
+	// custom backend options
 	opts, err = parseYamlTweaks(`
 backend-tweaks:
   options:
@@ -59,6 +60,7 @@ backend-tweaks:
 		assert.EqualValues(t, []string{"fhs"}, opts.GetOptions("", "ryftprim", "fhs"))
 	}
 
+	// backend router
 	opts, err = parseYamlTweaks(`
 backend-tweaks:
   options:
@@ -74,5 +76,83 @@ backend-tweaks:
 		assert.EqualValues(t, "ryftprim", opts.GetBackendTool("fhs"))
 		assert.EqualValues(t, "ryftx", opts.GetBackendTool("es"))
 		assert.EqualValues(t, "ryftx", opts.GetBackendTool("ts"))
+	}
+
+	// abs-path (as a map)
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path:
+    ryftprim: false
+    ryftx: true
+    default: false
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"ryftprim": false,
+			"ryftx":    true,
+			"default":  false,
+		}, opts.UseAbsPath)
+	}
+
+	// abs-path (as a slice)
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path:
+  - ryftx
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"ryftx": true,
+		}, opts.UseAbsPath)
+	}
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: [ ryftx ]
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"ryftx": true,
+		}, opts.UseAbsPath)
+	}
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: [ ryftx, ryftpcre2 ]
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"ryftx":     true,
+			"ryftpcre2": true,
+		}, opts.UseAbsPath)
+	}
+
+	// abs-path (as a string)
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: ryftx
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"ryftx": true,
+		}, opts.UseAbsPath)
+	}
+
+	// abs-path (as a bool)
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: true
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"default": true,
+		}, opts.UseAbsPath)
+	}
+
+	// abs-path fails
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: 100
+`)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), `unknown "backend-tweaks.abs-path" option type`)
 	}
 }
