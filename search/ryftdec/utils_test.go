@@ -1,6 +1,7 @@
 package ryftdec
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,6 +13,16 @@ import (
 	"github.com/getryft/ryft-server/search/utils/query"
 	"github.com/stretchr/testify/assert"
 )
+
+// custom value to JSON
+func asJson(v interface{}) string {
+	d, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(d)
+}
 
 // test extension detection
 func TestDetectExtension(t *testing.T) {

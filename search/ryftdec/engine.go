@@ -61,6 +61,8 @@ type Engine struct {
 
 	KeepResultFiles bool // false by default
 	CompatMode      bool // false by default
+
+	Tweaks *Tweaks // backend tweaks
 }
 
 // NewEngine creates new RyftDEC search engine.
@@ -93,6 +95,29 @@ func (engine *Engine) Options() map[string]interface{} {
 	//opts["keep-files"] = engine.KeepResultFiles
 	opts["optimizer-limit"] = engine.optimizer.CombineLimit
 	opts["optimizer-do-not-combine"] = strings.Join(engine.optimizer.ExceptModes, ":")
+
+	btweaks := make(map[string]interface{})
+	if v, ok := opts["backend-tweaks"]; ok {
+		if vv, ok := v.(map[string]interface{}); ok {
+			for k, v := range vv {
+				btweaks[k] = v
+			}
+		}
+	}
+
+	if len(engine.Tweaks.Router) != 0 {
+		btweaks["router"] = engine.Tweaks.Router
+	}
+	if len(engine.Tweaks.Options) != 0 {
+		btweaks["options"] = engine.Tweaks.Options
+	}
+	if len(engine.Tweaks.Exec) != 0 {
+		btweaks["exec"] = engine.Tweaks.Exec
+	}
+	if len(btweaks) != 0 {
+		opts["backend-tweaks"] = btweaks
+	}
+
 	return opts
 }
 
@@ -135,6 +160,78 @@ func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery, boo
 			cfg.Mode = "g" // generic!
 		}
 	}
+}
+
+// updates the backend path and options
+func (engine *Engine) updateBackend(cfg *search.Config) (*search.Config, error) {
+	tool, opts, err := engine.getExecTool(cfg)
+	if err != nil {
+		log.WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
+		return nil, fmt.Errorf("failed to find tool: %s", err)
+	} else if tool == "" {
+		log.Warnf("[%s]: no appropriate tool found", TAG)
+		return nil, fmt.Errorf("no tool found: %s", tool)
+	}
+
+	// get tool path
+	path := engine.Tweaks.Exec[tool]
+	if len(path) == 0 {
+		return nil, fmt.Errorf("no executable path found for %s", tool)
+	}
+
+	// update configuration for the ryftprim
+	cfg = cfg.Clone()
+	cfg.Backend.Mode = tool
+	cfg.Backend.Tool = path[0]
+	cfg.Backend.Opts = make([]string, 0, len(path)-1+len(opts))
+	cfg.Backend.Opts = append(cfg.Backend.Opts, path[1:]...)
+	cfg.Backend.Opts = append(cfg.Backend.Opts, opts...)
+
+	return cfg, nil // OK
+}
+
+// getExecTool get backend tool name (ryftprim, ryftx or pcre2) and options
+func (engine *Engine) getExecTool(cfg *search.Config) (string, []string, error) {
+	// search primitive (check aliases)
+	prim := strings.ToLower(cfg.Mode)
+	switch prim {
+	case "g/es", "es":
+		prim = "es"
+	case "g/fhs", "fhs":
+		prim = "fhs"
+	case "g/feds", "feds":
+		prim = "feds"
+	case "g/ds", "ds":
+		prim = "ds"
+	case "g/ts", "ts":
+		prim = "ts"
+	case "g/ns", "ns":
+		prim = "ns"
+	case "g/cs", "cs":
+		prim = "cs"
+	case "g/ipv4", "ipv4":
+		prim = "ipv4"
+	case "g/ipv6", "ipv6":
+		prim = "ipv6"
+	case "g/pcre2", "pcre2":
+		prim = "pcre2"
+	}
+
+	// backend tool (with aliases)
+	var tool string
+	if cfg.Backend.Tool == "" {
+		// check the routing table by search primitive
+		tool = engine.Tweaks.GetBackendTool(prim)
+		if tool == "" {
+			tool = "ryftprim" // fallback
+		}
+	} else {
+		// use provided backend tool
+		tool = cfg.Backend.Tool
+	}
+
+	opts := engine.Tweaks.GetOptions(cfg.Backend.Mode, tool, prim)
+	return tool, opts, nil // OK
 }
 
 // parse engine options
@@ -205,6 +302,12 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 	}
 
+	// backend-tweaks
+	engine.Tweaks, err = ParseTweaks(opts)
+	if err != nil {
+		return fmt.Errorf(`failed to parse "backend-tweaks" options: %s`, err)
+	}
+
 	return nil
 }
 
@@ -260,7 +363,11 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 
 // PcapSearch starts asynchronous "/pcap/search" operation.
 func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
-	return engine.Backend.PcapSearch(cfg)
+	if cfg1, err := engine.updateBackend(cfg); err != nil {
+		return nil, err
+	} else {
+		return engine.Backend.PcapSearch(cfg1)
+	}
 }
 
 // Show starts asynchronous "/search/show" operation.

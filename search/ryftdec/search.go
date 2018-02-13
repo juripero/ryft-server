@@ -320,7 +320,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 && len(cfg.Transforms) == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
 		engine.updateConfig(cfg, sq, task.rootQuery.BoolOps)
-		return engine.Backend.Search(cfg)
+		if cfg1, err := engine.updateBackend(cfg); err != nil {
+			return nil, err
+		} else {
+			return engine.Backend.Search(cfg1)
+		}
 	}
 
 	// AND/OR: use source list of files to detect extensions
@@ -504,6 +508,11 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 		"query": cfg.Query,
 		"files": cfg.Files,
 	}).Infof("[%s/%d]: running backend search", TAG, task.subtaskId)
+	if cfg1, err := engine.updateBackend(cfg); err != nil {
+		return nil, err
+	} else {
+		cfg = cfg1
+	}
 	res, err := engine.Backend.Search(cfg)
 	if err != nil {
 		return nil, err
