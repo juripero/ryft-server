@@ -197,6 +197,9 @@ func AsStringSlice(v interface{}) ([]string, error) {
 	case nil:
 		return nil, nil // empty
 
+	case string:
+		return []string{vv}, nil // OK, single element
+
 	case []string:
 		return vv, nil // OK
 
