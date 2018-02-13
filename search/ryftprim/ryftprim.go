@@ -231,31 +231,13 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
-	var err error
-	var engineOpts []string
-	task.toolPath, engineOpts, err = engine.getExecPath(task.config)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
-		return fmt.Errorf("failed to find tool: %s", err)
-	} else if task.toolPath == "" {
-		task.log().Warnf("[%s]: no appropriate tool found", TAG)
-		return fmt.Errorf("no tool found: %s", task.toolPath)
-	}
-
 	// backend options (should be added to the END)
-	// define them here because need to know which engine will be used
-	var backendOpts []string
-	if len(task.config.Backend.Opts) > 0 { // options from request
-		backendOpts = task.config.Backend.Opts
-	} else if len(engineOpts) > 0 { // engine default options
-		backendOpts = engineOpts
-	}
-
-	// assign command line
-	task.toolArgs = append(task.toolArgs, backendOpts...)
+	task.toolArgs = append(task.toolArgs, task.config.Backend.Opts...)
+	task.toolPath = task.config.Backend.Tool
 
 	task.log().WithFields(map[string]interface{}{
-		"tool": task.toolPath,
+		"tool": task.config.Backend.Mode,
+		"path": task.toolPath,
 		"args": task.toolArgs,
 	}).Infof("[%s]: executing tool", TAG)
 	task.toolCmd = exec.Command(task.toolPath, task.toolArgs...)
@@ -266,7 +248,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.toolCmd.Stderr = task.toolOut
 
 	task.toolStartTime = time.Now() // performance metric
-	err = task.toolCmd.Start()
+	err := task.toolCmd.Start()
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to start tool", TAG)
 		return fmt.Errorf("failed to start tool: %s", err)

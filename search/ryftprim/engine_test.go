@@ -101,7 +101,6 @@ func TestEngineFiles(t *testing.T) {
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/bin/false",
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           root,
@@ -167,10 +166,11 @@ func TestEngineUsual(t *testing.T) {
 		cfg.ReportIndex = true
 		cfg.ReportData = true
 		cfg.Nodes = 1
+		cfg.Backend.Tool = prim
+		cfg.Backend.Mode = "testprim"
 
 		engine, err := factory(map[string]interface{}{
 			"instance-name":           ".test",
-			"ryftprim-exec":           prim,
 			"ryftprim-legacy":         true,
 			"ryftprim-kill-on-cancel": true,
 			"ryftone-mount":           root,
@@ -256,10 +256,11 @@ func TestEngineUsualLimit(t *testing.T) {
 	cfg.ReportData = true
 	cfg.Nodes = 1
 	cfg.Limit = 2
+	cfg.Backend.Tool = prim
+	cfg.Backend.Mode = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           root,
@@ -326,10 +327,11 @@ func TestEngineUsualNoOutput(t *testing.T) {
 	cfg.ReportIndex = true
 	cfg.ReportData = true
 	cfg.Nodes = 1
+	cfg.Backend.Tool = prim
+	cfg.Backend.Mode = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           root,
@@ -390,7 +392,6 @@ func TestEngineBadSearchMode(t *testing.T) {
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/bin/false",
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           "/tmp",
@@ -433,7 +434,6 @@ func TestEngineBadPath(t *testing.T) {
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           root,
@@ -487,7 +487,6 @@ func TestEngineFailedToStartTool(t *testing.T) {
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           root,
@@ -527,10 +526,11 @@ sleep 300s
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.ReportIndex = true
+	cfg.Backend.Tool = prim
+	cfg.Backend.Mode = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           root,
@@ -565,10 +565,11 @@ func TestEngineToolFailed(t *testing.T) {
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.ReportIndex = true
+	cfg.Backend.Tool = "/bin/false"
+	cfg.Backend.Mode = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           "/bin/false",
 		"ryftprim-legacy":         false,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           "/tmp",
@@ -622,10 +623,11 @@ exit(3)
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.ReportIndex = true
+	cfg.Backend.Tool = prim
+	cfg.Backend.Mode = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
-		"ryftprim-exec":           prim,
 		"ryftprim-legacy":         true,
 		"ryftprim-kill-on-cancel": true,
 		"ryftone-mount":           root,
