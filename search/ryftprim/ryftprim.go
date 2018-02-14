@@ -59,8 +59,13 @@ func (task *Task) releaseLockedFiles() {
 // This function converts search configuration to `ryftprim` command line arguments.
 // See `ryftprim -h` for option description.
 func (engine *Engine) prepare(backend string, task *Task) error {
-	args := []string{}
+	args := make([]string, 0, 16)
 	cfg := task.config
+
+	// tool options (should be added to the BEGIN)
+	if len(cfg.Backend.Path) > 1 {
+		args = append(args, cfg.Backend.Path[1:]...)
+	}
 
 	// select search mode
 	genericMode := false
@@ -206,6 +211,9 @@ func (engine *Engine) prepare(backend string, task *Task) error {
 		task.ViewFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)
 	}
 
+	// backend options (should be added to the END)
+	args = append(args, cfg.Backend.Opts...)
+
 	// assign command line
 	task.toolArgs = args
 	return nil // OK
@@ -231,16 +239,17 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
-	// backend options (should be added to the END)
-	task.toolArgs = append(task.toolArgs, task.config.Backend.Opts...)
-	task.toolPath = task.config.Backend.Tool
-
+	if len(task.config.Backend.Path) == 0 {
+		return fmt.Errorf("no backend path provided")
+	}
+	task.toolPath = task.config.Backend.Path[0]
 	task.log().WithFields(map[string]interface{}{
-		"tool": task.config.Backend.Mode,
+		"tool": task.config.Backend.Tool,
 		"path": task.toolPath,
 		"args": task.toolArgs,
 	}).Infof("[%s]: executing tool", TAG)
-	task.toolCmd = exec.Command(task.toolPath, task.toolArgs...)
+	task.toolCmd = exec.Command(task.toolPath,
+		task.toolArgs...)
 
 	// prepare combined STDERR&STDOUT output
 	task.toolOut = new(bytes.Buffer)
@@ -355,9 +364,7 @@ func (task *Task) finish(res *search.Result) {
 		res.Stat.AddSessionData("matches", res.Stat.Matches)
 
 		// save backend tool used
-		if _, tool := filepath.Split(task.toolPath); len(tool) != 0 {
-			res.Stat.Extra["backend"] = tool
-		}
+		res.Stat.Extra["backend"] = task.config.Backend.Tool
 	}
 
 	res.ReportDone()

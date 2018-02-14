@@ -163,31 +163,30 @@ func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery, boo
 }
 
 // updates the backend path and options
-func (engine *Engine) updateBackend(cfg *search.Config) (*search.Config, error) {
+func (engine *Engine) updateBackend(cfg *search.Config) error {
 	tool, opts, err := engine.getExecTool(cfg)
 	if err != nil {
 		log.WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
-		return nil, fmt.Errorf("failed to find tool: %s", err)
+		return fmt.Errorf("failed to find tool: %s", err)
 	} else if tool == "" {
 		log.Warnf("[%s]: no appropriate tool found", TAG)
-		return nil, fmt.Errorf("no tool found: %s", tool)
+		return fmt.Errorf("no tool found: %s", tool)
 	}
 
 	// get tool path
 	path := engine.Tweaks.Exec[tool]
 	if len(path) == 0 {
-		return nil, fmt.Errorf("no executable path found for %s", tool)
+		return fmt.Errorf("no executable path found for %s", tool)
 	}
 
 	// update configuration for the ryftprim
-	cfg = cfg.Clone()
-	cfg.Backend.Mode = tool
-	cfg.Backend.Tool = path[0]
-	cfg.Backend.Opts = make([]string, 0, len(path)-1+len(opts))
-	cfg.Backend.Opts = append(cfg.Backend.Opts, path[1:]...)
-	cfg.Backend.Opts = append(cfg.Backend.Opts, opts...)
+	cfg.Backend.Tool = tool
+	cfg.Backend.Path = path
+	if len(cfg.Backend.Opts) == 0 {
+		cfg.Backend.Opts = opts
+	}
 
-	return cfg, nil // OK
+	return nil // OK
 }
 
 // getExecTool get backend tool name (ryftprim, ryftx or pcre2) and options
@@ -215,6 +214,8 @@ func (engine *Engine) getExecTool(cfg *search.Config) (string, []string, error) 
 		prim = "ipv6"
 	case "g/pcre2", "pcre2":
 		prim = "pcre2"
+	default:
+		// "as is"
 	}
 
 	// backend tool (with aliases)
@@ -363,11 +364,10 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 
 // PcapSearch starts asynchronous "/pcap/search" operation.
 func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
-	if cfg1, err := engine.updateBackend(cfg); err != nil {
+	if err := engine.updateBackend(cfg); err != nil {
 		return nil, err
-	} else {
-		return engine.Backend.PcapSearch(cfg1)
 	}
+	return engine.Backend.PcapSearch(cfg)
 }
 
 // Show starts asynchronous "/search/show" operation.

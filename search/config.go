@@ -83,6 +83,9 @@ type Config struct {
 		// should be "ryftprim" or "ryftx" or "ryftpcre2"
 		Tool string
 
+		// backend full path
+		Path []string
+
 		// additional backend options
 		// addeded to the end of args
 		Opts []string

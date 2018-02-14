@@ -124,7 +124,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}()
 
 	// prepare command line arguments
-	if err := engine.prepare(cfg.Backend.Mode, task); err != nil {
+	if err := engine.prepare(cfg.Backend.Tool, task); err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
 		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
 	}
@@ -168,7 +168,7 @@ func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	}
 
 	// prepare command line arguments
-	if err := engine.prepare(cfg.Backend.Mode, task); err != nil {
+	if err := engine.prepare(cfg.Backend.Tool, task); err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
 		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
 	}

@@ -166,8 +166,8 @@ func TestEngineUsual(t *testing.T) {
 		cfg.ReportIndex = true
 		cfg.ReportData = true
 		cfg.Nodes = 1
-		cfg.Backend.Tool = prim
-		cfg.Backend.Mode = "testprim"
+		cfg.Backend.Path = []string{prim}
+		cfg.Backend.Tool = "testprim"
 
 		engine, err := factory(map[string]interface{}{
 			"instance-name":           ".test",
@@ -256,8 +256,8 @@ func TestEngineUsualLimit(t *testing.T) {
 	cfg.ReportData = true
 	cfg.Nodes = 1
 	cfg.Limit = 2
-	cfg.Backend.Tool = prim
-	cfg.Backend.Mode = "testprim"
+	cfg.Backend.Path = []string{prim}
+	cfg.Backend.Tool = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
@@ -327,8 +327,8 @@ func TestEngineUsualNoOutput(t *testing.T) {
 	cfg.ReportIndex = true
 	cfg.ReportData = true
 	cfg.Nodes = 1
-	cfg.Backend.Tool = prim
-	cfg.Backend.Mode = "testprim"
+	cfg.Backend.Path = []string{prim}
+	cfg.Backend.Tool = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
@@ -484,6 +484,8 @@ func TestEngineFailedToStartTool(t *testing.T) {
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.Mode = "fhs"
+	cfg.Backend.Path = []string{prim}
+	cfg.Backend.Tool = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
@@ -526,8 +528,8 @@ sleep 300s
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.ReportIndex = true
-	cfg.Backend.Tool = prim
-	cfg.Backend.Mode = "testprim"
+	cfg.Backend.Path = []string{prim}
+	cfg.Backend.Tool = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
@@ -565,8 +567,8 @@ func TestEngineToolFailed(t *testing.T) {
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.ReportIndex = true
-	cfg.Backend.Tool = "/bin/false"
-	cfg.Backend.Mode = "testprim"
+	cfg.Backend.Path = []string{"/bin/false"}
+	cfg.Backend.Tool = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
@@ -623,8 +625,8 @@ exit(3)
 
 	cfg := search.NewConfig("hello", "1.txt", "2.txt")
 	cfg.ReportIndex = true
-	cfg.Backend.Tool = prim
-	cfg.Backend.Mode = "testprim"
+	cfg.Backend.Path = []string{prim}
+	cfg.Backend.Tool = "testprim"
 
 	engine, err := factory(map[string]interface{}{
 		"instance-name":           ".test",
