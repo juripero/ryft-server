@@ -250,7 +250,12 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
-	autoRecord := engine.autoRecord && hasRecord(q)
+	// preliminary update backend to get "auto-record" flag
+	// WARNING: tool is selected for the whole search query!
+	if err := engine.updateBackend(cfg); err != nil {
+		return nil, fmt.Errorf("failed to select backend: %s", err)
+	}
+	autoRecord := engine.isAutoRecord(cfg.Backend.Tool) && hasRecord(q)
 	task.rootQuery = engine.Optimize(q)
 
 	task.result, err = NewInMemoryPostProcessing() // NewCatalogPostProcessing

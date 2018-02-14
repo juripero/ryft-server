@@ -53,11 +53,11 @@ type Engine struct {
 	Backend   search.Engine
 	optimizer *query.Optimizer
 
-	autoRecord   bool     // RECORD to XRECORD or CRECORD replacement
-	skipPatterns []string // skip/ignore patterns
-	jsonPatterns []string // JSON patterns
-	xmlPatterns  []string // XML patterns
-	csvPatterns  []string // CSV patterns
+	autoRecord   map[string]bool // RECORD to XRECORD or CRECORD replacement per backend
+	skipPatterns []string        // skip/ignore patterns
+	jsonPatterns []string        // JSON patterns
+	xmlPatterns  []string        // XML patterns
+	csvPatterns  []string        // CSV patterns
 
 	KeepResultFiles bool // false by default
 	CompatMode      bool // false by default
@@ -312,15 +312,77 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	return nil
 }
 
+// get the "auto-record" flag for the backend tool
+func (engine *Engine) isAutoRecord(tool string) bool {
+	if flag, ok := engine.autoRecord[tool]; ok {
+		return flag
+	}
+
+	// fallback
+	if flag, ok := engine.autoRecord["default"]; ok {
+		return flag
+	}
+
+	return false
+}
+
 // update "record-queries" options
 func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 	// parse "enabled" flag
 	if v, ok := opts["enabled"]; ok {
-		vv, err := utils.AsBool(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "user-config.record-queries.enabled" option: %s`, err)
+		engine.autoRecord = make(map[string]bool)
+		var asMap map[string]interface{}
+		var asSlice []string
+
+		switch vv := v.(type) {
+		case nil: // no configuration
+			break
+
+		case bool: // default: on/off
+			asMap = map[string]interface{}{
+				"default": vv,
+			}
+
+		case string: // one element slice
+			asSlice = []string{vv}
+
+		case []string: // slice
+			asSlice = vv
+
+		case []interface{}: // slice
+			if a, err := utils.AsStringSlice(vv); err != nil {
+				return fmt.Errorf(`failed to parse "user-config.record-queries.enabled": %s`, err)
+			} else {
+				asSlice = a
+			}
+
+		case map[string]interface{}: // map
+			asMap = vv
+
+		case map[interface{}]interface{}: // map
+			if m, err := utils.AsStringMap(vv); err != nil {
+				return fmt.Errorf(`failed to parse "user-config.record-queries.enabled": %s`, err)
+			} else {
+				asMap = m
+			}
+
+		default:
+			return fmt.Errorf(`failed to parse "user-config.record-queries.enabled" option: unexpected type %T`, v)
 		}
-		engine.autoRecord = vv
+
+		if asMap != nil {
+			for tool, v := range asMap {
+				if flag, err := utils.AsBool(v); err != nil {
+					return fmt.Errorf(`bad "user-config.record-queries.enabled" value for key "%s": %s`, tool, err)
+				} else {
+					engine.autoRecord[tool] = flag
+				}
+			}
+		} else if asSlice != nil {
+			for _, tool := range asSlice {
+				engine.autoRecord[tool] = true
+			}
+		}
 	}
 
 	// parse SKIP patterns
