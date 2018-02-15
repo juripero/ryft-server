@@ -491,7 +491,22 @@ record-queries:
   csv: ["*.csv"]
 ```
 
-This feature can be disabled by `enabled: false` option.
+This feature can be disabled by `enabled: false` option. Also this feature
+can be enabled for particular backend tools, for example:
+
+```{.yaml}
+record-queries:
+  enabled:
+  - ryftx
+  - ryftpcre2
+
+# ... or ...
+
+record-queries:
+  enabled:
+    default: true
+    ryftprim: false
+```
 
 The following lists of file patterns customize extension-based file type detection:
 - `skip` ignore these extensions. The `RECORD` will be kept as is.
