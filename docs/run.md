@@ -203,7 +203,7 @@ settings-path: /var/ryft/server.settings
 # instance-home: /
 ```
 
-`local-only` is used to run `ryft-server` outside cluster. No consult dependency,
+`local-only` is used to run `ryft-server` outside cluster. No consul dependency,
 no load balancing enabled. It's equivalent to `--local-only` command line option.
 
 `debug-mode` is used to enable extensive logging.
