@@ -52,7 +52,6 @@ struct JSON_Token
 struct JSON_Parser {
     const uint8_t *beg; ///< @brief Begin of JSON data.
     const uint8_t *end; ///< @brief End of JSON data.
-    int state; ///< @brief Parser's state.
 
     // buffered tokens
     struct JSON_Token tokens[32];   ///< @brief Buffer of tokens.

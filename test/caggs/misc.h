@@ -63,4 +63,14 @@ static inline void verr(const char *msg, ...)
 #define vlog3(...) if (verbose < 3) {} else vlog(__VA_ARGS__)
 
 
+// print INFO error messages
+#define verr1(...) if (verbose < 1) {} else verr(__VA_ARGS__)
+
+// print DETAIL error messages
+#define verr2(...) if (verbose < 2) {} else verr(__VA_ARGS__)
+
+// print TRACE error messages
+#define verr3(...) if (verbose < 3) {} else verr(__VA_ARGS__)
+
+
 #endif // __CAGGS_MISC_H__

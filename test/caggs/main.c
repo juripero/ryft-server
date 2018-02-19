@@ -140,7 +140,7 @@ static struct Stat* stat_clone(struct Stat *base)
 }
 
 // merge statistics
-static void stat_merge(struct Stat *to, struct Stat *from)
+static void stat_merge(struct Stat *to, const struct Stat *from)
 {
     if (!from->count)
         return; // nothing to merge
@@ -200,7 +200,8 @@ static int process_record(const struct Conf *cfg,
 
     if (JSON_NUMBER != field->token.type)
     {
-        verr("WARN: bad value found, ignored\n");
+        s->count += 1; // TODO: check not NULL
+        verr2("WARN: bad value found, ignored\n");
         return 0;
     }
 

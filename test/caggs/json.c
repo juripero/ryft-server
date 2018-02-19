@@ -4,18 +4,6 @@
 #include <stdlib.h>
 
 
-/**
- * @brief The JSON parser's state.
- */
-enum JSON_ParserState
-{
-    JSON_PARSER_STATE_VALUE,
-    JSON_PARSER_STATE_OBJ_KEY,
-    JSON_PARSER_STATE_OBJ_VAL,
-
-    JSON_PARSER_STATE_EOF,
-};
-
 /*
  * json_init() implementation.
  */
@@ -25,7 +13,6 @@ void json_init(struct JSON_Parser *parser,
 {
     parser->beg = (const uint8_t*)json_beg;
     parser->end = (const uint8_t*)json_end;
-    parser->state = JSON_PARSER_STATE_VALUE;
     parser->no_tokens = 0;
 }
 

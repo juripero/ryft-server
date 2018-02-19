@@ -34,7 +34,7 @@ int parse_len(const char *str, int *len)
         return -2; // suffix is unknown!
 
     // save length (bytes)
-    if (len) *len = (int)(b*x + 0.5);
+    if (len) *len = (int)(b*x + 0.5); // round
 
     return 0; // OK
 }
