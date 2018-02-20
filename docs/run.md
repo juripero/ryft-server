@@ -203,7 +203,7 @@ settings-path: /var/ryft/server.settings
 # instance-home: /
 ```
 
-`local-only` is used to run `ryft-server` outside cluster. No consult dependency,
+`local-only` is used to run `ryft-server` outside cluster. No consul dependency,
 no load balancing enabled. It's equivalent to `--local-only` command line option.
 
 `debug-mode` is used to enable extensive logging.
@@ -491,7 +491,22 @@ record-queries:
   csv: ["*.csv"]
 ```
 
-This feature can be disabled by `enabled: false` option.
+This feature can be disabled by `enabled: false` option. Also this feature
+can be enabled for particular backend tools, for example:
+
+```{.yaml}
+record-queries:
+  enabled:
+  - ryftx
+  - ryftpcre2
+
+# ... or ...
+
+record-queries:
+  enabled:
+    default: true
+    ryftprim: false
+```
 
 The following lists of file patterns customize extension-based file type detection:
 - `skip` ignore these extensions. The `RECORD` will be kept as is.
@@ -566,6 +581,8 @@ backend-options:
       ...
     router:
       ...
+    abs-path:
+      ...
 ```
 
 
@@ -585,7 +602,6 @@ backend-options:
 ```
 
 `/search` and `/count` endpoints accept `backend` parameter, but if it is not set explicetly `router` may be used for choosing backend that fits better for current search primitive. If search primitive is ommited in the `router` table value of the `default` key will be used.
-
 
 ### options
 
@@ -619,3 +635,38 @@ Search order in config defined above:
 - create `options` key using pattern `[backend-mode].[backend].[search primitive]` and search it in `options`.
 If nothing found in `options` try `[backend].[search primitive]`, then `[search primitive]`, `[backend]`, `[backend mode]`. Finally, if nothing found use value for the `default` key.
 - execute `backend` tool with a `query` and found options. E.g. `/usr/bin/ryftprim [query] ... [backend-options]`
+
+
+### absolute path
+
+This section describes the usage of absolute/relative path for the backend tool.
+Only `ryftprim` tool accepts path relative to `/ryftone` patrition. The
+`ryftx` and `ryftpcre2` tools accept absolute path.
+
+If no tool is specified the `default` flag is used.
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path:
+      default: false
+      ryftprim: false
+      ryftx: true
+      ryftpcre2: true
+```
+
+Other formats are also supported:
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path:
+    - ryftx
+    - ryftpcre2
+```
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path: [ ryftx, ryftpcre2 ]
+```

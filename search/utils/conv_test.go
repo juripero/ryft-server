@@ -245,6 +245,7 @@ func TestAsStringSlice(t *testing.T) {
 	}
 
 	check(nil)
+	check(string("a"), "a")
 	check([]string{"a"}, "a")
 	check([]interface{}{"b", "c"}, "b", "c")
 

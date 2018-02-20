@@ -77,6 +77,11 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return mux, nil // OK for now
 }
 
+// Search starts asynchronous "/pcap/search" or "/pcap/count" operation.
+func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
+	return engine.Search(cfg)
+}
+
 // Show starts asynchronous "/search/show" operation.
 func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	// redirect if we have only one backend

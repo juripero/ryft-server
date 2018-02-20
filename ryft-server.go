@@ -318,6 +318,14 @@ func main() {
 	private.GET("/cluster/members", server.DoClusterMembers)
 	private.GET("/run", server.DoRun)
 
+	// PCAP support
+	private.GET("/pcap/search", server.DoPcapSearch)
+	private.GET("/pcap/count", server.DoPcapCount)
+	private.POST("/pcap/search", server.DoPcapSearch)
+	private.POST("/pcap/count", server.DoPcapCount)
+	private.PUT("/pcap/search", server.DoPcapSearch)
+	private.PUT("/pcap/count", server.DoPcapCount)
+
 	// POST & PUT aliases for requests with JSON body
 	private.POST("/search", server.DoSearch)
 	private.POST("/count", server.DoCount)

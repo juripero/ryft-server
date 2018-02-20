@@ -250,7 +250,12 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
-	autoRecord := engine.autoRecord && hasRecord(q)
+	// preliminary update backend to get "auto-record" flag
+	// WARNING: tool is selected for the whole search query!
+	if err := engine.updateBackend(cfg); err != nil {
+		return nil, fmt.Errorf("failed to select backend: %s", err)
+	}
+	autoRecord := engine.isAutoRecord(cfg.Backend.Tool) && hasRecord(q)
 	task.rootQuery = engine.Optimize(q)
 
 	task.result, err = NewInMemoryPostProcessing() // NewCatalogPostProcessing
@@ -320,6 +325,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 && len(cfg.Transforms) == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
 		engine.updateConfig(cfg, sq, task.rootQuery.BoolOps)
+		if err := engine.updateBackend(cfg); err != nil {
+			return nil, err
+		}
 		return engine.Backend.Search(cfg)
 	}
 
@@ -504,6 +512,9 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 		"query": cfg.Query,
 		"files": cfg.Files,
 	}).Infof("[%s/%d]: running backend search", TAG, task.subtaskId)
+	if err := engine.updateBackend(cfg); err != nil {
+		return nil, err
+	}
 	res, err := engine.Backend.Search(cfg)
 	if err != nil {
 		return nil, err

@@ -102,31 +102,33 @@ func (s *Stat) Add(data interface{}) error {
 		return nil // do nothing if there is no value
 	}
 
-	// get it as float
-	val, err := utils.AsFloat64(val_)
-	if err != nil {
-		return err
-	}
-
-	// sum and sum of squared values
-	if (s.flags & StatSum) != 0 {
-		s.Sum += val
-	}
-	if (s.flags & StatSum2) != 0 {
-		s.Sum2 += val * val
-	}
-
-	// minimum
-	if (s.flags & StatMin) != 0 {
-		if s.Count == 0 || val < s.Min {
-			s.Min = val
+	if s.flags != 0 {
+		// get it as float
+		val, err := utils.AsFloat64(val_)
+		if err != nil {
+			return err
 		}
-	}
 
-	// maximum
-	if (s.flags & StatMax) != 0 {
-		if s.Count == 0 || val > s.Max {
-			s.Max = val
+		// sum and sum of squared values
+		if (s.flags & StatSum) != 0 {
+			s.Sum += val
+		}
+		if (s.flags & StatSum2) != 0 {
+			s.Sum2 += val * val
+		}
+
+		// minimum
+		if (s.flags & StatMin) != 0 {
+			if s.Count == 0 || val < s.Min {
+				s.Min = val
+			}
+		}
+
+		// maximum
+		if (s.flags & StatMax) != 0 {
+			if s.Count == 0 || val > s.Max {
+				s.Max = val
+			}
 		}
 	}
 

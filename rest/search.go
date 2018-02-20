@@ -237,7 +237,7 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	// get search engine
 	var engine search.Engine
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	if !server.Config.LocalOnly && !params.Local && len(params.Tweaks.Cluster) != 0 {
+	if /*!server.Config.LocalOnly && !params.Local &&*/ len(params.Tweaks.Cluster) != 0 {
 		log.WithField("config", params.Tweaks.Cluster).Debugf("[%s]: create tweaked search engine", CORE)
 		engine, err = server.getClusterTweakEngine(authToken, homeDir, cfg, params.Tweaks.Cluster)
 	} else {
