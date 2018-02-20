@@ -4,6 +4,7 @@
 #include "conf.h"
 #include "misc.h"
 #include "json.h"
+#include "stat.h"
 
 #include <signal.h>
 #include <stddef.h>
@@ -89,76 +90,6 @@ static int parse_index(const uint8_t *idx_beg, const uint8_t *idx_end, uint64_t 
     return 0; // OK
 }
 
-
-// TODO: abstract classes, dedicated files, etc
-struct Stat {
-    uint64_t count;
-    double sum, sum2;
-    double min, max;
-};
-
-// calculate statistics
-static void stat_add(struct Stat *s, double x)
-{
-    if (!s->count || x < s->min)
-        s->min = x;
-    if (!s->count || x > s->max)
-        s->max = x;
-    s->sum += x;
-    s->sum2 += x*x;
-    s->count += 1;
-}
-
-// print statistics to STDOUT
-static void stat_print(const struct Stat *s)
-{
-    if (s->count)
-    {
-        const double avg = s->sum/s->count;
-//        const double var = s->sum2/s->count - avg*avg;
-//        const double stdev = sqrt(var);
-//        const double sigma = 2.0;
-
-        vlog("{\"avg\":%f, \"sum\":%f, \"min\":%f, \"max\":%f, \"count\":%llu}\n",
-             avg, s->sum, s->min, s->max, s->count);
-    }
-    else
-    {
-        vlog("{\"avg\":null, \"sum\":0, \"min\":null, \"max\":null, \"count\":0}\n");
-    }
-}
-
-// clone statistics engine
-static struct Stat* stat_clone(struct Stat *base)
-{
-    struct Stat *s = (struct Stat*)malloc(sizeof(*s));
-    if (!s)
-        return 0; // failed
-
-    memcpy(s, base, sizeof(*s));
-    return s;
-}
-
-// merge statistics
-static void stat_merge(struct Stat *to, const struct Stat *from)
-{
-    if (!from->count)
-        return; // nothing to merge
-
-    if (!to->count || from->min < to->min)
-        to->min = from->min;
-    if (!to->count || from->max > to->max)
-        to->max = from->max;
-    to->sum += from->sum;
-    to->sum2 += from->sum2;
-    to->count += from->count;
-}
-
-// release statistics
-static void stat_free(struct Stat *s)
-{
-    free(s);
-}
 
 // global instance, TODO: remove this
 struct Stat g_stat;
@@ -504,7 +435,7 @@ int main(int argc, const char *argv[])
             (const uint8_t*)dat_p, (const uint8_t*)dat_p + dat_stat.st_size);
 
     // print global statistics
-    stat_print(&g_stat);
+    stat_print(&g_stat, stdout);
 
     // release resources
     munmap(idx_p, idx_stat.st_size);

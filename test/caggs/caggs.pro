@@ -15,6 +15,8 @@ HEADERS += misc.h
 SOURCES += misc.c
 HEADERS += json.h
 SOURCES += json.c
+HEADERS += stat.h
+SOURCES += stat.c
 
 OTHER_FILES += README.md
 OTHER_FILES += Makefile
