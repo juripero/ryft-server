@@ -3,10 +3,11 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
-QMAKE_CFLAGS += -std=c++0x -pthread
+QMAKE_CFLAGS += -std=c99 -pthread
 LIBS += -pthread
 
 DEFINES += _GNU_SOURCE
+DEFINES += NO_TESTS
 
 SOURCES += main.c
 HEADERS += conf.h
@@ -17,6 +18,7 @@ HEADERS += json.h
 SOURCES += json.c
 HEADERS += stat.h
 SOURCES += stat.c
+SOURCES += test.c
 
 OTHER_FILES += README.md
 OTHER_FILES += Makefile

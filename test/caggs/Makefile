@@ -31,6 +31,10 @@ all: caggs-stripped
 caggs: main.c misc.c misc.h conf.c conf.h json.c json.h stat.c stat.h
 	${CROSS}gcc -std=c99 ${DEFINES} -Wall -O3 -pthread -o caggs main.c misc.c conf.c json.c stat.c
 
+# build test executable
+test: misc.c misc.h conf.c conf.h json.c json.h stat.c stat.h
+	${CROSS}gcc -std=c99 ${DEFINES} -Wall -O3 -pthread -o caggs-test test.c misc.c conf.c json.c stat.c
+
 # strip executable
 caggs-stripped: caggs
 	${CROSS}strip caggs
