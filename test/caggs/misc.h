@@ -2,6 +2,7 @@
 #define __CAGGS_MISC_H__
 
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 
 
@@ -11,7 +12,7 @@
  * @param[out] len Length in bytes.
  * @return Zero on success.
  */
-int parse_len(const char *str, int *len);
+int parse_len(const char *str, int64_t *len);
 
 
 /**

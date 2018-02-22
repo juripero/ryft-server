@@ -124,16 +124,56 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
             break;
 
         case 'H': // header length
-            cfg->header_len = strtoul(optarg, NULL, 0); // TODO: check errors
-            break;
+        {
+            int64_t n = 0;
+            if (!!parse_len(optarg, &n))
+            {
+                verr("failed to parse header length: %s\n", optarg);
+                return -1; // failed
+
+            }
+            if (n < 0)
+            {
+                verr("invalid header length: cannot be negative\n");
+                return -1; // failed
+            }
+            cfg->header_len = n;
+        } break;
 
         case 'D': // delimiter length
-            cfg->delim_len = strtoul(optarg, NULL, 0); // TODO: check errors
-            break;
+        {
+            int64_t n = 0;
+            if (!!parse_len(optarg, &n))
+            {
+                verr("failed to parse delimiter length: %s\n", optarg);
+                return -1; // failed
+
+            }
+            if (n < 0)
+            {
+                verr("invalid delimiter length: cannot be negative\n");
+                return -1; // failed
+            }
+            cfg->delim_len = n;
+        } break;
 
         case 'F': // footer length
-            cfg->footer_len = strtoul(optarg, NULL, 0); // TODO: check errors
-            break;
+        {
+            int64_t n = 0;
+            if (!!parse_len(optarg, &n))
+            {
+                verr("failed to parse footer length: %s\n", optarg);
+                return -1; // failed
+
+            }
+            if (n < 0)
+            {
+                verr("invalid footer length: cannot be negative\n");
+                return -1; // failed
+            }
+
+            cfg->footer_len = n;
+        } break;
 
         case 'P': // concurrency
             cfg->concurrency = strtoul(optarg, NULL, 0);
@@ -192,12 +232,12 @@ void conf_print(const struct Conf *cfg)
 #if defined(CAGGS_VERSION)
     vlog("tool version: %s\n", CAGGS_VERSION);
 #endif // CAGGS_VERSION
-    vlog("INDEX: %s\n DATA: %s (%d/%d/%d)\n",
+    vlog("INDEX: %s\n DATA: %s (%ull/%ull/%ull)\n",
          cfg->idx_path,
          cfg->dat_path,
-         cfg->header_len,
-         cfg->delim_len,
-         cfg->footer_len);
+         (unsigned long long)cfg->header_len,
+         (unsigned long long)cfg->delim_len,
+         (unsigned long long)cfg->footer_len);
     vlog("field: %s\n", cfg->field);
     vlog("concurrency: x%d\n", cfg->concurrency);
     vlog("  verbosity: %d\n", verbose);
