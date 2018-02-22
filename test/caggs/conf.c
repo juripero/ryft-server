@@ -24,7 +24,7 @@ static void usage(void)
     vlog("-V, --version     print version if available\n");
     vlog("-q, --quiet       be quiet, disable verbose mode\n");
     vlog("-v, --verbose     enable verbose mode (also -vv and -vvv)\n");
-    vlog("-P<N>, --concurrency=<N> do processing in N threads\n");
+    vlog("-X<N>, --concurrency=<N> do processing in N threads (8 by default)\n");
     vlog("\n");
 
     vlog("-i<path>, --index=<path> path to INDEX file\n");
@@ -35,6 +35,11 @@ static void usage(void)
     vlog("-H<N>, --header=<N> size of DATA header in bytes\n");
     vlog("-D<N>, --delim=<N>  size of DATA delimiter in bytes\n");
     vlog("-F<N>, --footer=<N> size of DATA footer in bytes\n");
+    vlog("\n");
+
+    vlog("-b<N>, --index-chunk=<N> size of INDEX chunk in bytes (512MB by default)\n");
+    vlog("-B<N>, --data-chunk=<N>  size of DATA chunk in bytes (512MB by default)\n");
+    vlog("-R<N>, --max-records=<N> maximum number of records per DATA chunk (16M by default)\n");
     vlog("\n");
 
     vlog("The following signals are handled:\n");
@@ -51,6 +56,9 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
     cfg->header_len = 0;
     cfg->delim_len = 0;
     cfg->footer_len = 0;
+    cfg->idx_chunk_size = 512*(1024*1024);
+    cfg->dat_chunk_size = 512*(1024*1024);
+    cfg->rec_per_chunk = 16*(1024*1024);
     cfg->concurrency = 8;
 
     // long options
@@ -63,7 +71,10 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
         {"delimiter", required_argument, 0, 'D' },
         {"delim", required_argument, 0, 'D' },
         {"footer", required_argument, 0, 'F' },
-        {"concurrency", required_argument, 0, 'P' },
+        {"index-chunk", required_argument, 0, 'b' },
+        {"data-chunk", required_argument, 0, 'B' },
+        {"max-records", required_argument, 0, 'R' },
+        {"concurrency", required_argument, 0, 'X' },
 
         { "help", no_argument, 0, 'h' },
         { "version", no_argument, 0, 'V' },
@@ -77,7 +88,7 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
     {
         // parse options
         int res = getopt_long(argc, (char* const*)argv,
-                              "i:d:f:H:D:F:P:hVqv", opts, 0);
+                              "i:d:f:H:D:F:b:B:R:X:hVqv", opts, 0);
         if (res < 0)
             break; // done
 
@@ -175,7 +186,58 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
             cfg->footer_len = n;
         } break;
 
-        case 'P': // concurrency
+        case 'b': // INDEX chunk size
+        {
+            int64_t n = 0;
+            if (!!parse_len(optarg, &n))
+            {
+                verr("failed to parse INDEX chunk size: %s\n", optarg);
+                return -1; // failed
+
+            }
+            if (n < 1*1024*1024)
+            {
+                verr("invalid INDEX chunk size: cannot be less than 1MB\n");
+                return -1; // failed
+            }
+            cfg->idx_chunk_size = n;
+        } break;
+
+        case 'B': // DATA chunk size
+        {
+            int64_t n = 0;
+            if (!!parse_len(optarg, &n))
+            {
+                verr("failed to parse DATA chunk size: %s\n", optarg);
+                return -1; // failed
+
+            }
+            if (n < 1*1024*1024)
+            {
+                verr("invalid DATA chunk size: cannot be less than 1MB\n");
+                return -1; // failed
+            }
+            cfg->dat_chunk_size = n;
+        } break;
+
+        case 'R': // maximum records per chunk
+        {
+            int64_t n = 0;
+            if (!!parse_len(optarg, &n)) // use G, M, K suffixes as for bytes!
+            {
+                verr("failed to parse records per chunk: %s\n", optarg);
+                return -1; // failed
+
+            }
+            if (n < 1000)
+            {
+                verr("invalid records per chunk: cannot be less than 1000\n");
+                return -1; // failed
+            }
+            cfg->rec_per_chunk = n;
+        } break;
+
+        case 'X': // concurrency
             cfg->concurrency = strtoul(optarg, NULL, 0);
             if (cfg->concurrency <= 0 || 64 < cfg->concurrency)
             {
@@ -239,6 +301,11 @@ void conf_print(const struct Conf *cfg)
          (unsigned long long)cfg->delim_len,
          (unsigned long long)cfg->footer_len);
     vlog("field: %s\n", cfg->field);
+    vlog("INDEX chunk: %.3gGB\n",
+         cfg->idx_chunk_size/(1024*1024*1024.0));
+    vlog(" DATA chunk: %.3gGB (%.3gM records maximum)\n",
+         cfg->dat_chunk_size/(1024*1024*1024.0),
+         cfg->rec_per_chunk/(1024*1024.0));
     vlog("concurrency: x%d\n", cfg->concurrency);
     vlog("  verbosity: %d\n", verbose);
 }

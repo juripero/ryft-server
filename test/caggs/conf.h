@@ -20,7 +20,11 @@ struct Conf
     uint64_t delim_len;     ///< @brief DATA delimiter in bytes.
     uint64_t footer_len;    ///< @brief DATA footer in bytes.
 
-    int concurrency;   ///< @brief Number of processing threads.
+    uint64_t idx_chunk_size; ///< @brief INDEX processing chunk size in bytes.
+    uint64_t dat_chunk_size; ///< @brief DATA processing chunk size in bytes.
+    uint64_t rec_per_chunk; ///< @brief Maximum number of records per DATA chunk.
+
+    int concurrency;        ///< @brief Number of processing threads.
 };
 
 
