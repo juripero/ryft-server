@@ -18,6 +18,8 @@ HEADERS += json.h
 SOURCES += json.c
 HEADERS += stat.h
 SOURCES += stat.c
+HEADERS += proc.h
+SOURCES += proc.c
 SOURCES += test.c
 
 OTHER_FILES += README.md

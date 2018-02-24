@@ -294,12 +294,12 @@ void conf_print(const struct Conf *cfg)
 #if defined(CAGGS_VERSION)
     vlog("tool version: %s\n", CAGGS_VERSION);
 #endif // CAGGS_VERSION
-    vlog("INDEX: %s\n DATA: %s (%ull/%ull/%ull)\n",
+    vlog("INDEX: %s\n DATA: %s (%lld/%lld/%lld)\n",
          cfg->idx_path,
          cfg->dat_path,
-         (unsigned long long)cfg->header_len,
-         (unsigned long long)cfg->delim_len,
-         (unsigned long long)cfg->footer_len);
+         cfg->header_len,
+         cfg->delim_len,
+         cfg->footer_len);
     vlog("field: %s\n", cfg->field);
     vlog("INDEX chunk: %.3gGB\n",
          cfg->idx_chunk_size/(1024*1024*1024.0));

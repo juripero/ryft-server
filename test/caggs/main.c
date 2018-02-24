@@ -5,6 +5,7 @@
 #include "misc.h"
 #include "json.h"
 #include "stat.h"
+#include "proc.h"
 
 #include <signal.h>
 #include <stddef.h>
@@ -14,6 +15,7 @@
 #include <errno.h>
 #include <math.h>
 
+#include <inttypes.h>
 #include <stdatomic.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -52,43 +54,6 @@ static void signal_handler(int signo)
 }
 
 
-/**
- * @brief Parse the INDEX information.
- *
- * Tries to parse the INDEX line in the following format:
- * `filename,offset,length,fuzziness`.
- * The `filename`, `offset` and `fuzziness` are ignored.
- * So just `length` is parsed to the `data_len`.
- *
- * @param[in] idx_beg Begin of INDEX.
- * @param[in] idx_end End of INDEX.
- * @param[out] data_len Length of DATA in bytes.
- * @return Zero on success.
- */
-static int parse_index(const uint8_t *idx_beg, const uint8_t *idx_end, uint64_t *data_len)
-{
-    const int COMMA = ',';
-
-    // find ",fuzziness"
-    const uint8_t *c4 = (const uint8_t*)memrchr(idx_beg, COMMA,
-                                                idx_end - idx_beg);
-    if (!c4)
-        return -1; // no ",fuzziness" found
-
-    // find ",length"
-    const uint8_t *c3 = (const uint8_t*)memrchr(idx_beg, COMMA,
-                                                c4 - idx_beg);
-    if (!c3)
-        return -2; // no ",length" found
-
-    uint8_t *end = 0;
-    *data_len = strtoull((const char*)c3+1, // +1 to skip comma
-                         (char**)&end, 10);
-    if (end != c4)
-        return -3; // failed to parse length
-
-    return 0; // OK
-}
 
 
 // global instance, TODO: remove this
@@ -362,6 +327,21 @@ int main(int argc, const char *argv[])
     if (verbose >= 3)
         conf_print(&cfg);
 
+    const long page_size = sysconf(_SC_PAGE_SIZE);
+    if (page_size <= 0)
+    {
+        verr("ERROR: failed to get page size: %s\n",
+             strerror(errno));
+        return -1;
+    }
+    if (page_size & (page_size-1))
+    {
+        verr("ERROR: page size is not power of two: %ld\n",
+             page_size);
+        return -1;
+    }
+    vlog3("page size: %ld\n", page_size);
+
     struct JSON_Field *field = 0;
     if (!!json_field_parse(&field, cfg.field))
     {
@@ -369,80 +349,219 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
-    // try to open INDEX file
-    vlog2("opening INDEX file: %s\n", cfg.idx_path);
-    int idx_fd = open(cfg.idx_path, O_RDONLY/*|O_LARGEFILE*/);
-    if (idx_fd < 0)
+    // INDEX/DATA file parameters
+    struct FileP
     {
-        verr("ERROR: failed to open INDEX file: %s\n",
-             strerror(errno));
-        return -1;
-    }
-    // and get INDEX file size
-    struct stat idx_stat;
-    memset(&idx_stat, 0, sizeof(idx_stat));
-    if (!!fstat(idx_fd, &idx_stat))
-    {
-        verr("ERROR: failed to stat INDEX file: %s\n",
-             strerror(errno));
-        return -1;
-    }
-    vlog2("        INDEX file: #%d (%d bytes)\n",
-          idx_fd, idx_stat.st_size);
+        int      fd;    // file descriptor
+        uint64_t pos;   // read position
+        uint64_t len;   // file length, bytes
+    } i_file, d_file;
 
-    // try to open DATA file
-    vlog2("opening  DATA file: %s\n", cfg.dat_path);
-    int dat_fd = open(cfg.dat_path, O_RDONLY/*|O_LARGEFILE*/);
-    if (dat_fd < 0)
+    if (1) // try to open INDEX file
     {
-        verr("ERROR: failed to open DATA file: %s\n",
-             strerror(errno));
-        return -1;
-    }
-    // and get DATA file size
-    struct stat dat_stat;
-    memset(&dat_stat, 0, sizeof(dat_stat));
-    if (!!fstat(dat_fd, &dat_stat))
-    {
-        verr("ERROR: failed to stat DATA file: %s\n",
-             strerror(errno));
-        return -1;
-    }
-    vlog2("         DATA file: #%d (%d bytes)\n",
-          dat_fd, dat_stat.st_size);
+        vlog2("opening INDEX file: %s\n", cfg.idx_path);
+        i_file.fd = open(cfg.idx_path, O_RDONLY/*|O_LARGEFILE*/);
+        if (i_file.fd < 0)
+        {
+            verr("ERROR: failed to open INDEX file: %s\n",
+                 strerror(errno));
+            return -1;
+        }
 
-    // TODO: do memory mapping part-by-part
-    // let say 64MB per each part.
+        // and get INDEX file size
+        struct stat s;
+        memset(&s, 0, sizeof(s));
+        if (!!fstat(i_file.fd, &s))
+        {
+            verr("ERROR: failed to stat INDEX file: %s\n",
+                 strerror(errno));
+            return -1;
+        }
+        i_file.len = s.st_size;
+        i_file.pos = 0;
 
-    // do memory mapping
-    void *idx_p = mmap(0, idx_stat.st_size, PROT_READ, MAP_SHARED, idx_fd, 0);
-    if (MAP_FAILED == idx_p)
-    {
-        verr("ERROR: failed to map INDEX file: %s\n",
-             strerror(errno));
-        return -1;
-    }
-    void *dat_p = mmap(0, dat_stat.st_size, PROT_READ, MAP_SHARED, dat_fd, 0);
-    if (MAP_FAILED == dat_p)
-    {
-        verr("ERROR: failed to map DATA file: %s\n",
-             strerror(errno));
-        return -1;
+        vlog2("        INDEX file: #%d (%llu bytes)\n",
+              i_file.fd, i_file.len);
     }
 
-    // do actual processing
-    do_work(&cfg, field,
-            (const uint8_t*)idx_p, (const uint8_t*)idx_p + idx_stat.st_size,
-            (const uint8_t*)dat_p, (const uint8_t*)dat_p + dat_stat.st_size);
+    if (1) // try to open DATA file
+    {
+        vlog2("opening  DATA file: %s\n", cfg.dat_path);
+        d_file.fd = open(cfg.dat_path, O_RDONLY/*|O_LARGEFILE*/);
+        if (d_file.fd < 0)
+        {
+            verr("ERROR: failed to open DATA file: %s\n",
+                 strerror(errno));
+            return -1;
+        }
+
+        // and get DATA file size
+        struct stat s;
+        memset(&s, 0, sizeof(s));
+        if (!!fstat(d_file.fd, &s))
+        {
+            verr("ERROR: failed to stat DATA file: %s\n",
+                 strerror(errno));
+            return -1;
+        }
+        d_file.len = s.st_size;
+        d_file.pos = 0; // read position
+
+        vlog2("         DATA file: #%d (%llu bytes)\n",
+              d_file.fd, d_file.len);
+    }
+
+    // memory chunk parameters
+    struct ChunkP
+    {
+        int id;         // identifier (for log/debug purposes)
+        uint8_t *base;  // base address (mapped memory)
+        uint64_t pos;   // read position
+        uint64_t len;   // chunk length, bytes
+    } i_buf, d_buf;
+
+    memset(&i_buf, 0, sizeof(i_buf));
+    memset(&d_buf, 0, sizeof(d_buf));
+
+    struct RecordRef *records = (struct RecordRef*)malloc(cfg.rec_per_chunk * sizeof(*records));
+
+    d_file.pos += cfg.header_len; // skip header
+    while (!g_stopped && d_file.pos < (d_file.len - cfg.footer_len)) // keep in mind footer!
+    {
+        const uint64_t d_align = d_file.pos & (page_size-1);
+        uint64_t num_of_records = 0; // actual number of record references parsed
+        uint64_t data_len = d_align; // corresponding DATA chunk size
+
+        // prepare DATA chunk
+        while (!g_stopped && i_file.pos < i_file.len
+            && num_of_records < cfg.rec_per_chunk
+            && data_len < cfg.dat_chunk_size)
+        {
+            if (!i_buf.base) // prepare next INDEX chunk
+            {
+                const uint64_t i_align = i_file.pos & (page_size-1);
+                const uint64_t rem = i_file.len - (i_file.pos - i_align); // remain bytes
+                const uint64_t len = rem < cfg.idx_chunk_size
+                                   ? rem : cfg.idx_chunk_size;
+
+                void *base = mmap(0, len, PROT_READ, MAP_SHARED,
+                                  i_file.fd, i_file.pos - i_align);
+                if (MAP_FAILED == base)
+                {
+                    verr("ERROR: failed to map INDEX file: %s\n",
+                         strerror(errno));
+                    return -1;
+                }
+
+                vlog2("new IndexChunk%d of %llu bytes (at %llu) prepared, align:%lld\n",
+                      i_buf.id, len, i_file.pos, i_align);
+
+                i_buf.base = (uint8_t*)base;
+                i_buf.len = len;
+                i_buf.pos = i_align;
+            }
+
+            // parse indices to record referenecs
+            const uint8_t *buf = i_buf.base + i_buf.pos;
+            uint64_t i_len = i_buf.len - i_buf.pos;
+            uint64_t d_len = cfg.dat_chunk_size - data_len;
+            uint64_t n_rec = cfg.rec_per_chunk - num_of_records; // remain space
+            const int is_last = (i_file.len - i_file.pos) <= i_len;
+            int res = parse_index_chunk(is_last, buf, &i_len,
+                                        cfg.delim_len, data_len, &d_len,
+                                        records + num_of_records, &n_rec);
+            if (res < 0)
+            {
+                verr("ERROR: failed to parse INDEX file\n");
+                return -1;
+            }
+
+            vlog2("IndexChunk%d: %llu indices, %llu DATA bytes, %llu INDEX bytes, INDEX:[%llu..%llu)\n",
+                  i_buf.id, n_rec, d_len, i_len,
+                  i_file.pos, i_file.pos + i_len);
+
+            // update current chunk
+            i_file.pos += i_len;
+            i_buf.pos += i_len;
+            data_len += d_len;
+            num_of_records += n_rec;
+            if (res > 0 || i_buf.pos >= i_buf.len)
+            {
+                // release INDEX chunk
+                if (!!munmap((void*)i_buf.base, i_buf.len))
+                {
+                    verr("ERROR: failed to unmap INDEX file: %s\n",
+                         strerror(errno));
+                    return -1;
+                }
+
+                vlog2("IndexChunk%d of %llu bytes (at %llu) released\n",
+                      i_buf.id, i_buf.len, i_file.pos);
+
+                i_buf.base = 0;
+                i_buf.len = 0;
+                i_buf.id += 1;
+            }
+            else
+                break;
+        }
+
+        vlog2("DataChunk%d: %llu records, %llu DATA bytes, DATA:[%llu..%llu)\n",
+              d_buf.id, num_of_records, data_len,
+              d_file.pos, d_file.pos + data_len);
+        if (!data_len|| !num_of_records)
+            break;
+
+        // prepare DATA chunk
+        void *base = mmap(0, data_len, PROT_READ, MAP_SHARED,
+                          d_file.fd, d_file.pos - d_align);
+        if (MAP_FAILED == base)
+        {
+            verr("ERROR: failed to map DATA file: %s\n",
+                 strerror(errno));
+            return -1;
+        }
+        d_buf.base = (uint8_t*)base;
+        d_buf.len = data_len;
+        d_buf.pos = d_align;
+
+        /*
+        // do actual processing
+        do_work(&cfg, field,
+                (const uint8_t*)idx_p, (const uint8_t*)idx_p + idx_stat.st_size,
+                (const uint8_t*)dat_p, (const uint8_t*)dat_p + dat_stat.st_size);
+        */
+        (void)do_work;
+
+        if (1)
+        for (uint64_t i = 0; i < num_of_records; ++i)
+        {
+//            printf("record #%"PRIu64" at %"PRIu64" of %"PRIu64" bytes: ",
+//                   i, records[i].offset, records[i].length);
+
+            extern void print_buf(const void*, const void*);
+            const uint8_t *rec = d_buf.base + records[i].offset;
+            print_buf(rec, rec + records[i].length);
+            printf("\n");
+        }
+
+        // release DATA chunk
+        if (!!munmap(base, d_buf.len))
+        {
+            verr("ERROR: failed to unmap DATA file: %s\n",
+                 strerror(errno));
+            return -1;
+        }
+
+        d_file.pos += data_len - d_align;
+        d_buf.id += 1;
+    }
 
     // print global statistics
-    stat_print(&g_stat, stdout);
+    // stat_print(&g_stat, stdout);
 
-    // release resources
-    munmap(idx_p, idx_stat.st_size);
-    munmap(dat_p, dat_stat.st_size);
-    close(dat_fd);
-    close(idx_fd);
+    close(d_file.fd);
+    close(i_file.fd);
     conf_free(&cfg);
 
     return 0;

@@ -5,7 +5,7 @@
 #include <string.h>
 
 // print buffer
-static void print_buf(const void *beg_, const void *end_)
+void print_buf(const void *beg_, const void *end_)
 {
     const char *beg = (const char*)beg_;
     const char *end = (const char*)end_;
@@ -417,3 +417,19 @@ int main(int argc, const char *argv[])
 }
 
 #endif // NO_TESTS
+
+
+/*
+To test large file processing the following Bash script can be used:
+
+./caggs -i /ryftone/test-100K.txt -d /ryftone/test-100K.bin --field foo -D2 -X1 --data-chunk=2G --index-chunk=2G -q > ref.log
+
+for d in 1048576 1052676; do
+    for i in {1048576..1052676}; do
+        echo -n "data:$d index:$i: ... " >> my.log && \
+        ./caggs -i /ryftone/test-100K.txt -d /ryftone/test-100K.bin --field foo \
+            -D2 -X1 --data-chunk=$d --index-chunk=$i -q > tst.log && \
+        diff ref.log tst.log && echo "OK" >> my.log || echo "FAILED" >> my.log
+    done
+done
+*/
