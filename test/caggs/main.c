@@ -75,7 +75,7 @@ static int process_record(const struct Conf *cfg,
 {
     (void)cfg; // not used yet
 
-//    printf("  RECORD[%llu]:", len);
+//    printf("  RECORD[%"PRIu64"]:", len);
 //    for (; len > 0; --len)
 //        printf("%c", *dat++);
 //    printf("\n");
@@ -293,7 +293,7 @@ static int do_work(const struct Conf *cfg, struct JSON_Field *field,
         free(xx);
     }
 
-    vlog2("total records processed: %llu\n", count);
+    vlog2("total records processed: %"PRIu64"\n", count);
     return 0; // OK
 }
 
@@ -380,7 +380,7 @@ int main(int argc, const char *argv[])
         i_file.len = s.st_size;
         i_file.pos = 0;
 
-        vlog2("        INDEX file: #%d (%llu bytes)\n",
+        vlog2("        INDEX file: #%d (%"PRIu64" bytes)\n",
               i_file.fd, i_file.len);
     }
 
@@ -407,7 +407,7 @@ int main(int argc, const char *argv[])
         d_file.len = s.st_size;
         d_file.pos = 0; // read position
 
-        vlog2("         DATA file: #%d (%llu bytes)\n",
+        vlog2("         DATA file: #%d (%"PRIu64" bytes)\n",
               d_file.fd, d_file.len);
     }
 
@@ -453,7 +453,7 @@ int main(int argc, const char *argv[])
                     return -1;
                 }
 
-                vlog2("new IndexChunk%d of %llu bytes (at %llu) prepared, align:%lld\n",
+                vlog2("new IndexChunk%d of %"PRIu64" bytes (at %"PRIu64") prepared, align:%"PRId64"\n",
                       i_buf.id, len, i_file.pos, i_align);
 
                 i_buf.base = (uint8_t*)base;
@@ -476,7 +476,7 @@ int main(int argc, const char *argv[])
                 return -1;
             }
 
-            vlog2("IndexChunk%d: %llu indices, %llu DATA bytes, %llu INDEX bytes, INDEX:[%llu..%llu)\n",
+            vlog2("IndexChunk%d: %"PRIu64" indices, %"PRIu64" DATA bytes, %"PRIu64" INDEX bytes, INDEX:[%"PRIu64"..%"PRIu64")\n",
                   i_buf.id, n_rec, d_len, i_len,
                   i_file.pos, i_file.pos + i_len);
 
@@ -495,7 +495,7 @@ int main(int argc, const char *argv[])
                     return -1;
                 }
 
-                vlog2("IndexChunk%d of %llu bytes (at %llu) released\n",
+                vlog2("IndexChunk%d of %"PRIu64" bytes (at %"PRIu64") released\n",
                       i_buf.id, i_buf.len, i_file.pos);
 
                 i_buf.base = 0;
@@ -506,7 +506,7 @@ int main(int argc, const char *argv[])
                 break;
         }
 
-        vlog2("DataChunk%d: %llu records, %llu DATA bytes, DATA:[%llu..%llu)\n",
+        vlog2("DataChunk%d: %"PRIu64" records, %"PRIu64" DATA bytes, DATA:[%"PRIu64"..%"PRIu64")\n",
               d_buf.id, num_of_records, data_len,
               d_file.pos, d_file.pos + data_len);
         if (!data_len|| !num_of_records)
