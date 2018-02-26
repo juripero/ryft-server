@@ -1,7 +1,10 @@
 #ifndef __CAGGS_PROC_H__
 #define __CAGGS_PROC_H__
 
+#include "conf.h"
+
 #include <stdint.h>
+#include <stdio.h>
 
 
 /**
@@ -54,5 +57,52 @@ int parse_index_chunk(int is_last_chunk,
                       uint64_t *max_data_len,
                       struct RecordRef *records,
                       uint64_t *num_of_records);
+
+
+/**
+ * @brief Work related parameters and results.
+ */
+struct Work
+{
+    struct JSON_Field *field; ///< @brief Field to search for.
+
+    struct Stat *stat; ///< @brief Final statistics.
+};
+
+
+/**
+ * @brief Create new work structure.
+ * @param cfg Configuration.
+ * @return NULL on failure.
+ */
+struct Work* work_make(const struct Conf *cfg);
+
+
+/**
+ * @brief Release work structure.
+ * @param w Work to release.
+ */
+void work_free(struct Work *w);
+
+
+/**
+ * @brief Do work processing.
+ * @param w Work to process.
+ * @param data_buf Begin of DATA buffer.
+ * @param records Record references.
+ * @param num_of_records Number of record references.
+ * @return Zero on success.
+ */
+int work_do(struct Work *w, const uint8_t *data_buf,
+            const struct RecordRef *records,
+            uint64_t num_of_records);
+
+
+/**
+ * @brief Print work results.
+ * @param w Work to get results from.
+ * @param f Output stream.
+ */
+void work_print(struct Work *w, FILE *f);
 
 #endif // __CAGGS_PROC_H__
