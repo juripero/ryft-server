@@ -101,11 +101,11 @@ void stat_print(const struct Stat *s, FILE *f)
 //        const double stdev = sqrt(var);
 //        const double sigma = 2.0;
 
-        fprintf(f, "{\"avg\":%f, \"sum\":%f, \"min\":%f, \"max\":%f, \"count\":%llu}\n",
+        fprintf(f, "{\"avg\":%f, \"sum\":%f, \"min\":%f, \"max\":%f, \"count\":%llu}",
              avg, s->sum, s->min, s->max, (long long unsigned int)s->count);
     }
     else
     {
-        fprintf(f, "{\"avg\":null, \"sum\":0, \"min\":null, \"max\":null, \"count\":0}\n");
+        fprintf(f, "{\"avg\":null, \"sum\":0, \"min\":null, \"max\":null, \"count\":0}");
     }
 }

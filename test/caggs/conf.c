@@ -238,10 +238,10 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
         } break;
 
         case 'X': // concurrency
-            cfg->concurrency = strtoul(optarg, NULL, 0);
-            if (cfg->concurrency <= 0 || 64 < cfg->concurrency)
+            cfg->concurrency = strtol(optarg, NULL, 0);
+            if (cfg->concurrency < 0 || 64 < cfg->concurrency)
             {
-                verr("concurrency \"%d\" is out of range [1..64]\n", cfg->concurrency);
+                verr("concurrency \"%d\" is out of range [0..64]\n", cfg->concurrency);
                 return -1; // failed
             }
             break;

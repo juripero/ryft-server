@@ -67,6 +67,10 @@ struct Work
     struct JSON_Field *field; ///< @brief Field to search for.
 
     struct Stat *stat; ///< @brief Final statistics.
+
+    struct XProc *xproc; ///< @brief XProc processing units.
+    int n_xproc; ///< @brief Number of XProc units.
+    int xproc_started; /// <@brief XProc "active" flag.
 };
 
 
@@ -86,16 +90,28 @@ void work_free(struct Work *w);
 
 
 /**
- * @brief Do work processing.
+ * @brief Do start work processing.
+ *
+ * DATA buffer and record references should not be
+ * used or changed until work is done.
+ *
  * @param w Work to process.
  * @param data_buf Begin of DATA buffer.
  * @param records Record references.
  * @param num_of_records Number of record references.
  * @return Zero on success.
  */
-int work_do(struct Work *w, const uint8_t *data_buf,
-            const struct RecordRef *records,
-            uint64_t num_of_records);
+int work_do_start(struct Work *w, const uint8_t *data_buf,
+                  const struct RecordRef *records,
+                  uint64_t num_of_records);
+
+
+/**
+ * @brief Do join the work processing.
+ * @param w Work to join.
+ * @return Zero on success.
+ */
+int work_do_join(struct Work *w);
 
 
 /**

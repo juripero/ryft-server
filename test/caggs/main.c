@@ -27,7 +27,7 @@
 
 
 // some global variables
-static int volatile g_stopped = 0;
+int volatile g_stopped = 0;
 
 
 /**
@@ -170,17 +170,19 @@ int main(int argc, const char *argv[])
         uint8_t *base;  // base address (mapped memory)
         uint64_t pos;   // read position
         uint64_t len;   // chunk length, bytes
-    } i_buf;
+    } i_buf, d_buf;
 
     memset(&i_buf, 0, sizeof(i_buf));
-    int d_buf_id = 0; // DATA chunk identifier
+    memset(&d_buf, 0, sizeof(d_buf));
 
-    struct RecordRef *records = (struct RecordRef*)malloc(cfg.rec_per_chunk * sizeof(*records));
+    struct RecordRef *records0 = (struct RecordRef*)malloc(cfg.rec_per_chunk * sizeof(*records0));
+    struct RecordRef *records1 = (struct RecordRef*)malloc(cfg.rec_per_chunk * sizeof(*records1));
 
     d_file.pos += cfg.header_len; // skip DATA header
     while (!g_stopped && d_file.pos < (d_file.len - cfg.footer_len)) // keep in mind DATA footer!
     {
         const uint64_t d_align = d_file.pos & (page_size-1); // DATA aligment
+        struct RecordRef *records = (d_buf.id&1) ? records1 : records0;
         uint64_t num_of_records = 0; // actual number of record references parsed
         uint64_t data_len = d_align; // corresponding DATA chunk size
 
@@ -268,10 +270,26 @@ int main(int argc, const char *argv[])
         }
 
         vlog2("DataChunk%d: %"PRIu64" records, %"PRIu64" DATA bytes, DATA:[%"PRIu64"..%"PRIu64")\n",
-              d_buf_id, num_of_records, data_len,
+              d_buf.id, num_of_records, data_len,
               d_file.pos, d_file.pos + data_len);
         if (!data_len|| !num_of_records)
             break;
+
+        // do wait previous processing units
+        if (!!work_do_join(work))
+        {
+            verr("ERROR: failed to join processing\n");
+            return -1;
+        }
+
+        // release previous DATA chunk
+        if (d_buf.base)
+        if (!!munmap(d_buf.base, d_buf.len))
+        {
+            verr("ERROR: failed to unmap DATA file: %s\n",
+                 strerror(errno));
+            return -1;
+        }
 
         // prepare DATA chunk
         void *base = mmap(0, data_len, PROT_READ, MAP_SHARED,
@@ -284,23 +302,34 @@ int main(int argc, const char *argv[])
         }
 
         // do actual processing
-        if (!!work_do(work, (uint8_t*)base,
-                      records, num_of_records))
+        if (!!work_do_start(work, (uint8_t*)base,
+                            records, num_of_records))
         {
-            verr("ERROR: failed to do processing\n");
-            return -1;
-        }
-
-        // release DATA chunk
-        if (!!munmap(base, data_len))
-        {
-            verr("ERROR: failed to unmap DATA file: %s\n",
-                 strerror(errno));
+            verr("ERROR: failed to start processing\n");
             return -1;
         }
 
         d_file.pos += data_len - d_align;
-        d_buf_id += 1;
+        d_buf.base = (uint8_t*)base;
+        d_buf.len = data_len;
+        d_buf.pos = d_align;
+        d_buf.id += 1;
+    }
+
+    // do final processing (wait processing units)
+    if (!!work_do_join(work))
+    {
+        verr("ERROR: failed to join final processing\n");
+        return -1;
+    }
+
+    // release last DATA chunk
+    if (d_buf.base)
+    if (!!munmap(d_buf.base, d_buf.len))
+    {
+        verr("ERROR: failed to unmap DATA file: %s\n",
+             strerror(errno));
+        return -1;
     }
 
     // print results

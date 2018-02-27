@@ -3,8 +3,12 @@
 #include "stat.h"
 #include "json.h"
 
+#include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
+
+#include <pthread.h>
 
 /*
  * parse_index() implementation.
@@ -47,7 +51,6 @@ int parse_index(const uint8_t *idx_beg,
 
     return 0; // OK
 }
-
 
 
 /*
@@ -115,6 +118,22 @@ int parse_index_chunk(int is_last_chunk,
 }
 
 
+/**
+ * @brief The single thread processing.
+ */
+struct XProc
+{
+    pthread_t thread_id;
+
+    struct JSON_Field *field;   ///< @brief Field to search for.
+    struct Stat *stat;          ///< @brief Intermediate statistics.
+
+    const uint8_t *data_buf;            ///< @brief Begin of DATA buffer.
+    const struct RecordRef *records;    ///< @brief Records to process.
+    uint64_t num_of_records;            ///< @brief Number of records to process.
+};
+
+
 /*
  * work_make() implementation.
  */
@@ -133,7 +152,31 @@ struct Work* work_make(const struct Conf *cfg)
         return 0;
     }
 
+    // final statistics
     w->stat = stat_make();
+
+    // concurrency
+    w->xproc_started = 0;
+    if (cfg->concurrency > 0)
+    {
+        const int n = cfg->concurrency;
+
+        struct XProc *xproc = (struct XProc*)malloc(n * sizeof(*xproc));
+        for (int i = 0; i < n; ++i)
+        {
+            xproc[i].field = json_field_clone(w->field);
+            xproc[i].stat = stat_clone(w->stat);
+        }
+
+        w->n_xproc = n;
+        w->xproc = xproc;
+    }
+    else
+    {
+        w->n_xproc = 0;
+        w->xproc = 0;
+    }
+
     return w; // OK
 }
 
@@ -143,31 +186,45 @@ struct Work* work_make(const struct Conf *cfg)
  */
 void work_free(struct Work *w)
 {
+    if (w->n_xproc > 0)
+    {
+        // release XProc processing units
+        struct XProc *xproc = (struct XProc*)w->xproc;
+        for (int i = 0; i < w->n_xproc; ++i)
+        {
+            json_field_free(xproc[i].field);
+            stat_free(xproc[i].stat);
+        }
+    }
+
     stat_free(w->stat);
     json_field_free(w->field);
     free(w);
 }
 
 
-/*
- * work_do() implementation.
+/**
+ * @brief Processing thread.
+ * @param param The XProc structure.
  */
-int work_do(struct Work *w, const uint8_t *data_buf,
-            const struct RecordRef *records,
-            uint64_t num_of_records)
+static void* xproc_thread(void *param)
 {
+    struct XProc *x = (struct XProc*)param;
+
     // process all records
-    for (uint64_t i = 0; i < num_of_records; ++i)
+    extern int volatile g_stopped;
+    for (uint64_t i = 0; !g_stopped && i < x->num_of_records; ++i)
     {
         // printf("record #%"PRIu64" at %"PRIu64" of %"PRIu64" bytes: ",
         //        i, records[i].offset, records[i].length);
 
-        const uint8_t *rec = data_buf + records[i].offset;
-        const uint8_t *end = rec + records[i].length;
+        const uint8_t *rec = x->data_buf + x->records[i].offset;
+        const uint8_t *end = rec + x->records[i].length;
         // extern void print_buf(const void*, const void*);
         // print_buf(rec, end); printf("\n");
 
-        struct JSON_Field *field = w->field;
+        // TODO: need to reset all fields: children and siblings
+        struct JSON_Field *field = x->field;
         while (field->children != 0)
             field = field->children;
         field->token.type = JSON_EOF;
@@ -175,7 +232,7 @@ int work_do(struct Work *w, const uint8_t *data_buf,
         struct JSON_Parser parser;
         json_init(&parser, rec, end);
 
-        if (!!json_get(&parser, w->field))
+        if (!!json_get(&parser, x->field))
         {
             verr1("ERROR: failed to get JSON field\n");
             // return -1; // failed
@@ -184,14 +241,91 @@ int work_do(struct Work *w, const uint8_t *data_buf,
 
         if (JSON_NUMBER != field->token.type)
         {
-            w->stat->count += 1; // TODO: check not NULL
+            x->stat->count += 1; // TODO: check not NULL
             verr2("WARN: bad value found, ignored\n");
             return 0;
         }
 
-        double x = strtod((const char*)field->token.beg, NULL);
-        // vlog(" %g ", x);
-        stat_add(w->stat, x);
+        double val = strtod((const char*)field->token.beg, NULL);
+        // vlog(" %g ", val);
+        stat_add(x->stat, val);
+    }
+
+    return param;
+}
+
+
+/*
+ * work_do_start() implementation.
+ */
+int work_do_start(struct Work *w, const uint8_t *data_buf,
+                  const struct RecordRef *records,
+                  uint64_t num_of_records)
+{
+    const int n = w->n_xproc;
+
+    if (!n)
+    {
+        struct XProc x;
+        x.field = w->field;
+        x.stat = w->stat;
+        x.data_buf = data_buf;
+        x.records = records;
+        x.num_of_records = num_of_records;
+
+        xproc_thread(&x); // do processing on the same thread!
+        return 0; // OK
+    }
+
+    // start processing units (new iteration)
+    const uint64_t N = (num_of_records + n-1) / n; // ceil
+    vlog2("xproc: start %d threads (about %"PRId64" records per thread)\n", n, N);
+    for (int i = 0; i < n; ++i)
+    {
+        w->xproc[i].data_buf = data_buf;
+        w->xproc[i].records = records + N*i;
+        w->xproc[i].num_of_records = (i+1 == n) ? (num_of_records - N*i) : N;
+        stat_init(w->xproc[i].stat); // reset stat
+        if (!!pthread_create(&w->xproc[i].thread_id,
+                             NULL/*attributes*/,
+                             xproc_thread,
+                             &w->xproc[i]))
+        {
+            verr1("failed to create processing thread: %s\n",
+                  strerror(errno));
+            return -1;
+        }
+    }
+
+    w->xproc_started = 1;
+    return 0; // OK
+}
+
+
+/*
+ * work_do_join() implementation.
+ */
+int work_do_join(struct Work *w)
+{
+    // wait all processing units (previous iteration)
+    if (w->xproc_started)
+    {
+        const int n = w->n_xproc;
+        vlog2("xproc: wait %d threads\n", n);
+        for (int i = 0; i < n; ++i)
+        {
+            if (!!pthread_join(w->xproc[i].thread_id, NULL))
+            {
+                verr1("failed to join processing thread: %s\n",
+                      strerror(errno));
+                return -1;
+            }
+
+            // merge statistics
+            stat_merge(w->stat, w->xproc[i].stat);
+        }
+
+        w->xproc_started = 0;
     }
 
     return 0; // OK
@@ -205,194 +339,3 @@ void work_print(struct Work *w, FILE *f)
 {
     stat_print(w->stat, f);
 }
-
-
-
-//// concurrency processing variables
-//struct {
-//    const struct Conf *cfg;
-//    struct JSON_Field *base_field;
-//    volatile int stopped;
-//    atomic_ptrdiff_t rpos; // read position, atomic
-//    atomic_ptrdiff_t wpos; // write position, atomic
-//    struct {
-//        const uint8_t *dat_beg;
-//        const uint8_t *dat_end;
-//    } buf[4*1024*1024];
-//} X;
-
-//// processing thread
-//static void* x_thread(void *p)
-//{
-//    struct Stat *s = (struct Stat*)p;
-//    struct JSON_Field *field = json_field_clone(X.base_field); // need to release at the end!
-//    // TODO: pass dedicated Task structure containing clone of Stat and clone of Field
-
-//    // TODO: count the number of processed records by this thread!
-//    int count = 0;
-
-//    while (1)
-//    {
-//        // get next processing index
-//        ptrdiff_t rpos = atomic_fetch_add(&X.rpos, 1);
-
-//        // busy-wait available data
-//        while (1)
-//        {
-//            ptrdiff_t wpos = atomic_load(&X.wpos);
-//            if (rpos < wpos)
-//                break; // finally have data to process
-//            if (X.stopped)
-//            {
-//                vlog1("processed records by x-thread: %d\n", count);
-//                return p; // done
-//            }
-//            pthread_yield(); // try again a bit later
-//        }
-
-//        const uint8_t *dat_beg = X.buf[rpos % (sizeof(X.buf)/sizeof(X.buf[0]))].dat_beg;
-//        const uint8_t *dat_end = X.buf[rpos % (sizeof(X.buf)/sizeof(X.buf[0]))].dat_end;
-//        int res = process_record(X.cfg, field, dat_beg, dat_end, s);
-//        if (res != 0)
-//        {
-//            verr("ERROR: failed to process RECORD: %s\n", res);// TODO: add "at" information from dat_p
-//            return 0; // failed
-//        }
-
-//        count += 1;
-//    }
-//}
-
-
-///**
-// * @brief Do the work.
-// * @param[in] cfg Application configuration.
-// * @param[in] field Head of JSON fields tree.
-// * @param[in] idx_p The begin of INDEX file.
-// * @param[in] idx_len The length of INDEX file in bytes.
-// * @param[in] dat_p The begin of DATA file.
-// * @param[in] dat_len The length of DATA file in bytes.
-// * @return Zero on success.
-// */
-//static int do_work0(const struct Conf *cfg, struct JSON_Field *field,
-//                   const uint8_t *idx_beg, const uint8_t *idx_end,
-//                   const uint8_t *dat_beg, const uint8_t *dat_end)
-//{
-//    // remove DATA header
-//    if ((ptrdiff_t)cfg->header_len <= (dat_end - dat_beg))
-//        dat_beg += cfg->header_len;
-//    else
-//    {
-//        verr("ERROR: no DATA available (%d) to skip header (%d)\n",
-//             (dat_end - dat_beg), cfg->header_len);
-//        return -1; // failed
-//    }
-
-//    // remove DATA footer
-//    if ((off_t)cfg->footer_len <= (dat_end - dat_beg))
-//        dat_end -= cfg->footer_len;
-//    else
-//    {
-//        verr("ERROR: no DATA available (%d) to skip footer (%d)\n",
-//             dat_end - dat_beg, cfg->footer_len);
-//        return -1; // failed
-//    }
-
-//    // initialize concurrency stuff
-//    struct {
-//        pthread_t thread_id;
-//        struct Stat *stat;
-//    } *xx = 0;
-//    if (cfg->concurrency > 1)
-//    {
-//        vlog2("run with %d threads\n", cfg->concurrency);
-//        X.cfg = cfg;
-//        X.base_field = field;
-//        X.stopped = 0;
-//        X.rpos = 0;
-//        X.wpos = 0;
-
-//        xx = malloc(cfg->concurrency * sizeof(*xx));
-//        for (int i = 0; i < cfg->concurrency; ++i)
-//        {
-//            xx[i].stat = stat_clone(&g_stat);
-//            pthread_create(&xx[i].thread_id,
-//                           NULL/*attributes*/,
-//                           x_thread, xx[i].stat);
-//        }
-//    }
-
-//    // read INDEX line by line
-//    uint64_t count = 0;
-//    while ((idx_end - idx_beg) > 0)
-//    {
-//        // try to find the NEWLINE '\n' character
-//        const uint8_t *eol = (const uint8_t*)memchr(idx_beg, '\n',
-//                                                    idx_end - idx_beg);
-//        const uint8_t *next = eol ? (eol + 1) : idx_end;
-
-//        uint64_t d_len = 0;
-//        int res = parse_index(idx_beg, next, &d_len);
-//        if (res != 0)
-//        {
-//            verr("ERROR: failed to parse INDEX: %d\n", res); // TODO: add "at" information from idx_p
-//            return -2; // failed
-//        }
-
-//        // TODO: concurrency!!!
-//        if ((ptrdiff_t)d_len <= (dat_end - dat_beg))
-//        {
-//            if (cfg->concurrency > 1)
-//            {
-//                // put data to buffer for a processing thread
-//                ptrdiff_t wpos = atomic_load(&X.wpos);
-//                X.buf[wpos % (sizeof(X.buf)/sizeof(X.buf[0]))].dat_beg = dat_beg;
-//                X.buf[wpos % (sizeof(X.buf)/sizeof(X.buf[0]))].dat_end = dat_beg + d_len;
-//                atomic_fetch_add(&X.wpos, 1);
-//            }
-//            else
-//            {
-//            int res = process_record(cfg, field, dat_beg,
-//                                     dat_beg + d_len,
-//                                     &g_stat);
-//            if (res != 0)
-//            {
-//                verr("ERROR: failed to process RECORD: %s\n", res);// TODO: add "at" information from dat_p
-//                return -3; // failed
-//            }
-//            }
-
-//            // go to next record...
-//            dat_beg += d_len + cfg->delim_len;
-//        }
-//        else
-//        {
-//            verr("ERROR: no DATA found\n"); // TODO: add "at" information from dat_p
-//            return -4; // failed
-//        }
-
-//        // go to next line
-//        idx_beg = next;
-//        count += 1;
-
-//        if (g_stopped != 0)
-//            break;
-//    }
-
-//    // merge concurrency engines if needed
-//    if (cfg->concurrency > 1)
-//    {
-//        X.stopped = 1; // stop all processing threads
-
-//        for (int i = 0; i < cfg->concurrency; ++i)
-//        {
-//            pthread_join(xx[i].thread_id, NULL);
-//            stat_merge(&g_stat, xx[i].stat);
-//            stat_free(xx[i].stat);
-//        }
-//        free(xx);
-//    }
-
-//    vlog2("total records processed: %"PRIu64"\n", count);
-//    return 0; // OK
-//}
