@@ -1,5 +1,6 @@
 #include "misc.h"
 
+#include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -37,4 +38,21 @@ int parse_len(const char *str, int64_t *len)
     if (len) *len = (b*x + 0.5); // round
 
     return 0; // OK
+}
+
+
+/*
+ * get_time() implementation.
+ */
+int64_t get_time()
+{
+    struct timeval tv;
+    if (!!gettimeofday(&tv, 0))
+    {
+        // TODO: report error?
+        return 0;
+    }
+
+    // convert time value to microseconds
+    return tv.tv_sec*(int64_t)1000000 + tv.tv_usec;
 }

@@ -263,6 +263,7 @@ int work_do_start(struct Work *w, const uint8_t *data_buf,
                   uint64_t num_of_records)
 {
     const int n = w->n_xproc;
+    w->xproc_start = get_time();
 
     if (!n)
     {
@@ -274,6 +275,8 @@ int work_do_start(struct Work *w, const uint8_t *data_buf,
         x.num_of_records = num_of_records;
 
         xproc_thread(&x); // do processing on the same thread!
+
+        vlog3("xproc: done in %.3fms\n", (get_time() - w->xproc_start)*1e-3);
         return 0; // OK
     }
 
@@ -325,6 +328,7 @@ int work_do_join(struct Work *w)
             stat_merge(w->stat, w->xproc[i].stat);
         }
 
+        vlog3("xproc: done in %.3fms\n", (get_time() - w->xproc_start)*1e-3);
         w->xproc_started = 0;
     }
 

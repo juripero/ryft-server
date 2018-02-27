@@ -185,6 +185,7 @@ int main(int argc, const char *argv[])
         struct RecordRef *records = (d_buf.id&1) ? records1 : records0;
         uint64_t num_of_records = 0; // actual number of record references parsed
         uint64_t data_len = d_align; // corresponding DATA chunk size
+        const int64_t i_start = get_time();
 
         // prepare DATA chunk: parse one or more INDEX chunks until
         // requered number of record references will be parsed
@@ -269,6 +270,9 @@ int main(int argc, const char *argv[])
             }
         }
 
+        const int64_t i_stop = get_time();
+        vlog3("DataChunk%d prepared in %.3fms (%"PRIu64" indices parsed)\n",
+              d_buf.id, (i_stop - i_start)*1e-3, num_of_records);
         vlog2("DataChunk%d: %"PRIu64" records, %"PRIu64" DATA bytes, DATA:[%"PRIu64"..%"PRIu64")\n",
               d_buf.id, num_of_records, data_len,
               d_file.pos, d_file.pos + data_len);

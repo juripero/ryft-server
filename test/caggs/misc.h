@@ -15,6 +15,24 @@
 int parse_len(const char *str, int64_t *len);
 
 
+
+/**
+ * @brief Get current time.
+ * @return Current timestamp, microseconds
+ *         or `0` in case of any errror.
+ */
+int64_t get_time();
+
+
+/**
+ * @brief Get current time in seconds.
+ */
+static inline double get_time_sec()
+{
+    return get_time() * 1e-6;
+}
+
+
 /**
  * @brief Verbose level.
  *

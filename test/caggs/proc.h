@@ -70,7 +70,9 @@ struct Work
 
     struct XProc *xproc; ///< @brief XProc processing units.
     int n_xproc; ///< @brief Number of XProc units.
+
     int xproc_started; /// <@brief XProc "active" flag.
+    int64_t xproc_start; ///< @brief The last iteration start time, microseconds.
 };
 
 
