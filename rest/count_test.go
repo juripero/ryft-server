@@ -113,7 +113,7 @@ func TestCountUsual(t *testing.T) {
 	}
 
 	if all {
-		check(`/count?query=hello&file=*.txt&backend-option=--rx-shard-size&backend-option=4M&backend-option=--rx-max-spawns&backend-option=5&backend=ryftx`,
+		check(`/count?query=hello&file=*.txt&backend-option=--rx-shard-size&backend-option=4M&backend-option=--rx-max-spawns&backend-option=5&backend=ryftprim`,
 			"application/json", time.Second, http.StatusOK)
 	}
 }

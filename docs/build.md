@@ -40,7 +40,7 @@ Also it's possible to build Debian package:
 make debian
 ```
 
-This command builds `ryft-servers` and packs everything into Debian package which
+This command builds `ryft-server` and packs everything into Debian package which
 can be found under `debian/` subdirectory.
 
 Note, `make debian` should be run in the project's root directory. In this case `ryft-server` is rebuilt
@@ -50,15 +50,34 @@ deb package is created - `ryft-server` is not rebuilt, just used from your `$GOP
 It's recommended to run `make update` periodically to update all 3rd-party
 dependencies.
 
+The command `docker-build` or `docker_build` allows to build `ryft-server` inside Docker container
+using environment with fixed versions of side auxiliary packages. The side package parameters are listed
+in `vendor/vendor.json` file. The build process inside Docker container performs by compiler with
+fixed version and takes a time.
+
+First of all, it is necessary to install Docker from official repository using
+[installation notes](https://docs.docker.com/engine/installation/linux/docker-ce/ubuntu/).
+
+Then it should be started the Debian package build inside Docker container:
+
+```{.sh}
+make docker-build
+```
+
+The results are packed to Debian package which can be found under `debian/` subdirectory.
 
 ## Version
 
 Note the `ryft-server` version - it's automatically generated using current git commit.
-Simple `make` will produce the following output (exact numbers may differ):
+Simple `make` is equivalent to `go build` execution with specified keys. It will will produce the 
+following output (exact numbers may differ):
 
 ```{.sh}
 $ make
 go build -ldflags "-X main.Version=0.6.1-139-g51fcf47 -X main.GitHash=51fcf47f0de217b0dfba4c4e2ed83ed172e123ae"
+
+Version: 0.6.1-139-g51fcf47
+GitHash: 51fcf47f0de217b0dfba4c4e2ed83ed172e123ae
 ```
 
 where `main.Version` is the server's version and `main.GitHash` is corresponding git commit hash.

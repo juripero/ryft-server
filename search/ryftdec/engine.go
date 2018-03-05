@@ -53,14 +53,16 @@ type Engine struct {
 	Backend   search.Engine
 	optimizer *query.Optimizer
 
-	autoRecord   bool     // RECORD to XRECORD or CRECORD replacement
-	skipPatterns []string // skip/ignore patterns
-	jsonPatterns []string // JSON patterns
-	xmlPatterns  []string // XML patterns
-	csvPatterns  []string // CSV patterns
+	autoRecord   map[string]bool // RECORD to XRECORD or CRECORD replacement per backend
+	skipPatterns []string        // skip/ignore patterns
+	jsonPatterns []string        // JSON patterns
+	xmlPatterns  []string        // XML patterns
+	csvPatterns  []string        // CSV patterns
 
 	KeepResultFiles bool // false by default
 	CompatMode      bool // false by default
+
+	Tweaks *Tweaks // backend tweaks
 }
 
 // NewEngine creates new RyftDEC search engine.
@@ -93,6 +95,29 @@ func (engine *Engine) Options() map[string]interface{} {
 	//opts["keep-files"] = engine.KeepResultFiles
 	opts["optimizer-limit"] = engine.optimizer.CombineLimit
 	opts["optimizer-do-not-combine"] = strings.Join(engine.optimizer.ExceptModes, ":")
+
+	btweaks := make(map[string]interface{})
+	if v, ok := opts["backend-tweaks"]; ok {
+		if vv, ok := v.(map[string]interface{}); ok {
+			for k, v := range vv {
+				btweaks[k] = v
+			}
+		}
+	}
+
+	if len(engine.Tweaks.Router) != 0 {
+		btweaks["router"] = engine.Tweaks.Router
+	}
+	if len(engine.Tweaks.Options) != 0 {
+		btweaks["options"] = engine.Tweaks.Options
+	}
+	if len(engine.Tweaks.Exec) != 0 {
+		btweaks["exec"] = engine.Tweaks.Exec
+	}
+	if len(btweaks) != 0 {
+		opts["backend-tweaks"] = btweaks
+	}
+
 	return opts
 }
 
@@ -135,6 +160,79 @@ func (engine *Engine) updateConfig(cfg *search.Config, q *query.SimpleQuery, boo
 			cfg.Mode = "g" // generic!
 		}
 	}
+}
+
+// updates the backend path and options
+func (engine *Engine) updateBackend(cfg *search.Config) error {
+	tool, opts, err := engine.getExecTool(cfg)
+	if err != nil {
+		log.WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
+		return fmt.Errorf("failed to find tool: %s", err)
+	} else if tool == "" {
+		log.Warnf("[%s]: no appropriate tool found", TAG)
+		return fmt.Errorf("no tool found: %s", tool)
+	}
+
+	// get tool path
+	path := engine.Tweaks.Exec[tool]
+	if len(path) == 0 {
+		return fmt.Errorf("no executable path found for %s", tool)
+	}
+
+	// update configuration for the ryftprim
+	cfg.Backend.Tool = tool
+	cfg.Backend.Path = path
+	if len(cfg.Backend.Opts) == 0 {
+		cfg.Backend.Opts = opts
+	}
+
+	return nil // OK
+}
+
+// getExecTool get backend tool name (ryftprim, ryftx or pcre2) and options
+func (engine *Engine) getExecTool(cfg *search.Config) (string, []string, error) {
+	// search primitive (check aliases)
+	prim := strings.ToLower(cfg.Mode)
+	switch prim {
+	case "g/es", "es":
+		prim = "es"
+	case "g/fhs", "fhs":
+		prim = "fhs"
+	case "g/feds", "feds":
+		prim = "feds"
+	case "g/ds", "ds":
+		prim = "ds"
+	case "g/ts", "ts":
+		prim = "ts"
+	case "g/ns", "ns":
+		prim = "ns"
+	case "g/cs", "cs":
+		prim = "cs"
+	case "g/ipv4", "ipv4":
+		prim = "ipv4"
+	case "g/ipv6", "ipv6":
+		prim = "ipv6"
+	case "g/pcre2", "pcre2":
+		prim = "pcre2"
+	default:
+		// "as is"
+	}
+
+	// backend tool (with aliases)
+	var tool string
+	if cfg.Backend.Tool == "" {
+		// check the routing table by search primitive
+		tool = engine.Tweaks.GetBackendTool(prim)
+		if tool == "" {
+			tool = "ryftprim" // fallback
+		}
+	} else {
+		// use provided backend tool
+		tool = cfg.Backend.Tool
+	}
+
+	opts := engine.Tweaks.GetOptions(cfg.Backend.Mode, tool, prim)
+	return tool, opts, nil // OK
 }
 
 // parse engine options
@@ -205,18 +303,86 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		}
 	}
 
+	// backend-tweaks
+	engine.Tweaks, err = ParseTweaks(opts)
+	if err != nil {
+		return fmt.Errorf(`failed to parse "backend-tweaks" options: %s`, err)
+	}
+
 	return nil
+}
+
+// get the "auto-record" flag for the backend tool
+func (engine *Engine) isAutoRecord(tool string) bool {
+	if flag, ok := engine.autoRecord[tool]; ok {
+		return flag
+	}
+
+	// fallback
+	if flag, ok := engine.autoRecord["default"]; ok {
+		return flag
+	}
+
+	return false
 }
 
 // update "record-queries" options
 func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 	// parse "enabled" flag
 	if v, ok := opts["enabled"]; ok {
-		vv, err := utils.AsBool(v)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "user-config.record-queries.enabled" option: %s`, err)
+		engine.autoRecord = make(map[string]bool)
+		var asMap map[string]interface{}
+		var asSlice []string
+
+		switch vv := v.(type) {
+		case nil: // no configuration
+			break
+
+		case bool: // default: on/off
+			asMap = map[string]interface{}{
+				"default": vv,
+			}
+
+		case string: // one element slice
+			asSlice = []string{vv}
+
+		case []string: // slice
+			asSlice = vv
+
+		case []interface{}: // slice
+			if a, err := utils.AsStringSlice(vv); err != nil {
+				return fmt.Errorf(`failed to parse "user-config.record-queries.enabled": %s`, err)
+			} else {
+				asSlice = a
+			}
+
+		case map[string]interface{}: // map
+			asMap = vv
+
+		case map[interface{}]interface{}: // map
+			if m, err := utils.AsStringMap(vv); err != nil {
+				return fmt.Errorf(`failed to parse "user-config.record-queries.enabled": %s`, err)
+			} else {
+				asMap = m
+			}
+
+		default:
+			return fmt.Errorf(`failed to parse "user-config.record-queries.enabled" option: unexpected type %T`, v)
 		}
-		engine.autoRecord = vv
+
+		if asMap != nil {
+			for tool, v := range asMap {
+				if flag, err := utils.AsBool(v); err != nil {
+					return fmt.Errorf(`bad "user-config.record-queries.enabled" value for key "%s": %s`, tool, err)
+				} else {
+					engine.autoRecord[tool] = flag
+				}
+			}
+		} else if asSlice != nil {
+			for _, tool := range asSlice {
+				engine.autoRecord[tool] = true
+			}
+		}
 	}
 
 	// parse SKIP patterns
@@ -256,6 +422,14 @@ func (engine *Engine) updateRecordOptions(opts map[string]interface{}) error {
 	}
 
 	return nil // OK
+}
+
+// PcapSearch starts asynchronous "/pcap/search" operation.
+func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
+	if err := engine.updateBackend(cfg); err != nil {
+		return nil, err
+	}
+	return engine.Backend.PcapSearch(cfg)
 }
 
 // Show starts asynchronous "/search/show" operation.

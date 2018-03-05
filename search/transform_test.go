@@ -80,7 +80,7 @@ func TestRegexpReplace(t *testing.T) {
 func TestScriptCall(t *testing.T) {
 	// good case
 	check := func(script []string, in string, expectedOut string, expectedSkip bool) {
-		tx, err := NewScriptCall(script, "")
+		tx, err := NewScriptCall(script, "", script[0], script[1:])
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -94,7 +94,7 @@ func TestScriptCall(t *testing.T) {
 
 	// bad case
 	bad := func(script []string, in string, expectedError string) {
-		tx, err := NewScriptCall(script, "")
+		tx, err := NewScriptCall(script, "", "", nil)
 		if err != nil {
 			assert.Contains(t, err.Error(), expectedError)
 			return
@@ -111,4 +111,11 @@ func TestScriptCall(t *testing.T) {
 	check([]string{"/bin/false"}, "hello", "hello", true)
 	bad([]string{}, "hello", "no script path provided")
 	bad([]string{"/bin/missing-script"}, "hello", "no valid script found")
+
+	if tx, err := NewScriptCall([]string{"/bin/cat"}, "", "cat", nil); assert.NoError(t, err) {
+		assert.EqualValues(t, "script(cat)", tx.String())
+	}
+	if tx, err := NewScriptCall([]string{"/bin/cat", "-", "a"}, "", "cat", []string{"-", "a"}); assert.NoError(t, err) {
+		assert.EqualValues(t, "script(cat,-,a)", tx.String())
+	}
 }

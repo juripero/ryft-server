@@ -155,6 +155,9 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 	if cfg.Performance {
 		q.Set("performance", fmt.Sprintf("%t", cfg.Performance))
 	}
+	for _, t := range cfg.Transforms {
+		q.Add("transform", t.String())
+	}
 
 	u.RawQuery = q.Encode()
 	return u

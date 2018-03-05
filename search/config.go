@@ -83,6 +83,9 @@ type Config struct {
 		// should be "ryftprim" or "ryftx" or "ryftpcre2"
 		Tool string
 
+		// backend full path
+		Path []string
+
 		// additional backend options
 		// addeded to the end of args
 		Opts []string
@@ -110,7 +113,7 @@ type Aggregations interface {
 	GetOpts() map[string]interface{}
 	Merge(other interface{}) error
 	Add(raw []byte) error
-	ToJson(final bool) interface{}
+	ToJson(final bool) map[string]interface{}
 }
 
 // NewEmptyConfig creates new empty search configuration.

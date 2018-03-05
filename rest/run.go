@@ -87,6 +87,14 @@ func (server *Server) DoRun(ctx *gin.Context) {
 				return filepath.Join(mountPoint, homeDir)
 			case "RYFTONE":
 				return mountPoint
+			case "UID":
+				return fmt.Sprintf("%d", os.Getuid())
+			case "GID":
+				return fmt.Sprintf("%d", os.Getgid())
+			case "EUID":
+				return fmt.Sprintf("%d", os.Geteuid())
+			case "EGID":
+				return fmt.Sprintf("%d", os.Getegid())
 			}
 			return os.Getenv(name) // system fallback
 		}
@@ -122,14 +130,16 @@ func (server *Server) DoRun(ctx *gin.Context) {
 		}
 	}
 
+	var user_args []string
 	if len(params.Command) != 0 {
-		args = append(args, params.Command)
+		user_args = append(user_args, params.Command)
 	}
-	args = append(args, params.Args...)
-	if len(args) == 0 || len(args[0]) == 0 {
+	user_args = append(user_args, params.Args...)
+	if len(user_args) == 0 || len(user_args[0]) == 0 {
 		panic(NewError(http.StatusBadRequest,
 			"no command or argument provided"))
 	}
+	args = append(args, user_args...)
 
 	log.WithFields(map[string]interface{}{
 		"args": args,
@@ -139,11 +149,31 @@ func (server *Server) DoRun(ctx *gin.Context) {
 
 	// run docker image
 	cmd := exec.Command(args[0], args[1:]...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		panic(NewError(http.StatusInternalServerError, err.Error()).
-			WithDetails("failed to execute"))
-	}
+	var out []byte
+	doneCh := make(chan struct{})
 
-	ctx.Data(http.StatusOK, "application/octet-stream", out)
+	go func() {
+		defer close(doneCh)
+		out, err = cmd.CombinedOutput()
+	}()
+
+	log.Debugf("[%s]: waiting Docker container response...", CORE)
+	select {
+	case <-doneCh:
+		if err != nil {
+			panic(NewError(http.StatusInternalServerError, err.Error()).
+				WithDetails(string(out)))
+		}
+		ctx.Data(http.StatusOK, "application/octet-stream", out)
+		log.Debugf("[%s]: Docker container has finished", CORE)
+
+	case <-ctx.Writer.CloseNotify():
+		log.Warnf("[%s]: cancelling by user (connection is gone)...", CORE)
+		if p := cmd.Process; p != nil {
+			if err := p.Kill(); err != nil {
+				log.WithError(err).Warnf("[%s]: failed to kill Docker container", CORE)
+			}
+			log.Debugf("[%s]: Docker container has cancelled", CORE)
+		}
+	}
 }

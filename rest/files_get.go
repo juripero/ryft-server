@@ -195,8 +195,13 @@ func (server *Server) doGetRegularFile(ctx *gin.Context, path string, mt time.Ti
 func (server *Server) doGetCatalog(ctx *gin.Context, cat *catalog.Catalog, filename string, mt time.Time) {
 	f, err := cat.GetFile(filename)
 	if err != nil {
-		panic(NewError(http.StatusInternalServerError, err.Error()).
-			WithDetails("failed to open catalog file"))
+		if err == os.ErrNotExist {
+			panic(NewError(http.StatusNotFound, err.Error()).
+				WithDetails("failed to get file from catalog"))
+		} else {
+			panic(NewError(http.StatusInternalServerError, err.Error()).
+				WithDetails("failed to get file from catalog"))
+		}
 	}
 	defer f.Close()
 

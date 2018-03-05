@@ -1,13 +1,9 @@
-GOBINDATA = ${GOPATH}/bin/go-bindata
-ASSETS = bindata.go
-BINARIES = ryft-server
 HINT = ryft-server
 APP_VERSION ?= latest
 RYFT_DOCKER_BRANCH ?= master
 RYFT_INTEGRATION_TEST ?= develop
-BUILDER_VERSION ?= latest
 
-all: $(ASSETS) build version
+all: build version
 
 ifeq (${VERSION},)
   VERSION=$(shell git describe --tags)
@@ -16,44 +12,50 @@ ifeq (${GITHASH},)
   GITHASH=$(shell git log -1 --format='%H')
 endif
 
-.PHONY: version
+.PHONY: version version-q
 version:
 	@echo "Version: ${VERSION}"
 	@echo "GitHash: ${GITHASH}"
+version-q:
+	@echo "${VERSION}"
 
-$(GOBINDATA):
+# update binary data
+.PHONY: update_bindata
+update_bindata: ${GOPATH}/bin/go-bindata
+	@echo "[${HINT}]: updating bindata..."
+	@${GOPATH}/bin/go-bindata -o bindata.go -prefix static/ static/...
+${GOPATH}/bin/go-bindata:
 	@go get -u github.com/jteeuwen/go-bindata/...
 
-.PHONY: $(ASSETS)
-$(ASSETS): $(GOBINDATA)
-	@echo "[${HINT}]: updating bindata..."
-	@${GOBINDATA} -o bindata.go -prefix static/ static/...
+# update vendor sources
+.PHONY: update_vendor
+update_vendor:
+	@echo "[${HINT}]: updating vendor..."
+	@${GOPATH}/bin/govendor sync
+@${GOPATH}/bin/govendor:
+	@go get -u github.com/kardianos/govendor
 
-.PHONY: update
-update:
-	go get -d -u -t -v ./...
 
-.PHONY: build
-build:
+# build or install
+.PHONY: build install
+build: update_vendor update_bindata
 	@echo "[${HINT}]: building ryft-server..."
 	@go build -ldflags "-s -w -X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
-
-.PHONY: install
-install: $(ASSETS)
+install: update_vendor update_bindata
 	@echo "[${HINT}]: installing ryft-server..."
 	@go install -ldflags "-s -w -X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 
-.PHONY: debian
-debian: install
-	@make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
 
-# build Debian package using Docker container
-.PHONY: docker-build docker_build
+# build Debian package
+.PHONY: debian docker-build docker_build
+debian: build
+	@make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
 docker_build: docker-build
 docker-build:
-	@make -C docker build
+	@make -C docker debian
 
 
+# run coverage test
 .PHONY: test_cover test-cover test
 test_cover: test-cover
 test-cover:
@@ -63,8 +65,10 @@ test-cover:
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftmux/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/ryftprim/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/utils/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/aggs/ || true
 	@go test -tags "${GO_TAGS}" -cover ./search/utils/catalog/ || true
-	@go test -tags "${GO_TAGS}" -cover ./search/utils/query || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/query/ || true
+	@go test -tags "${GO_TAGS}" -cover ./search/utils/view/ || true
 
 	@go test -tags "${GO_TAGS}" -cover ./rest/codec/ || true
 	@go test -tags "${GO_TAGS}" -cover ./rest/codec/json/ || true
@@ -87,8 +91,8 @@ test:
 	go test -tags "${GO_TAGS}" ./...
 
 clean:
-	rm -f $(ASSETS)
-	rm -f $(BINARIES)
+	@rm -f bindata.go
+	@rm -f ryft-server
 
 
 # clone and pull ryft-docker remote repository

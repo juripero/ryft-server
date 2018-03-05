@@ -47,20 +47,20 @@ func TestParseField(t *testing.T) {
 	check("..a...b..", "a", "b")
 	check(`"a b"."c"`, "a b", "c")
 	check("1", "1")
-	check("[5]", 5)
-	check("a.[5]", "a", 5)
-	check("[5].b", 5, "b")
+	check("[5]", 4)
+	check("a.[5]", "a", 4)
+	check("[5].b", 4, "b")
 	check_ex("a.b.c", []string{"x", "b", "z"}, nil, "a", 1, "c")
-	check_ex("a.[1].c", nil, []string{"x", "b", "z"}, "a", "b", "c")
+	check_ex("a.[2].c", nil, []string{"x", "b", "z"}, "a", "b", "c")
 
 	bad("[11111111111111111111111]", "failed to parse field index")
 	bad("[5[", "found instead of ]")
 	bad("[xyz]", "found instead of index")
 	bad("(-)", "unexpected token found")
 
-	tmp := Field{fieldStr("a"), fieldInt(5), fieldStr("b")}
+	tmp := Field{fieldStr("a"), fieldInt(4), fieldStr("b")}
 	assert.EqualValues(t, tmp.String(), "a.[5].b")
-	assert.EqualValues(t, MakeIntField(555).String(), "[555]")
+	assert.EqualValues(t, MakeIntField(554).String(), "[555]")
 }
 
 // test nested field access
@@ -115,11 +115,11 @@ func TestAccessValue(t *testing.T) {
 	bad("foo/bar", "foo.", "bad data type for string field")
 
 	// array
-	check([]string{"a", "b", "c"}, "[1]", "b")
-	check([]interface{}{5, "b", false}, "[0]", 5)
-	check([]interface{}{5, "b", false}, "[1]", "b")
-	check([]interface{}{5, "b", true}, "[2]", true)
+	check([]string{"a", "b", "c"}, "[2]", "b")
+	check([]interface{}{5, "b", false}, "[1]", 5)
+	check([]interface{}{5, "b", false}, "[2]", "b")
+	check([]interface{}{5, "b", true}, "[3]", true)
 	bad([]string{"a", "b", "c"}, "[100]", "requested value is missed")
 	bad([]interface{}{5, "b", false}, "[100]", "requested value is missed")
-	bad("foo/bar", "[0]", "bad data type for index field")
+	bad("foo/bar", "[1]", "bad data type for index field")
 }

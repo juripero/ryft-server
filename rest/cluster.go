@@ -66,6 +66,7 @@ func (server *Server) DoClusterMembers(ctx *gin.Context) {
 			"service-port":    s.ServicePort,
 			"service-id":      s.ServiceID,
 			"service-tags":    s.ServiceTags,
+			"local":           server.isLocalService(s),
 		}
 	}
 
@@ -80,10 +81,25 @@ func (server *Server) getConsulClient() (*consul.Client, error) {
 		return server.consulClient.(*consul.Client), nil // cached
 	}
 
-	// create new client
+	// prepare configuration
 	config := consul.DefaultConfig()
-	// TODO: get some data from server's configuration?
-	config.Datacenter = "dc1"
+	if addr := server.Config.Consul.Address; addr != "" {
+		if u, err := url.Parse(addr); err != nil {
+			return nil, fmt.Errorf("failed to parse consul's address: %s", err)
+		} else {
+			config.Scheme = u.Scheme
+			config.Address = u.Host
+			log.WithField("address", fmt.Sprintf("%s://%s", config.Scheme, config.Address)).
+				Info("custom consul location is used")
+		}
+	}
+	if dc := server.Config.Consul.Datacenter; dc != "" {
+		config.Datacenter = dc
+	} else {
+		config.Datacenter = "dc1" // default
+	}
+
+	// create new client
 	client, err := consul.NewClient(config)
 	if err != nil {
 		return nil, err
@@ -214,18 +230,22 @@ func (s *Server) isLocalService(service *consul.CatalogService) bool {
 		return false
 	}
 
-	// get all interfaces
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		log.WithError(err).Warnf("failed to get interface addresses")
-		return false
-	}
-
 	var address string
 	if service.ServiceAddress != "" {
 		address = service.ServiceAddress
 	} else {
 		address = service.Address
+	}
+
+	if address == s.Config.HostName {
+		return true // same host
+	}
+
+	// get all interfaces
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.WithError(err).Warnf("failed to get interface addresses")
+		return false
 	}
 
 	// check each interface without mask
@@ -246,6 +266,10 @@ func (s *Server) isLocalServiceUrl(serviceUrl *url.URL) bool {
 	// service port must match
 	if len(parts) < 2 || parts[1] != fmt.Sprintf("%d", s.listenAddress.Port) {
 		return false
+	}
+
+	if parts[0] == s.Config.HostName {
+		return true // same host
 	}
 
 	// get all interfaces

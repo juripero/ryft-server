@@ -58,9 +58,14 @@ func (task *Task) releaseLockedFiles() {
 // Prepare `ryftprim` command line arguments.
 // This function converts search configuration to `ryftprim` command line arguments.
 // See `ryftprim -h` for option description.
-func (engine *Engine) prepare(task *Task) error {
-	args := []string{}
+func (engine *Engine) prepare(backend string, task *Task) error {
+	args := make([]string, 0, 16)
 	cfg := task.config
+
+	// tool options (should be added to the BEGIN)
+	if len(cfg.Backend.Path) > 1 {
+		args = append(args, cfg.Backend.Path[1:]...)
+	}
 
 	// select search mode
 	genericMode := false
@@ -91,6 +96,8 @@ func (engine *Engine) prepare(task *Task) error {
 		args = append(args, "-p", "ipv6")
 	case "pcre2":
 		args = append(args, "-p", "pcre2")
+	case "pcap":
+		args = append(args, "-p", "pcap")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
@@ -139,7 +146,7 @@ func (engine *Engine) prepare(task *Task) error {
 		}
 
 		if !skip {
-			args = append(args, "-f", engine.getFilePath(path))
+			args = append(args, "-f", engine.getFilePath(backend, path))
 		}
 	}
 
@@ -182,7 +189,7 @@ func (engine *Engine) prepare(task *Task) error {
 				Warnf("[%s]: index filename was updated to have TXT extension", TAG)
 		}
 
-		args = append(args, "-oi", engine.getFilePath(task.IndexFileName))
+		args = append(args, "-oi", engine.getFilePath(backend, task.IndexFileName))
 	}
 
 	// DATA output file
@@ -196,13 +203,16 @@ func (engine *Engine) prepare(task *Task) error {
 				engine.Instance, fmt.Sprintf(".dat-%s.bin", task.Identifier))
 		}
 
-		args = append(args, "-od", engine.getFilePath(task.DataFileName))
+		args = append(args, "-od", engine.getFilePath(backend, task.DataFileName))
 	}
 
 	// VIEW output file
 	if len(cfg.KeepViewAs) != 0 {
 		task.ViewFileName = filepath.Join(engine.MountPoint, engine.HomeDir, cfg.KeepViewAs)
 	}
+
+	// backend options (should be added to the END)
+	args = append(args, cfg.Backend.Opts...)
 
 	// assign command line
 	task.toolArgs = args
@@ -229,34 +239,17 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 		}
 	}
 
-	var err error
-	var engineOpts []string
-	task.toolPath, engineOpts, err = engine.getExecPath(task.config)
-	if err != nil {
-		task.log().WithError(err).Warnf("[%s]: failed to find appropriate tool", TAG)
-		return fmt.Errorf("failed to find tool: %s", err)
-	} else if task.toolPath == "" {
-		task.log().Warnf("[%s]: no appropriate tool found", TAG)
-		return fmt.Errorf("no tool found: %s", task.toolPath)
+	if len(task.config.Backend.Path) == 0 {
+		return fmt.Errorf("no backend path provided")
 	}
-
-	// backend options (should be added to the END)
-	// define them here because need to know which engine will be used
-	var backendOpts []string
-	if len(task.config.Backend.Opts) > 0 { // options from request
-		backendOpts = task.config.Backend.Opts
-	} else if len(engineOpts) > 0 { // engine default options
-		backendOpts = engineOpts
-	}
-
-	// assign command line
-	task.toolArgs = append(task.toolArgs, backendOpts...)
-
+	task.toolPath = task.config.Backend.Path[0]
 	task.log().WithFields(map[string]interface{}{
-		"tool": task.toolPath,
+		"tool": task.config.Backend.Tool,
+		"path": task.toolPath,
 		"args": task.toolArgs,
 	}).Infof("[%s]: executing tool", TAG)
-	task.toolCmd = exec.Command(task.toolPath, task.toolArgs...)
+	task.toolCmd = exec.Command(task.toolPath,
+		task.toolArgs...)
 
 	// prepare combined STDERR&STDOUT output
 	task.toolOut = new(bytes.Buffer)
@@ -264,7 +257,7 @@ func (engine *Engine) run(task *Task, res *search.Result) error {
 	task.toolCmd.Stderr = task.toolOut
 
 	task.toolStartTime = time.Now() // performance metric
-	err = task.toolCmd.Start()
+	err := task.toolCmd.Start()
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to start tool", TAG)
 		return fmt.Errorf("failed to start tool: %s", err)
@@ -371,9 +364,7 @@ func (task *Task) finish(res *search.Result) {
 		res.Stat.AddSessionData("matches", res.Stat.Matches)
 
 		// save backend tool used
-		if _, tool := filepath.Split(task.toolPath); len(tool) != 0 {
-			res.Stat.Extra["backend"] = tool
-		}
+		res.Stat.Extra["backend"] = task.config.Backend.Tool
 	}
 
 	res.ReportDone()
@@ -552,8 +543,18 @@ func (engine *Engine) relativeToMountPoint(path string) string {
 }
 
 // get a file path (relative or absolute)
-func (engine *Engine) getFilePath(path string) string {
-	if engine.UseAbsPath {
+func (engine *Engine) getFilePath(backend string, path string) string {
+	useAbsPath := engine.UseAbsPath // default
+	if backend != "" {
+		// get tweaks[backend]
+		if a, ok := engine.Tweaks.UseAbsPath[backend]; ok {
+			useAbsPath = a
+		} else if b, ok := engine.Tweaks.UseAbsPath["default"]; ok {
+			useAbsPath = b
+		}
+	}
+
+	if useAbsPath {
 		return path
 	}
 

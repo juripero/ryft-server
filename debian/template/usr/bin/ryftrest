@@ -464,6 +464,12 @@ esac
 [[ -z "$QUERY" && -z "$BODY" ]] && fail "no search query provided, run '$0 --help' for help"
 [[ -z "${FILES[@]}" && -z "${CATALOGS[@]}" && -z "$BODY" ]] && fail "no file or catalog provided, run '$0 --help' for help"
 
+# PCAP search
+if [[ "$MODE" = "pcap" ]]; then
+    ENDPOINT="/pcap$ENDPOINT"
+    DELIMITER=
+fi
+
 # build the URL
 CURL_OPTS=(--compressed)
 URL_QUERY=(local=$(urlencode "$LOCAL"))

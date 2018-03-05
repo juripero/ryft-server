@@ -40,6 +40,11 @@ import (
 	"github.com/getryft/ryft-server/search/utils"
 )
 
+const (
+	AGGS_NAME = "_aggs"
+	// INAMES = "_names"
+)
+
 // Engine is abstract aggregation engine
 type Engine interface {
 	Name() string
@@ -84,6 +89,16 @@ func (a *Aggregations) GetOpts() map[string]interface{} {
 // Clone clones the aggregation engines and functions
 func (a *Aggregations) Clone() search.Aggregations {
 	if a == nil {
+		// IMPORTANT to report nil interface!
+		return nil // nothing to clone
+	}
+
+	return a.clone()
+}
+
+// clones the aggregation engines and functions
+func (a *Aggregations) clone() *Aggregations {
+	if a == nil {
 		return nil // nothing to clone
 	}
 
@@ -115,7 +130,7 @@ func (a *Aggregations) Clone() search.Aggregations {
 // ToJson saves all aggregations to JSON
 // if final is true then all functions are reported
 // otherwise the all engines are reported (cluster mode).
-func (a *Aggregations) ToJson(final bool) interface{} {
+func (a *Aggregations) ToJson(final bool) map[string]interface{} {
 	res := make(map[string]interface{})
 	if a == nil {
 		return res // empty
@@ -158,7 +173,8 @@ func (a *Aggregations) Add(rawData []byte) error {
 
 // merge another (intermediate) aggregation engines
 func (a *Aggregations) Merge(data_ interface{}) error {
-	if data, ok := data_.(map[string]interface{}); ok {
+	switch data := data_.(type) {
+	case map[string]interface{}:
 		for _, engine := range a.engines {
 			if im, ok := data[engine.Name()]; ok {
 				if err := engine.Merge(im); err != nil {
@@ -168,7 +184,19 @@ func (a *Aggregations) Merge(data_ interface{}) error {
 				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
 			}
 		}
-	} else {
+
+	case *Aggregations:
+		for _, engine := range a.engines {
+			if im, ok := data.engines[engine.Name()]; ok {
+				if err := engine.Merge(im); err != nil {
+					return fmt.Errorf("failed to merge intermediate aggregation: %s", err)
+				}
+			} else {
+				return fmt.Errorf("intermediate engine %s is missing", engine.Name())
+			}
+		}
+
+	default:
 		return fmt.Errorf("data is not a map")
 	}
 
@@ -251,6 +279,11 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 			return string(raw), nil
 		}
 
+	case "-":
+		a.parseRawData = func(raw []byte) (interface{}, error) {
+			return nil, fmt.Errorf("internal format, shouldn't be used")
+		}
+
 	default:
 		// see failure check at the end
 	}
@@ -261,6 +294,21 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		if !ok {
 			return nil, fmt.Errorf("bad type of aggregation object: %T", agg_)
 		}
+
+		// extract sub-aggregations (will be moved to aggregation options)
+		var subAggs interface{}
+		if s1, ok := agg["aggregations"]; ok {
+			delete(agg, "aggregations")
+			subAggs = s1
+		}
+		if s2, ok := agg["aggs"]; ok {
+			if subAggs != nil {
+				return nil, fmt.Errorf(`both "aggs" and "aggregations" cannot be provided`)
+			}
+			delete(agg, "aggs")
+			subAggs = s2
+		}
+
 		if len(agg) != 1 {
 			return nil, fmt.Errorf("%q contains invalid aggregation object", name)
 		}
@@ -270,6 +318,10 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 			opts, ok := opts_.(map[string]interface{})
 			if !ok {
 				return nil, fmt.Errorf("bad type of aggregation options: %T", opts_)
+			}
+
+			if subAggs != nil {
+				opts[AGGS_NAME] = subAggs
 			}
 
 			// parse and add function and corresponding engine
@@ -372,6 +424,13 @@ func newFunc(aggType string, opts map[string]interface{}, iNames []string) (Func
 
 	case "geo_centroid", "geo-centroid":
 		if f, err := newGeoCentroidFunc(opts, iNames); err == nil {
+			return f, f.engine, nil // OK
+		} else {
+			return nil, nil, err // failed
+		}
+
+	case "date_histogram", "date-histogram", "date_hist", "date-hist":
+		if f, err := newDateHistFunc(opts, iNames); err == nil {
 			return f, f.engine, nil // OK
 		} else {
 			return nil, nil, err // failed

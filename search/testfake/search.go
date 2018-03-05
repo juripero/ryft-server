@@ -307,6 +307,16 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	return res, nil // OK for now
 }
 
+// Search starts asynchronous "/pcap/search" or "/pcap/count" operation.
+func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
+	backend, err := ryftprim.NewEngine(engine.Options())
+	if err != nil {
+		return nil, err
+	}
+
+	return backend.PcapSearch(cfg)
+}
+
 // Show starts asynchronous "/search/show" operation.
 func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	backend, err := ryftprim.NewEngine(engine.Options())

@@ -237,7 +237,7 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	// get search engine
 	var engine search.Engine
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	if !server.Config.LocalOnly && !params.Local && len(params.Tweaks.Cluster) != 0 {
+	if /*!server.Config.LocalOnly && !params.Local &&*/ len(params.Tweaks.Cluster) != 0 {
 		log.WithField("config", params.Tweaks.Cluster).Debugf("[%s]: create tweaked search engine", CORE)
 		engine, err = server.getClusterTweakEngine(authToken, homeDir, cfg, params.Tweaks.Cluster)
 	} else {
@@ -489,7 +489,7 @@ func parseTransforms(rules []string, cfg ServerConfig) ([]search.Transform, erro
 				pathAndArgs := make([]string, 0, len(info.ExecPath)+len(args))
 				pathAndArgs = append(pathAndArgs, info.ExecPath...)
 				pathAndArgs = append(pathAndArgs, args...)
-				tx, err = search.NewScriptCall(pathAndArgs, "/tmp")
+				tx, err = search.NewScriptCall(pathAndArgs, "/tmp", name, args)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create script-call transformation: %s", err)
 				}
@@ -566,7 +566,7 @@ func updateSession(session *Session, stat *search.Stat) {
 func selectAggsOpts(a, b map[string]interface{}) map[string]interface{} {
 	if a != nil && b != nil {
 		panic(NewError(http.StatusBadRequest, "invalid aggregation configuration").
-			WithDetails(`both "aggs" and "aggregations" connot be provided`))
+			WithDetails(`both "aggs" and "aggregations" cannot be provided`))
 	}
 
 	if a != nil {

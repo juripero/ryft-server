@@ -16,7 +16,7 @@ To run another server instance on `9000` port just pass "address" argument:
 ```{.sh}
 ./ryft-server --address=0.0.0.0:9000
 # or
-./ryft-server -l=:9000
+./ryft-server -l:9000
 ```
 
 So it's possible to run multiple server instances on the same machine.
@@ -61,11 +61,11 @@ logging-options:
     core/pending-jobs: debug
   debug:
     core: debug
+    core/safe: debug
     core/catalogs: debug
     core/pending-jobs: debug
     core/busyness: debug
     search/ryftprim: debug
-    search/ryftone: debug
     search/ryfthttp: debug
     search/ryftmux: debug
     search/ryftdec: debug
@@ -78,8 +78,9 @@ configuration. There is special command line argument `--logging` which also
 could be used to change logging configuration.
 
 The logging configuration itself consists of logger names and corresponding
-logging levels. By default all loggers have "info" level. It is very easy to
-create any logging configuration with fine-tunes logging levels.
+logging levels. By default all loggers have "info" level. The possible logging
+level values are: "panic", "fatal", "error", "warn" or "warning", "info" and
+"debug". It is very easy to create any logging configuration with fine-tunes logging levels.
 
 
 ## Keeping search results
@@ -126,7 +127,6 @@ backend-options:
 `search-backend` is the search engine name and can be one of the following:
 
 - `ryftprim` uses *ryftprim* command line tool to access Ryft hardware (is used by default)
-- `ryftone` uses *libryftone* library to access Ryft hardware
 - `ryfthttp` uses another `ryft-server` instance to access Ryft hardware
 
 `backend-options` is search engine specific options. For example `ryftprim` engine
@@ -198,9 +198,12 @@ keep-results: false
 busyness-tolerance: 0
 http-timeout: 1h
 processing-threads: 8
+settings-path: /var/ryft/server.settings
+# hostname: node-1
+# instance-home: /
 ```
 
-`local-only` is used to run `ryft-server` outside cluster. No consult dependency,
+`local-only` is used to run `ryft-server` outside cluster. No consul dependency,
 no load balancing enabled. It's equivalent to `--local-only` command line option.
 
 `debug-mode` is used to enable extensive logging.
@@ -219,6 +222,14 @@ It's `1h` (one hour) by default.
 `processing-threads` is the number of parallel threads used to handle all requests.
 If zero the default system value is used. This value is used internally by Go runtime.
 See [GOMAXPROCS](https://golang.org/pkg/runtime/#GOMAXPROCS) for more details.
+
+`settings-path` is used to specify local `ryft-server` storage.
+
+`hostname` is used to customize the hostname provided by the `ryft-server`.
+By default the system's hostname is used.
+
+`instance-home` is used to specify common home directory which is prefixed to
+user's home directory or is used by default if authentication is disabled.
 
 
 #### TLS server configuration
@@ -315,6 +326,26 @@ certificate) just set `insecure-skip-verify: true`. It is not recommended to
 define these `insecure-*` options in production.
 
 See [authentication](./auth.md) document for more details.
+
+
+### Consul configuration
+
+There is Consul-related configuration section:
+
+```{.yaml}
+consul:
+  address: http://127.0.0.1:8500
+  data-center: dc1
+```
+
+The `consul.address` specifies the remote consul address including schema and
+port number. By default it is `http://127.0.0.1:8500`.
+
+The `consul.datacenter` specifies the consul's data center name.
+By default it is `dc1`.
+
+Note, that consul address also can be specified via environment variable
+`CONSUL_HTTP_ADDR=127.0.0.1:8500`.
 
 
 ### Catalog configuration
@@ -436,7 +467,7 @@ curl -s "http://ryft-host:8765/files?file=.ryft-user.yaml&offset=0" \
 
 By default the `default-user-config` section from main configuration file used.
 But if the `/ryftone/${RYFTUSER}/.ryft-user.yaml` or `/ryftone/${RYFTUSER}/.ryft-user.json`
-file is present, then it will be used instead of `default-user-config` secion.
+file is present, then it will be used instead of `default-user-config` section.
 
 Please note, if you change parameters in main configuration file and nothing is happened
 then probably there is Ryft user configuration file which overrides all parameters
@@ -460,7 +491,22 @@ record-queries:
   csv: ["*.csv"]
 ```
 
-This feature can be disabled by `enabled: false` option.
+This feature can be disabled by `enabled: false` option. Also this feature
+can be enabled for particular backend tools, for example:
+
+```{.yaml}
+record-queries:
+  enabled:
+  - ryftx
+  - ryftpcre2
+
+# ... or ...
+
+record-queries:
+  enabled:
+    default: true
+    ryftprim: false
+```
 
 The following lists of file patterns customize extension-based file type detection:
 - `skip` ignore these extensions. The `RECORD` will be kept as is.
@@ -470,6 +516,18 @@ The following lists of file patterns customize extension-based file type detecti
 
 Note, the file pattern may include directory filter, the `json: ["foo/*.json"]`
 matches all JSON files in `foo` directory.
+
+There is special case for the XML data. The XML file should be in valid format,
+i.e. it should contain `<?xml ... ?>` header and a root element. For example:
+
+```{.xml}
+<?xml version = "1.0" encoding = "UTF-8" ?>
+<xml_root>
+  <r><c01>
+    ...
+```
+
+In this case the `RECORD.c01` will be automatically replaced to `XRECORD.r.c01`.
 
 
 # Debian package
@@ -513,21 +571,102 @@ tail -f /var/log/ryft/server.log
 
 ## Default backend options
 
-You can specify default options for search backends using `<engine>-opts` fields of `backend-options` section. Such fields accept list of backend parameters.
+There described new section in the `ryft-server.conf` that allow user to tune backend options in order to achieve better performance.
 
-    ryftprim-opts: []  // default options for `ryftprim` backend
-    ryftx-opts: []     // default options for `ryftx` backend
-    ryftpcre2-opts: [] // default options for `pcre2` backend
-    ryft-all-opts: []  // default options for all engines in case if one of them omitted
+Part of config:
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    options:
+      ...
+    router:
+      ...
+    abs-path:
+      ...
+```
 
 
-Note that `<engine>-opts` always overrides `ryft-all-opts` if it is presented.
-If ryft-server accepted list of `backend-option` parameters they fully replace default options.
+### `router` section
 
-It works with replace but not merge strategy because otherwise it would be impossible to disable flags without value like "-v", "--list", etc.
+If presented options define mapping between search primitive and backend tool.
 
-Example:
+e.g.:
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    router:
+      default: ryftx
+      es: ryftprim
+      fhs,ds: ryftprim
+      prce2: prce2
+```
 
-    ryftprim-opts: ["-v"]
-    ryftx-opts: ["--rx-shard-size", "64M", "--rx-max-spawns", "14"]
+`/search` and `/count` endpoints accept `backend` parameter, but if it is not set explicetly `router` may be used for choosing backend that fits better for current search primitive. If search primitive is ommited in the `router` table value of the `default` key will be used.
 
+### options
+
+Options defined in `options` section should have an `array` format and will be passed to the backend tool within a search query.
+Parameters set in `backend-options` have more priority than `options` though.
+
+User can set options for a backend tool, for a search primitive and for a combination `[backend].[search primitive]`.
+
+User can also create set of options specifying `backend-mode` parameter. In this case key of `options` table has a structure: `[backend-mode].[backend].[search primitive]`.
+e.g.:
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    options:
+      default: []             # default mode
+      default.ryftx.es: []
+      default.ryftx.ds: []
+      default.ryftx: []
+      hp: []                  # high-performance mode
+      hp.ryftx.es: []
+      hp.ryftprim.es: []
+      hp.ryftprim: []
+```
+The rule of thumb is: the more preciesly you specify options the higher priority they have.
+User can set `backend` and `backend-mode` parameters in `/search` and `count` endpoints.
+
+Search order in config defined above:
+- extract `backend-mode` from the request parameters
+- extract `backend` tool from the request parameters or from the `router` table
+- extract `search primitive` from the search query
+- create `options` key using pattern `[backend-mode].[backend].[search primitive]` and search it in `options`.
+If nothing found in `options` try `[backend].[search primitive]`, then `[search primitive]`, `[backend]`, `[backend mode]`. Finally, if nothing found use value for the `default` key.
+- execute `backend` tool with a `query` and found options. E.g. `/usr/bin/ryftprim [query] ... [backend-options]`
+
+
+### absolute path
+
+This section describes the usage of absolute/relative path for the backend tool.
+Only `ryftprim` tool accepts path relative to `/ryftone` patrition. The
+`ryftx` and `ryftpcre2` tools accept absolute path.
+
+If no tool is specified the `default` flag is used.
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path:
+      default: false
+      ryftprim: false
+      ryftx: true
+      ryftpcre2: true
+```
+
+Other formats are also supported:
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path:
+    - ryftx
+    - ryftpcre2
+```
+
+```{.yaml}
+backend-options:
+  backend-tweaks:
+    abs-path: [ ryftx, ryftpcre2 ]
+```

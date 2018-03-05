@@ -3,7 +3,7 @@
   "info": {
     "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "RyftOne REST API",
-    "version": "0.14.0"
+    "version": "1.0.0"
   },
   "paths": {
     "/search": {
@@ -47,7 +47,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -71,7 +71,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -112,7 +112,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -135,7 +135,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -167,7 +167,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -193,7 +193,122 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
+          }
+        }
+      }
+    },
+    "/pcap/search": {
+      "get": {
+        "operationId": "pcapSearch",
+        "description": "Endpoint for the PCAP search. Does the PCAP binary file search.",
+        "summary": "PCAP binary file search",
+        "tags": [ "search" ],
+        "produces": [ "application/json", "text/csv" ],
+        "parameters": [
+          { "$ref": "#/parameters/SearchQuery" },
+          { "$ref": "#/parameters/SearchFile" },
+          { "$ref": "#/parameters/IgnoreMissingFiles" },
+          { "$ref": "#/parameters/SearchBackend" },
+          { "$ref": "#/parameters/SearchBackendMode" },
+          { "$ref": "#/parameters/SearchBackendOption" },
+          { "$ref": "#/parameters/SaveData" },
+          { "$ref": "#/parameters/SaveIndex" },
+          { "$ref": "#/parameters/Lifetime" },
+          { "$ref": "#/parameters/ReadShareMode" },
+          { "$ref": "#/parameters/SearchNodes" },
+          { "$ref": "#/parameters/SearchStat" },
+          { "$ref": "#/parameters/Performance" },
+          { "$ref": "#/parameters/SearchLimit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains search statistics.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/Error" }
+          }
+        }
+      },
+      "post": {
+        "description": "Does the PCAP search. The same as `GET /pcap/search` but uses JSON object in request's body to specify search parameters.",
+        "tags": [ "search" ],
+        "produces": [ "application/json", "text/csv" ],
+        "summary": "PCAP binary file search",
+        "operationId": "pcapSearchPost",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "schema": { "$ref": "#/definitions/SearchRequest" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains search statistics.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/Error" }
+          }
+        }
+      }
+    },
+    "/pcap/count": {
+      "get": {
+        "description": "Endpoint for the count. Does the PCAP search but returns just statistics.",
+        "tags": [ "search" ],
+        "summary": "Count the number of matches in PCAP file",
+        "operationId": "pcapCount",
+        "produces": [ "application/json", "text/csv" ],
+        "parameters": [
+          { "$ref": "#/parameters/SearchQuery" },
+          { "$ref": "#/parameters/SearchFile" },
+          { "$ref": "#/parameters/IgnoreMissingFiles" },
+          { "$ref": "#/parameters/SearchBackend" },
+          { "$ref": "#/parameters/SearchBackendMode" },
+          { "$ref": "#/parameters/SearchBackendOption" },
+          { "$ref": "#/parameters/SaveData" },
+          { "$ref": "#/parameters/SaveIndex" },
+          { "$ref": "#/parameters/Lifetime" },
+          { "$ref": "#/parameters/ReadShareMode" },
+          { "$ref": "#/parameters/SearchNodes" },
+          { "$ref": "#/parameters/Performance" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains search statistics only.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/Error" }
+          }
+        }
+      },
+      "post": {
+        "description": "Does the search but returns just statistics. The same as `GET /pcap/count` but uses JSON object in request's body to specify search parameters.",
+        "tags": [ "search" ],
+        "summary": "Count the number of matches",
+        "operationId": "pcapCountPost",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "schema": { "$ref": "#/definitions/CountRequest" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search result contains search statistics only.",
+            "schema": { "$ref": "#/definitions/SearchResponse" }
+          },
+          "default": {
+            "description": "Error response.",
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -239,7 +354,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -270,7 +385,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -297,7 +412,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -331,7 +446,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -360,7 +475,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -403,7 +518,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -442,7 +557,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -450,17 +565,18 @@
     "/version": {
       "get": {
         "tags": [ "misc" ],
-        "summary": "Get server's version",
-        "description": "Endpoint to query current build version",
+        "summary": "Get server's version.",
+        "description": "This endpoint reports the version of the REST service.",
         "operationId": "version",
+        "security": [],
         "responses": {
           "200": {
-            "description": "Hash and version",
-            "schema": { "$ref": "#/definitions/VersionResponse" }
+            "description": "REST service version.",
+            "schema": { "$ref": "#/definitions/Version" }
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -471,24 +587,29 @@
         "summary": "Authentication",
         "description": "Endpoint to authenticate an user",
         "operationId": "login",
+        "security": [],
         "consumes": ["application/json"],
         "parameters": [
           {
             "in": "body",
-            "name": "body",
+            "name": "credentials",
             "description": "User's credentials",
             "required": true,
-            "schema": { "$ref": "#/definitions/LoginRequest" }
+            "schema": { "$ref": "#/definitions/Credentials" }
           }
         ],
         "responses": {
           "200": {
             "description": "JWT",
-            "schema": { "$ref": "#/definitions/LoginResponse" }
+            "schema": { "$ref": "#/definitions/JwtToken" }
+          },
+          "404": {
+            "description": "Authentication is disabled.",
+            "schema": { "$ref": "#/definitions/Error" }
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         },
         "security": []
@@ -500,14 +621,19 @@
         "summary": "Refresh authentication",
         "description": "Endpoint to refresh existing authentication token",
         "operationId": "token_refresh",
+        "security": [ {"jwt":[]} ],
         "responses": {
           "200": {
             "description": "JWT",
-            "schema": { "$ref": "#/definitions/LoginResponse" }
+            "schema": { "$ref": "#/definitions/JwtToken" }
+          },
+          "404": {
+            "description": "Authentication is disabled.",
+            "schema": { "$ref": "#/definitions/Error" }
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -523,7 +649,7 @@
         ],
         "responses": {
           "200": {
-            "description": "List of requested users",
+            "description": "List of requested users.",
             "schema": {
               "type": "array",
               "items": { "$ref": "#/definitions/UserInfo" }
@@ -531,7 +657,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -544,7 +670,7 @@
         "parameters": [
           {
             "in": "body",
-            "name": "body",
+            "name": "user",
             "description": "User's properties",
             "required": true,
             "schema": { "$ref": "#/definitions/UserInfo" }
@@ -558,7 +684,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       },
@@ -570,7 +696,7 @@
         "parameters": [
           {
             "in": "body",
-            "name": "body",
+            "name": "user",
             "description": "User's properties",
             "required": true,
             "schema": { "$ref": "#/definitions/UserInfo" }
@@ -584,7 +710,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
 
@@ -607,7 +733,7 @@
           },
           "default": {
             "description": "Error response.",
-            "schema": { "$ref": "#/definitions/ErrorResponse" }
+            "schema": { "$ref": "#/definitions/Error" }
           }
         }
       }
@@ -935,7 +1061,8 @@
           "description": "Processing details",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/CountResponse"
+            "type": "object",
+            "properties": {}
           }
         },
         "extra": {
@@ -952,11 +1079,15 @@
             },
             "aggregations": {
               "type": "object",
-              "additionalProperties": {}
+              "additionalProperties": {
+                "type": "object"
+              }
             },
             "debug": {
               "type": "object",
-              "additionalProperties": {}
+              "additionalProperties": {
+                "type": "object"
+              }
             }
           }
         }
@@ -1014,51 +1145,70 @@
         }
       }
     },
-    "VersionResponse": {
+    "Version": {
+      "description": "REST service version information.",
       "type": "object",
       "properties": {
         "git-hash": {
+          "description": "Git hash of the source tree the REST service is built on.",
           "type": "string"
         },
         "version": {
+          "description": "REST service version.",
           "type": "string"
         }
       }
     },
-    "LoginRequest": {
+    "Credentials": {
+      "description": "User's credentials: name and password.",
       "type": "object",
       "properties": {
         "username": {
+          "description": "User's name.",
           "type": "string"
         },
         "password": {
+          "description": "User's password.",
           "type": "string"
         }
       }
     },
-    "LoginResponse": {
+    "JwtToken": {
+      "description": "JWT token information.",
       "type": "object",
       "properties": {
         "expire": {
-          "type": "string"
+          "description": "Token expiration datetime (RFC-3339).",
+          "type": "string",
+          "format": "date-time"
         },
         "token": {
+          "description": "JWT token.",
           "type": "string"
         }
       }
     },
-    "ErrorResponse": {
+    "Error": {
+      "description": "Detailed error information.",
       "type": "object",
-      "additionalProperties": {
-        "type": "object"
-      },
       "properties": {
         "message": {
+          "description": "Short error message.",
           "type": "string"
         },
-        "code": {
+        "details": {
+          "description": "Detailed error description.",
           "type": "string"
+        },
+        "status": {
+          "description": "Corresponding HTTP status code.",
+          "type": "integer",
+          "required": true
         }
+      },
+      "additionalProperties": {
+        "description": "Extensions.",
+        "type": "object"
       }
     },
     "RenameResponse": {
@@ -1414,24 +1564,24 @@
       "type": "object",
       "properties": {
         "username": {
-          "description": "Unique user name",
+          "description": "Unique user name.",
           "type": "string"
         },
         "password": {
-          "description": "User's password",
+          "description": "User's password.",
           "type": "string"
         },
         "roles": {
-          "description": "Set of user's roles",
+          "description": "Set of user's roles.",
           "type": "array",
           "items": { "type": "string" }
         },
         "home": {
-          "description": "User's home directory inside `/ryftone` partition",
+          "description": "User's home directory inside `/ryftone` partition.",
           "type": "string"
         },
         "cluster-tag": {
-          "description": "Partitioning tag used in cluster mode",
+          "description": "Partitioning tag used in cluster mode.",
           "type": "string"
         }
       }

@@ -70,7 +70,7 @@ func TestEngineOptions(t *testing.T) {
 		b.MountPoint = backend.MountPoint
 		b.HomeDir = backend.HomeDir
 		if engine, err := NewEngine(b, opts); assert.NoError(t, err) {
-			assert.EqualValues(t, opts, engine.Options())
+			assert.JSONEq(t, asJson(opts), asJson(engine.Options()))
 		}
 	}
 	check2 := func(opts map[string]interface{}, expectedOpts map[string]interface{}) {
@@ -78,7 +78,7 @@ func TestEngineOptions(t *testing.T) {
 		b.MountPoint = backend.MountPoint
 		b.HomeDir = backend.HomeDir
 		if engine, err := NewEngine(b, opts); assert.NoError(t, err) {
-			assert.EqualValues(t, expectedOpts, engine.Options())
+			assert.JSONEq(t, asJson(expectedOpts), asJson(engine.Options()))
 		}
 	}
 
@@ -102,6 +102,11 @@ func TestEngineOptions(t *testing.T) {
 			"compat-mode":              false,
 			"optimizer-limit":          -1,
 			"optimizer-do-not-combine": "",
+			"backend-tweaks": map[string]interface{}{
+				"exec": map[string]interface{}{
+					"ryftprim": []string{"/usr/bin/ryftprim"},
+				},
+			},
 		}
 
 		if len(name) != 0 {
@@ -124,6 +129,11 @@ func TestEngineOptions(t *testing.T) {
 			"compat-mode":              false,
 			"optimizer-limit":          -1,
 			"optimizer-do-not-combine": "",
+			"backend-tweaks": map[string]interface{}{
+				"exec": map[string][]string{
+					"ryftprim": []string{"/usr/bin/ryftprim"},
+				},
+			},
 		}, engine.Options())
 	}
 

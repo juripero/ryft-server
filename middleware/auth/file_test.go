@@ -59,7 +59,7 @@ func TestReadUsersFileJson(t *testing.T) {
 			assert.Equal(t, len(users), 3) {
 			assert.Equal(t, users[0].Name, "Joe")
 			assert.Equal(t, users[1].Password, "456")
-			assert.Equal(t, users[2].Home, "boo_dir")
+			assert.Equal(t, users[2].HomeDir, "boo_dir")
 		}
 	}
 }
@@ -90,7 +90,7 @@ func TestReadUsersFileYaml(t *testing.T) {
 			assert.Equal(t, len(users), 3) {
 			assert.Equal(t, users[0].Name, "Joe")
 			assert.Equal(t, users[1].Password, "456")
-			assert.Equal(t, users[2].Home, "boo_dir")
+			assert.Equal(t, users[2].HomeDir, "boo_dir")
 		}
 	}
 }

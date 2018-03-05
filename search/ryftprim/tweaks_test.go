@@ -20,59 +20,81 @@ func TestTweakOpts(t *testing.T) {
 		return ParseTweaks(cfg)
 	}
 
-	// empty config
-	opts, err := ParseTweaks(map[string]interface{}{})
-	if assert.NoError(t, err) {
-		assert.EqualValues(t, []string(nil), opts.GetOptions("default", "ryftx", "es"))
-		assert.EqualValues(t, []string(nil), opts.GetOptions("", "ryftprim", "es"))
-	}
-
-	opts, err = parseYamlTweaks(`
+	// abs-path (as a map)
+	opts, err := parseYamlTweaks(`
 backend-tweaks:
-  options:
-    high.ryftprim.es: [high, prim, es]
-    high.ryftprim.ds: [high, prim, ds]
-    high.ryftprim: [high, prim]
-    high.fhs: [high, fhs]
-    high: [high]
-
-    ryftx.es: [x, es]
-    ryftx.ts: [x, ts]
-    ryftx: [x]
-    fhs: [fhs]
-
-    default: ["?"]
+  abs-path:
+    ryftprim: false
+    ryftx: true
+    default: false
 `)
 	if assert.NoError(t, err) {
-		assert.EqualValues(t, []string{"high", "prim", "es"}, opts.GetOptions("high", "ryftprim", "es"))
-		assert.EqualValues(t, []string{"high", "prim"}, opts.GetOptions("high", "ryftprim", "feds"))
-		assert.EqualValues(t, []string{"high", "fhs"}, opts.GetOptions("high", "ryftprim", "fhs"))
-		assert.EqualValues(t, []string{"high"}, opts.GetOptions("high", "ryftx", "es"))
-		assert.EqualValues(t, []string{"high"}, opts.GetOptions("high", "ryftx", "feds"))
-		assert.EqualValues(t, []string{"high", "fhs"}, opts.GetOptions("high", "ryftx", "fhs"))
-
-		assert.EqualValues(t, []string{"x", "es"}, opts.GetOptions("", "ryftx", "es"))
-		assert.EqualValues(t, []string{"x"}, opts.GetOptions("", "ryftx", "feds"))
-		assert.EqualValues(t, []string{"fhs"}, opts.GetOptions("", "ryftx", "fhs"))
-		assert.EqualValues(t, []string{"?"}, opts.GetOptions("", "ryftprim", "es"))
-		assert.EqualValues(t, []string{"?"}, opts.GetOptions("", "ryftprim", "feds"))
-		assert.EqualValues(t, []string{"fhs"}, opts.GetOptions("", "ryftprim", "fhs"))
+		assert.EqualValues(t, map[string]bool{
+			"ryftprim": false,
+			"ryftx":    true,
+			"default":  false,
+		}, opts.UseAbsPath)
 	}
 
+	// abs-path (as a slice)
 	opts, err = parseYamlTweaks(`
 backend-tweaks:
-  options:
-    default: ["?"]
-  router:
-    pcre2: ryftpcre2
-    fhs,feds: ryftprim
-    default: ryftx
+  abs-path:
+  - ryftx
 `)
 	if assert.NoError(t, err) {
-		assert.EqualValues(t, "ryftpcre2", opts.GetBackendTool("pcre2"))
-		assert.EqualValues(t, "ryftprim", opts.GetBackendTool("feds"))
-		assert.EqualValues(t, "ryftprim", opts.GetBackendTool("fhs"))
-		assert.EqualValues(t, "ryftx", opts.GetBackendTool("es"))
-		assert.EqualValues(t, "ryftx", opts.GetBackendTool("ts"))
+		assert.EqualValues(t, map[string]bool{
+			"ryftx": true,
+		}, opts.UseAbsPath)
+	}
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: [ ryftx ]
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"ryftx": true,
+		}, opts.UseAbsPath)
+	}
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: [ ryftx, ryftpcre2 ]
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"ryftx":     true,
+			"ryftpcre2": true,
+		}, opts.UseAbsPath)
+	}
+
+	// abs-path (as a string)
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: ryftx
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"ryftx": true,
+		}, opts.UseAbsPath)
+	}
+
+	// abs-path (as a bool)
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: true
+`)
+	if assert.NoError(t, err) {
+		assert.EqualValues(t, map[string]bool{
+			"default": true,
+		}, opts.UseAbsPath)
+	}
+
+	// abs-path fails
+	opts, err = parseYamlTweaks(`
+backend-tweaks:
+  abs-path: 100
+`)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), `unknown "backend-tweaks.abs-path" option type`)
 	}
 }
