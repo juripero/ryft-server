@@ -1,4 +1,5 @@
 /ryft-server
+/ryft-server-aggs
 /bindata.go
 /cover.out
 *.deb
