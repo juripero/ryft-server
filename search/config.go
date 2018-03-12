@@ -98,6 +98,7 @@ type Config struct {
 	// fine tune options
 	Tweaks struct {
 		Format map[string]interface{} // format specific options (column names for CSV, etc)
+		Aggs   map[string]interface{} // aggregation specific options
 	}
 
 	// report performance metrics

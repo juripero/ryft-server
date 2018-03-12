@@ -54,7 +54,7 @@ func (engine *Engine) Options() map[string]interface{} {
 	opts["open-poll"] = engine.OpenFilePollTimeout.String()
 	opts["read-poll"] = engine.ReadFilePollTimeout.String()
 	opts["read-limit"] = engine.ReadFilePollLimit
-	opts["aggregation-concurrency"] = engine.AggregationConcurrency
+	opts["aggregations"] = engine.aggsOpts.ToMap()
 	opts["keep-files"] = engine.KeepResultFiles
 	opts["minimize-latency"] = engine.MinimizeLatency
 	opts["index-host"] = engine.IndexHost
@@ -180,18 +180,19 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 		return fmt.Errorf(`"read-limit" cannot be negative or zero`)
 	}
 
-	// read aggregation-concurrency
+	// [COMPATIBILITY] read aggregation-concurrency
 	if v, ok := opts["aggregation-concurrency"]; ok {
 		vv, err := utils.AsInt64(v)
 		if err != nil {
 			return fmt.Errorf(`failed to parse "aggregation-concurrency" option: %s`, err)
 		}
-		engine.AggregationConcurrency = int(vv)
-	} else {
-		engine.AggregationConcurrency = 1
+		engine.aggsOpts.Concurrency = int(vv)
 	}
-	if engine.AggregationConcurrency <= 0 {
+	if engine.aggsOpts.Concurrency < 0 {
 		return fmt.Errorf(`"aggregation-concurrency" cannot be negative or zero`)
+	}
+	if err := engine.aggsOpts.Parse(opts["aggregations"], false); err != nil {
+		return fmt.Errorf(`failed to parse "aggregations" options: %s`, err)
 	}
 
 	// keep result files

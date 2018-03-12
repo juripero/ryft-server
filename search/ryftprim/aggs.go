@@ -33,6 +33,7 @@ package ryftprim
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -41,6 +42,7 @@ import (
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/mitchellh/mapstructure"
 )
 
 // dedicated structure for aggregation goroutine
@@ -49,9 +51,76 @@ type aggregationGoroutine struct {
 	lastError    error
 }
 
+// AggregationOptions contains static and runtime aggregation options
+type AggregationOptions struct {
+	ToolPath []string `json:"optimized-tool,omitempty"`
+
+	// runtime options
+	Engine             string `json:"engine,omitempty"`
+	MaxRecordsPerChunk string `json:"max-records-per-chunk,omitempty"`
+	DataChunkSize      string `json:"data-chunk-size,omitempty"`
+	IndexChunkSize     string `json:"index-chunk-size,omitempty"`
+	Concurrency        int    `json:"concurrency,omitempty"`
+}
+
+// inverse of Parse() method
+func (opts *AggregationOptions) ToMap() map[string]interface{} {
+	// do it via JSON encoding/decoding
+	data, _ := json.Marshal(opts)
+	var res map[string]interface{}
+	_ = json.Unmarshal(data, &res)
+	return res
+}
+
+// Parse aggregation options
+func (opts *AggregationOptions) Parse(params interface{}, keepToolPath bool) error {
+	var oldToolPath []string
+	if keepToolPath {
+		oldToolPath = opts.ToolPath
+		opts.ToolPath = nil // reset
+	}
+
+	dcfg := mapstructure.DecoderConfig{
+		WeaklyTypedInput: true,
+		Result:           opts,
+		TagName:          "json",
+	}
+	if d, err := mapstructure.NewDecoder(&dcfg); err != nil {
+		return fmt.Errorf("failed to create decoder: %s", err)
+	} else if err := d.Decode(params); err != nil {
+		return fmt.Errorf("failed to decode: %s", err)
+	}
+
+	// path to optimized tool
+	if keepToolPath {
+		// tool-path cannot be changed by user options
+		opts.ToolPath = oldToolPath
+	} else if len(opts.ToolPath) != 0 {
+		if info, err := os.Stat(opts.ToolPath[0]); os.IsNotExist(err) {
+			return fmt.Errorf(`no "optimized-tool" tool found: %s`, err)
+		} else if err != nil {
+			return fmt.Errorf(`bad "optimized-tool" tool found: %s`, err)
+		} else if info.IsDir() {
+			return fmt.Errorf(`bad "optimized-tool" tool found: %s`, "is a directory")
+		}
+	}
+
+	// concurrency
+	if opts.Concurrency < 0 {
+		return fmt.Errorf(`"concurrency" cannot be negative`)
+	}
+
+	return nil // OK
+}
+
 // Apply aggregations
-func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter string,
+func ApplyAggregations(opts AggregationOptions, indexPath, dataPath string, delimiter string,
 	aggregations search.Aggregations, checkJsonArray bool, cancelFunc func() bool) error {
+
+	if len(opts.ToolPath) != 0 {
+		// TODO: use optimized tool to calculate aggregations
+	}
+
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
 	var dataSkip uint64
@@ -93,12 +162,12 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 	var dataCh chan []byte
 	var wg sync.WaitGroup
 	var subErrs int32
-	if concurrency > 1 {
+	if opts.Concurrency > 1 {
 		// create a few goroutines to process aggregations
 		// each goroutine will use its own Aggerations
-		subAggs = make([]*aggregationGoroutine, concurrency)
+		subAggs = make([]*aggregationGoroutine, opts.Concurrency)
 		dataCh = make(chan []byte, 4*1024)
-		log.Debugf("[%s/aggs]: start sub-processing in %d threads", TAG, concurrency)
+		log.Debugf("[%s/aggs]: start sub-processing in %d threads", TAG, opts.Concurrency)
 		start := time.Now()
 
 		// run several processing goroutines
@@ -214,7 +283,7 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 			dataPos += uint64(len(delimiter))
 		}
 
-		if concurrency > 1 {
+		if opts.Concurrency > 1 {
 			dataCh <- data // send data to processing goroutines
 			if atomic.LoadInt32(&subErrs) != 0 {
 				return fmt.Errorf("parallel error occurred")
