@@ -75,6 +75,7 @@ type Function interface {
 // Aggregations is a set of functions and related engines.
 type Aggregations struct {
 	parseRawData func([]byte) (interface{}, error)
+	Format       string
 
 	Functions map[string]Function
 	Engines   map[string]Engine
@@ -104,6 +105,7 @@ func (a *Aggregations) clone() *Aggregations {
 
 	n := &Aggregations{
 		parseRawData: a.parseRawData,
+		Format:       a.Format,
 		Functions:    make(map[string]Function),
 		Engines:      make(map[string]Engine),
 		Options:      a.Options,
@@ -255,16 +257,19 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 	// format
 	switch format {
 	case "xml":
+		a.Format = "xml"
 		a.parseRawData = func(raw []byte) (interface{}, error) {
 			return xml.ParseXml(raw, nil)
 		}
 
 	case "json":
+		a.Format = "json"
 		a.parseRawData = func(raw []byte) (interface{}, error) {
 			return json.ParseRaw(raw)
 		}
 
 	case "csv":
+		a.Format = "csv"
 		csvFmt, err := csv.New(formatOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare CSV format")
@@ -275,6 +280,7 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		}
 
 	case "utf8", "utf-8":
+		a.Format = "utf8"
 		a.parseRawData = func(raw []byte) (interface{}, error) {
 			return string(raw), nil
 		}

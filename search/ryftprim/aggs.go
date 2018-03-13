@@ -123,6 +123,10 @@ func (opts *AggregationOptions) ParseTweaks(params interface{}) error {
 }
 
 // Apply optimized (c-based) aggregations
+/*
+Use the following command to check:
+curl -s "http://localhost:8765/search/aggs?data=test-10M.bin&index=test-10M.txt&delimiter=%0d%0a&format=json&performance=true" --data '{"tweaks":{"aggs":{"concurrency":4,"engine":"optimized"}}, "aggs":{"1":{"stats":{"field":"foo"}},"2":{"avg":{"field":"foo"}}}}' | jq .stats.extra
+*/
 func applyOptimizedAggregations(opts AggregationOptions, indexPath, dataPath string, delimiter string,
 	aggregations search.Aggregations, checkJsonArray bool, cancelFunc func() bool) (error, bool) {
 
@@ -134,15 +138,41 @@ func applyOptimizedAggregations(opts AggregationOptions, indexPath, dataPath str
 	}
 
 	// check the "engine"
+	forceOptimized := false
 	switch strings.ToLower(opts.Engine) {
 	case "native":
 		return nil, false // disabled by user
+
+	case "optimized":
+		forceOptimized = true
+		break
+
+	case "auto", "":
+		break
+
+	default:
+		return fmt.Errorf(`"%s" is unknown aggregation engine (should be "native", "optimized" or "auto")`, opts.Engine), true
 	}
 
 	if a, ok := aggregations.(*aggs.Aggregations); ok {
+		// check the "json" format
+		switch a.Format {
+		case "json":
+			break
+
+		default:
+			if forceOptimized {
+				return fmt.Errorf("requested aggregation format is not supported by optimized engine"), true
+			}
+			return nil, false // not a "json" format found
+		}
+
 		// check we have only "stat" aggregations
 		for _, e := range a.Engines {
 			if _, ok := e.(*aggs.Stat); !ok {
+				if forceOptimized {
+					return fmt.Errorf("requested type of aggregation is not supported by optimized engine"), true
+				}
 				return nil, false // not a "stat" engine found
 			}
 		}

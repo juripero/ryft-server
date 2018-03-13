@@ -496,9 +496,6 @@ static struct JSON_Field* json_field_make(void)
 }
 
 
-//#define JSON_INDEX_BASE 0
-#define JSON_INDEX_BASE 1
-
 /*
  * json_field_parse() implementation.
  */

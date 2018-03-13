@@ -54,6 +54,8 @@ static void usage(void)
 int conf_parse(struct Conf *cfg, int argc, const char *argv[])
 {
     // default options
+    cfg->fields = 0;
+    cfg->n_fields = 0;
     cfg->header_len = 0;
     cfg->delim_len = 0;
     cfg->footer_len = 0;
@@ -125,6 +127,7 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
             break;
 
         case 'N': // native format
+            // TODO: set corresponding flag
             break;
 
         case 'i': // INDEX file path
@@ -136,8 +139,17 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
             break;
 
         case 'f': // field
-            cfg->field = optarg; // TODO: do we need to copy?
-            break;
+        {
+            const char **fields = (const char**)realloc(cfg->fields,
+                                                        (cfg->n_fields+1)*sizeof(cfg->fields[0]));
+            if (!fields)
+            {
+                verr("failed to allocate memory for fields\n");
+                return -1;
+            }
+            cfg->fields = fields;
+            cfg->fields[cfg->n_fields++] = optarg; // TODO: do we need to copy?
+        } break;
 
         case 'H': // header length
         {
@@ -270,9 +282,9 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
         return -1; // failed
     }
 
-    if (!cfg->field)
+    if (!cfg->n_fields)
     {
-        verr("ERROR: no FIELD provided\n");
+        verr("ERROR: at least one FIELD should be provided\n");
         // usage();
         return -1; // failed
     }
@@ -286,6 +298,8 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
  */
 int conf_free(struct Conf *cfg)
 {
+    if (cfg->fields)
+        free(cfg->fields);
     (void)cfg;
     return 0; // OK
 }
@@ -305,7 +319,10 @@ void conf_print(const struct Conf *cfg)
          (int)cfg->header_len,
          (int)cfg->delim_len,
          (int)cfg->footer_len);
-    vlog("field: %s\n", cfg->field);
+    vlog("fields: [");
+    for (int i = 0; i < cfg->n_fields; ++i)
+        vlog("%s%s", i?", ":"", cfg->fields[i]);
+    vlog("]\n");
     vlog("INDEX chunk: %.3gGB\n",
          cfg->idx_chunk_size/(1024*1024*1024.0));
     vlog(" DATA chunk: %.3gGB (%.3gM records maximum)\n",

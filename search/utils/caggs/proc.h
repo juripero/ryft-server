@@ -64,9 +64,11 @@ int parse_index_chunk(int is_last_chunk,
  */
 struct Work
 {
-    struct JSON_Field *field; ///< @brief Field to search for.
+    struct JSON_Field *field_tree; ///< @brief Field tree to search for.
 
-    struct Stat *stat; ///< @brief Final statistics.
+    struct JSON_Field **fields; ///< @brief Target fields.
+    struct Stat **stats;        ///< @brief Final statistics (per target field).
+    int n_fields;               ///< @brief Number of target fields.
 
     struct XProc *xproc; ///< @brief XProc processing units.
     int n_xproc; ///< @brief Number of XProc units.

@@ -4,6 +4,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef JSON_INDEX_BASE
+//# define JSON_INDEX_BASE 0
+#   define JSON_INDEX_BASE 1
+#endif // JSON_INDEX_BASE
+
 
 /**
  * @brief JSON token type.

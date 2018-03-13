@@ -14,7 +14,9 @@ struct Conf
 {
     const char *idx_path;   ///< @brief Path to INDEX file.
     const char *dat_path;   ///< @brief Path to DATA file.
-    const char *field;      ///< @brief Field to access data.
+
+    const char **fields;    ///< @brief Fields to access data.
+    int n_fields;           ///< @brief Number of fields.
 
     uint64_t header_len;    ///< @brief DATA header in bytes.
     uint64_t delim_len;     ///< @brief DATA delimiter in bytes.
