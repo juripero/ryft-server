@@ -341,5 +341,7 @@ int work_do_join(struct Work *w)
  */
 void work_print(struct Work *w, FILE *f)
 {
+    fprintf(f, "[");
     stat_print(w->stat, f);
+    fprintf(f, "]");
 }

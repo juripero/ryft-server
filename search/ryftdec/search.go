@@ -48,7 +48,7 @@ import (
 func (engine *Engine) getBackendAggsOpts() ryftprim.AggregationOptions {
 	opts := engine.Backend.Options()
 	var res ryftprim.AggregationOptions
-	_ = res.Parse(opts["aggregations"], true)
+	_ = res.ParseConfig(opts["aggregations"])
 	// errors should be already handled in backend constructor
 	return res
 }
@@ -434,7 +434,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 			start := time.Now()
 
 			aggsOpts := engine.getBackendAggsOpts()
-			if err := aggsOpts.Parse(cfg.Tweaks.Aggs, true); err != nil {
+			if err := aggsOpts.ParseTweaks(cfg.Tweaks.Aggs); err != nil {
 				task.log().WithError(err).Errorf("[%s]: failed to get aggregation options", TAG)
 				mux.ReportError(fmt.Errorf("failed to get aggregation options: %s", err))
 				return

@@ -191,7 +191,7 @@ func (engine *Engine) update(opts map[string]interface{}) (err error) {
 	if engine.aggsOpts.Concurrency < 0 {
 		return fmt.Errorf(`"aggregation-concurrency" cannot be negative or zero`)
 	}
-	if err := engine.aggsOpts.Parse(opts["aggregations"], false); err != nil {
+	if err := engine.aggsOpts.ParseConfig(opts["aggregations"]); err != nil {
 		return fmt.Errorf(`failed to parse "aggregations" options: %s`, err)
 	}
 

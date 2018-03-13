@@ -96,16 +96,16 @@ void stat_print(const struct Stat *s, FILE *f)
 
     if (s->count)
     {
-        const double avg = s->sum/s->count;
+//        const double avg = s->sum/s->count;
 //        const double var = s->sum2/s->count - avg*avg;
 //        const double stdev = sqrt(var);
 //        const double sigma = 2.0;
 
-        fprintf(f, "{\"avg\":%f, \"sum\":%f, \"min\":%f, \"max\":%f, \"count\":%llu}",
-             avg, s->sum, s->min, s->max, (long long unsigned int)s->count);
+        fprintf(f, "{\"sum2\":%f, \"sum\":%f, \"min\":%f, \"max\":%f, \"count\":%llu}",
+             s->sum2, s->sum, s->min, s->max, (long long unsigned int)s->count);
     }
     else
     {
-        fprintf(f, "{\"avg\":null, \"sum\":0, \"min\":null, \"max\":null, \"count\":0}");
+        fprintf(f, "{\"sum2\":0, \"sum\":0, \"min\":null, \"max\":null, \"count\":0}");
     }
 }

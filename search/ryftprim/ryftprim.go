@@ -501,12 +501,12 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 		func() {
 			task.aggsStartTime = time.Now()
 			aggsOpts := engine.aggsOpts
-			if err := aggsOpts.Parse(task.config.Tweaks.Aggs, true); err != nil {
+			if err := aggsOpts.ParseTweaks(task.config.Tweaks.Aggs); err != nil {
 				task.log().WithError(err).Errorf("[%s]: failed to get aggregation options", TAG)
 				res.ReportError(fmt.Errorf("failed to get aggregation options: %s", err))
 				return
 			}
-			err := ApplyAggregations(engine.aggsOpts,
+			err := ApplyAggregations(aggsOpts,
 				task.IndexFileName, task.DataFileName, task.config.Delimiter,
 				task.config.Aggregations, task.config.IsRecord,
 				func() bool { return res.IsCancelled() })

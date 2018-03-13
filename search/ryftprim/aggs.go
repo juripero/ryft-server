@@ -37,11 +37,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/aggs"
 	"github.com/mitchellh/mapstructure"
 )
 
@@ -72,14 +75,8 @@ func (opts *AggregationOptions) ToMap() map[string]interface{} {
 	return res
 }
 
-// Parse aggregation options
-func (opts *AggregationOptions) Parse(params interface{}, keepToolPath bool) error {
-	var oldToolPath []string
-	if keepToolPath {
-		oldToolPath = opts.ToolPath
-		opts.ToolPath = nil // reset
-	}
-
+// ParseConfig parses aggregation options from configuration file
+func (opts *AggregationOptions) ParseConfig(params interface{}) error {
 	dcfg := mapstructure.DecoderConfig{
 		WeaklyTypedInput: true,
 		Result:           opts,
@@ -92,10 +89,7 @@ func (opts *AggregationOptions) Parse(params interface{}, keepToolPath bool) err
 	}
 
 	// path to optimized tool
-	if keepToolPath {
-		// tool-path cannot be changed by user options
-		opts.ToolPath = oldToolPath
-	} else if len(opts.ToolPath) != 0 {
+	if len(opts.ToolPath) != 0 {
 		if info, err := os.Stat(opts.ToolPath[0]); os.IsNotExist(err) {
 			return fmt.Errorf(`no "optimized-tool" tool found: %s`, err)
 		} else if err != nil {
@@ -113,13 +107,154 @@ func (opts *AggregationOptions) Parse(params interface{}, keepToolPath bool) err
 	return nil // OK
 }
 
+// ParseTweaks parses aggregation options tweaks (user customized)
+func (opts *AggregationOptions) ParseTweaks(params interface{}) error {
+	// ToolPath should not be changed via tweaks!
+	oldToolPath := opts.ToolPath
+	opts.ToolPath = nil // reset
+
+	if err := opts.ParseConfig(params); err != nil {
+		return err
+	}
+
+	// restore ToolPath
+	opts.ToolPath = oldToolPath
+	return nil // OK
+}
+
+// Apply optimized (c-based) aggregations
+func applyOptimizedAggregations(opts AggregationOptions, indexPath, dataPath string, delimiter string,
+	aggregations search.Aggregations, checkJsonArray bool, cancelFunc func() bool) (error, bool) {
+
+	log.WithField("opts", opts.ToMap()).Debugf("[%s/aggs]: try to apply optimized version", TAG)
+
+	// check optimized tool is configured
+	if len(opts.ToolPath) == 0 {
+		return nil, false // no optimized tool configured
+	}
+
+	// check the "engine"
+	switch strings.ToLower(opts.Engine) {
+	case "native":
+		return nil, false // disabled by user
+	}
+
+	if a, ok := aggregations.(*aggs.Aggregations); ok {
+		// check we have only "stat" aggregations
+		for _, e := range a.Engines {
+			if _, ok := e.(*aggs.Stat); !ok {
+				return nil, false // not a "stat" engine found
+			}
+		}
+
+		// prepare command line arguments
+		args := make([]string, 0, len(opts.ToolPath)+16)
+		args = append(args, opts.ToolPath...)
+		if opts.DataChunkSize != "" {
+			args = append(args, "--data-chunk", opts.DataChunkSize)
+		}
+		if opts.IndexChunkSize != "" {
+			args = append(args, "--index-chunk", opts.IndexChunkSize)
+		}
+		if opts.MaxRecordsPerChunk != "" {
+			args = append(args, "--max-records", opts.MaxRecordsPerChunk)
+		}
+		args = append(args, fmt.Sprintf("--concurrency=%d", opts.Concurrency))
+		args = append(args, fmt.Sprintf("--delimiter=%d", len(delimiter)))
+		if checkJsonArray {
+			if jarr, err := IsJsonArrayFile(dataPath); err != nil {
+				return fmt.Errorf("failed to check JSON array: %s", err), true
+			} else if jarr {
+				args = append(args,
+					fmt.Sprintf("--delimiter=%d", len(delimiter)+JsonArraySkip), // override
+					fmt.Sprintf("--header=%d", JsonArraySkip),
+					fmt.Sprintf("--footer=%d", JsonArraySkip))
+			}
+		}
+		args = append(args, "--data", dataPath, "--index", indexPath)
+		engines := make([]aggs.Engine, 0, len(a.Engines)) // engines in fixed order
+		for _, e := range a.Engines {
+			if s, ok := e.(*aggs.Stat); ok {
+				args = append(args, "--field", s.Field.String())
+				engines = append(engines, e)
+			}
+		}
+		args = append(args, "-q", "--native")
+
+		// run optimized engine on dedicated goroutine
+		log.WithField("args", args).Debugf("[%s/aggs]: use 'optimized' engine", TAG)
+		cmd := exec.Command(args[0], args[1:]...)
+		cmdCh := make(chan struct{})
+		var cmdOut []byte
+		var cmdErr error
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("UNHANDLED PANIC: %s", r)
+					cmdErr = fmt.Errorf("unhandled panic: %s", r)
+				}
+
+				close(cmdCh)
+			}()
+
+			cmdOut, cmdErr = cmd.CombinedOutput()
+		}()
+
+		// busy-wait the optimized engine is done
+	BusyWait:
+		for {
+			select {
+			case <-cmdCh:
+				// tool is done
+				break BusyWait
+
+			case <-time.After(100 * time.Millisecond):
+				if cancelFunc() {
+					// check if request is cancelled
+					if p := cmd.Process; p != nil {
+						if err := p.Kill(); err != nil {
+							log.WithError(err).Warnf("[%s/aggs]: failed to kill 'optimized' engine", TAG)
+						}
+					}
+				}
+			}
+		}
+		if cmdErr != nil {
+			return fmt.Errorf("failed to run optimized engine: %s\n%s", cmdErr, cmdOut), true
+		}
+
+		// parse results
+		var jdata []interface{}
+		if err := json.Unmarshal(cmdOut, &jdata); err != nil {
+			return fmt.Errorf("failed to decode optimized engine response: %s", err), true
+		} else if len(jdata) != len(a.Engines) {
+			return fmt.Errorf("bad optimized engine response: length mismath (%d != %d)", len(jdata), len(a.Engines)), true
+		}
+
+		// merge resutls
+		for i, e := range engines {
+			if err := e.Merge(jdata[i]); err != nil {
+				return fmt.Errorf("failed to merge optimized engine response: %s", err), true
+			}
+		}
+
+		return nil, true // OK
+	}
+
+	return nil, false // bad aggregation type
+}
+
 // Apply aggregations
 func ApplyAggregations(opts AggregationOptions, indexPath, dataPath string, delimiter string,
 	aggregations search.Aggregations, checkJsonArray bool, cancelFunc func() bool) error {
 
-	if len(opts.ToolPath) != 0 {
-		// TODO: use optimized tool to calculate aggregations
+	// try to use optimized tool to calculate aggregations
+	if err, ok := applyOptimizedAggregations(opts, indexPath, dataPath,
+		delimiter, aggregations, checkJsonArray, cancelFunc); ok {
+		return err
 	}
+
+	log.Debugf("[%s/aggs]: use 'native' engine", TAG)
 
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position

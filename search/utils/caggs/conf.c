@@ -25,6 +25,7 @@ static void usage(void)
     vlog("-q, --quiet       be quiet, disable verbose mode\n");
     vlog("-v, --verbose     enable verbose mode (also -vv and -vvv)\n");
     vlog("-X<N>, --concurrency=<N> do processing in N threads (8 by default)\n");
+    vlog("--native          use \"native\" output format\n");
     vlog("\n");
 
     vlog("-i<path>, --index=<path> path to INDEX file\n");
@@ -80,6 +81,7 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
         { "version", no_argument, 0, 'V' },
         { "quiet", no_argument, 0, 'q' },
         { "verbose", no_argument, 0, 'v' },
+        { "native", no_argument, 0, 'N' },
 
         { 0, 0, 0, 0 } // EOF
     };
@@ -120,6 +122,9 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
 
         case 'v': // tell more and more...
             verbose += 1;
+            break;
+
+        case 'N': // native format
             break;
 
         case 'i': // INDEX file path
