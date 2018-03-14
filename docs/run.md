@@ -143,6 +143,8 @@ backend-options:
 
 More information about search engines can be found [here](./search/engine.md)
 
+#### Query parser
+
 A few options are used by query parser:
 
 ```{.yaml}
@@ -165,6 +167,48 @@ Zero value `optimizer-limit=0` means "do not combine at all".
 `optimizer-do-not-combine` is coma-separated list of search modes that
 should not be combined. Usually `FEDS` cannot be combined. Multiple
 modes can be specified: `optimizer-do-not-combine=feds,fhs`.
+
+
+#### Aggregation configuration
+
+This section contains parameters related to aggregation processing:
+
+```{.yaml}
+backend-options:
+  ...
+  aggregations:
+    optimized-tool: /usr/bin/ryft-server-aggs  # path to optimized tool (comment to disable)
+    max-records-per-chunk: 16M       # maximum number of records per DATA chunk
+    data-chunk-size: 1GB             # maximum DATA chunk size
+    index-chunk-size: 1GB            # maximum INDEX chunk size
+    concurrency: 8                   # number of parallel threads to calculate aggregation on
+    engine: auto                     # aggregation engine, one of: auto, native, optimized
+```
+
+The `optimized-tool` option specifies the absolute path to the optimized tool
+which can be used to calculate some aggregations. This tool is written in C
+and uses no dynamic memory allocation (except for a few processing buffers)
+to process large data files. The data processing is performed on chunk-by-chunk
+basis with multiple threads.
+
+The `max-records-per-chunk` option specifies the maximum number of records per
+DATA processing chunk. The `G`, `M` and `K` suffices can be used to specify `1024`
+multipliers.
+
+The `data-chunk-size` and `index-chunk-size` options specify the size of DATA and
+INDEX chunks in bytes. The `GB`, `MB` and `KB` suffices can be used to specify
+`1024` multipliers.
+
+The `concurrency` option specifies how many processing threads should be used
+to calculate aggregations. Recommended value is the number of CPU.
+
+The `engine` option specifies the default processing engine. Can be one of:
+- `auto` automatically select appropriate aggregation engine
+- `native` use native Go-implemented aggregation engine
+- `optimized` use optimized C-based aggregation engine. Note, `optimized` engine doesn't support all the aggregation functions.
+
+Some of these options can be overriden via corresponding request's
+[tweaks](./rest/aggs.md#aggregation-processing-customization).
 
 
 ### Server configuration

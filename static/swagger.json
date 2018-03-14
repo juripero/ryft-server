@@ -1413,6 +1413,10 @@
         "aggs": {
           "description": "Custom aggregations",
           "type": "object"
+        },
+        "tweaks": {
+          "description": "Custom tweaks",
+          "type": "object"
         }
       }
     },
@@ -1517,6 +1521,10 @@
         "aggs": {
           "description": "Custom aggregations",
           "type": "object"
+        },
+        "tweaks": {
+          "description": "Custom tweaks",
+          "type": "object"
         }
       }
     },
@@ -1556,6 +1564,10 @@
         },
         "aggs": {
           "description": "Custom aggregations",
+          "type": "object"
+        },
+        "tweaks": {
+          "description": "Custom tweaks",
           "type": "object"
         }
       }
