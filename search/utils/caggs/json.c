@@ -230,6 +230,7 @@ static inline int json_next_string(struct JSON_Parser *parser,
                 // special escaped symbols
                 case '\"': case '/': case 'b': case 'f':
                 case '\\': case 'r': case 'n': case 't':
+                    ++p; // skip symbol
                     escaped = 1;
                     break;
 
