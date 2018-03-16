@@ -314,16 +314,16 @@ void work_free(struct Work *w)
     if (w->n_xproc > 0)
     {
         // release XProc processing units
-        struct XProc *xproc = (struct XProc*)w->xproc;
         for (int k = 0; k < w->n_xproc; ++k)
         {
-            struct XProc *x = &xproc[k];
+            struct XProc *x = &w->xproc[k];
             for (int i = 0; i < x->n_fields; ++i)
                 stat_free(x->stats[i]);
             json_field_free(x->field_tree);
             free(x->fields);
             free(x->stats);
         }
+        free(w->xproc);
     }
 
     for (int i = 0; i < w->n_fields; ++i)

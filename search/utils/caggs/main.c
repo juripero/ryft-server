@@ -344,6 +344,9 @@ int main(int argc, const char *argv[])
     work_free(work);
     conf_free(&cfg);
 
+    free(records0);
+    free(records1);
+
     return 0;
 }
 
