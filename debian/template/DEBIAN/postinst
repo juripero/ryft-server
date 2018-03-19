@@ -21,6 +21,7 @@ fixUIDGID /usr/bin/ryft_ps
 fixUIDGID /usr/bin/ryft_rdf
 fixUIDGID /usr/bin/ryft_status
 fixUIDGID /usr/bin/ryft-server
+fixUIDGID /usr/bin/ryft-server-aggs
 fixUIDGID /usr/bin/ryftrest
 fixUIDGID /usr/bin/ryftutil
 fixUIDGID /usr/bin/ryft-versions

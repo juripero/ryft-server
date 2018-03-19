@@ -3,7 +3,7 @@ APP_VERSION ?= latest
 RYFT_DOCKER_BRANCH ?= master
 RYFT_INTEGRATION_TEST ?= develop
 
-all: build version
+all: build caggs version
 
 ifeq (${VERSION},)
   VERSION=$(shell git describe --tags)
@@ -44,6 +44,13 @@ build: update_vendor update_bindata
 install: update_vendor update_bindata
 	@echo "[${HINT}]: installing ryft-server..."
 	@go install -ldflags "-s -w -X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
+
+
+# build caggs tool
+caggs:
+	@echo "[${HINT}]: building ryft-server-aggs tool..."
+	@make -C search/utils/caggs all
+	@mv ./search/utils/caggs/caggs ./ryft-server-aggs
 
 
 # build Debian package

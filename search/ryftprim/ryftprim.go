@@ -498,22 +498,30 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// apply aggregations
 	if task.config.Aggregations != nil {
-		task.aggsStartTime = time.Now()
-		err := ApplyAggregations(engine.AggregationConcurrency,
-			task.IndexFileName, task.DataFileName, task.config.Delimiter,
-			task.config.Aggregations, task.config.IsRecord,
-			func() bool { return res.IsCancelled() })
-		if err != nil {
-			task.log().WithError(err).
-				Warnf("[%s]: failed to apply aggregations", TAG)
-			res.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
-		}
-		task.aggsStopTime = time.Now()
+		func() {
+			task.aggsStartTime = time.Now()
+			aggsOpts := engine.aggsOpts
+			if err := aggsOpts.ParseTweaks(task.config.Tweaks.Aggs); err != nil {
+				task.log().WithError(err).Errorf("[%s]: failed to get aggregation options", TAG)
+				res.ReportError(fmt.Errorf("failed to get aggregation options: %s", err))
+				return
+			}
+			err := ApplyAggregations(aggsOpts,
+				task.IndexFileName, task.DataFileName, task.config.Delimiter,
+				task.config.Aggregations, task.config.IsRecord,
+				func() bool { return res.IsCancelled() })
+			if err != nil {
+				task.log().WithError(err).Warnf("[%s]: failed to apply aggregations", TAG)
+				res.ReportError(fmt.Errorf("failed to apply aggregations: %s", err))
+				return
+			}
+			task.aggsStopTime = time.Now()
 
-		if res.Stat == nil {
-			// create dummy statistics to report aggregations here
-			res.Stat = search.NewStat(engine.IndexHost)
-		}
+			if res.Stat == nil {
+				// create dummy statistics to report aggregations here
+				res.Stat = search.NewStat(engine.IndexHost)
+			}
+		}()
 	}
 
 	// cleanup: remove INDEX&DATA files at the end of processing

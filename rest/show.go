@@ -68,6 +68,9 @@ type SearchShowParams struct {
 	Tweaks struct {
 		Format map[string]interface{} `json:"format,omitempty" msgpack:"format,omitempty"`
 		// Cluster []interface{}          `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
+
+		ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+		LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
@@ -194,6 +197,9 @@ func (server *Server) doSearchShow(ctx *gin.Context, params SearchShowParams) {
 		cfg.DataFormat = params.Format
 	}
 	cfg.Tweaks.Format = tcode_opts
+	cfg.Tweaks.Aggs = selectAggsOpts(
+		params.Tweaks.ShortAggs,
+		params.Tweaks.LongAggs)
 
 	// aggregations
 	cfg.Aggregations, err = aggs.MakeAggs(

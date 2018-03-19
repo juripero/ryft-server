@@ -33,14 +33,19 @@ package ryftprim
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/getryft/ryft-server/search"
+	"github.com/getryft/ryft-server/search/utils/aggs"
+	"github.com/mitchellh/mapstructure"
 )
 
 // dedicated structure for aggregation goroutine
@@ -49,9 +54,238 @@ type aggregationGoroutine struct {
 	lastError    error
 }
 
+// AggregationOptions contains static and runtime aggregation options
+type AggregationOptions struct {
+	ToolPath []string `json:"optimized-tool,omitempty"`
+
+	// runtime options
+	Engine             string `json:"engine,omitempty"`
+	MaxRecordsPerChunk string `json:"max-records-per-chunk,omitempty"`
+	DataChunkSize      string `json:"data-chunk-size,omitempty"`
+	IndexChunkSize     string `json:"index-chunk-size,omitempty"`
+	Concurrency        int    `json:"concurrency,omitempty"`
+}
+
+// inverse of Parse() method
+func (opts *AggregationOptions) ToMap() map[string]interface{} {
+	// do it via JSON encoding/decoding
+	data, _ := json.Marshal(opts)
+	var res map[string]interface{}
+	_ = json.Unmarshal(data, &res)
+	return res
+}
+
+// ParseConfig parses aggregation options from configuration file
+func (opts *AggregationOptions) ParseConfig(params interface{}) error {
+	dcfg := mapstructure.DecoderConfig{
+		WeaklyTypedInput: true,
+		Result:           opts,
+		TagName:          "json",
+	}
+	if d, err := mapstructure.NewDecoder(&dcfg); err != nil {
+		return fmt.Errorf("failed to create decoder: %s", err)
+	} else if err := d.Decode(params); err != nil {
+		return fmt.Errorf("failed to decode: %s", err)
+	}
+
+	// path to optimized tool
+	if len(opts.ToolPath) != 0 {
+		if info, err := os.Stat(opts.ToolPath[0]); os.IsNotExist(err) {
+			return fmt.Errorf(`no "optimized-tool" tool found: %s`, err)
+		} else if err != nil {
+			return fmt.Errorf(`bad "optimized-tool" tool found: %s`, err)
+		} else if info.IsDir() {
+			return fmt.Errorf(`bad "optimized-tool" tool found: %s`, "is a directory")
+		}
+	}
+
+	// concurrency
+	if opts.Concurrency < 0 {
+		return fmt.Errorf(`"concurrency" cannot be negative`)
+	}
+
+	return nil // OK
+}
+
+// ParseTweaks parses aggregation options tweaks (user customized)
+func (opts *AggregationOptions) ParseTweaks(params interface{}) error {
+	// ToolPath should not be changed via tweaks!
+	oldToolPath := opts.ToolPath
+	opts.ToolPath = nil // reset
+
+	if err := opts.ParseConfig(params); err != nil {
+		return err
+	}
+
+	// restore ToolPath
+	opts.ToolPath = oldToolPath
+	return nil // OK
+}
+
+// Apply optimized (c-based) aggregations
+/*
+Use the following command to check:
+curl -s "http://localhost:8765/search/aggs?data=test-10M.bin&index=test-10M.txt&delimiter=%0d%0a&format=json&performance=true" --data '{"tweaks":{"aggs":{"concurrency":4,"engine":"optimized"}}, "aggs":{"1":{"stats":{"field":"foo"}},"2":{"avg":{"field":"foo"}}}}' | jq .stats.extra
+*/
+func applyOptimizedAggregations(opts AggregationOptions, indexPath, dataPath string, delimiter string,
+	aggregations search.Aggregations, checkJsonArray bool, cancelFunc func() bool) (error, bool) {
+
+	log.WithField("opts", opts.ToMap()).Debugf("[%s/aggs]: try to apply optimized version", TAG)
+
+	// check optimized tool is configured
+	if len(opts.ToolPath) == 0 {
+		return nil, false // no optimized tool configured
+	}
+
+	// check the "engine"
+	forceOptimized := false
+	switch strings.ToLower(opts.Engine) {
+	case "native":
+		return nil, false // disabled by user
+
+	case "optimized":
+		forceOptimized = true
+		break
+
+	case "auto", "":
+		break
+
+	default:
+		return fmt.Errorf(`"%s" is unknown aggregation engine (should be "native", "optimized" or "auto")`, opts.Engine), true
+	}
+
+	if a, ok := aggregations.(*aggs.Aggregations); ok {
+		// check the "json" format
+		switch a.Format {
+		case "json":
+			break
+
+		default:
+			if forceOptimized {
+				return fmt.Errorf("requested aggregation format is not supported by optimized engine"), true
+			}
+			return nil, false // not a "json" format found
+		}
+
+		// check we have only "stat" aggregations
+		for _, e := range a.Engines {
+			if _, ok := e.(*aggs.Stat); !ok {
+				if forceOptimized {
+					return fmt.Errorf("requested type of aggregation is not supported by optimized engine"), true
+				}
+				return nil, false // not a "stat" engine found
+			}
+		}
+
+		// prepare command line arguments
+		args := make([]string, 0, len(opts.ToolPath)+16)
+		args = append(args, opts.ToolPath...)
+		if opts.DataChunkSize != "" {
+			args = append(args, "--data-chunk", opts.DataChunkSize)
+		}
+		if opts.IndexChunkSize != "" {
+			args = append(args, "--index-chunk", opts.IndexChunkSize)
+		}
+		if opts.MaxRecordsPerChunk != "" {
+			args = append(args, "--max-records", opts.MaxRecordsPerChunk)
+		}
+		args = append(args, fmt.Sprintf("--concurrency=%d", opts.Concurrency))
+		args = append(args, fmt.Sprintf("--delimiter=%d", len(delimiter)))
+		if checkJsonArray {
+			if jarr, err := IsJsonArrayFile(dataPath); err != nil {
+				return fmt.Errorf("failed to check JSON array: %s", err), true
+			} else if jarr {
+				args = append(args,
+					fmt.Sprintf("--delimiter=%d", len(delimiter)+JsonArraySkip), // override
+					fmt.Sprintf("--header=%d", JsonArraySkip),
+					fmt.Sprintf("--footer=%d", JsonArraySkip))
+			}
+		}
+		args = append(args, "--data", dataPath, "--index", indexPath)
+		engines := make([]aggs.Engine, 0, len(a.Engines)) // engines in fixed order
+		for _, e := range a.Engines {
+			if s, ok := e.(*aggs.Stat); ok {
+				args = append(args, "--field", s.Field.String())
+				engines = append(engines, e)
+			}
+		}
+		args = append(args, "-q", "--native")
+
+		// run optimized engine on dedicated goroutine
+		log.WithField("args", args).Debugf("[%s/aggs]: use 'optimized' engine", TAG)
+		cmd := exec.Command(args[0], args[1:]...)
+		cmdCh := make(chan struct{})
+		var cmdOut []byte
+		var cmdErr error
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("UNHANDLED PANIC: %s", r)
+					cmdErr = fmt.Errorf("unhandled panic: %s", r)
+				}
+
+				close(cmdCh)
+			}()
+
+			cmdOut, cmdErr = cmd.CombinedOutput()
+		}()
+
+		// busy-wait the optimized engine is done
+	BusyWait:
+		for {
+			select {
+			case <-cmdCh:
+				// tool is done
+				break BusyWait
+
+			case <-time.After(100 * time.Millisecond):
+				if cancelFunc() {
+					// check if request is cancelled
+					if p := cmd.Process; p != nil {
+						if err := p.Kill(); err != nil {
+							log.WithError(err).Warnf("[%s/aggs]: failed to kill 'optimized' engine", TAG)
+						}
+					}
+				}
+			}
+		}
+		if cmdErr != nil {
+			return fmt.Errorf("failed to run optimized engine: %s\n%s", cmdErr, cmdOut), true
+		}
+
+		// parse results
+		var jdata []interface{}
+		if err := json.Unmarshal(cmdOut, &jdata); err != nil {
+			return fmt.Errorf("failed to decode optimized engine response: %s", err), true
+		} else if len(jdata) != len(a.Engines) {
+			return fmt.Errorf("bad optimized engine response: length mismath (%d != %d)", len(jdata), len(a.Engines)), true
+		}
+
+		// merge resutls
+		for i, e := range engines {
+			if err := e.Merge(jdata[i]); err != nil {
+				return fmt.Errorf("failed to merge optimized engine response: %s", err), true
+			}
+		}
+
+		return nil, true // OK
+	}
+
+	return nil, false // bad aggregation type
+}
+
 // Apply aggregations
-func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter string,
+func ApplyAggregations(opts AggregationOptions, indexPath, dataPath string, delimiter string,
 	aggregations search.Aggregations, checkJsonArray bool, cancelFunc func() bool) error {
+
+	// try to use optimized tool to calculate aggregations
+	if err, ok := applyOptimizedAggregations(opts, indexPath, dataPath,
+		delimiter, aggregations, checkJsonArray, cancelFunc); ok {
+		return err
+	}
+
+	log.Debugf("[%s/aggs]: use 'native' engine", TAG)
+
 	var idxRd, datRd *bufio.Reader
 	var dataPos uint64 // DATA read position
 	var dataSkip uint64
@@ -93,12 +327,12 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 	var dataCh chan []byte
 	var wg sync.WaitGroup
 	var subErrs int32
-	if concurrency > 1 {
+	if opts.Concurrency > 1 {
 		// create a few goroutines to process aggregations
 		// each goroutine will use its own Aggerations
-		subAggs = make([]*aggregationGoroutine, concurrency)
+		subAggs = make([]*aggregationGoroutine, opts.Concurrency)
 		dataCh = make(chan []byte, 4*1024)
-		log.Debugf("[%s/aggs]: start sub-processing in %d threads", TAG, concurrency)
+		log.Debugf("[%s/aggs]: start sub-processing in %d threads", TAG, opts.Concurrency)
 		start := time.Now()
 
 		// run several processing goroutines
@@ -214,7 +448,7 @@ func ApplyAggregations(concurrency int, indexPath, dataPath string, delimiter st
 			dataPos += uint64(len(delimiter))
 		}
 
-		if concurrency > 1 {
+		if opts.Concurrency > 1 {
 			dataCh <- data // send data to processing goroutines
 			if atomic.LoadInt32(&subErrs) != 0 {
 				return fmt.Errorf("parallel error occurred")

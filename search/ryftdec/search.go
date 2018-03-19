@@ -44,6 +44,15 @@ import (
 	"github.com/getryft/ryft-server/search/utils/query"
 )
 
+// get backend aggregation options
+func (engine *Engine) getBackendAggsOpts() ryftprim.AggregationOptions {
+	opts := engine.Backend.Options()
+	var res ryftprim.AggregationOptions
+	_ = res.ParseConfig(opts["aggregations"])
+	// errors should be already handled in backend constructor
+	return res
+}
+
 // checks if input fileset contains any catalog
 // also populates the Post-Processing engine
 // return: numOfCatalogs, expandedFileList, error
@@ -424,7 +433,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		if cfg.Aggregations != nil {
 			start := time.Now()
 
-			if err := ryftprim.ApplyAggregations(engine.getBackendAggConcurrency(),
+			aggsOpts := engine.getBackendAggsOpts()
+			if err := aggsOpts.ParseTweaks(cfg.Tweaks.Aggs); err != nil {
+				task.log().WithError(err).Errorf("[%s]: failed to get aggregation options", TAG)
+				mux.ReportError(fmt.Errorf("failed to get aggregation options: %s", err))
+				return
+			}
+			if err := ryftprim.ApplyAggregations(aggsOpts,
 				opts.atHome(keepIndexAs), opts.atHome(keepDataAs),
 				delimiter, cfg.Aggregations, isJsonArray,
 				func() bool { return mux.IsCancelled() }); err != nil {

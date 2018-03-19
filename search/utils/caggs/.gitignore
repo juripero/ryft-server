@@ -1,0 +1,6 @@
+# QtCreator project files
+/*.pro.user
+
+# binaries
+/caggs
+/*.o

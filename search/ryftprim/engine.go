@@ -66,8 +66,8 @@ type Engine struct {
 	ReadFilePollTimeout time.Duration
 	ReadFilePollLimit   int
 
-	// number of parallel threads to calculate aggregations on
-	AggregationConcurrency int
+	// aggregation options
+	aggsOpts AggregationOptions
 
 	IndexHost string // optional host (cluster mode)
 

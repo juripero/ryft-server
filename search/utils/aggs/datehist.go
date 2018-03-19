@@ -39,7 +39,7 @@ type Bucket struct {
 func (b *Bucket) Add(data interface{}) error {
 	if b.SubAggs != nil {
 		// add already parsed data to bucket's engines
-		for _, engine := range b.SubAggs.engines {
+		for _, engine := range b.SubAggs.Engines {
 			if err := engine.Add(data); err != nil {
 				return err
 			}
@@ -127,7 +127,7 @@ func (h *DateHist) Name() string {
 	// names of all sub-aggregations
 	if h.subAggs != nil {
 		var subAggs []string
-		for _, e := range h.subAggs.engines {
+		for _, e := range h.subAggs.Engines {
 			subAggs = append(subAggs, e.Name())
 		}
 		name = append(name, fmt.Sprintf("sub-aggs<%s>",

@@ -14,14 +14,14 @@ version:
 	@echo "Version: ${VERSION}"
 	@echo "githash: ${GITHASH}"
 
-RYFT_SERVER_BIN=${CURDIR}/../ryft-server
 DEBNAME=ryft-server-${VERSION}_amd64.deb
 DESTDIR=.build
 
 .PHONY: package
 package-content: control
 	@echo "[${HINT}]: saving package content..."
-	@cp "${RYFT_SERVER_BIN}" "${DESTDIR}/usr/bin/"
+	@cp "../ryft-server" "${DESTDIR}/usr/bin/"
+	@cp "../ryft-server-aggs" "${DESTDIR}/usr/bin/"
 	@cp "../ryft-server.conf" "${DESTDIR}/etc/ryft-server.conf"
 	@cp "../ryft-users.yaml" "${DESTDIR}/etc/ryft-users.yaml"
 	@echo "/etc/ryft-server.conf" > "${DESTDIR}/DEBIAN/conffiles"
