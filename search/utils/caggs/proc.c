@@ -378,13 +378,14 @@ static void* xproc_thread(void *param)
             if (JSON_NUMBER != field->token.type
              && JSON_STRING != field->token.type)
             {
-                stat->count += 1; // TODO: check not NULL
-                verr2("WARN: bad value found, ignored\n");
+                if (JSON_EOF != field->token.type)
+                    stat->count += 1; // check not NULL
+                verr3("WARN: bad value found [%d], ignored\n", field->token.type);
                 continue;
             }
 
             double val = strtod((const char*)field->token.beg, NULL);
-            // vlog(" %g ", val);
+            vlog3("found: [%d]: %g\n", field->token.type, val);
             stat_add(stat, val);
         }
     }
