@@ -375,11 +375,12 @@ static void* xproc_thread(void *param)
             struct JSON_Field *field = x->fields[i];
             struct Stat *stat = x->stats[i];
 
-            if (JSON_NUMBER != field->token.type)
+            if (JSON_NUMBER != field->token.type
+             && JSON_STRING != field->token.type)
             {
                 stat->count += 1; // TODO: check not NULL
                 verr2("WARN: bad value found, ignored\n");
-                return 0;
+                continue;
             }
 
             double val = strtod((const char*)field->token.beg, NULL);
