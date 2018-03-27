@@ -421,18 +421,23 @@ int work_do_start(struct Work *w, const uint8_t *data_buf,
 
     // start processing units (new iteration)
     const uint64_t N = (num_of_records + n-1) / n; // ceil
+    const uint64_t K = (num_of_records)       % n;
     vlog2("xproc: start %d threads (about %"PRId64" records per thread)\n", n, N);
+    uint64_t r = 0;
     for (int k = 0; k < n; ++k)
     {
-        w->xproc[k].data_buf = data_buf;
-        w->xproc[k].records = records + N*k;
-        w->xproc[k].num_of_records = (k+1 == n) ? (num_of_records - N*k) : N;
+        struct XProc *x = &w->xproc[k];
+        x->data_buf = data_buf;
+        x->records = records + r;
+        x->num_of_records = N;
+        if (K && k >= K && N >= 1)
+            x->num_of_records -= 1;
+        r += x->num_of_records;
         for (int i = 0; i < w->n_fields; ++i)
-            stat_init(w->xproc[k].stats[i]); // reset stat
-        if (!!pthread_create(&w->xproc[k].thread_id,
+            stat_init(x->stats[i]); // reset stat
+        if (!!pthread_create(&x->thread_id,
                              NULL/*attributes*/,
-                             xproc_thread,
-                             &w->xproc[k]))
+                             xproc_thread, x))
         {
             verr1("failed to create processing thread: %s\n",
                   strerror(errno));
