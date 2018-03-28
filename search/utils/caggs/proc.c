@@ -385,7 +385,7 @@ static void* xproc_thread(void *param)
             }
 
             double val = strtod((const char*)field->token.beg, NULL);
-            vlog3("found: [%d]: %g\n", field->token.type, val);
+            // vlog3("found: [%d]: %g\n", field->token.type, val);
             stat_add(stat, val);
         }
     }

@@ -209,6 +209,12 @@ int main(int argc, const char *argv[])
                          strerror(errno));
                     return -1;
                 }
+                if (!!madvise(base, len, MADV_SEQUENTIAL))
+                {
+                    verr("ERROR: failed to advise INDEX file mapping: %s\n",
+                         strerror(errno));
+                    return -1;
+                }
 
                 vlog2("new IndexChunk%d of %"PRIu64" bytes (at %"PRIu64"-%"PRIu64"=%"PRIu64") prepared\n",
                       i_buf.id, len, i_file.pos, i_align, i_file.pos - i_align);
@@ -276,8 +282,26 @@ int main(int argc, const char *argv[])
         vlog2("DataChunk%d: %"PRIu64" records, %"PRIu64" DATA bytes, DATA:[%"PRIu64"..%"PRIu64")\n",
               d_buf.id, num_of_records, data_len,
               d_file.pos, d_file.pos + data_len);
-        if (!data_len|| !num_of_records)
+        if (!data_len || !num_of_records)
             break;
+
+        // prepare DATA chunk
+        // (do it before join previous work: system
+        // will have a chance to map requested pages)
+        void *base = mmap(0, data_len, PROT_READ, MAP_SHARED,
+                          d_file.fd, d_file.pos - d_align);
+        if (MAP_FAILED == base)
+        {
+            verr("ERROR: failed to map DATA file: %s\n",
+                 strerror(errno));
+            return -1;
+        }
+        if (!!madvise(base, data_len, MADV_SEQUENTIAL))
+        {
+            verr("ERROR: failed to advise DATA file mapping: %s\n",
+                 strerror(errno));
+            return -1;
+        }
 
         // do wait previous processing units
         if (!!work_do_join(work))
@@ -291,16 +315,6 @@ int main(int argc, const char *argv[])
         if (!!munmap(d_buf.base, d_buf.len))
         {
             verr("ERROR: failed to unmap DATA file: %s\n",
-                 strerror(errno));
-            return -1;
-        }
-
-        // prepare DATA chunk
-        void *base = mmap(0, data_len, PROT_READ, MAP_SHARED,
-                          d_file.fd, d_file.pos - d_align);
-        if (MAP_FAILED == base)
-        {
-            verr("ERROR: failed to map DATA file: %s\n",
                  strerror(errno));
             return -1;
         }

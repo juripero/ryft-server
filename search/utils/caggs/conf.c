@@ -59,8 +59,8 @@ int conf_parse(struct Conf *cfg, int argc, const char *argv[])
     cfg->header_len = 0;
     cfg->delim_len = 0;
     cfg->footer_len = 0;
-    cfg->idx_chunk_size = 512*(1024*1024);
-    cfg->dat_chunk_size = 512*(1024*1024);
+    cfg->idx_chunk_size = 64*(1024*1024);
+    cfg->dat_chunk_size = 64*(1024*1024);
     cfg->rec_per_chunk = 16*(1024*1024);
     cfg->concurrency = 8;
 
@@ -323,10 +323,10 @@ void conf_print(const struct Conf *cfg)
     for (int i = 0; i < cfg->n_fields; ++i)
         vlog("%s%s", i?", ":"", cfg->fields[i]);
     vlog("]\n");
-    vlog("INDEX chunk: %.3gGB\n",
-         cfg->idx_chunk_size/(1024*1024*1024.0));
-    vlog(" DATA chunk: %.3gGB (%.3gM records maximum)\n",
-         cfg->dat_chunk_size/(1024*1024*1024.0),
+    vlog("INDEX chunk: %.3gMB\n",
+         cfg->idx_chunk_size/(1024*1024.0));
+    vlog(" DATA chunk: %.3gMB (%.3gM records maximum)\n",
+         cfg->dat_chunk_size/(1024*1024.0),
          cfg->rec_per_chunk/(1024*1024.0));
     vlog("concurrency: x%d\n", cfg->concurrency);
     vlog("  verbosity: %d\n", verbose);
