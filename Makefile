@@ -28,11 +28,15 @@ ${GOPATH}/bin/go-bindata:
 	@go get -u github.com/jteeuwen/go-bindata/...
 
 # update vendor sources
-.PHONY: update_vendor
-update_vendor:
+.PHONY: update_vendor fetch_vendor
+update_vendor: ${GOPATH}/bin/govendor
 	@echo "[${HINT}]: updating vendor..."
 	@${GOPATH}/bin/govendor sync
-@${GOPATH}/bin/govendor:
+fetch_vendor: ${GOPATH}/bin/govendor
+# looking for new version of dependencies
+	@echo "[${HINT}]: fetching vendor..."
+	@${GOPATH}/bin/govendor fetch -v +vendor
+${GOPATH}/bin/govendor:
 	@go get -u github.com/kardianos/govendor
 
 
