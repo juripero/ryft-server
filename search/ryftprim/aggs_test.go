@@ -35,10 +35,10 @@ func TestAggregationOptions(t *testing.T) {
 		"concurrency":    8,
 	}
 
-	if assert.NoError(t, opts.Parse(cfg1, false)) {
+	if assert.NoError(t, opts.ParseConfig(cfg1)) {
 		assert.JSONEq(t, asJson(cfg1), asJson(opts.ToMap()))
 	}
-	if assert.NoError(t, opts.Parse(cfg2, true)) {
+	if assert.NoError(t, opts.ParseTweaks(cfg2)) {
 		assert.JSONEq(t, asJson(cfg1), asJson(opts.ToMap()))
 	}
 }

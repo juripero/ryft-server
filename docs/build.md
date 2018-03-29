@@ -69,7 +69,7 @@ The results are packed to Debian package which can be found under `debian/` subd
 ## Version
 
 Note the `ryft-server` version - it's automatically generated using current git commit.
-Simple `make` is equivalent to `go build` execution with specified keys. It will will produce the 
+Simple `make` is equivalent to `go build` execution with specified keys. It will will produce the
 following output (exact numbers may differ):
 
 ```{.sh}
@@ -130,10 +130,10 @@ Before make a release please ensure:
 - static/swagger.json is updated:
    - has appropriate `info.version`
    - most of clients API are correct (Go, Python, JavaScript)
-- 3rd party dependencies are updated: `make update`
-- all tests are OK: `make test`
+- 3rd party dependencies are updated (if decided): `make fetch_vendor`
+- all unit tests are OK: `make test` or `make test-cover`
 
-Switch to `master` branch and merge all development code.
+Switch to `master` branch and merge all development code or create corresponding pull request and merge it.
 On [GitHub Releases](https://github.com/getryft/ryft-server/releases) page
 push the "Draft a new Release" button, select target branch as `master` and
 set the next release tag. Enter short description. For "alpha" versions
@@ -144,5 +144,10 @@ Once release tag is created build the corresponding Debian package:
 ```{.sh}
 git checkout master
 git pull
-make debian
+make docker-build
 ```
+
+Please check all the integration tests are OK in Jenkins:
+- `ryft-integration-tests` [obsolete] `ryftx` tests
+- `ryft-integration-tests-ryftprim` [obsolete] `ryftprim` tests
+- `ryft-integration-tests-v2` new version of tests (both `ryftx` and `ryftprim`)
