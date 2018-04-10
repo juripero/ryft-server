@@ -11,6 +11,7 @@ various search types:
 - [IPv4 search](./IPV4.md)
 - [IPv6 search](./IPV6.md)
 - [Regexp search](./PCRE2.md)
+- [PCAP search](./PCAP.md)
 
 
 # General search syntax

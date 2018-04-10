@@ -17,7 +17,72 @@ Note, that it's possible to run custom post-processing script with `GET /run` me
 So if there is no required aggregation it's relatively easy to implement it manually.
 
 
-# Min aggregation
+# Aggregation processing engines
+
+There are two aggregation processing engines:
+- `native` which is default Go-based implementation
+- `optimized` which is highly optimized C-based implementation.
+
+Corresponding aggregation processing engine can be selected via
+[default configuration options](../run.md#aggregation-configuration)
+or via [request tweaks](#aggregation-processing-customization).
+
+## Optimized engine
+
+For now the `optimized` engine supports only "stat" aggregations:
+- [Min](#min-aggregation)
+- [Max](#max-aggregation)
+- [Sum](#sum-aggregation)
+- [Value Count](#value-count-aggregation)
+- [Avg](#avg-aggregation)
+- [Stats](#stats-aggregation)
+
+This optimized tool is written in C and uses no dynamic memory allocation to process
+large amount of data. Memory mapping is used to optimize INDEX/DATA files reading.
+The data processing is performed on chunk-by-chunk basis with multiple threads.
+
+Once DATA chunk is prepared it is processed by multiple processing units.
+At the same time the next DATA chunk is prepared.
+
+There are a few concurrency options:
+- `"concurrency": 0` which actually means "use no additional threads".
+  All processing is done in main thread.
+- `"concurrency": N` (where `N >= 1`) which means use a few additional threads for processing.
+  In this case DATA processing is done on dedicated threads while the main
+  thread prepares next DATA chunk.
+
+The DATA chunk has the following constraints:
+- maximum number of records
+- maximum data size
+
+It is recommended to use quite big values here.
+
+
+# Aggregation processing customization
+
+There is [dedicated section](../run.md#aggregation-configuration) in server's
+configuration file that customizes default aggregation processing options.
+Some of these options can be customized via request tweaks.
+
+```{.json}
+{"tweaks": { "aggs": {"concurrency":8, "engine":"optimized"}},
+ "aggs" : {"min_bar" : {"min" : {"field":"foo.bar"}} }}
+```
+
+The following options can be customized:
+- `max-records-per-chunk`
+- `data-chunk-size`
+- `index-chunk-size`
+- `concurrency`
+- `engine`
+
+Please check [this section](../run.md#aggregation-configuration) for detailed
+description.
+
+
+# Aggregation functions
+
+## Min aggregation
 
 This aggregation calculates minimum value over a set of found records.
 The values can be extracted from specific numeric field in the record, for
@@ -42,7 +107,7 @@ Response:
 
 The aggregation name `min_bar` also serves as the key in the JSON response.
 
-## Missing value
+### Missing value
 
 If requested field is missing then the whole record is ignored. But the default
 value for missing fields can be specified with `missing` option.
@@ -52,7 +117,7 @@ value for missing fields can be specified with `missing` option.
 ```
 
 
-# Max aggregation
+## Max aggregation
 
 This aggregation calculates maximum value over a set of found records.
 The values can be extracted from specific numeric field in the record, for
@@ -77,7 +142,7 @@ Response:
 
 The aggregation name `max_bar` also serves as the key in the JSON response.
 
-## Missing value
+### Missing value
 
 If requested field is missing then the whole record is ignored. But the default
 value for missing fields can be specified with `missing` option.
@@ -87,7 +152,7 @@ value for missing fields can be specified with `missing` option.
 ```
 
 
-# Sum aggregation
+## Sum aggregation
 
 This aggregation calculates sum of values over a set of found records.
 The values can be extracted from specific numeric field in the record, for
@@ -112,7 +177,7 @@ Response:
 
 The aggregation name `sum_bar` also serves as the key in the JSON response.
 
-## Missing value
+### Missing value
 
 If requested field is missing then the whole record is ignored. But the default
 value for missing fields can be specified with `missing` option.
@@ -122,7 +187,7 @@ value for missing fields can be specified with `missing` option.
 ```
 
 
-# Value Count aggregation
+## Value Count aggregation
 
 This aggregation just counts the number of values over a set of found records.
 The values can be extracted from specific numeric field in the record, for
@@ -148,7 +213,7 @@ Response:
 The aggregation name `count_bar` also serves as the key in the JSON response.
 
 
-# Avg aggregation
+## Avg aggregation
 
 This aggregation calculates the average value over a set of found records.
 The values can be extracted from specific numeric field in the record, for
@@ -173,7 +238,7 @@ Response:
 
 The aggregation name `avg_bar` also serves as the key in the JSON response.
 
-## Missing value
+### Missing value
 
 If requested field is missing then the whole record is ignored. But the default
 value for missing fields can be specified with `missing` option.
@@ -183,7 +248,7 @@ value for missing fields can be specified with `missing` option.
 ```
 
 
-# Stats aggregation
+## Stats aggregation
 
 This aggregation calculates the main statistics over a set of found records.
 The values can be extracted from specific numeric field in the record, for
@@ -212,7 +277,7 @@ Response (combination of `min`, `max`, `sum`, `avg` and `count` aggregations):
 
 The aggregation name `stats_bar` also serves as the key in the JSON response.
 
-## Missing value
+### Missing value
 
 If requested field is missing then the whole record is ignored. But the default
 value for missing fields can be specified with `missing` option.
@@ -222,7 +287,7 @@ value for missing fields can be specified with `missing` option.
 ```
 
 
-# Extended Stats aggregation
+## Extended Stats aggregation
 
 This aggregation calculates the extended statistics over a set of found records.
 The values can be extracted from specific numeric field in the record, for
@@ -259,7 +324,7 @@ Response (combination of `min`, `max`, `sum`, `avg`, `count` and
 
 The aggregation name `stats_bar` also serves as the key in the JSON response.
 
-## Missing value
+### Missing value
 
 If requested field is missing then the whole record is ignored. But the default
 value for missing fields can be specified with `missing` option.
@@ -268,7 +333,7 @@ value for missing fields can be specified with `missing` option.
 {"aggs" : {"stats_bar" : {"extended_stats" : {"field":"foo.bar", "missing":0}} }}
 ```
 
-## Sigma value
+### Sigma value
 
 The `std_deviation_bounds` is calculated as [`avg-sigma*std_deviation`, `avg+sigma*std_deviation`].
 By default there is `sigma=2` but this value can be specified in the request JSON:
@@ -278,7 +343,7 @@ By default there is `sigma=2` but this value can be specified in the request JSO
 ```
 
 
-# Geo Bounds aggregation
+## Geo Bounds aggregation
 
 This aggregation calculates the bounding rectangle over a set of found records.
 The positions can be extracted from specific field in the record, for
@@ -318,7 +383,7 @@ fields for latitude and longitude:
 {"aggs" : {"viewport" : {"geo_bounds" : {"lat":"latitude", "lon":"longitude"}} }}
 ```
 
-## Geo Data format
+### Geo Data format
 
 The Geo position can be in the following formats:
 
@@ -329,7 +394,7 @@ The Geo position can be in the following formats:
 Where `<lat>` and `<lon>` are valid floating point numbers.
 
 
-# Geo Centroid aggregation
+## Geo Centroid aggregation
 
 This aggregation calculates the simple or weighted centeroid over a set of found records.
 The coordinates can be extracted from specific field in the record, for
@@ -377,7 +442,7 @@ to latitude/longitude to get centroid point.
 This algorithm consumes CPU resources since we need to
 calculate a lot of `sin/cos` values, but the centroid point is more precisely.
 
-# Date histogram aggregation
+## Date histogram aggregation
 
 Date histogram splits search results on buckets and counts number of rows inside. Key of a bucket is interval and its values are rows, each contains datetime field from the interval. It is also possible to apply sub-aggregaton to each bucket.
 

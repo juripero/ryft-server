@@ -83,6 +83,9 @@ type Config struct {
 		// should be "ryftprim" or "ryftx" or "ryftpcre2"
 		Tool string
 
+		// backend full path
+		Path []string
+
 		// additional backend options
 		// addeded to the end of args
 		Opts []string
@@ -95,6 +98,7 @@ type Config struct {
 	// fine tune options
 	Tweaks struct {
 		Format map[string]interface{} // format specific options (column names for CSV, etc)
+		Aggs   map[string]interface{} // aggregation specific options
 	}
 
 	// report performance metrics

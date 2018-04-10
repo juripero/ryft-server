@@ -1,4 +1,3 @@
-# support for VERSION AND GITHASH environment variables
 HINT=ryft-server/debian
 
 all: package
@@ -15,18 +14,19 @@ version:
 	@echo "Version: ${VERSION}"
 	@echo "githash: ${GITHASH}"
 
-RYFT_SERVER_BIN=${GOPATH}/bin/ryft-server
 DEBNAME=ryft-server-${VERSION}_amd64.deb
 DESTDIR=.build
 
 .PHONY: package
 package-content: control
 	@echo "[${HINT}]: saving package content..."
-	@cp "${RYFT_SERVER_BIN}" "${DESTDIR}/usr/bin/"
+	@cp "../ryft-server" "${DESTDIR}/usr/bin/"
+	@cp "../ryft-server-aggs" "${DESTDIR}/usr/bin/"
 	@cp "../ryft-server.conf" "${DESTDIR}/etc/ryft-server.conf"
 	@cp "../ryft-users.yaml" "${DESTDIR}/etc/ryft-users.yaml"
 	@echo "/etc/ryft-server.conf" > "${DESTDIR}/DEBIAN/conffiles"
 	@echo "/etc/ryft-users.yaml" >> "${DESTDIR}/DEBIAN/conffiles"
+	@cp -R "../docker/tshark" "${DESTDIR}/usr/share/ryft/docker/"
 	@rm "${DESTDIR}/var/log/ryft/.keep"
 	@rm "${DESTDIR}/var/ryft/.keep"
 	@echo "Installed-Size: $$(du -k -s ${DESTDIR} | awk '{print $$1}')" >> "${CONTROLFILE}"
@@ -45,6 +45,7 @@ template:
 	@mkdir -p ${DESTDIR}
 	@cp -r template/* ${DESTDIR}/
 	@mkdir -p ${DESTDIR}/usr/bin
+	@mkdir -p ${DESTDIR}/usr/share/ryft/docker
 
 # create DEBIAN control file
 CONTROLFILE=${DESTDIR}/DEBIAN/control

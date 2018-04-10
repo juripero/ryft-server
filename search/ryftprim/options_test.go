@@ -28,9 +28,6 @@ func TestOptions(t *testing.T) {
 	fake := func(name string, val interface{}) map[string]interface{} {
 		opts := map[string]interface{}{
 			"instance-name":           ".name",
-			"ryftprim-exec":           "/bin/false",
-			"ryftx-exec":              "",
-			"ryftpcre2-exec":          "/bin/false",
 			"ryftprim-legacy":         false,
 			"ryftprim-abs-path":       true,
 			"ryftprim-kill-on-cancel": true,
@@ -39,10 +36,12 @@ func TestOptions(t *testing.T) {
 			"open-poll":               "100ms",
 			"read-poll":               "100ms",
 			"read-limit":              50,
-			"aggregation-concurrency": 1,
 			"keep-files":              true,
 			"minimize-latency":        true,
 			"index-host":              "localhost",
+			"aggregations": map[string]interface{}{
+				"concurrency": 1.0,
+			},
 		}
 
 		if len(name) != 0 {
@@ -56,9 +55,6 @@ func TestOptions(t *testing.T) {
 	if engine, err := NewEngine(nil); assert.NoError(t, err) {
 		assert.EqualValues(t, map[string]interface{}{
 			"instance-name":           "",
-			"ryftprim-exec":           "/usr/bin/ryftprim",
-			"ryftx-exec":              "",
-			"ryftpcre2-exec":          "/usr/bin/ryftprim",
 			"ryftprim-legacy":         true,
 			"ryftprim-abs-path":       false,
 			"ryftprim-kill-on-cancel": false,
@@ -67,20 +63,18 @@ func TestOptions(t *testing.T) {
 			"open-poll":               "50ms",
 			"read-poll":               "50ms",
 			"read-limit":              100,
-			"aggregation-concurrency": 1,
 			"keep-files":              false,
 			"minimize-latency":        false,
 			"index-host":              "",
+			"aggregations":            map[string]interface{}{},
 		}, engine.Options())
 
-		assert.EqualValues(t, `ryftprim{instance:"", ryftone:"/ryftone", home:"/", ryftprim:"/usr/bin/ryftprim", ryftx:""}`, engine.String())
+		assert.EqualValues(t, `ryftprim{instance:"", ryftone:"/ryftone", home:"/"}`, engine.String())
 	}
 
 	check(fake("home-dir", "/"))
 
 	bad(fake("instance-name", false), `failed to parse "instance-name"`)
-	bad(fake("ryftprim-exec", false), `failed to parse "ryftprim-exec"`)
-	bad(fake("ryftprim-exec", "/usr/bin/missing-file-name"), `tool not found`, "no such file or directory")
 	bad(fake("ryftprim-legacy", []byte{}), `failed to parse "ryftprim-legacy"`)
 	bad(fake("ryftprim-kill-on-cancel", []byte{}), `failed to parse "ryftprim-kill-on-cancel"`)
 	bad(fake("ryftone-mount", false), `failed to parse "ryftone-mount"`)

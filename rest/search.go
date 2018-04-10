@@ -88,6 +88,9 @@ type SearchParams struct {
 	Tweaks struct {
 		Format  map[string]interface{} `json:"format,omitempty" msgpack:"format,omitempty"`
 		Cluster []interface{}          `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
+
+		ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
+		LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
@@ -224,6 +227,9 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 		cfg.DataFormat = params.Format
 	}
 	cfg.Tweaks.Format = tcode_opts
+	cfg.Tweaks.Aggs = selectAggsOpts(
+		params.Tweaks.ShortAggs,
+		params.Tweaks.LongAggs)
 
 	// aggregations
 	cfg.Aggregations, err = aggs.MakeAggs(
@@ -237,7 +243,7 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	// get search engine
 	var engine search.Engine
 	userName, authToken, homeDir, userTag := server.parseAuthAndHome(ctx)
-	if !server.Config.LocalOnly && !params.Local && len(params.Tweaks.Cluster) != 0 {
+	if /*!server.Config.LocalOnly && !params.Local &&*/ len(params.Tweaks.Cluster) != 0 {
 		log.WithField("config", params.Tweaks.Cluster).Debugf("[%s]: create tweaked search engine", CORE)
 		engine, err = server.getClusterTweakEngine(authToken, homeDir, cfg, params.Tweaks.Cluster)
 	} else {
@@ -489,7 +495,7 @@ func parseTransforms(rules []string, cfg ServerConfig) ([]search.Transform, erro
 				pathAndArgs := make([]string, 0, len(info.ExecPath)+len(args))
 				pathAndArgs = append(pathAndArgs, info.ExecPath...)
 				pathAndArgs = append(pathAndArgs, args...)
-				tx, err = search.NewScriptCall(pathAndArgs, "/tmp")
+				tx, err = search.NewScriptCall(pathAndArgs, "/tmp", name, args)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create script-call transformation: %s", err)
 				}

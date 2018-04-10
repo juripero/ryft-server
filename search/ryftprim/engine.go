@@ -49,12 +49,9 @@ var (
 // RyftPrim engine uses `ryftprim` utility as a backend.
 type Engine struct {
 	Instance         string // empty by default. might be some server instance name like ".server-1234"
-	RyftprimExec     string // "/usr/bin/ryftprim" by default
-	RyftxExec        string // usually "/usr/bin/ryftx" but "" by default
-	Ryftpcre2Exec    string // "/usr/bin/ryftprim" by default
 	LegacyMode       bool   // legacy mode to get machine readable statistics
 	KillToolOnCancel bool   // flag to kill ryftprim if cancelled
-	UseAbsPath       bool   // flag to use absolute path
+	UseAbsPath       bool   // flag to use absolute path (fallback for tweaks)
 	MountPoint       string // "/ryftone" by default
 	HomeDir          string // subdir of mountpoint
 
@@ -69,8 +66,8 @@ type Engine struct {
 	ReadFilePollTimeout time.Duration
 	ReadFilePollLimit   int
 
-	// number of parallel threads to calculate aggregations on
-	AggregationConcurrency int
+	// aggregation options
+	aggsOpts AggregationOptions
 
 	IndexHost string // optional host (cluster mode)
 
@@ -92,8 +89,8 @@ func NewEngine(opts map[string]interface{}) (*Engine, error) {
 
 // String gets string representation of the engine.
 func (engine *Engine) String() string {
-	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q, ryftprim:%q, ryftx:%q}",
-		engine.Instance, engine.MountPoint, engine.HomeDir, engine.RyftprimExec, engine.RyftxExec)
+	return fmt.Sprintf("ryftprim{instance:%q, ryftone:%q, home:%q}",
+		engine.Instance, engine.MountPoint, engine.HomeDir)
 	// TODO: other parameters?
 }
 
@@ -127,8 +124,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}()
 
 	// prepare command line arguments
-	err := engine.prepare(task)
-	if err != nil {
+	if err := engine.prepare(cfg.Backend.Tool, task); err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
 		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
 	}
@@ -141,12 +137,17 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		return res, nil // OK
 	}
 
-	err = engine.run(task, res)
+	err := engine.run(task, res)
 	if err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to run", TAG)
 		return nil, fmt.Errorf("failed to run %s: %s", TAG, err)
 	}
 	return res, nil // OK
+}
+
+// Search starts asynchronous "/pcap/search" operation.
+func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
+	return engine.Search(cfg)
 }
 
 // Show implements "/search/show" endpoint
@@ -167,8 +168,7 @@ func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	}
 
 	// prepare command line arguments
-	err := engine.prepare(task)
-	if err != nil {
+	if err := engine.prepare(cfg.Backend.Tool, task); err != nil {
 		task.log().WithError(err).Warnf("[%s]: failed to prepare", TAG)
 		return nil, fmt.Errorf("failed to prepare %s: %s", TAG, err)
 	}

@@ -21,6 +21,7 @@ fixUIDGID /usr/bin/ryft_ps
 fixUIDGID /usr/bin/ryft_rdf
 fixUIDGID /usr/bin/ryft_status
 fixUIDGID /usr/bin/ryft-server
+fixUIDGID /usr/bin/ryft-server-aggs
 fixUIDGID /usr/bin/ryftrest
 fixUIDGID /usr/bin/ryftutil
 fixUIDGID /usr/bin/ryft-versions
@@ -38,6 +39,14 @@ chmod 0755 -f /ryftone/.rest-*
 chown "$target_uid:$target_gid" -f -R /ryftone/.rest-*
 chown "$target_uid:$target_gid" -f /var/log/ryft/server.log
 
+# pull the Docker images (check the docker.images configuration options)
+[ -z "$RYFT_DO_NOT_PULL_DOCKER_IMAGES" ] && \
+(( docker pull alpine:latest \
+&& docker pull ubuntu:16.04 \
+&& docker pull python:2.7 \
+&& docker build -t ryft/alpine-tshark /usr/share/ryft/docker/tshark ) \
+|| echo "failed to pull some Docker images, the /run endpoint may fail" )
+
 echo $NAME starting...
 if [ -z `which systemctl` ]; then
 	# yes upstart
@@ -47,17 +56,17 @@ if [ -z `which systemctl` ]; then
 	# no systemd
 	rm -f /etc/systemd/system/ryft-server-d.service
 
-	# start service
-	service $NAME start
+	# start service (if no $RYFT_DO_NOT_START defined)
+	[ -z "$RYFT_DO_NOT_START" ] && service $NAME start || true
 else
-	# yes systemd 
+	# yes systemd
 	chown root:root -f /etc/systemd/system/ryft-server-d.service
-        systemctl enable ryft-server-d
+	systemctl enable ryft-server-d
 
 	# no upstart
 	rm -f /etc/init/ryft-server-d.conf
 	rm -f /etc/init/rhfsdTrigger.conf
 
-	# start service
-	systemctl start $NAME
+	# start service (if no $RYFT_DO_NOT_START defined)
+	[ -z "$RYFT_DO_NOT_START" ] && systemctl start $NAME || true
 fi

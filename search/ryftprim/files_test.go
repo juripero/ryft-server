@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ func TestDirInfoRead(t *testing.T) {
 
 	info, err := ReadDir(root, "foo", false, true, "host")
 	if assert.NoError(t, err) {
+		sort.Strings(info.Files)
 		assert.EqualValues(t, "foo", info.DirPath)
 		assert.EqualValues(t, []string{"123.txt", "456.txt"}, info.Files)
 		assert.EqualValues(t, []string{"dir"}, info.Dirs)
@@ -29,6 +31,7 @@ func TestDirInfoRead(t *testing.T) {
 
 	info, err = ReadDir(root, "foo", true, true, "host")
 	if assert.NoError(t, err) {
+		sort.Strings(info.Files)
 		assert.EqualValues(t, "foo", info.DirPath)
 		assert.EqualValues(t, []string{".789", "123.txt", "456.txt"}, info.Files)
 		assert.EqualValues(t, []string{"dir"}, info.Dirs)

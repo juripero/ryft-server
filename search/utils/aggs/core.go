@@ -75,15 +75,16 @@ type Function interface {
 // Aggregations is a set of functions and related engines.
 type Aggregations struct {
 	parseRawData func([]byte) (interface{}, error)
+	Format       string
 
-	functions map[string]Function
-	engines   map[string]Engine
-	options   map[string]interface{} // source options
+	Functions map[string]Function
+	Engines   map[string]Engine
+	Options   map[string]interface{} // source options
 }
 
 // GetOpts gets aggregation options
 func (a *Aggregations) GetOpts() map[string]interface{} {
-	return a.options
+	return a.Options
 }
 
 // Clone clones the aggregation engines and functions
@@ -104,24 +105,25 @@ func (a *Aggregations) clone() *Aggregations {
 
 	n := &Aggregations{
 		parseRawData: a.parseRawData,
-		functions:    make(map[string]Function),
-		engines:      make(map[string]Engine),
-		options:      a.options,
+		Format:       a.Format,
+		Functions:    make(map[string]Function),
+		Engines:      make(map[string]Engine),
+		Options:      a.Options,
 	}
 
 	// clone functions and engines
-	for k, v := range a.functions {
+	for k, v := range a.Functions {
 		f, e := v.clone()
 
 		// check existing engine
-		if ee, ok := n.engines[e.Name()]; ok {
+		if ee, ok := n.Engines[e.Name()]; ok {
 			ee.Join(e) // join existing engine
 			f.bind(ee) // replace engine
 		} else {
-			n.engines[e.Name()] = e // add new engine
+			n.Engines[e.Name()] = e // add new engine
 		}
 
-		n.functions[k] = f
+		n.Functions[k] = f
 	}
 
 	return n
@@ -137,11 +139,11 @@ func (a *Aggregations) ToJson(final bool) map[string]interface{} {
 	}
 
 	if final {
-		for name, f := range a.functions {
+		for name, f := range a.Functions {
 			res[name] = f.ToJson()
 		}
 	} else {
-		for _, engine := range a.engines {
+		for _, engine := range a.Engines {
 			res[engine.Name()] = engine.ToJson()
 		}
 	}
@@ -162,7 +164,7 @@ func (a *Aggregations) Add(rawData []byte) error {
 	}
 
 	// then add parsed data to engines
-	for _, engine := range a.engines {
+	for _, engine := range a.Engines {
 		if err := engine.Add(data); err != nil {
 			return err
 		}
@@ -175,7 +177,7 @@ func (a *Aggregations) Add(rawData []byte) error {
 func (a *Aggregations) Merge(data_ interface{}) error {
 	switch data := data_.(type) {
 	case map[string]interface{}:
-		for _, engine := range a.engines {
+		for _, engine := range a.Engines {
 			if im, ok := data[engine.Name()]; ok {
 				if err := engine.Merge(im); err != nil {
 					return fmt.Errorf("failed to merge intermediate aggregation: %s", err)
@@ -186,8 +188,8 @@ func (a *Aggregations) Merge(data_ interface{}) error {
 		}
 
 	case *Aggregations:
-		for _, engine := range a.engines {
-			if im, ok := data.engines[engine.Name()]; ok {
+		for _, engine := range a.Engines {
+			if im, ok := data.Engines[engine.Name()]; ok {
 				if err := engine.Merge(im); err != nil {
 					return fmt.Errorf("failed to merge intermediate aggregation: %s", err)
 				}
@@ -245,9 +247,9 @@ func MakeAggs(params map[string]interface{}, format string, formatOpts map[strin
 // MakeAggs makes set of aggregation engines
 func makeAggs(params map[string]interface{}, format string, formatOpts map[string]interface{}) (*Aggregations, error) {
 	a := &Aggregations{
-		functions: make(map[string]Function),
-		engines:   make(map[string]Engine),
-		options:   params,
+		Functions: make(map[string]Function),
+		Engines:   make(map[string]Engine),
+		Options:   params,
 	}
 
 	var strToIdx []string // for CSV data
@@ -255,16 +257,19 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 	// format
 	switch format {
 	case "xml":
+		a.Format = "xml"
 		a.parseRawData = func(raw []byte) (interface{}, error) {
 			return xml.ParseXml(raw, nil)
 		}
 
 	case "json":
+		a.Format = "json"
 		a.parseRawData = func(raw []byte) (interface{}, error) {
 			return json.ParseRaw(raw)
 		}
 
 	case "csv":
+		a.Format = "csv"
 		csvFmt, err := csv.New(formatOpts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare CSV format")
@@ -275,6 +280,7 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		}
 
 	case "utf8", "utf-8":
+		a.Format = "utf8"
 		a.parseRawData = func(raw []byte) (interface{}, error) {
 			return string(raw), nil
 		}
@@ -331,7 +337,7 @@ func makeAggs(params map[string]interface{}, format string, formatOpts map[strin
 		}
 	}
 
-	if len(a.engines) != 0 {
+	if len(a.Engines) != 0 {
 		if a.parseRawData == nil {
 			return nil, fmt.Errorf("%q is unknown data format", format)
 		}
@@ -350,15 +356,15 @@ func (a *Aggregations) addFunc(aggName, aggType string, opts map[string]interfac
 	}
 
 	// check existing engine
-	if ee, ok := a.engines[e.Name()]; ok {
+	if ee, ok := a.Engines[e.Name()]; ok {
 		ee.Join(e) // join existing engine
 		f.bind(ee) // replace engine
 	} else {
-		a.engines[e.Name()] = e // add new engine
+		a.Engines[e.Name()] = e // add new engine
 	}
 
 	// save function
-	a.functions[aggName] = f
+	a.Functions[aggName] = f
 
 	return nil // OK
 }

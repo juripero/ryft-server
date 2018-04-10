@@ -44,6 +44,15 @@ import (
 	"github.com/getryft/ryft-server/search/utils/query"
 )
 
+// get backend aggregation options
+func (engine *Engine) getBackendAggsOpts() ryftprim.AggregationOptions {
+	opts := engine.Backend.Options()
+	var res ryftprim.AggregationOptions
+	_ = res.ParseConfig(opts["aggregations"])
+	// errors should be already handled in backend constructor
+	return res
+}
+
 // checks if input fileset contains any catalog
 // also populates the Post-Processing engine
 // return: numOfCatalogs, expandedFileList, error
@@ -88,7 +97,8 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 					if autoRecord {
 						format, root, err := engine.detectFileFormat(filePath)
 						if err != nil {
-							return 0, nil, "", "", fmt.Errorf("failed to detect %q file format: %s", filePath, err)
+							return 0, nil, "", "", fmt.Errorf("failed to detect %q file format: %s\n(%s)", filePath, err,
+								`Automatic RECORD replacement is enabled but there is no corresponding extension pattern found. Please review the default "default-user-config" section or user's configuration located at /ryftone/$RYFTUSER/.ryft-user.yaml.`)
 						}
 						if len(autoFormat) == 0 {
 							autoFormat = format
@@ -249,7 +259,12 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		task.log().WithError(err).Warnf("[%s]: failed to decompose query", TAG)
 		return nil, fmt.Errorf("failed to decompose query: %s", err)
 	}
-	autoRecord := engine.autoRecord && hasRecord(q)
+	// preliminary update backend to get "auto-record" flag
+	// WARNING: tool is selected for the whole search query!
+	if err := engine.updateBackend(cfg); err != nil {
+		return nil, fmt.Errorf("failed to select backend: %s", err)
+	}
+	autoRecord := engine.isAutoRecord(cfg.Backend.Tool) && hasRecord(q)
 	task.rootQuery = engine.Optimize(q)
 
 	task.result, err = NewInMemoryPostProcessing() // NewCatalogPostProcessing
@@ -319,6 +334,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	if sq := task.rootQuery.Simple; sq != nil && hasCatalogs == 0 && len(cfg.Transforms) == 0 {
 		task.result.Drop(false) // no sense to save empty working catalog
 		engine.updateConfig(cfg, sq, task.rootQuery.BoolOps)
+		if err := engine.updateBackend(cfg); err != nil {
+			return nil, err
+		}
 		return engine.Backend.Search(cfg)
 	}
 
@@ -415,7 +433,13 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 		if cfg.Aggregations != nil {
 			start := time.Now()
 
-			if err := ryftprim.ApplyAggregations(engine.getBackendAggConcurrency(),
+			aggsOpts := engine.getBackendAggsOpts()
+			if err := aggsOpts.ParseTweaks(cfg.Tweaks.Aggs); err != nil {
+				task.log().WithError(err).Errorf("[%s]: failed to get aggregation options", TAG)
+				mux.ReportError(fmt.Errorf("failed to get aggregation options: %s", err))
+				return
+			}
+			if err := ryftprim.ApplyAggregations(aggsOpts,
 				opts.atHome(keepIndexAs), opts.atHome(keepDataAs),
 				delimiter, cfg.Aggregations, isJsonArray,
 				func() bool { return mux.IsCancelled() }); err != nil {
@@ -503,6 +527,9 @@ func (engine *Engine) doSearch(task *Task, opts backendOptions, query query.Quer
 		"query": cfg.Query,
 		"files": cfg.Files,
 	}).Infof("[%s/%d]: running backend search", TAG, task.subtaskId)
+	if err := engine.updateBackend(cfg); err != nil {
+		return nil, err
+	}
 	res, err := engine.Backend.Search(cfg)
 	if err != nil {
 		return nil, err

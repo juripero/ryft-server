@@ -13,6 +13,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// as JSON
+func asJson(val interface{}) string {
+	if buf, err := json.Marshal(val); err != nil {
+		panic(fmt.Errorf("failed to save JSON: %s", err))
+	} else {
+		return string(buf)
+	}
+}
+
+// test aggregation options
+func TestAggregationOptions(t *testing.T) {
+	var opts AggregationOptions
+
+	cfg1 := map[string]interface{}{
+		"optimized-tool": []string{"/bin/false"},
+		"concurrency":    8.0,
+	}
+	cfg2 := map[string]interface{}{
+		"optimized-tool": []string{"/bin/true"},
+		"concurrency":    8,
+	}
+
+	if assert.NoError(t, opts.ParseConfig(cfg1)) {
+		assert.JSONEq(t, asJson(cfg1), asJson(opts.ToMap()))
+	}
+	if assert.NoError(t, opts.ParseTweaks(cfg2)) {
+		assert.JSONEq(t, asJson(cfg1), asJson(opts.ToMap()))
+	}
+}
+
 // test aggregations
 func TestApplyAggregations(t *testing.T) {
 	SetLogLevelString(testLogLevel)
@@ -78,7 +108,9 @@ func TestApplyAggregations(t *testing.T) {
 			return
 		}
 
-		err = ApplyAggregations(n, indexPath, dataPath, "\n", Aggs, true, nil)
+		var aggsOpts AggregationOptions
+		aggsOpts.Concurrency = n
+		err = ApplyAggregations(aggsOpts, indexPath, dataPath, "\n", Aggs, true, nil)
 		if err != nil {
 			assert.Contains(t, err.Error(), expected)
 		} else {

@@ -44,6 +44,27 @@ import (
 	"github.com/getryft/ryft-server/search"
 )
 
+// get request body
+func getBodyData(cfg *search.Config) map[string]interface{} {
+	tweaks := make(map[string]interface{})
+	if len(cfg.Tweaks.Format) != 0 {
+		tweaks["format"] = cfg.Tweaks.Format
+	}
+	if len(cfg.Tweaks.Aggs) != 0 {
+		tweaks["aggs"] = cfg.Tweaks.Aggs
+	}
+
+	body := make(map[string]interface{})
+	if cfg.Aggregations != nil {
+		body["aggs"] = cfg.Aggregations.GetOpts()
+	}
+	if len(tweaks) != 0 {
+		body["tweaks"] = tweaks
+	}
+
+	return body
+}
+
 // Search starts asynchronous "/search" or "/count" operation.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
@@ -55,15 +76,50 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 
 	// prepare request's body (aggregations, etc...)
-	bodyData := make(map[string]interface{})
-	if cfg.Aggregations != nil {
-		bodyData["aggs"] = cfg.Aggregations.GetOpts()
-	}
-	if len(cfg.Tweaks.Format) != 0 {
-		bodyData["format"] = cfg.Tweaks.Format
-	}
 	var bodyRd io.Reader
-	if len(bodyData) != 0 {
+	if bodyData := getBodyData(cfg); len(bodyData) != 0 {
+		if body, err := json.Marshal(bodyData); err != nil {
+			return nil, fmt.Errorf("failed to prepare request body: %s", err)
+		} else {
+			bodyRd = bytes.NewReader(body)
+		}
+	}
+
+	// prepare request
+	task.log().WithField("url", url.String()).Infof("[%s]: sending GET", TAG)
+	req, err := http.NewRequest("GET", url.String(), bodyRd)
+	if err != nil {
+		task.log().WithError(err).Warnf("[%s]: failed to create request", TAG)
+		return nil, fmt.Errorf("failed to create request: %s", err)
+	}
+
+	// we expect MSGPACK format for streaming (for /search and /count)
+	req.Header.Set("Accept", codec.MIME)
+
+	// authorization
+	if len(engine.AuthToken) != 0 {
+		req.Header.Set("Authorization", engine.AuthToken)
+	}
+
+	res := search.NewResult()
+	go engine.doSearch(task, req, res)
+
+	return res, nil // OK for now
+}
+
+// Search starts asynchronous "/pcap/search" or "/pcap/count" operation.
+func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
+	task := NewTask(cfg)
+	url := engine.prepareSearchUrl(cfg)
+	if cfg.ReportIndex {
+		url.Path += "/pcap/search"
+	} else {
+		url.Path += "/pcap/count"
+	}
+
+	// prepare request's body (aggregations, etc...)
+	var bodyRd io.Reader
+	if bodyData := getBodyData(cfg); len(bodyData) != 0 {
 		if body, err := json.Marshal(bodyData); err != nil {
 			return nil, fmt.Errorf("failed to prepare request body: %s", err)
 		} else {
