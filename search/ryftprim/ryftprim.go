@@ -421,7 +421,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// notify client about error
 	if err != nil && err != ErrCancelled {
-		res.ReportError(fmt.Errorf("%s failed with %s\n%s", TAG, err, out))
+		res.ReportError(fmt.Errorf("%s failed with %s\n%s",
+			task.config.Backend.Tool, err, out))
 	}
 
 	// suppress some errors
