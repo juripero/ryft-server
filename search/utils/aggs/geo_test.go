@@ -79,29 +79,29 @@ func TestGeoEngine(t *testing.T) {
 	}
 
 	check(&Geo{LocField: mustParseField("Location"), flags: GeoCentroidW},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
+		`{"count":3, "min_lat":0, "max_lat":0, "min_neg_lon":0, "max_neg_lon":0, "min_pos_lon":0, "max_pos_lon":0, "centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
 	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoCentroidW},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
+		`{"count":3, "min_lat":0, "max_lat":0, "min_neg_lon":0, "max_neg_lon":0, "min_pos_lon":0, "max_pos_lon":0, "centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
 
 	check(&Geo{LocField: mustParseField("Location"), flags: GeoCentroid},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
+		`{"count":3, "min_lat":0, "max_lat":0, "min_neg_lon":0, "max_neg_lon":0, "min_pos_lon":0, "max_pos_lon":0, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
 	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoCentroid},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
+		`{"count":3, "min_lat":0, "max_lat":0, "min_neg_lon":0, "max_neg_lon":0, "min_pos_lon":0, "max_pos_lon":0, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
 
-	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
-	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
+	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":3, "min_lat":10, "max_lat":40, "min_neg_lon":-30, "max_neg_lon":-20, "min_pos_lon":10, "max_pos_lon":10, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
+	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":3, "min_lat":10, "max_lat":40, "min_neg_lon":-30, "max_neg_lon":-20, "min_pos_lon":10, "max_pos_lon":10, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 
-	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds | GeoCentroidW | GeoCentroid},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
-	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds | GeoCentroidW | GeoCentroid},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
+	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds | GeoCentroidW | GeoCentroid, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":3, "min_lat":10, "max_lat":40, "min_neg_lon":-30, "max_neg_lon":-20, "min_pos_lon":10, "max_pos_lon":10, "centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
+	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds | GeoCentroidW | GeoCentroid, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":3, "min_lat":10, "max_lat":40, "min_neg_lon":-30, "max_neg_lon":-20, "min_pos_lon":10, "max_pos_lon":10, "centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
 
-	check(&Geo{LocField: mustParseField("missLocation"), flags: GeoBounds | GeoCentroidW},
-		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
-	check(&Geo{LatField: mustParseField("missLatitude"), LonField: mustParseField("missLongitude"), flags: GeoBounds | GeoCentroidW},
-		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
+	check(&Geo{LocField: mustParseField("missLocation"), flags: GeoBounds | GeoCentroidW, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":0, "min_lat":90.01, "max_lat":-90.01, "min_neg_lon":180.01, "max_neg_lon":-180.01, "min_pos_lon":180.01, "max_pos_lon":-180.01, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
+	check(&Geo{LatField: mustParseField("missLatitude"), LonField: mustParseField("missLongitude"), flags: GeoBounds | GeoCentroidW, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":0, "min_lat":90.01, "max_lat":-90.01, "min_neg_lon":180.01, "max_neg_lon":-180.01, "min_pos_lon":180.01, "max_pos_lon":-180.01, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 }
 
 // check "geo_bounds"
