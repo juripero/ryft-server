@@ -125,7 +125,7 @@ func TestEnginePrepareSearchUrl(t *testing.T) {
 			"local-only": local,
 		})
 		if assert.NoError(t, err) {
-			url := engine.prepareSearchUrl(cfg)
+			url := engine.prepareSearchUrl(cfg, false /*isShow*/)
 			if cfg.ReportIndex {
 				url.Path += "/search"
 			} else {

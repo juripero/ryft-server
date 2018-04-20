@@ -78,7 +78,7 @@ func (engine *Engine) String() string {
 }
 
 // prepareSearchUrl formats proper URL based on search configuration.
-func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
+func (engine *Engine) prepareSearchUrl(cfg *search.Config, isShow bool) *url.URL {
 	// server URL should be parsed in engine initialization
 	// so we can omit error checking here
 	u, _ := url.Parse(engine.ServerURL)
@@ -147,7 +147,11 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 		q.Set("lifetime", cfg.Lifetime.String())
 	}
 	if cfg.Limit >= 0 {
-		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
+		if !isShow {
+			q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
+		} else {
+			q.Set("count", fmt.Sprintf("%d", cfg.Limit)) // /search/show uses 'count' instead of 'limit'
+		}
 	}
 	if cfg.Offset > 0 {
 		q.Set("offset", fmt.Sprintf("%d", cfg.Offset))
