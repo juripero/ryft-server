@@ -628,7 +628,7 @@ func TestEngineToolFailed(t *testing.T) {
 
 		// check first error
 		if err := <-res.ErrorChan; assert.NotNil(t, err) {
-			assert.Contains(t, err.Error(), "ryftprim failed with exit status")
+			assert.Contains(t, err.Error(), "failed with exit status")
 		}
 	}
 }
@@ -686,7 +686,7 @@ exit(3)
 
 		// check first error
 		if err := <-res.ErrorChan; assert.NotNil(t, err) {
-			assert.Contains(t, err.Error(), "ryftprim failed with exit status")
+			assert.Contains(t, err.Error(), "failed with exit status")
 		}
 	}
 }
