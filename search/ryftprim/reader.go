@@ -442,8 +442,9 @@ func (rr *ResultsReader) process(res *search.Result) {
 				rec := search.NewRecord(index, data)
 				// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
-				res.ReportRecord(rec)
-				if rr.Limit >= 0 && res.RecordsReported() >= uint64(rr.Limit) {
+				if rr.Limit < 0 || res.RecordsReported() < uint64(rr.Limit) {
+					res.ReportRecord(rec)
+				} else {
 					rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 					return // done
 				}
@@ -716,8 +717,9 @@ func (rr *ResultsReader) show(res *search.Result) {
 		rec := search.NewRecord(index, data)
 		// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
-		res.ReportRecord(rec)
-		if rr.Limit >= 0 && res.RecordsReported() >= uint64(rr.Limit) {
+		if rr.Limit < 0 || res.RecordsReported() < uint64(rr.Limit) {
+			res.ReportRecord(rec)
+		} else {
 			rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 			return // done
 		}
