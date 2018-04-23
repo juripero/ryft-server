@@ -103,9 +103,6 @@ type Config struct {
 
 	// report performance metrics
 	Performance bool
-
-	// report debug internal info
-	DebugInternals bool // TODO: move to Tweaks
 }
 
 // absstract aggregations

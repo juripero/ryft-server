@@ -167,7 +167,6 @@ func (server *Server) doPcapSearch(ctx *gin.Context, params PcapSearchParams) {
 
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
-	cfg.DebugInternals = server.Config.DebugInternals
 	cfg.Mode = "pcap"
 	cfg.Width = 0 // PCAP is some kind of RECORD search
 	cfg.Nodes = uint(params.Nodes)
