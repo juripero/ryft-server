@@ -168,6 +168,9 @@ fi
 
 elasticVersion=`/opt/elasticsearch/bin/elasticsearch --version 2>/dev/null`
 if [ "${elasticVersion}" == "" ]; then
+    elasticVersion=`/usr/share/elasticsearch/bin/elasticsearch --version 2>/dev/null`
+fi
+if [ "${elasticVersion}" == "" ]; then
     elasticV="Not Installed"
     ev1=""
     ev2=""
