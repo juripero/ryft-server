@@ -1,6 +1,6 @@
 /*
  * ============= Ryft-Customized BSD License ============
- * Copyright (c) 2015, Ryft Systems, Inc.
+ * Copyright (c) 2018, Ryft Systems, Inc.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -78,7 +78,7 @@ func (engine *Engine) String() string {
 }
 
 // prepareSearchUrl formats proper URL based on search configuration.
-func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
+func (engine *Engine) prepareSearchUrl(cfg *search.Config, isShow bool) *url.URL {
 	// server URL should be parsed in engine initialization
 	// so we can omit error checking here
 	u, _ := url.Parse(engine.ServerURL)
@@ -147,7 +147,11 @@ func (engine *Engine) prepareSearchUrl(cfg *search.Config) *url.URL {
 		q.Set("lifetime", cfg.Lifetime.String())
 	}
 	if cfg.Limit >= 0 {
-		q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
+		if !isShow {
+			q.Set("limit", fmt.Sprintf("%d", cfg.Limit))
+		} else {
+			q.Set("count", fmt.Sprintf("%d", cfg.Limit)) // /search/show uses 'count' instead of 'limit'
+		}
 	}
 	if cfg.Offset > 0 {
 		q.Set("offset", fmt.Sprintf("%d", cfg.Offset))

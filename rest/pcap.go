@@ -1,6 +1,6 @@
 /*
  * ============= Ryft-Customized BSD License ============
- * Copyright (c) 2015, Ryft Systems, Inc.
+ * Copyright (c) 2018, Ryft Systems, Inc.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -167,7 +167,6 @@ func (server *Server) doPcapSearch(ctx *gin.Context, params PcapSearchParams) {
 
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
-	cfg.DebugInternals = server.Config.DebugInternals
 	cfg.Mode = "pcap"
 	cfg.Width = 0 // PCAP is some kind of RECORD search
 	cfg.Nodes = uint(params.Nodes)

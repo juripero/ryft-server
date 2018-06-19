@@ -1,6 +1,6 @@
 /*
  * ============= Ryft-Customized BSD License ============
- * Copyright (c) 2015, Ryft Systems, Inc.
+ * Copyright (c) 2018, Ryft Systems, Inc.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -168,9 +168,6 @@ type ServerConfig struct {
 	} `yaml:"docker,omitempty"`
 
 	DefaultUserConfig map[string]interface{} `yaml:"default-user-config"`
-
-	// expose debug info in REST API response
-	DebugInternals bool `yaml:"debug-internals"`
 }
 
 // Server instance

@@ -1,6 +1,6 @@
 /*
  * ============= Ryft-Customized BSD License ============
- * Copyright (c) 2015, Ryft Systems, Inc.
+ * Copyright (c) 2018, Ryft Systems, Inc.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -68,7 +68,7 @@ func getBodyData(cfg *search.Config) map[string]interface{} {
 // Search starts asynchronous "/search" or "/count" operation.
 func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
-	url := engine.prepareSearchUrl(cfg)
+	url := engine.prepareSearchUrl(cfg, false /*isShow*/)
 	if cfg.ReportIndex {
 		url.Path += "/search"
 	} else {
@@ -110,7 +110,7 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 // Search starts asynchronous "/pcap/search" or "/pcap/count" operation.
 func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
-	url := engine.prepareSearchUrl(cfg)
+	url := engine.prepareSearchUrl(cfg, false /*isShow*/)
 	if cfg.ReportIndex {
 		url.Path += "/pcap/search"
 	} else {
@@ -152,7 +152,7 @@ func (engine *Engine) PcapSearch(cfg *search.Config) (*search.Result, error) {
 // Show implements "/search/show" endpoint
 func (engine *Engine) Show(cfg *search.Config) (*search.Result, error) {
 	task := NewTask(cfg)
-	url := engine.prepareSearchUrl(cfg)
+	url := engine.prepareSearchUrl(cfg, true /*isShow*/)
 	if cfg.Offset >= 0 {
 		url.Path += "/search/show"
 	} else {

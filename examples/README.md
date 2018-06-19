@@ -1,10 +1,10 @@
-Rfyt REST API Examples
+Ryft REST API Examples
 ======================
 
 Test Data Generator
 -------------------
 
-`logsgen.py` is a pyton test data generation utility. It can be used to produce test files of any size by given template. 
+`logsgen.py` is a pyton test data generation utility. It can be used to produce test files of any size by given template.
 It uses [faker](https://github.com/joke2k/faker) and [pystache](https://github.com/defunkt/pystache) libraries for tempaltes declaration and random data providers.
 
 ### Usage
@@ -20,7 +20,7 @@ Install Dependencies First:
 
 ```
 
-Then see command line arguments: 
+Then see command line arguments:
 ```
 >python3 logsgen.py -h
 usage: logsgen.py [-h] template count [output]
@@ -133,7 +133,7 @@ Below is a list of supported random values providers:
 ### faker.providers.credit_card
 
 	fake.credit_card_security_code(card_type=None)                                              # 688
-	fake.credit_card_full(card_type=None, validate=False, max_check=10)                         # 
+	fake.credit_card_full(card_type=None, validate=False, max_check=10)                         #
 	                                                                                              JCB 16 digit
 	                                                                                              Tressie Schimmel
 	                                                                                              3337243334121237  07/17
@@ -215,7 +215,7 @@ Below is a list of supported random values providers:
 	                                                                                              im. Expedita est iste fuga omnis excepturi fugit voluptate
 	                                                                                              m neque. Dolor molestiae enim sunt quo veniam iure. Conseq
 	                                                                                              uatur et tenetur inventore sed velit.', u'Quis officiis cu
-	                                                                                              mque voluptas inventore animi ipsam quibusdam. Distinctio 
+	                                                                                              mque voluptas inventore animi ipsam quibusdam. Distinctio
 	                                                                                              in quaerat vitae vero aut voluptatem et. Consequatur eum a
 	                                                                                              ut beatae voluptatem voluptates ea nam laboriosam.']
 	fake.words(nb=3)                                                                            # [u'ratione', u'sit', u'dignissimos']
@@ -265,13 +265,13 @@ Below is a list of supported random values providers:
 
 ### faker.providers.profile
 
-	fake.simple_profile()                                                                       # {'username': u'hbartoletti', 'name': u'Lollie Armstrong', 
-	                                                                                              'birthdate': '2005-02-02', 'sex': 'F', 'address': u'96985 
+	fake.simple_profile()                                                                       # {'username': u'hbartoletti', 'name': u'Lollie Armstrong',
+	                                                                                              'birthdate': '2005-02-02', 'sex': 'F', 'address': u'96985
 	                                                                                              Shaniqua Highway\nWest Emanuel, TN 44507', 'mail': u'donne
 	                                                                                              lly.zoe@hotmail.com'}
 	fake.profile(fields=None)                                                                   # {'website': [u'http://klocko.com/'], 'username': u'corry.j
 	                                                                                              erde', 'name': u'Madlyn Dietrich', 'blood_group': 'B+', 'r
-	                                                                                              esidence': u'758 Boehm Ferry\nLake Nylah, GU 38551-8388', 
+	                                                                                              esidence': u'758 Boehm Ferry\nLake Nylah, GU 38551-8388',
 	                                                                                              'company': u'Kihn Inc', 'address': u'6182 Hills Rest\nNort
 	                                                                                              h Florianberg, NM 75008', 'birthdate': '1985-04-23', 'sex'
 	                                                                                              : 'M', 'job': 'Administrator, education', 'ssn': u'333-82-

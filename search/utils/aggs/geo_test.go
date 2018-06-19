@@ -1,3 +1,31 @@
+/*
+ * ============= Ryft-Customized BSD License ============
+ * Copyright (c) 2015, Ryft Systems, Inc.
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *   this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation and/or
+ *   other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software must display the following acknowledgement:
+ *   This product includes software developed by Ryft Systems, Inc.
+ * 4. Neither the name of Ryft Systems, Inc. nor the names of its contributors may be used *   to endorse or promote products derived from this software without specific prior written permission. *
+ * THIS SOFTWARE IS PROVIDED BY RYFT SYSTEMS, INC. ''AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL RYFT SYSTEMS, INC. BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * ============
+ */
+
 package aggs
 
 import (
@@ -79,29 +107,29 @@ func TestGeoEngine(t *testing.T) {
 	}
 
 	check(&Geo{LocField: mustParseField("Location"), flags: GeoCentroidW},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
+		`{"count":3, "min_lat":0, "max_lat":0, "min_neg_lon":0, "max_neg_lon":0, "min_pos_lon":0, "max_pos_lon":0, "centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
 	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoCentroidW},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
+		`{"count":3, "min_lat":0, "max_lat":0, "min_neg_lon":0, "max_neg_lon":0, "min_pos_lon":0, "max_pos_lon":0, "centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":0,"lon":0}}`)
 
 	check(&Geo{LocField: mustParseField("Location"), flags: GeoCentroid},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
+		`{"count":3, "min_lat":0, "max_lat":0, "min_neg_lon":0, "max_neg_lon":0, "min_pos_lon":0, "max_pos_lon":0, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
 	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoCentroid},
-		`{"count":3,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
+		`{"count":3, "min_lat":0, "max_lat":0, "min_neg_lon":0, "max_neg_lon":0, "min_pos_lon":0, "max_pos_lon":0, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":80,"lon":-40}}`)
 
-	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
-	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
+	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":3, "min_lat":10, "max_lat":40, "min_neg_lon":-30, "max_neg_lon":-20, "min_pos_lon":10, "max_pos_lon":10, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
+	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":3, "min_lat":10, "max_lat":40, "min_neg_lon":-30, "max_neg_lon":-20, "min_pos_lon":10, "max_pos_lon":10, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 
-	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds | GeoCentroidW | GeoCentroid},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
-	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds | GeoCentroidW | GeoCentroid},
-		`{"count":3,"top_left":{"lat":40,"lon":-30},"bottom_right":{"lat":10,"lon":10},"centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
+	check(&Geo{LocField: mustParseField("Location"), flags: GeoBounds | GeoCentroidW | GeoCentroid, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":3, "min_lat":10, "max_lat":40, "min_neg_lon":-30, "max_neg_lon":-20, "min_pos_lon":10, "max_pos_lon":10, "centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
+	check(&Geo{LatField: mustParseField("Latitude"), LonField: mustParseField("Longitude"), flags: GeoBounds | GeoCentroidW | GeoCentroid, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":3, "min_lat":10, "max_lat":40, "min_neg_lon":-30, "max_neg_lon":-20, "min_pos_lon":10, "max_pos_lon":10, "centroid_wsum":{"x":2.447057939911266, "y":-0.5082102826226784, "z":1.3164357873534698},"centroid_sum":{"lat":80,"lon":-40}}`)
 
-	check(&Geo{LocField: mustParseField("missLocation"), flags: GeoBounds | GeoCentroidW},
-		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
-	check(&Geo{LatField: mustParseField("missLatitude"), LonField: mustParseField("missLongitude"), flags: GeoBounds | GeoCentroidW},
-		`{"count":0,"top_left":{"lat":0,"lon":0},"bottom_right":{"lat":0,"lon":0},"centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
+	check(&Geo{LocField: mustParseField("missLocation"), flags: GeoBounds | GeoCentroidW, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":0, "min_lat":90.01, "max_lat":-90.01, "min_neg_lon":180.01, "max_neg_lon":-180.01, "min_pos_lon":180.01, "max_pos_lon":-180.01, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
+	check(&Geo{LatField: mustParseField("missLatitude"), LonField: mustParseField("missLongitude"), flags: GeoBounds | GeoCentroidW, MinLat: +90.01, MaxLat: -90.01, MinNegLon: +180.01, MaxNegLon: -180.01, MinPosLon: +180.01, MaxPosLon: -180.01},
+		`{"count":0, "min_lat":90.01, "max_lat":-90.01, "min_neg_lon":180.01, "max_neg_lon":-180.01, "min_pos_lon":180.01, "max_pos_lon":-180.01, "centroid_wsum":{"x":0, "y":0, "z":0},"centroid_sum":{"lat":0,"lon":0}}`)
 }
 
 // check "geo_bounds"

@@ -1,6 +1,6 @@
 /*
  * ============= Ryft-Customized BSD License ============
- * Copyright (c) 2015, Ryft Systems, Inc.
+ * Copyright (c) 2018, Ryft Systems, Inc.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -85,7 +85,7 @@ func (s *Scanner) isLetter(r rune) bool {
 
 // is ident rune?
 func (s *Scanner) isIdent(r rune) bool {
-	return r == '_' || s.isLetter(r)
+	return r == '-' || r == '_' || s.isLetter(r)
 }
 
 // is digit rune?

@@ -1,6 +1,6 @@
 /*
  * ============= Ryft-Customized BSD License ============
- * Copyright (c) 2015, Ryft Systems, Inc.
+ * Copyright (c) 2018, Ryft Systems, Inc.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -442,8 +442,9 @@ func (rr *ResultsReader) process(res *search.Result) {
 				rec := search.NewRecord(index, data)
 				// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
-				res.ReportRecord(rec)
-				if rr.Limit >= 0 && res.RecordsReported() >= uint64(rr.Limit) {
+				if rr.Limit < 0 || res.RecordsReported() < uint64(rr.Limit) {
+					res.ReportRecord(rec)
+				} else {
 					rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 					return // done
 				}
@@ -716,8 +717,9 @@ func (rr *ResultsReader) show(res *search.Result) {
 		rec := search.NewRecord(index, data)
 		// rr.log().WithField("rec", rec).Debugf("[%s/reader]: new record", TAG) // FIXME: DEBUG
 
-		res.ReportRecord(rec)
-		if rr.Limit >= 0 && res.RecordsReported() >= uint64(rr.Limit) {
+		if rr.Limit < 0 || res.RecordsReported() < uint64(rr.Limit) {
+			res.ReportRecord(rec)
+		} else {
 			rr.log().WithField("limit", rr.Limit).Debugf("[%s/reader]: stopped by limit", TAG)
 			return // done
 		}

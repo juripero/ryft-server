@@ -1,6 +1,6 @@
 /*
  * ============= Ryft-Customized BSD License ============
- * Copyright (c) 2015, Ryft Systems, Inc.
+ * Copyright (c) 2018, Ryft Systems, Inc.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -158,7 +158,6 @@ func (server *Server) DoCount0(ctx *gin.Context) {
 
 	// prepare search configuration
 	cfg := search.NewConfig(params.Query, params.Files...)
-	cfg.DebugInternals = server.Config.DebugInternals
 	cfg.Mode = params.Mode
 	cfg.Width = mustParseWidth(params.Width)
 	cfg.Dist = uint(params.Dist)

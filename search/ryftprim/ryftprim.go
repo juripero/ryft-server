@@ -1,6 +1,6 @@
 /*
  * ============= Ryft-Customized BSD License ============
- * Copyright (c) 2015, Ryft Systems, Inc.
+ * Copyright (c) 2018, Ryft Systems, Inc.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -410,10 +410,6 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 			task.log().WithError(err).Warnf("[%s]: failed to parse statistics", TAG)
 			err = fmt.Errorf("failed to parse statistics: %s", err)
 		} else {
-			if task.config.DebugInternals {
-				res.Stat.AddDebugData("tool", task.toolPath)
-				res.Stat.AddDebugData("args", task.toolArgs)
-			}
 			task.log().WithField("stat", res.Stat).
 				Infof("[%s]: parsed statistics", TAG)
 		}
@@ -421,7 +417,8 @@ func (engine *Engine) finish(err error, task *Task, res *search.Result) {
 
 	// notify client about error
 	if err != nil && err != ErrCancelled {
-		res.ReportError(fmt.Errorf("%s failed with %s\n%s", TAG, err, out))
+		res.ReportError(fmt.Errorf("%s failed with %s\n%s",
+			task.config.Backend.Tool, err, out))
 	}
 
 	// suppress some errors

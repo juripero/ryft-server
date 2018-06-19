@@ -42,6 +42,10 @@ const (
 	GeoCentroid  // simple
 )
 
+const (
+	MAX_ABS_LON = 180.0
+)
+
 var (
 	findFloats = prepareFindFloats()
 )
@@ -67,12 +71,16 @@ type Geo struct {
 	WrapLonField bool        `json:"-" msgpack:"-"` // "wrap_longitude" field
 
 	Count        uint64  `json:"count" msgpack:"count"` // number of points
-	TopLeft      Point   `json:"top_left" msgpack:"top_left"`
-	BottomRight  Point   `json:"bottom_right" msgpack:"bottom_right"`
 	CentroidSumW Point3D `json:"centroid_wsum" msgpack:"centroid_wsum"`
 	CentroidSum  Point   `json:"centroid_sum" msgpack:"centroid_sum"`
 
-	posLeft, negLeft, posRight, negRight float64
+	// geo bounds
+	MinLat    float64 `json:"min_lat" msgpack:"min_lat"`         // minimum latitude
+	MaxLat    float64 `json:"max_lat" msgpack:"max_lat"`         // maximum latitude
+	MinPosLon float64 `json:"min_pos_lon" msgpack:"min_pos_lon"` // minimum positive longitude
+	MaxPosLon float64 `json:"max_pos_lon" msgpack:"max_pos_lon"` // maximum positive longitude
+	MinNegLon float64 `json:"min_neg_lon" msgpack:"min_neg_lon"` // minimum negative longitude
+	MaxNegLon float64 `json:"max_neg_lon" msgpack:"max_neg_lon"` // maximum negative longitude
 }
 
 // clone the engine
@@ -282,21 +290,46 @@ func (g *Geo) mergeMap(data map[string]interface{}) error {
 
 	// geo_bounds
 	if (g.flags & GeoBounds) != 0 {
-		// top_left
-		lat, lon, err := getPoint(data, "top_left")
+		// latitude
+		minLat, err := utils.AsFloat64(data["min_lat"])
 		if err != nil {
 			return err
 		}
-		g.updateBounds(lat, lon)
+		maxLat, err := utils.AsFloat64(data["max_lat"])
+		if err != nil {
+			return err
+		}
 
-		// bottom_right
-		lat, lon, err = getPoint(data, "bottom_right")
+		// longitude
+		minPosLon, err := utils.AsFloat64(data["min_pos_lon"])
 		if err != nil {
 			return err
 		}
-		g.Count += 1 // tricky way to avoid g.Count == 0 check inside updateBounds()
-		g.updateBounds(lat, lon)
-		g.Count -= 1
+		maxPosLon, err := utils.AsFloat64(data["max_pos_lon"])
+		if err != nil {
+			return err
+		}
+		minNegLon, err := utils.AsFloat64(data["min_neg_lon"])
+		if err != nil {
+			return err
+		}
+		maxNegLon, err := utils.AsFloat64(data["max_neg_lon"])
+		if err != nil {
+			return err
+		}
+
+		if minNegLon <= +MAX_ABS_LON {
+			g.updateBounds(minLat, minNegLon)
+		}
+		if maxNegLon >= -MAX_ABS_LON {
+			g.updateBounds(maxLat, maxNegLon)
+		}
+		if minPosLon <= +MAX_ABS_LON {
+			g.updateBounds(minLat, minPosLon)
+		}
+		if maxPosLon >= -MAX_ABS_LON {
+			g.updateBounds(maxLat, maxPosLon)
+		}
 	}
 
 	// geo_centroid weighted
@@ -336,10 +369,18 @@ func (g *Geo) merge(other *Geo) error {
 
 	// geo_bounds
 	if (g.flags & GeoBounds) != 0 {
-		g.updateBounds(other.TopLeft.Lat, other.TopLeft.Lon)
-		g.Count += 1 // tricky way to avoid g.Count == 0 check inside updateBounds()
-		g.updateBounds(other.BottomRight.Lat, other.BottomRight.Lon)
-		g.Count -= 1
+		if other.MinNegLon <= +MAX_ABS_LON {
+			g.updateBounds(other.MinLat, other.MinNegLon)
+		}
+		if other.MaxNegLon >= -MAX_ABS_LON {
+			g.updateBounds(other.MaxLat, other.MaxNegLon)
+		}
+		if other.MinPosLon <= +MAX_ABS_LON {
+			g.updateBounds(other.MinLat, other.MinPosLon)
+		}
+		if other.MaxPosLon >= -MAX_ABS_LON {
+			g.updateBounds(other.MaxLat, other.MaxPosLon)
+		}
 	}
 
 	// geo_centroid weighted
@@ -363,55 +404,28 @@ func (g *Geo) merge(other *Geo) error {
 
 // updateBounds extends bounds of rectangle which contains all points
 func (g *Geo) updateBounds(lat, lon float64) {
-	// g.TopLeft.Lat = math.Max(g.TopLeft.Lat, lat)
-	if g.Count == 0 || lat > g.TopLeft.Lat {
-		g.TopLeft.Lat = lat
+	// latitude
+	if lat > g.MaxLat {
+		g.MaxLat = lat
 	}
-	// g.BottomRight.Lat = math.Min(g.BottomRight.Lat, lat)
-	if g.Count == 0 || lat < g.BottomRight.Lat {
-		g.BottomRight.Lat = lat
-	}
-
-	if lon >= 0 && lon < g.posLeft {
-		g.posLeft = lon
-	}
-	if lon >= 0 && lon > g.posRight {
-		g.posRight = lon
-	}
-	if lon < 0 && lon < g.negLeft {
-		g.negLeft = lon
-	}
-	if lon < 0 && lon > g.negRight {
-		g.negRight = lon
+	if lat < g.MinLat {
+		g.MinLat = lat
 	}
 
-	// use same implementation as in ElasticSearch
-	// https://github.com/elastic/elasticsearch/blob/ad8f359deb87745239712ecec89570a295bb8cc7/core/src/main/java/org/elasticsearch/search/aggregations/metrics/geobounds/InternalGeoBounds.java#L214
-	if (math.IsInf(g.posLeft, 1)) == true {
-		g.TopLeft.Lon = g.negLeft
-		g.BottomRight.Lon = g.negRight
-	} else if (math.IsInf(g.negLeft, 1)) == true {
-		g.TopLeft.Lon = g.posLeft
-		g.BottomRight.Lon = g.posRight
-	} else if g.WrapLonField == true {
-		unwrappedWidth := g.posRight - g.negLeft
-		wrappedWidth := (180 - g.posLeft) - (-180 - g.negRight)
-		if unwrappedWidth <= wrappedWidth {
-			g.TopLeft.Lon = g.negLeft
-			g.BottomRight.Lon = g.posRight
-		} else {
-			g.TopLeft.Lon = g.posLeft
-			g.BottomRight.Lon = g.negRight
+	// longitude
+	if lon >= 0 { // positive case
+		if lon < g.MinPosLon {
+			g.MinPosLon = lon
 		}
-	} else {
-		// g.TopLeft.Lon = math.Min(g.TopLeft.Lon, lon)
-		if g.Count == 0 || lon < g.TopLeft.Lon {
-			g.TopLeft.Lon = lon
+		if lon > g.MaxPosLon {
+			g.MaxPosLon = lon
 		}
-
-		// g.BottomRight.Lon = math.Max(g.BottomRight.Lon, lon)
-		if g.Count == 0 || lon > g.BottomRight.Lon {
-			g.BottomRight.Lon = lon
+	} else { // negative case
+		if lon < g.MinNegLon {
+			g.MinNegLon = lon
+		}
+		if lon > g.MaxNegLon {
+			g.MaxNegLon = lon
 		}
 	}
 }
@@ -424,6 +438,59 @@ func deg2rad(value float64) float64 {
 //convert radians to degrees
 func rad2deg(value float64) float64 {
 	return value * (180 / math.Pi)
+}
+
+// get bounding box
+func (g *Geo) getBoundingBox() (topLeft Point, bottomRight Point) {
+	if g.Count == 0 {
+		return // no data to report
+	}
+
+	// latitude
+	topLeft.Lat = g.MaxLat
+	bottomRight.Lat = g.MinLat
+
+	// non-wrapped longitude
+	if !g.WrapLonField {
+		// top-left
+		if g.MinNegLon > +180.0 {
+			topLeft.Lon = g.MinPosLon
+		} else {
+			topLeft.Lon = g.MinNegLon
+		}
+
+		// bottom-right
+		if g.MaxPosLon < -180.0 {
+			bottomRight.Lon = g.MaxNegLon
+		} else {
+			bottomRight.Lon = g.MaxPosLon
+		}
+
+		return
+	}
+
+	// wrapped longitude
+	if g.MinPosLon > +180 {
+		// negative only
+		topLeft.Lon = g.MinNegLon
+		bottomRight.Lon = g.MaxNegLon
+	} else if g.MinNegLon > +180 {
+		// positive only
+		topLeft.Lon = g.MinPosLon
+		bottomRight.Lon = g.MaxPosLon
+	} else {
+		unwrappedWidth := g.MaxPosLon - g.MinNegLon
+		wrappedWidth := 360 - (g.MinPosLon - g.MaxNegLon)
+		if unwrappedWidth <= wrappedWidth {
+			topLeft.Lon = g.MinNegLon
+			bottomRight.Lon = g.MaxPosLon
+		} else {
+			topLeft.Lon = g.MinPosLon
+			bottomRight.Lon = g.MaxNegLon
+		}
+	}
+
+	return
 }
 
 // updateCentroidW recalculates weighted centroid
@@ -472,7 +539,7 @@ func parseGeoBoundsOpts(opts map[string]interface{}, iNames []string) (field, la
 	if wrapLon_, ok := opts["wrap_longitude"]; ok {
 		wrapLon, err = utils.AsBool(wrapLon_)
 	} else {
-		wrapLon = true
+		wrapLon = true // default
 	}
 	return
 }
@@ -533,10 +600,12 @@ func newGeoBoundsFunc(opts map[string]interface{}, iNames []string) (*geoBoundsF
 			LatField:     lat,
 			LonField:     lon,
 			WrapLonField: wrapLon,
-			posLeft:      math.Inf(1),
-			negLeft:      math.Inf(1),
-			posRight:     math.Inf(-1),
-			negRight:     math.Inf(-1),
+			MinLat:       +90.01,
+			MaxLat:       -90.01,
+			MinNegLon:    +180.01,
+			MaxNegLon:    -180.01,
+			MinPosLon:    +180.01,
+			MaxPosLon:    -180.01,
 		},
 	}}, nil // OK
 }
@@ -547,16 +616,16 @@ func (f *geoBoundsFunc) ToJson() interface{} {
 		return map[string]interface{}{} // empty
 	}
 
-	bounds := f.engine
+	topLeft, bottomRight := f.engine.getBoundingBox()
 	return map[string]interface{}{
 		"bounds": map[string]interface{}{
 			"top_left": map[string]interface{}{
-				"lat": bounds.TopLeft.Lat,
-				"lon": bounds.TopLeft.Lon,
+				"lat": topLeft.Lat,
+				"lon": topLeft.Lon,
 			},
 			"bottom_right": map[string]interface{}{
-				"lat": bounds.BottomRight.Lat,
-				"lon": bounds.BottomRight.Lon,
+				"lat": bottomRight.Lat,
+				"lon": bottomRight.Lon,
 			},
 		},
 	}
@@ -599,10 +668,16 @@ func newGeoCentroidFunc(opts map[string]interface{}, iNames []string) (*geoCentr
 		return &geoCentroidFunc{
 			geoFunc: geoFunc{
 				engine: &Geo{
-					flags:    flags,
-					LocField: field,
-					LatField: lat,
-					LonField: lon,
+					flags:     flags,
+					LocField:  field,
+					LatField:  lat,
+					LonField:  lon,
+					MinLat:    +90.01,
+					MaxLat:    -90.01,
+					MinNegLon: +180.01,
+					MaxNegLon: -180.01,
+					MinPosLon: +180.01,
+					MaxPosLon: -180.01,
 				},
 			},
 			weighted: weighted,
