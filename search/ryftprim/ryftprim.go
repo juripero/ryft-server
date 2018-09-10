@@ -96,8 +96,11 @@ func (engine *Engine) prepare(backend string, task *Task) error {
 		args = append(args, "-p", "ipv6")
 	case "pcre2":
 		args = append(args, "-p", "pcre2")
+//	case "pcap":
+//		args = append(args, "-p", "pcap")
+//modified pcap case not to send any mode to the ryft cli, the ryftx_pcap primitive does not use mode
 	case "pcap":
-		args = append(args, "-p", "pcap")
+		args = append(args, " ")
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
