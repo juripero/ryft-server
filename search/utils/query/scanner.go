@@ -85,7 +85,7 @@ func (s *Scanner) isLetter(r rune) bool {
 
 // is ident rune?
 func (s *Scanner) isIdent(r rune) bool {
-	return r == '-' || r == '_' || s.isLetter(r)
+	return r == '_' || s.isLetter(r)
 }
 
 // is digit rune?
