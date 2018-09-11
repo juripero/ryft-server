@@ -188,7 +188,7 @@ func hasRecord(q query.Query) bool {
 }
 
 // get the first simple query
-func getFirstSimple(q query.Query) *query.SimpleQuery {
+/func getFirstSimple(q query.Query) *query.SimpleQuery {
 	// check simple query first
 	if q.Simple != nil {
 		return q.Simple
@@ -202,7 +202,7 @@ func getFirstSimple(q query.Query) *query.SimpleQuery {
 	}
 
 	return nil // not found
-}
+}/
 
 // get CSV column names from tweaks
 // see corresponding rest/format/csv package!!!
@@ -278,9 +278,9 @@ func (engine *Engine) Search(cfg *search.Config) (*search.Result, error) {
 	}
 	// preliminary update backend to get "auto-record" flag
 	// WARNING: tool is selected for the whole search query!
-	if sq := getFirstSimple(q); sq != nil {
+	/if sq := getFirstSimple(q); sq != nil {
 		engine.updateConfig(cfg, sq, q.BoolOps)
-	}
+	}/
 	if err := engine.updateBackend(cfg); err != nil {
 		return nil, fmt.Errorf("failed to select backend: %s", err)
 	}
