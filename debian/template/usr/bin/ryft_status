@@ -313,7 +313,7 @@ function os_service_detect() {
 }
 
 function os_boot_status() {
-	if [ $ryftone == 1 ]
+	if [ $OSVersionMajor == 14 ]
 	then
 		$ryftsudo initctl show-config $1 | grep -q "^  start on" && echo -n boot_on || echo -n boot_off
 	else
