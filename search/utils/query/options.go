@@ -33,6 +33,7 @@ package query
 import (
 	"fmt"
 	"strings"
+        "regexp"
 )
 
 // Options contains search options
@@ -48,6 +49,10 @@ type Options struct {
 	CurrencySymbol string // Monetary currency symbol, for example "$" (CURRENCY)
 	DigitSeparator string // Digits separator, for example "," (CURRENCY, NUMBER)
 	DecimalPoint   string // Decimal point marker, for example "." (CURRENCY, NUMBER)
+
+	fieldDelimiter string // Field separator for CSV records
+        extraOptionName [5] string // Name of passthru option
+        extraOptionValue [5] string // Value of passthru option
 
 	FileFilter string // File filter, regular expression (is used for query combination)
 }
@@ -186,6 +191,18 @@ func (o Options) String() string {
 	// file filter
 	if len(o.FileFilter) != 0 {
 		args = append(args, fmt.Sprintf("filter=%q", o.FileFilter))
+	}
+
+	// field delimiter
+        if len(o.fieldDelimiter) != 0 {
+		args = append(args, fmt.Sprintf("field_delimiter=%q", o.fieldDelimiter))
+	}
+
+        // passthru option
+	for i := 0; i < 5; i++ {
+        	if len(o.extraOptionValue[i]) != 0 {
+			args = append(args, fmt.Sprintf("%s=%q", o.extraOptionName[i], o.extraOptionValue[i]))
+		}
 	}
 
 	if len(args) != 0 {
@@ -343,6 +360,12 @@ func (o *Options) SetMode(mode string) *Options {
 
 	o.Mode = mode
 	return o
+}
+
+// Checks if unknown option is formatted NAME=Value where value is quoted string
+//
+func CheckOptionFormat(opt string) bool {
+	return regexp.MustCompile(`[A-Z][A-Z_]*`).MatchString(opt)
 }
 
 // Set sets some option
@@ -568,8 +591,43 @@ func (o *Options) Set(option string, positonalName string) (bool, error) {
 			return named, fmt.Errorf("%q found instead of =", eq)
 		}
 
+	// CSV Record Delimiter
+	case strings.EqualFold(opt, "FIELD_DELIMITER"):
+		if not {
+			return named, fmt.Errorf("! is not supported for string option")
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			if v, err := p.parseStringVal(); err != nil {
+				return named, err
+			} else {
+				o.fieldDelimiter = v
+			}
+		} else {
+			return named, fmt.Errorf("%q found instead of =", eq)
+		}
+
+	// Unknown option
+	case CheckOptionFormat(opt):
+		if not {
+			return named, fmt.Errorf("unknown option %q found", opt)
+		} else if eq := p.scanIgnoreSpace(); eq.token == EQ {
+			if v, err := p.parseStringVal(); err != nil {
+                                return named, err
+                        } else {
+				for i := 0; i < 5; i++ {
+					if len(o.extraOptionName[i]) == 0 {
+						o.extraOptionName[i] = opt
+						o.extraOptionValue[i] = v
+						break
+					}
+				}
+
+                        }
+                } else {
+                        return named, fmt.Errorf("%q found instead of =", eq)
+                }
+
 	default:
-		return named, fmt.Errorf("unknown option %q found", opt)
+		return named, fmt.Errorf("unknown parser option %q found", opt)
 	}
 
 	if !p.EOF() {

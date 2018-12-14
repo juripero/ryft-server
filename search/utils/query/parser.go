@@ -470,6 +470,17 @@ func getExprOld(expr string, opts Options) string {
 func getExprNew(expr string, opts Options) string {
 	args := []string{expr}
 
+	// Add in file type options and new options
+	if len(opts.fieldDelimiter) > 0 {
+		args = append(args, fmt.Sprintf(`FIELD_DELIMITER="%s"`, opts.fieldDelimiter))
+	}
+
+	for i := 0; i < 5; i++ {
+		if len(opts.extraOptionName[i]) > 0 {
+				args = append(args, fmt.Sprintf(`%s="%s"`, opts.extraOptionName[i], opts.extraOptionValue[i]))
+		}
+	}
+
 	switch opts.Mode {
 	// exact search
 	case "es":
