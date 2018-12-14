@@ -550,11 +550,12 @@ UNITS2=' + {"Matches               ": .matches}
         elif .fabricDataRate < 0.001 then
              {"Fabric Data Rate(KB/s)": ((.fabricDataRate * 1024)|.*100+0.005|floor|./100)}
         else {"Fabric Data Rate(MB/s)": .fabricDataRate}
-        end
-        + if .fabricDuration >= 1000 then
-             {"Fabric Duration(sec)  ": ((.fabricDuration / 1000)|.*100+0.005|floor|./100)}
-        else {"Fabric Duration(msec) ": .fabricDuration}
         end'
+ # commented out to remove Fabric Duration from output display
+ #       + if .fabricDuration >= 1000 then
+ #            {"Fabric Duration(sec)  ": ((.fabricDuration / 1000)|.*100+0.005|floor|./100)}
+ #       else {"Fabric Duration(msec) ": .fabricDuration}
+ #       end'
 
 UNITS_H=' + {"Host                  ": .host}'
 
@@ -563,7 +564,8 @@ UNITS_H=' + {"Host                  ": .host}'
         JQ_STR="$JQ_STR | del(.[\"Host                  \"])"
     fi
     if [[ -z "$ADD_DRATE" ]]; then
-        JQ_STR="$JQ_STR | del(.[\"Data Rate(GB/s)       \"],.[\"Data Rate(MB/s)       \"],.[\"Data Rate(KB/s)       \"])"
+#commented out the line so the Data Rate is always displayed.  
+#        JQ_STR="$JQ_STR | del(.[\"Data Rate(GB/s)       \"],.[\"Data Rate(MB/s)       \"],.[\"Data Rate(KB/s)       \"])"
         JQ_STR="$JQ_STR | del(.[\"Fabric Data Rate(GB/s)\"],.[\"Fabric Data Rate(MB/s)\"],.[\"Fabric Data Rate(KB/s)\"])"
     fi
     if [[ -z "$ADD_DETAILS" ]]; then

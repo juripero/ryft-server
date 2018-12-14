@@ -96,8 +96,11 @@ func (engine *Engine) prepare(backend string, task *Task) error {
 		args = append(args, "-p", "ipv6")
 	case "pcre2":
 		args = append(args, "-p", "pcre2")
+//	case "pcap":
+//		args = append(args, "-p", "pcap")
+//modified pcap case not to send any mode to the ryft cli, the ryftx_pcap primitive does not use mode
 	case "pcap":
-		args = append(args, "-p", "pcap")
+		args = args
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)
 	}
@@ -149,12 +152,14 @@ func (engine *Engine) prepare(backend string, task *Task) error {
 			args = append(args, "-f", engine.getFilePath(backend, path))
 		}
 	}
-
-	if len(cfg.Delimiter) != 0 {
-		// data separator (should be hex-escaped)
-		args = append(args, "-e", utils.HexEscape([]byte(cfg.Delimiter)))
-	} else {
-		args = append(args, "-en") // NULL delimiter
+	// added change for ryftx_pcap, does not use the data separator.
+	if cfg.Mode != "pcap" {
+		if len(cfg.Delimiter) != 0 {
+			// data separator (should be hex-escaped)
+			args = append(args, "-e", utils.HexEscape([]byte(cfg.Delimiter)))
+		} else {
+			args = append(args, "-en") // NULL delimiter
+		}
 	}
 
 	// enable verbose mode to grab statistics
