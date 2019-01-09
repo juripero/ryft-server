@@ -2087,17 +2087,17 @@ ryft_statusX() {
 	then
 		$smokePath|tee $ryft_status_filename
 		faildetect=`cat $ryft_status_filename|grep FAILED|wc -l`
-        if [ $rhfs == 1 ]
-        then
-    		passdetect=`cat $ryft_status_filename|egrep "1 tests.*PASSED"|wc -l`
-        else
-            passdetect=`cat $ryft_status_filename|egrep "PASSED"|wc -l`
-        fi 
+	        if [ $rhfs == 1 ]
+	        then
+			passdetect=`cat $ryft_status_filename|egrep "PASSED"|wc -l`
+	        else
+			passdetect=`cat $ryft_status_filename|egrep "PASSED"|wc -l`
+	        fi 
 		if [ $faildetect != 0 -o $passdetect = 0 ]
 		then
 			echo "*** smoke.sh failed ***"
-            smoke_error=1
-            filesystem_error=1
+			smoke_error=1
+			filesystem_error=1
 			status=$((status+1))
 		fi
 	fi
