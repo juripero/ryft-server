@@ -1,0 +1,2 @@
+#!/bin/bash
+. /home/ryftuser/.bashrc; /usr/bin/ryftx "$@"
