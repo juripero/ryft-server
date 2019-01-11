@@ -6,14 +6,17 @@
 
 
 #
-# get ryftone?
+# rhfs?
 #
+rhfs=0
 test -e /dev/smca
 if [ $? == 0 ]
 then
-	ryftone=1
-else
-	ryftone=0
+	filesystem=`df -h /ryftone|tail -1|awk '{print $1}'`
+	if [ "${filesystem}" == "/dev/fuse" -o "${filesystem}" == "" ]
+	then
+		rhfs=1
+	fi
 fi
 
 #
@@ -25,13 +28,13 @@ OSVersionMinor=`lsb_release -a 2>/dev/null|grep Release|cut -d':' -f2-|sed 's/^\
 #
 # is there a smoke test?
 #
-smokePath=~ryftuser/ryft/regression/util/smoke.sh
-test -e $smokePath
-if [ $? != 0 ]
+if [ $rhfs == 1 ]
 then
-    smokePath=~ryftuser/bin/smoke
-    test -e $smokePath
+	smokePath=/usr/bin/smoke
+else
+	smokePath=/usr/bin/smokex
 fi
+test -e $smokePath
 if [ $? != 0 ]
 then
     smokePath=""
@@ -52,7 +55,7 @@ then
 	ryftsudo="sudo"
 fi
 tailLines="-40"
-if [ $ryftone == 1 ]
+if [ $rhfs == 1 ]
 then
     ryftoneLog=/var/log/ryft/ryftone.log
     ryftoneLogPattern="/var/log/ryft/ryftone.log*"
@@ -906,15 +909,15 @@ function ryft_ryftone_maintenance_menu
         MAINTENANCE_MENU_TEXT[$menu_select]="Smoke test               ($smokePath)"
         menu_select=`menu_select_next $menu_select`
     fi
-    if [ $ryftone == 1 ]
+    if [ $rhfs == 1 ]
     then
-        MAINTENANCE_MENU_TEXT[$menu_select]="Cpc                      (~ryftuser/regression/util/cpc)"
+        MAINTENANCE_MENU_TEXT[$menu_select]="Cpc                      (cpc)"
         menu_select=`menu_select_next $menu_select`
-		MAINTENANCE_MENU_TEXT[$menu_select]="Recycle                  (~ryftuser/regression/util/recycle)"
+		MAINTENANCE_MENU_TEXT[$menu_select]="Recycle                  (sudo recycle)"
 		menu_select=`menu_select_next $menu_select`
 		MAINTENANCE_MENU_TEXT[$menu_select]="File system check/repair (sudo fsck_rhfs -y -Y)"
 		menu_select=`menu_select_next $menu_select`
-		MAINTENANCE_MENU_TEXT[$menu_select]="Hardware reset rhfs ccc  (sudo ~ryftuser/regression/util/hw_reset_rhfs_ccc.sh)"
+		MAINTENANCE_MENU_TEXT[$menu_select]="Hardware reset rhfs ccc  (sudo hw_reset_rhfs_ccc.sh)"
 		menu_select=`menu_select_next $menu_select`
 		MAINTENANCE_MENU_TEXT[$menu_select]="IPMI Menu"
 		menu_select=`menu_select_next $menu_select`
@@ -931,7 +934,7 @@ function ryft_ryftone_maintenance_menu
     fi            
     MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action will reboot the ryftone.' && sudo shutdown -rf now || echo 'not sure'"
     menu_select=`menu_select_next $menu_select`
-    if [ $ryftone == 1 ]
+    if [ $rhfs == 1 ]
     then
         MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action will power down the ryftone.' && ryft_ays 'Double checking...' && sudo poweroff || echo 'not sure'"
         menu_select=`menu_select_next $menu_select`
@@ -944,16 +947,16 @@ function ryft_ryftone_maintenance_menu
         MAINTENANCE_MENU_ACTIONS[$menu_select]="$smokePath"
         menu_select=`menu_select_next $menu_select`
     fi
-    if [ $ryftone == 1 ]
+    if [ $rhfs == 1 ]
     then
-		MAINTENANCE_MENU_ACTIONS[$menu_select]="~ryftuser/ryft/regression/util/cpc"
+		MAINTENANCE_MENU_ACTIONS[$menu_select]="cpc"
 		menu_select=`menu_select_next $menu_select`
-		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.' && ~ryftuser/ryft/regression/util/recycle"
+		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action restarts rhfsd, which temporarily dismounts /ryftone filsystem.' && sudo recycle"
 		menu_select=`menu_select_next $menu_select`
 		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action performs /ryftone file system check/repair' && sudo fsck_rhfs -y -Y"
 		menu_select=`menu_select_next $menu_select`
 	
-		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action permanently removes all /ryftone filesystem data.' && ryft_ays 'Double checking...' && sudo ~ryftuser/ryft/regression/util/hw_reset_rhfs_ccc.sh || echo 'not sure'"
+		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action permanently removes all /ryftone filesystem data.' && ryft_ays 'Double checking...' && sudo hw_reset_rhfs_ccc.sh || echo 'not sure'"
 		menu_select=`menu_select_next $menu_select`
 		MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ipmi_menu"
 		menu_select=`menu_select_next $menu_select`
@@ -1190,7 +1193,7 @@ function ryft_logs_menu
     menu_select=`menu_select_next $menu_select`
     LOGS_MENU_TEXT[${menu_select}]="consul-alerts log        (tail ${tailLines} $consulAlertsLog)"
     menu_select=`menu_select_next $menu_select`
-    if [ $ryftone == 1 ]
+    if [ $rhfs == 1 ]
     then
         LOGS_MENU_TEXT[${menu_select}]="RyftOne diagnostic dump  (sudo ryft_diagnostics_dump)"
         menu_select=`menu_select_next $menu_select`
@@ -1216,7 +1219,7 @@ function ryft_logs_menu
     menu_select=`menu_select_next $menu_select`
     LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; tail ${tailLines} $consulAlertsLog; ryft_separator"
     menu_select=`menu_select_next $menu_select`
-    if [ $ryftone == 1 ]
+    if [ $rhfs == 1 ]
     then
 	    LOGS_MENU_ACTIONS[${menu_select}]="ryft_separator; ryft_showCommand \"sudo ryft_diagnostics_dump\" && ryft_separator; echo -n \" diagnostic dump filename is:\" && ls -t *.bz2|head -1; ryft_separator"
 	    menu_select=`menu_select_next $menu_select`
@@ -1372,13 +1375,13 @@ ryft_status_filename=/tmp/ryft_status_$$
 ryft_status_verbose=/tmp/ryft_status_verbose_$$
 ryft_ryftone_files=/tmp/ryft_ryftone_files_$$
 detect_process() {
-	if [ $ryftone == 0 -a "$1" == "rhfsd" ]
+	if [ $rhfs == 0 -a "$1" == "rhfsd" ]
 	then
 		returnValue=1
-	elif [ $ryftone == 0 -a "$1" == "tlogd" ]
+	elif [ $rhfs == 0 -a "$1" == "tlogd" ]
 	then
 		returnValue=1
-	elif [ $ryftone == 0 -a "$1" == "ccc_mgr" ]
+	elif [ $rhfs == 0 -a "$1" == "ccc_mgr" ]
 	then
 		returnValue=1
 	else
@@ -1473,11 +1476,11 @@ show_smoke_error () {
     echo
 }
 show_filesystem_error () {
-	#echo "*** /ryftone filesystem is not mounted.  To correct, try commands: '~/ryft/regression/util/cpc; ~/ryft/regression/util/recycle'  ***"
+	#echo "*** /ryftone filesystem is not mounted.  To correct, try commands: 'cpc; sudo recycle'  ***"
 	problemCounter=$((problemCounter+1))
 	echo -e "${redAttributeON}*${problemCounter}* /ryftone filesystem is not mounted or smoke test failed.${attributesOFF}"
 	echo "Follow corrective actions in following order:"
-	echo "1. command: '(cd ~ryftuser/ryft/regression/util;./cpc;./recycle)'"
+	echo "1. command: '(cpc; sudo recycle)'"
 	echo "   Repeat command if 'ryft_status' doesn't indicate OKAY"
  	echo "   If ryft_status is not OKAY, advance to step #2."
 	echo "   If OKAY, 'ryft_status -smoke' should show no problems."
@@ -1490,7 +1493,7 @@ show_filesystem_error () {
 	echo "   if 'ryft_status -smoke' problems persist, repeat steps 1 and 2 one time."
 	echo "   if 'ryft_status -smoke' problems persist, advance to next step."
 	echo
-	echo "3. do 3 times 'sudo ~/ryft/regression/util/hw_reset_rhfs_ccc.sh; sudo poweroff;'"
+	echo "3. do 3 times 'sudo hw_reset_rhfs_ccc.sh; sudo poweroff;'"
 	echo "   ***NOTE***: this process will require restoring /ryftone filesystem data" 
 	echo "   perform 'ryft_status -smoke' after completing 3 hw_reset, poweroff cycles'"
 	echo "   if 'ryft_status -smoke' problems persist, call customer support"
@@ -1511,7 +1514,7 @@ tlogd_status_reset() {
 show_tlogd_error () {
 	problemCounter=$((problemCounter+1))
 	echo -e "${redAttributeON}*${problemCounter}* tlogd is not running. ${attributesOFF}To start tlogd issue command: "
-	echo "	'~ryftuser/ryft/regression/util/recycle'"
+	echo "	'sudo recycle'"
 }
 
 #
@@ -1520,7 +1523,7 @@ rhfsd_error=0
 show_rhfsd_error () {
 	problemCounter=$((problemCounter+1))
 	echo -e "${redAttributeON}*${problemCounter}* rhfsd is not running. ${attributesOFF}To start rhfsd issue command: "
-	echo "	'~ryftuser/ryft/regression/util/recycle'"
+	echo "	'sudo recycle'"
 }
 
 #
@@ -1529,7 +1532,7 @@ ccc_mgr_error=0
 show_ccc_mgr_error () {
 	problemCounter=$((problemCounter+1))
 	echo -e "${redAttributeON}*${problemCounter}* ccc_mgr is not running. ${attributesOFF}To start ccc_mgr, issue command: "
-	echo "	'~ryftuser/ryft/regression/util/recycle'"
+	echo "	'sudo recycle'"
 }
 
 #
@@ -1752,7 +1755,7 @@ showErrorDisplay() {
 		show_elasticsearch_error
 	fi
 
-    if [ $ryftone == 1 ]
+    if [ $rhfs == 1 ]
     then
     	show_tlogd_error
     	show_rhfsd_error
@@ -1956,7 +1959,7 @@ ryft_statusX() {
 	cat $ryft_status_filename
 	)>>$ryft_status_verbose
 	ryftoneMounted=`cat $ryft_status_filename|grep "/ryftone"|grep "/dev/fuse"|wc -l`
-	if [ $ryftone == 1 -a $ryftoneMounted != 1 ]
+	if [ $rhfs == 1 -a $ryftoneMounted != 1 ]
 	then
 		filesystem_error=1
 		status=$((status+1))
@@ -2084,17 +2087,17 @@ ryft_statusX() {
 	then
 		$smokePath|tee $ryft_status_filename
 		faildetect=`cat $ryft_status_filename|grep FAILED|wc -l`
-        if [ $ryftone == 1 ]
-        then
-    		passdetect=`cat $ryft_status_filename|egrep "1 tests.*PASSED"|wc -l`
-        else
-            passdetect=`cat $ryft_status_filename|egrep "PASSED"|wc -l`
-        fi 
+	        if [ $rhfs == 1 ]
+	        then
+			passdetect=`cat $ryft_status_filename|egrep "PASSED"|wc -l`
+	        else
+			passdetect=`cat $ryft_status_filename|egrep "PASSED"|wc -l`
+	        fi 
 		if [ $faildetect != 0 -o $passdetect = 0 ]
 		then
 			echo "*** smoke.sh failed ***"
-            smoke_error=1
-            filesystem_error=1
+			smoke_error=1
+			filesystem_error=1
 			status=$((status+1))
 		fi
 	fi
@@ -2124,11 +2127,11 @@ ryft_statusX() {
 		then
 			show_filesystem_filecount_error
 		else
-			if [ $ryftone == 1 -a $filesystem_error != 0 ]
+			if [ $rhfs == 1 -a $filesystem_error != 0 ]
 			then
 				show_filesystem_error
 			fi
-            if [ $ryftone == 0 -a $smoke_error != 0 ]
+            if [ $rhfs == 0 -a $smoke_error != 0 ]
             then
                 show_smoke_error
             fi
@@ -2246,7 +2249,7 @@ then
 	#
 	# fix case where /ryftone will not mount due to files present 
 	#
-	if [ $ryftone == 1 -a $filesystem_filecount != 1 -a $filesystem_error != 0 -a $rhfsd_error != 0 ] 
+	if [ $rhfs == 1 -a $filesystem_filecount != 1 -a $filesystem_error != 0 -a $rhfsd_error != 0 ] 
 	then
 		filesystem_filecount_fix
 
