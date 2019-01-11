@@ -25,6 +25,7 @@ fixUIDGID /usr/bin/ryft-server-aggs
 fixUIDGID /usr/bin/ryftrest
 fixUIDGID /usr/bin/ryftutil
 fixUIDGID /usr/bin/ryft-versions
+fixUIDGID /usr/bin/ryftx_wrapper
 
 # configurations
 chown "$target_uid:$target_gid" -f /etc/ryft-server.conf
