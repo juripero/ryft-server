@@ -177,6 +177,21 @@ getLayeredProducts(){
     if [ "${tempWebApiDemoVersion}" != "" ]; then
         webApiDemoVersion="${tempWebApiDemoVersion}"
     fi
+
+    # get ryft-pcap version
+    ryftPcapVersion=`dpkg -l | grep ryft-pcap | \
+                      sed "s/^.*ryft-pcap[[:space:]]*\([0-9.][0-9.]*\).*/\1/"`
+    if [[ "${ryftPcapVersion}" =~ ^[0-9][0-9.]*$ ]]; then
+        :
+    else
+        ryftPcapVersion=`yum list installed | grep ryft-pcap | \
+                      sed "s/^.*ryft-pcap\.[^-0-9.]*\([0-9.][-0-9.]*\).*/\1/"`
+        if [[ "${ryftPcapVersion}" =~ ^[0-9][-0-9.]*$ ]]; then
+            :
+        else
+            ryftPcapVersion="Not Installed"
+        fi
+    fi
 }
 
 
@@ -261,6 +276,7 @@ echo "ryftpcre2:     ${ryftPCRE2Version}"
 echo ""
 echo "ryft-server:   ${serverRev}"
 echo "Ryft ODBC:     ${ODBCVersion}"
+echo "ryft-pcap:     ${ryftPcapVersion}"
 echo "Web API Demo:  ${webApiDemoVersion}"
 echo ""
 echo "Consul:        ${consulVersion}"
