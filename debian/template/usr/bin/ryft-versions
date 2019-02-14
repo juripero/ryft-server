@@ -4,7 +4,7 @@ DEBUG=0
 #
 # Shell script to return Ryft product versions
 #
-scriptVersion="01-11-2019 16:00:00"
+scriptVersion="02-12-2019 12:00:00"
 
 # Set defaults
 PLATFORM="Undetermined"
@@ -177,6 +177,21 @@ getLayeredProducts(){
     if [ "${tempWebApiDemoVersion}" != "" ]; then
         webApiDemoVersion="${tempWebApiDemoVersion}"
     fi
+
+    # get ryft-pcap version
+    ryftPcapVersion=`dpkg -l 2>/dev/null | grep ryft-pcap | \
+                      sed "s/^.*ryft-pcap[[:space:]]*\([0-9.][0-9.]*\).*/\1/"`
+    if [[ "${ryftPcapVersion}" =~ ^[0-9][0-9.]*$ ]]; then
+        :
+    else
+        ryftPcapVersion=`yum list installed 2>/dev/null | grep ryft-pcap | \
+                      sed "s/^.*ryft-pcap\.[^-0-9.]*\([0-9.][-0-9.]*\).*/\1/"`
+        if [[ "${ryftPcapVersion}" =~ ^[0-9][-0-9.]*$ ]]; then
+            :
+        else
+            ryftPcapVersion="Not Installed"
+        fi
+    fi
 }
 
 
@@ -261,6 +276,7 @@ echo "ryftpcre2:     ${ryftPCRE2Version}"
 echo ""
 echo "ryft-server:   ${serverRev}"
 echo "Ryft ODBC:     ${ODBCVersion}"
+echo "ryft-pcap:     ${ryftPcapVersion}"
 echo "Web API Demo:  ${webApiDemoVersion}"
 echo ""
 echo "Consul:        ${consulVersion}"
