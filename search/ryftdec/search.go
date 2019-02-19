@@ -147,11 +147,11 @@ func (engine *Engine) checksForCatalog(wcat PostProcessing, files []string, home
 		}
 	}
 
-	// disabled: to use already expanded file list
-	/* if no catalogs found, use source file list
-	if N_catalogs == 0 {
-		new_files = files // use source files "as is"
-	}*/
+	// disabled: to use already expanded file list - 02132019-Enabling to not use expanded list
+	// if no catalogs found, use source file list
+	if NoCatalogs == 0 {
+		newFiles = files // use source files "as is"
+	}
 
 	return NoCatalogs, newFiles, autoFormat, rootRecord, nil // OK
 }
