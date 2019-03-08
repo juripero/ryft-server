@@ -30,7 +30,7 @@ rpm: debian
 	docker run --rm \
 		-v ${SOURCE}/docker:/opt/work \
 		-v ${SOURCE}/debian:/opt/debian \
-		debtorpm:${BUILD_IMAGE_TAG} /opt/work/build_rpm.sh /opt/debian/*1.2.3*.deb
+		debtorpm:${BUILD_IMAGE_TAG} /opt/work/build_rpm.sh /opt/debian/*.deb
 
 # run /bin/bash in Docker container
 # run as $USER, not as root
