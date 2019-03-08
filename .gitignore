@@ -3,6 +3,7 @@
 /bindata.go
 /cover.out
 *.deb
+*.rpm
 *.orig
 .vscode
 .idea/

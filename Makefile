@@ -63,7 +63,7 @@ debian: build
 	@make -C debian package VERSION=${VERSION} GITHASH=${GITHASH}
 docker_build: docker-build
 docker-build:
-	@make -C docker debian
+	@make -C docker rpm
 
 
 # run coverage test
