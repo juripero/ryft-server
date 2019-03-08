@@ -18,7 +18,7 @@ cd ${scriptDir}
 getRpmRelease() {
 	echo $1 |\
 	egrep -o "\-([0-9]+\.[0-9]+\.[0-9]+.*)_" |\
-	sed 's/^\-//; s/_$//; s/\-/./g'
+	sed 's/^\-//; s/_$//; s/\-/-/g'
 }
 
 #
@@ -44,8 +44,8 @@ then
 
 	export RPMREBUILD_TMPDIR=`mktemp -d`
 	echo
-	echo rpmrebuild  --change-files="sed -i 's|^%dir.*\"/\"||g;s|^%dir.*\"/usr/bin\"||g;s|^Version:.*|Version:14.32|g' $RPMREBUILD_TMPDIR/work/files.1" --define "_rpmfilename ryft-server-${rpmRelease}_x86_64.rpm" -p ${rpmfile} ">${outfile}.2"
-	rpmrebuild  --change-files="sed -i 's|^%dir.*\"/\"||g;s|^%dir.*\"/usr/bin\"||g;' $RPMREBUILD_TMPDIR/work/files.1" --define "_rpmfilename ryft-server-${rpmRelease}_x86_64.rpm" -p ${rpmfile} >${outfile}.2
+	echo rpmrebuild  --change-files="sed -i 's|^%dir.*\"/\"||g;s|^%dir.*\"/usr/bin\"||g;s|^Version:.*|Version:14.32|g' $RPMREBUILD_TMPDIR/work/files.1" --define "_rpmfilename ryft-server-${rpmRelease}.x86_64.rpm" -p ${rpmfile} ">${outfile}.2"
+	rpmrebuild  --change-files="sed -i 's|^%dir.*\"/\"||g;s|^%dir.*\"/usr/bin\"||g;' $RPMREBUILD_TMPDIR/work/files.1" --define "_rpmfilename ryft-server-${rpmRelease}.x86_64.rpm" -p ${rpmfile} >${outfile}.2
 
 
 	if [ $? == 0 ]

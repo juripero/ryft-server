@@ -3,7 +3,7 @@ HINT=ryft-server/debian
 all: package
 
 ifeq (${VERSION},)
-  VERSION=$(shell git describe --tags|tr '-' '.')
+  VERSION=$(shell git describe --tags|tr '-' '-')
 endif
 ifeq (${GITHASH},)
   GITHASH=$(shell git log -1 --format='%H')
