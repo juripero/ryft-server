@@ -15,8 +15,19 @@ cd ${scriptDir}
 #. ./functions
 #setOSVariables
 
+getRpmRelease() {
+	echo $1 |\
+	egrep -o "\-([0-9]+\.[0-9]+\.[0-9]+.*)_" |\
+	sed 's/^\-//; s/_$//; s/\-/./g'
+}
+
 #
 returnCode=1
+
+echo "# build_rpm.sh $@"
+
+rpmRelease=`getRpmRelease $1`	
+echo "# build_rpm rpm release=${rpmRelease}"
 
 outfile=/tmp/build_deb_$$.log
 
@@ -33,9 +44,8 @@ then
 
 	export RPMREBUILD_TMPDIR=`mktemp -d`
 	echo
-	echo rpmrebuild  --change-files="sed -i 's|^%dir.*\"/\"||g;s|^%dir.*\"/usr/bin\"||g' $RPMREBUILD_TMPDIR/work/files.1" -p ${rpmfile} ">${outfile}.2"
-	rpmrebuild  --change-files="sed -i 's|^%dir.*\"/\"||g;s|^%dir.*\"/usr/bin\"||g' $RPMREBUILD_TMPDIR/work/files.1" -p ${rpmfile} >${outfile}.2
- 
+	echo rpmrebuild  --change-files="sed -i 's|^%dir.*\"/\"||g;s|^%dir.*\"/usr/bin\"||g;s|^Version:.*|Version:14.32|g' $RPMREBUILD_TMPDIR/work/files.1" --define "_rpmfilename ryft-server-${rpmRelease}_x86_64.rpm" -p ${rpmfile} ">${outfile}.2"
+	rpmrebuild  --change-files="sed -i 's|^%dir.*\"/\"||g;s|^%dir.*\"/usr/bin\"||g;' $RPMREBUILD_TMPDIR/work/files.1" --define "_rpmfilename ryft-server-${rpmRelease}_x86_64.rpm" -p ${rpmfile} >${outfile}.2
 
 
 	if [ $? == 0 ]
@@ -43,11 +53,16 @@ then
 		echo "rpmrebuild success file=" `cat ${outfile}.2`
 		rpmfile=`awk '{print $2}' ${outfile}.2`
 	
-		echo "cksum ${rpmfile}"
-		cksum ${rpmfile}
+		echo "rpmrebuild --define \"_rpmfilename ryft-server-${rpmRelease}_x86_64.rpm\" -p ${rpmfile} >${outfile}.3"
+		rpmrebuild --define "_rpmfilename ryft-server-${rpmRelease}_x86_64.rpm" -p ${rpmfile} >${outfile}.3
+		echo "rpmrebuild success file=" `cat ${outfile}.2`
+		rpmfile2=`awk '{print $2}' ${outfile}.2`
+	
+		echo "cksum ${rpmfile2}"
+		cksum ${rpmfile2}
 
-		echo "cp ${rpmfile} /opt/debian/"
-		cp ${rpmfile} /opt/debian/
+		echo "cp ${rpmfile2} /opt/debian/"
+		cp ${rpmfile2} /opt/debian/
 
 		echo "rm ${scriptDir}/*.rpm"
 		rm ${scriptDir}/*.rpm
