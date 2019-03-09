@@ -6,7 +6,7 @@ RYFT_INTEGRATION_TEST ?= develop
 all: build caggs version
 
 ifeq (${VERSION},)
-  VERSION=$(shell git describe --tags|tr '-' '-')
+  VERSION=$(shell git describe --tags)
 endif
 ifeq (${GITHASH},)
   GITHASH=$(shell git log -1 --format='%H')

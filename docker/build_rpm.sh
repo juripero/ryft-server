@@ -18,7 +18,7 @@ cd ${scriptDir}
 getRpmRelease() {
 	echo $1 |\
 	egrep -o "\-([0-9]+\.[0-9]+\.[0-9]+.*)_" |\
-	sed 's/^\-//; s/_$//; s/\-/-/g'
+	sed 's/^\-//; s/_$//;'
 }
 
 #
