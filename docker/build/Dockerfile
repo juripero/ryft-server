@@ -1,5 +1,9 @@
 # do not use alpine because it uses incompatible libc!
+
+#build stopped working when jessie stopped LTS update support
 #FROM golang:1.8.5
+
+#BUILD_HOMEDIR workaround addresses golang:1.12.1 issue where non-root user tries to create ~/.cache directory 
 FROM golang:1.12.1
 
 ARG BUILD_HOMEDIR=/var/lib/jenkins
