@@ -2,6 +2,8 @@
 #FROM golang:1.8.5
 FROM golang:1.12.1
 
+ARG BUILD_HOMEDIR=/var/lib/jenkins
+
 RUN apt-get update && apt-get install -y git dpkg
 
 # predefined source path
@@ -13,14 +15,8 @@ WORKDIR ${RYFTPATH}
 RUN go get -u github.com/jteeuwen/go-bindata/...
 RUN go get -u github.com/kardianos/govendor
 
-RUN mkdir /home/ryftuser
-RUN chmod 777 /home/ryftuser
-
-RUN mkdir /home/jenkins
-RUN chmod 777 /home/jenkins
-
-RUN mkdir -p /var/lib/jenkins
-RUN chmod 777 /var/lib/jenkins
+RUN mkdir -p ${BUILD_HOMEDIR}
+RUN chmod 777 ${BUILD_HOMEDIR}
 
 ENTRYPOINT [ ]
 CMD [ "make", "debian" ]

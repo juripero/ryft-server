@@ -2,7 +2,7 @@ HINT = ryft-server/docker
 
 SOURCE ?= $(abspath $(dir ${CURDIR}))
 #BUILD_IMAGE_TAG ?= latest
-BUILD_IMAGE_TAG ?= v1 
+BUILD_IMAGE_TAG ?= $(shell whoami) 
 
 all: debian
 
@@ -45,7 +45,7 @@ cli: image
 # create image to build sources
 image: debtorpm
 	@echo "[${HINT}]: building Docker image..."
-	docker build -q -t=ryft/server/build:${BUILD_IMAGE_TAG} build
+	docker build -q -t=ryft/server/build:${BUILD_IMAGE_TAG} --build-arg BUILD_HOMEDIR=$(shell grep `whoami` /etc/passwd|cut -d':' -f6) build
 
 debtorpm: 
 	@echo "[${HINT}]: building debtorpm Docker image..."
