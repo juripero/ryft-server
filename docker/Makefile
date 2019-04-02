@@ -19,10 +19,8 @@ build: image
 
 # build Debian package
 debian: build
-	@echo "[${HINT}]: building Debian package (as ryftuser)..."
+	@echo "[${HINT}]: building Debian package (as root)..."
 	docker run --rm \
-		--user $(shell id -u ${USER}):$(shell id -g ${USER}) \
-		-v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro \
 		-v ${SOURCE}:/go/src/github.com/getryft/ryft-server \
 		ryft/server/build:${BUILD_IMAGE_TAG} make -C debian all
 

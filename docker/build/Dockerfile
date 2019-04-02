@@ -16,7 +16,5 @@ RUN go get -u github.com/kardianos/govendor
 RUN mkdir /home/ryftuser
 RUN chmod 777 /home/ryftuser
 
-USER ryftuser
-
 ENTRYPOINT [ ]
 CMD [ "make", "debian" ]
