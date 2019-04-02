@@ -2,6 +2,7 @@ HINT = ryft-server
 APP_VERSION ?= latest
 RYFT_DOCKER_BRANCH ?= master
 RYFT_INTEGRATION_TEST ?= develop
+GOCACHE ?= off
 
 all: build caggs version
 
@@ -44,6 +45,8 @@ ${GOPATH}/bin/govendor:
 .PHONY: build install
 build: update_vendor update_bindata
 	@echo "[${HINT}]: building ryft-server..."
+	@whoami
+	@go env GOCACHE
 	@go build -ldflags "-s -w -X main.Version=${VERSION} -X main.GitHash=${GITHASH}" -tags "${GO_TAGS}"
 install: update_vendor update_bindata
 	@echo "[${HINT}]: installing ryft-server..."
