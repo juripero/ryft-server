@@ -14,8 +14,9 @@ RUN go get -u github.com/jteeuwen/go-bindata/...
 RUN go get -u github.com/kardianos/govendor
 
 RUN mkdir /home/ryftuser
-
 RUN chmod 777 /home/ryftuser
+RUN mkdir /home/jenkins
+RUN chmod 777 /home/jenkins
 
 ENTRYPOINT [ ]
 CMD [ "make", "debian" ]
