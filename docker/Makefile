@@ -1,7 +1,8 @@
 HINT = ryft-server/docker
 
 SOURCE ?= $(abspath $(dir ${CURDIR}))
-BUILD_IMAGE_TAG ?= latest
+#BUILD_IMAGE_TAG ?= latest
+BUILD_IMAGE_TAG ?= v1 
 
 all: debian
 
