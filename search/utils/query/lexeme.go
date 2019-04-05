@@ -312,3 +312,12 @@ func (lex Lexeme) IsRegex() bool {
 		strings.EqualFold(lex.literal, "REGEX") ||
 		strings.EqualFold(lex.literal, "REGEXP")
 }
+
+// IsPip checks "PIP" search type.
+func (lex Lexeme) IsPip() bool {
+	if lex.token != IDENT {
+		return false
+	}
+
+	return strings.EqualFold(lex.literal, "PIP")
+}

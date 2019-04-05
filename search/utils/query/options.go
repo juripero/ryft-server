@@ -51,8 +51,8 @@ type Options struct {
 	DecimalPoint   string // Decimal point marker, for example "." (CURRENCY, NUMBER)
 
 	fieldDelimiter string // Field separator for CSV records
-        extraOptionName [5] string // Name of passthru option
-        extraOptionValue [5] string // Value of passthru option
+        extraOptionName [10] string // Name of passthru option
+        extraOptionValue [10] string // Value of passthru option
 
 	FileFilter string // File filter, regular expression (is used for query combination)
 }
@@ -199,7 +199,7 @@ func (o Options) String() string {
 	}
 
         // passthru option
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
         	if len(o.extraOptionValue[i]) != 0 {
 			args = append(args, fmt.Sprintf("%s=%q", o.extraOptionName[i], o.extraOptionValue[i]))
 		}
@@ -347,6 +347,19 @@ func (o *Options) SetMode(mode string) *Options {
 		//o.Width = 0
 		//o.Line = false
 		o.Case = true
+		o.Reduce = false
+		o.Octal = false
+		o.CurrencySymbol = ""
+		o.DigitSeparator = ""
+		o.DecimalPoint = ""
+		//o.FileFilter = ""
+
+	// PIP
+	case "pip":
+		o.Dist = 0
+		//o.Width = 0
+		//o.Line = false
+		o.Case = false
 		o.Reduce = false
 		o.Octal = false
 		o.CurrencySymbol = ""
@@ -613,7 +626,7 @@ func (o *Options) Set(option string, positonalName string) (bool, error) {
 			if v, err := p.parseStringVal(); err != nil {
                                 return named, err
                         } else {
-				for i := 0; i < 5; i++ {
+				for i := 0; i < 10; i++ {
 					if len(o.extraOptionName[i]) == 0 {
 						o.extraOptionName[i] = opt
 						o.extraOptionValue[i] = v
