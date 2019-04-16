@@ -4,7 +4,7 @@ DEBUG=0
 #
 # Shell script to return Ryft product versions
 #
-scriptVersion="02-12-2019 12:00:00"
+scriptVersion="04-16-2019 15:00:00"
 
 # Set defaults
 PLATFORM="Undetermined"
