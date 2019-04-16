@@ -383,6 +383,10 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression, res.Options = p.parseSearchExpr(res.Options)
 			res.Options.SetMode("pcre2")
 
+		case lex.IsPip(): // PIP + options
+			expression, res.Options = p.parsePIPExpr(res.Options)
+			res.Options.SetMode("pip")
+
 		// consume all continous strings and wildcards
 		case lex.token == STRING,
 			lex.token == WCARD:
@@ -460,6 +464,10 @@ func getExprOld(expr string, opts Options) string {
 	// PCRE2 search
 	case "pcre2":
 		return expr // "as is"
+
+	// PIP search
+	case "pip":
+		return expr // "as is"
 	}
 
 	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
@@ -468,16 +476,19 @@ func getExprOld(expr string, opts Options) string {
 
 // get search expression in new (generic) format.
 func getExprNew(expr string, opts Options) string {
-	args := []string{expr}
+	var args []string
+	if opts.Mode != "pip" {
+	    args = append(args, expr)
+	}
 
 	// Add in file type options and new options
 	if len(opts.fieldDelimiter) > 0 {
 		args = append(args, fmt.Sprintf(`FIELD_DELIMITER="%s"`, opts.fieldDelimiter))
 	}
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		if len(opts.extraOptionName[i]) > 0 {
-				args = append(args, fmt.Sprintf(`%s="%s"`, opts.extraOptionName[i], opts.extraOptionValue[i]))
+			args = append(args, fmt.Sprintf(`%s="%s"`, opts.extraOptionName[i], opts.extraOptionValue[i]))
 		}
 	}
 
@@ -618,6 +629,12 @@ func getExprNew(expr string, opts Options) string {
 		}
 
 		return fmt.Sprintf("PCRE2(%s)", strings.Join(args, ", "))
+
+	// PIP
+	case "pip":
+		// PIP uses all passed parameters and no globals
+		
+		return fmt.Sprintf("PIP(%s)", strings.Join(args, ", "))
 	}
 
 	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
@@ -712,6 +729,33 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	default:
 		p.unscan(lex)
 	}
+
+	// right paren last
+	switch end := p.scanIgnoreSpace(); end.token {
+	case RPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of )", end))
+	}
+
+	return res, opts
+}
+
+// parse generic search expression in parentheses and options (PIP)
+func (p *Parser) parsePIPExpr(opts Options) (string, Options) {
+	var res string
+
+	// left paren first
+	switch beg := p.scanIgnoreSpace(); beg.token {
+	case LPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of (", beg))
+	}
+
+	res = ""
+
+	opts = p.parseSearchOptions(opts)
 
 	// right paren last
 	switch end := p.scanIgnoreSpace(); end.token {
