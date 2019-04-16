@@ -3,7 +3,7 @@
   "info": {
     "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "RyftOne REST API",
-    "version": "1.2.4"
+    "version": "1.2.5"
   },
   "paths": {
     "/search": {
@@ -766,8 +766,8 @@
       "in": "query",
       "name": "mode",
       "type": "string",
-      "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search",
-      "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2" ]
+      "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search\n- `pip` = Point-in-Polygon search",
+      "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2", "pip" ]
     },
     "Surrounding": {
       "in": "query",
@@ -1306,8 +1306,8 @@
         },
         "mode": {
           "type": "string",
-          "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search",
-          "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2" ]
+          "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search\n- `pip` = Point-in-Polygon search",
+          "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2", "pip" ]
         },
         "surrounding": {
           "type": "string",
@@ -1438,8 +1438,8 @@
         },
         "mode": {
           "type": "string",
-          "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search",
-          "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2" ]
+          "description": "Search mode. Could be one of:\n- `es` - exact search\n- `fhs` - fuzzy hamming search\n- `feds` - fuzzy edit distance search\n- `ds` - date search\n- `ts` - time search\n- `ns` - numeric search\n- `cs` - currency search\n- `ipv4` - IPv4 search\n- `ipv6` - IPv6 search\n- `pcre2` - RegExp search\n- `pip` = Point-in-Polygon search",
+          "enum": [ "es", "fhs", "feds", "ds", "ts", "ns", "cs", "ipv4", "ipv6", "pcre2", "pip" ]
         },
         "surrounding": {
           "type": "string",
