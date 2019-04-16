@@ -159,19 +159,14 @@ getLayeredProducts(){
         ODBCVersion=`/usr/local/ryft/bin/x8664/ryft1_odbcctl -v`
     fi
 
-    # Get web demo version. ls format:
-    #     lrwxrwxrwx  1 root     root       27 Apr 26 04:52 ryft-demo -> /opt/web-ui/ryft-demo-0.4.3
+    # Get web API version. Looking for base nginx install.  May fail for apache install.
+    # lrwxrwxrwx  1 root     root       29 Apr 16 14:00 html -> /var/www/blacklynxWebUI-1.0.2
 
-    test -e /opt/ryft-demo
+    test -d /var/www
     if [ $? == 0 ]
     then
-        test -L /opt/ryft-demo
-        if [ $? == 0 ]
-        then
-            tempWebApiDemoVersion=`ls -al /opt/ryft-demo 2>/dev/null | sed -e 's#.*->.*ryft-demo-\([0-9.]*\).*#\1#'`
-        else
-            tempWebApiDemoVersion=`dpkg -l|grep ryft-webui|awk '{print $3}'`
-        fi
+	    tempWebApiDemoVersion=`ls -al /var/www | grep -e "html.*blacklynxWebUI" | \
+		                       sed -e "s/.*blacklynxWebUI-\([0-9.]*\).*/\1/"`
     fi
 
     if [ "${tempWebApiDemoVersion}" != "" ]; then
