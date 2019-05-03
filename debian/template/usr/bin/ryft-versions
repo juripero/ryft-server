@@ -4,7 +4,7 @@ DEBUG=0
 #
 # Shell script to return Ryft product versions
 #
-scriptVersion="04-16-2019 15:00:00"
+scriptVersion="04-23-2019 09:30:00"
 
 # Set defaults
 PLATFORM="Undetermined"
@@ -150,7 +150,11 @@ getLayeredProducts(){
     serverRev=`curl -s http://localhost:8765/version 2>/dev/null | \
                sed -e "s/.*\(\"version\":\"\)\([^\"]*\).*/\2/"`
     if [ "${serverRev}" == "" ]; then
-       serverRev="${tempServerRev}"
+       if [ "${tempServerRev}" != "" ]; then
+           serverRev="${tempServerRev}"
+       else
+           serverRev="Not Installed"
+       fi
     fi
 
     # Get ODBC version
