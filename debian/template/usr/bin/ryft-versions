@@ -4,7 +4,7 @@ DEBUG=0
 #
 # Shell script to return Ryft product versions
 #
-scriptVersion="04-23-2019 09:30:00"
+scriptVersion="05-08-2019 16:00:00"
 
 # Set defaults
 PLATFORM="Undetermined"
@@ -61,6 +61,9 @@ determinePlatform(){
         verbose "Device is a RyftONE"
     else
         UUID_NO=`sudo cat /sys/devices/virtual/dmi/id/product_uuid`
+		if [ "${DEBUG}" != 0 ]; then
+            echo -e "UUID_NO: $UUID_NO"
+        fi
         if [[ "${UUID_NO}" =~ ^EC2.* ]]; then
             verbose "Device is AWS Instance"
             AWSInstance="true"
@@ -75,11 +78,20 @@ determinePlatform(){
             fi
         else
             PLATFORM=`xbsak list 2>&1`
+		    if [ "${DEBUG}" != 0 ]; then
+                echo -e "xbsak: $PLATFORM"
+            fi
             if [ "$?" -ne 0 ]; then
                 verbose "Unknown platform"
                 PLATFORM="Unknown"
             else
-                PLATFORM=`echo "$PLATFORM" | grep -v "^INFO" | cut -d' ' -f2`
+                WHICH=`echo "${PLATFORM}"A | grep -c "xbutil"`
+                if [ "$WHICH" -gt 0 ]; then
+                    PLATFORM=`xbutil list 2>&1`
+                    PLATFORM=`echo "$PLATFORM" | grep -v "^INFO" | cut -d' ' -f3`
+                else
+                    PLATFORM=`echo "$PLATFORM" | grep -v "^INFO" | cut -d' ' -f2`
+                fi
                 serialNo="Unknown"
             fi
         fi
