@@ -52,6 +52,8 @@ type Config struct {
 	Nodes  uint     // number of hardware nodes to use (0..4)
 	Limit  int64    // limit the number of records (-1 - no limit)
 	Offset int64    // first record index (/show feature)
+	JobID  string   // Job ID to link blgeo work
+	JobType string	// type of post processing (blgeo for now)
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
@@ -59,8 +61,12 @@ type Config struct {
 	KeepDataAs  string
 	KeepIndexAs string
 	KeepViewAs  string
+	KeepJobDataAs  string
+	KeepJobIndexAs  string
+	KeepJobOutputAs  string
 	Delimiter   string
 	Lifetime    time.Duration
+	Fields		string
 
 	// post-processing transformations
 	Transforms []Transform
@@ -100,6 +106,10 @@ type Config struct {
 		Format map[string]interface{} // format specific options (column names for CSV, etc)
 		Aggs   map[string]interface{} // aggregation specific options
 	}
+
+	// passed in parameters for post search executable
+
+	PostExecParams	map[string]interface{}
 
 	// report performance metrics
 	Performance bool
@@ -196,6 +206,21 @@ func (cfg Config) String() string {
 		props = append(props, fmt.Sprintf("limit:%d", cfg.Limit))
 	}
 
+	// JobID
+	if len(cfg.JobID) != 0 {
+		props = append(props, fmt.Sprintf("JobID:%q", cfg.JobID))
+	}
+
+	// JobType
+	if len(cfg.JobType) != 0 {
+		props = append(props, fmt.Sprintf("JobType:%q", cfg.JobType))
+	}
+
+	// PostExecParams
+	if len(cfg.PostExecParams) != 0 {
+		props = append(props, fmt.Sprintf("PostExecParams:%q", cfg.PostExecParams))
+	}
+
 	// data
 	if len(cfg.KeepDataAs) != 0 {
 		props = append(props, fmt.Sprintf("data:%q", cfg.KeepDataAs))
@@ -209,6 +234,21 @@ func (cfg Config) String() string {
 	// view
 	if len(cfg.KeepViewAs) != 0 {
 		props = append(props, fmt.Sprintf("view:%q", cfg.KeepViewAs))
+	}
+
+	// Post processing data
+	if len(cfg.KeepJobDataAs) != 0 {
+		props = append(props, fmt.Sprintf("jobData:%q", cfg.KeepJobDataAs))
+	}
+
+	// Post processing index
+	if len(cfg.KeepJobIndexAs) != 0 {
+		props = append(props, fmt.Sprintf("jobIndex:%q", cfg.KeepJobIndexAs))
+	}
+
+	// Post processing output
+	if len(cfg.KeepJobOutputAs) != 0 {
+		props = append(props, fmt.Sprintf("jobOutput:%q", cfg.KeepJobOutputAs))
 	}
 
 	// delimiter
@@ -279,6 +319,16 @@ func (cfg *Config) CheckRelativeToHome(home string) error {
 	if len(cfg.KeepDataAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepDataAs)) {
 		return fmt.Errorf("data %q is not relative to home", cfg.KeepDataAs)
 	}
+
+	// output blgeo DATA file
+//	if len(cfg.KeepBlgeoDataAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepBlgeoDataAs)) {
+//		return fmt.Errorf("blgeo data %q is not relative to home", cfg.KeepBlgeoDataAs)
+//	}
+
+	// output blgeo INDEX file
+//	if len(cfg.KeepBlgeoIndexAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepBlgeoIndexAs)) {
+//		return fmt.Errorf("blgeo index %q is not relative to home", cfg.KeepBlgeoIndexAs)
+//	}
 
 	// output VIEW file
 	if len(cfg.KeepViewAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepViewAs)) {

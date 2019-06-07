@@ -85,6 +85,11 @@ REST specific:
 --drate          Reformat output to add Data Rate
 --details        Reformat output to add Data Rate and details on intermediate results
 
+# Post search jobs
+--jobid=<jobid>  Specifies a tag used to sequence BlackLynx geo operations.
+                 Used to tag composite data and index files for further processing.
+--job-type=<job type>  Post processing job (ex. blgeo)
+
 
 Examples:
 
@@ -153,6 +158,8 @@ SPARK=
 PERFORMANCE=
 ACCEPT=json
 BODY=
+JOBID=
+JOBTYPE=
 
 # be silent by default
 
@@ -363,6 +370,22 @@ while [[ $# > 0 ]]; do
         FIELDS="$2"
         shift 2
         ;;
+    --jobid=*)
+        JOBID="${1#*=}"
+        shift
+        ;;
+    --jobid)
+        JOBID="$2"
+        shift 2
+        ;;
+    --job-type=*)
+        JOBTYPE="${1#*=}"
+        shift
+        ;;
+    --job-type)
+        JOBTYPE="$2"
+        shift 2
+        ;;
     --transform=*)
         TRANSFORMS=("${TRANSFORMS[@]}" "${1#*=}")
         shift
@@ -502,6 +525,8 @@ for opt in "${BACKEND_OPTS[@]}"; do
 done
 [[ ! -z "$FORMAT" ]] && URL_QUERY=("${URL_QUERY[@]}" format=$(urlencode "$FORMAT"))
 [[ ! -z "$FIELDS" ]] && URL_QUERY=("${URL_QUERY[@]}" fields=$(urlencode "$FIELDS"))
+[[ ! -z "$JOBID" ]] && URL_QUERY=("${URL_QUERY[@]}" jobid=$(urlencode "$JOBID"))
+[[ ! -z "$JOBTYPE" ]] && URL_QUERY=("${URL_QUERY[@]}" jobtype=$(urlencode "$JOBTYPE"))
 for tx in "${TRANSFORMS[@]}"; do
     [[ ! -z "$tx" ]] && URL_QUERY=("${URL_QUERY[@]}" transform=$(urlencode "$tx"))
 done

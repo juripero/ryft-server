@@ -38,6 +38,7 @@
           { "$ref": "#/parameters/SearchStat" },
           { "$ref": "#/parameters/Performance" },
           { "$ref": "#/parameters/SearchLimit" },
+          { "$ref": "#/parameters/JobID" },
           { "$ref": "#/parameters/Transform" }
         ],
         "responses": {

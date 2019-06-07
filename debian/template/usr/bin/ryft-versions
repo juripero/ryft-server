@@ -2,9 +2,9 @@
 
 DEBUG=0
 #
-# Shell script to return Ryft product versions
+# Shell script to return BlackLynx product versions
 #
-scriptVersion="05-08-2019 16:00:00"
+scriptVersion="06-07-2019 14:00:00"
 
 # Set defaults
 PLATFORM="Undetermined"
@@ -22,6 +22,40 @@ ryftxVersion="Not Installed"
 ryftPCAPVersion="Not Installed"
 ryftPCRE2Version="Not Installed"
 ryftBlgeoVersion="Not Installed"
+DO_ELASTIC="False"
+
+# print usage info
+usage() {
+    cat <<EOF
+
+    Usage: $0 [options]
+    version: ${scriptVersion}
+
+    Options:
+    -e|--elastic       Add ElasticSearch versions
+    -h|--help          Prints this short help message.
+
+EOF
+}
+
+# parse options
+while [[ $# > 0 ]]; do
+    case "$1" in
+	-e|--elastic)
+	 	DO_ELASTIC="True"
+		shift
+		;;
+	-h|--help)
+		usage
+		shift
+		exit 0
+		;;
+	*)
+		echo -e "*** Unknown option ${1} ***"
+		exit 1
+		;;
+	esac	
+done	
 
 verbose(){
     if [ "${DEBUG}" -gt 0 ]; then
@@ -307,12 +341,14 @@ if [ ${#cp2} -gt 0 ]; then
     echo "               ${cp2}"
 fi
 echo "Consul Alerts: ${consulAlertsVersion}"
-echo "Elastic:       ${elasticV}"
-if [ ${#ev1} -gt 0 ]; then
-    echo "               ${ev1}"
-fi
-if [ ${#ev2} -gt 0 ]; then
-    echo "               ${ev2}"
+if [ "${DO_ELASTIC}" == "True" ]; then
+	echo "Elastic:       ${elasticV}"
+	if [ ${#ev1} -gt 0 ]; then
+    	echo "               ${ev1}"
+	fi
+	if [ ${#ev2} -gt 0 ]; then
+    	echo "               ${ev2}"
+	fi
 fi
 echo ""
 

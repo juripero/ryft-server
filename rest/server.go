@@ -168,6 +168,13 @@ type ServerConfig struct {
 	} `yaml:"docker,omitempty"`
 
 	DefaultUserConfig map[string]interface{} `yaml:"default-user-config"`
+
+	// final processor to be run after queries
+	FinalProcessor map[string]struct {
+		Exec			string		`yaml:"exec"`
+		FileLifetime 	string		`yaml:"file-lifetime"`
+		ConfigFile		string		`yaml:"config-file-path"`
+	} `yaml:"final-processing-executables,omitempty"`
 }
 
 // Server instance
