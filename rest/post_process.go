@@ -36,9 +36,8 @@ import (
 	"os/exec"
 	"io"
 	"io/ioutil"
-//	"encoding/csv"
+	"regexp"
 	"fmt"
-//	"path/filepath"
 	"strings"
 	"strconv"
 	"time"
@@ -48,6 +47,37 @@ import (
 	"github.com/getryft/ryft-server/search"
 
 )
+func getLatestFile(dir string, prefix string, ext string) (string, bool) {
+	var found = false
+	var FName string
+
+	FName = ""
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		log.Infof("Unable to read %s", dir)
+		return FName, found
+	}
+	var modTime time.Time
+	s := "^" + prefix + ".*\\." + ext + "$"
+	var regex = regexp.MustCompile(s)
+	log.Debugf("[POST EXEC] File regex: %s", regex.String())
+	for _, fi := range files {
+	    if fi.Mode().IsRegular() {
+			if regex.MatchString(fi.Name()) {
+				if !fi.ModTime().Before(modTime) {
+					if fi.ModTime().After(modTime) {
+						modTime = fi.ModTime()
+						FName = dir + "/" + fi.Name()
+						log.Debugf("[POST EXEC] file %s is newer", fi.Name())
+						found = true
+					}
+				}	
+			}
+		}
+	}
+	return FName, found
+
+}
 
 // mark output post processing files to delete later
 //   Note: Each program may have different timeout
@@ -76,6 +106,10 @@ func (server *Server) cleanupPostSession(homeDir string, cfg *search.Config) {
 		server.addJob("delete-file", cfg.KeepJobIndexAs,
 			now.Add(addTime))
 	}
+	if len(cfg.KeepJobOutputAs) != 0 {
+		server.addJob("delete-file", cfg.KeepJobOutputAs,
+			now.Add(addTime))
+	}
 }
 
 func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
@@ -85,43 +119,73 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 	var	ConfigFile	string
 	log.Debugf("[POST EXEC] enter - type: %s", cfg.JobType)
 
-	if val, ok := cfg.PostExecParams["--kml-append"]; ok {
-		log.Debugf("[POST EXEC] Replacing --kml-append %s with kml file", val)
-		cfg.PostExecParams["--kml-append"] = fmt.Sprintf("/ryftone/jobs/blgeo_out_%s.kml", cfg.JobID)
-	}	
+	// Get ryft-server.conf parameters for target post processing job
 	if info, ok := server.Config.FinalProcessor[cfg.JobType]; ok {
 		// get information from ryft-server.conf and command parameters
 		Executable = info.Exec
 		ConfigFile = info.ConfigFile
 		for k, v := range cfg.PostExecParams {
 			myArgs = append(myArgs, k)
-			switch v.(type) {
-			case string:
-				if v != "" {
-					if ok := strings.Contains(v.(string), " "); ok {
-						s := fmt.Sprintf("\"%s\"", v.(string))
-						myArgs = append(myArgs, s)
-					} else {
-						myArgs = append(myArgs, v.(string))
-					}	
-				}
-				break
-			default:
+			if v.(string) != "" {
 				myArgs = append(myArgs, v.(string))
-			}
+			}	
 		}	
 	} else {
 		return resultInfo, errors.New("PostCommand type not found")
 	}
-	// Build command struct by needs of each program
+	// Build command struct for needs of each program
 	switch cfg.JobType {
 	case "blgeo":
-		// add combined index file and config files
-//		log.Debugf("[POST EXEC] Server Config file: %s", ConfigFile)
-		if _, err := os.Stat(ConfigFile); err == nil {
-			myArgs = append(myArgs, "--cfg")
-			myArgs = append(myArgs, ConfigFile)
+		// blegeo specific preprocessing to setup args for blgeo call
+		// if append, get previous kml output for appending
+		if val, ok := cfg.PostExecParams["--kml-append"]; ok {
+			log.Debugf("[POST EXEC] Replacing --kml-append %s with kml file", val)
+			for i, val := range myArgs {
+				if val == "--kml-append" && myArgs[i+1] == "create" {
+					myArgs[i+1] = "/ryftone/jobs/blgeo_out_" + cfg.JobID + ".kml"
+					break
+				}	
+			}	
+		}
+
+		// Add --pip if not on commandline (needed for KML boundaries)
+		if _, ok := cfg.PostExecParams["--pip"]; !ok {
+			re := regexp.MustCompile(`(?i) (?P<inOut>contains|not_contains)\s*pip\(vertex_file=["\\]+.*?polygons\/(?P<vFile>[^"\\]+)[^\)]*\)+\s*(?P<joiner>and|or)?`)
+			log.Debugf("[POST EXEC] regex: %s", re.String())
+			match := re.FindAllStringSubmatch(cfg.Query, -1)
+			myTerms	:= ""
+			storedConnector := ""
+			for i, vals := range match {
+				log.Debugf("[POST EXEC] %d: %q", i, vals)
+				if i < len(match) {
+					s := ""
+					if strings.EqualFold(vals[1], "CONTAINS") {
+						s = fmt.Sprintf("(in %s)", vals[2])
+					} else {
+						s = fmt.Sprintf("(out %s)", vals[2])
+					}	
+					if len(storedConnector) > 0 {
+						myTerms = myTerms + " and "
+					}
+					storedConnector = vals[3]
+					myTerms = myTerms + s
+				}
+				log.Debugf("[POST EXEC] Build string: %s", myTerms)
+			}	
+			log.Debugf("[POST EXEC] Checking to add --pip parameter %s", myTerms)
+			myArgs = append(myArgs, "--pip")
+			myArgs = append(myArgs, myTerms)
+		} 
+		
+		// add default config file if not specified on command line
+		log.Debugf("[POST EXEC] Server Config file: %s", ConfigFile)
+		if _, ok := cfg.PostExecParams["--cfg"]; !ok {
+			if _, err := os.Stat(ConfigFile); err == nil {
+				myArgs = append(myArgs, "--cfg")
+				myArgs = append(myArgs, ConfigFile)
+			}	
 		}	
+		// add index file for blgeo
 		myArgs = append(myArgs, "--oi-for-fusion")
 		myArgs = append(myArgs, cfg.KeepJobIndexAs)
 		// add data file (not needed, but blgeo won't run without)
@@ -148,11 +212,11 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 		resultInfo = append(resultInfo, "Error on command set stdout")
 		return resultInfo, err
 	}
-	log.Debugf("[POST EXEC] starting execution")
 	if err := cmd.Start(); err != nil {
 		resultInfo = append(resultInfo, "Error on command execution")
 		return resultInfo, err
 	}
+	log.Debugf("[POST EXEC] started execution - pid: %d", cmd.Process.Pid)
 	// read the stderr and stdout buffers
 	stderrBuf, _ := ioutil.ReadAll(CmdErr)
 	sError := fmt.Sprintf("%s", stderrBuf)
@@ -168,31 +232,32 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 
 	switch cfg.JobType {
 	case "blgeo":
-		oldFile := "/tmp/blgeo_out.kml"
-		newFile := fmt.Sprintf("/ryftone/jobs/blgeo_out_%s.kml", cfg.JobID)
-		tmpFile, err := os.Open(oldFile)
-		if err != nil {
-			s := fmt.Sprintf("Unable to open kml file: %s", err.Error())
-			resultInfo = append(resultInfo, s)
-			return resultInfo, err
-		}
-		jobFile, err := os.Create(newFile)
-		if err != nil {
-			s := fmt.Sprintf("Unable to open new kml file: %s", err.Error())
-			resultInfo = append(resultInfo, s)
-			return resultInfo, err
-		}
-		defer jobFile.Close()
-		_, err = io.Copy(jobFile, tmpFile)
-		tmpFile.Close()
-		if err != nil {
-			s := fmt.Sprintf("Unable to rename output file: %s", err.Error())
-			resultInfo = append(resultInfo, s)
-			return resultInfo, err
-		}
+		if oldFile, ok := getLatestFile("/tmp", "blgeo_out", "kml"); ok {
+			newFile := fmt.Sprintf("/ryftone/jobs/blgeo_out_%s.kml", cfg.JobID)
+			tmpFile, err := os.Open(oldFile)
+			if err != nil {
+				s := fmt.Sprintf("Unable to open kml file: %s", err.Error())
+				resultInfo = append(resultInfo, s)
+				return resultInfo, err
+			}
+			jobFile, err := os.Create(newFile)
+			if err != nil {
+				s := fmt.Sprintf("Unable to open new kml file: %s", err.Error())
+				resultInfo = append(resultInfo, s)
+				return resultInfo, err
+			}
+			defer jobFile.Close()
+			_, err = io.Copy(jobFile, tmpFile)
+			tmpFile.Close()
+			if err != nil {
+				s := fmt.Sprintf("Unable to rename output file: %s", err.Error())
+				resultInfo = append(resultInfo, s)
+				return resultInfo, err
+			}
 
-		cfg.KeepJobOutputAs = newFile
-		log.Debugf("[POST EXEC] Renamed %s to %s", oldFile, newFile)
+			cfg.KeepJobOutputAs = newFile
+			log.Debugf("[POST EXEC] Renamed %s to %s", oldFile, newFile)
+		}	
 		break
 	default:
 		log.Debugf("[POST EXEC] Job post processing using default operations")
