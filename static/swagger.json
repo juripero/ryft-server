@@ -1,8 +1,8 @@
 {
   "swagger": "2.0",
   "info": {
-    "description": "This is a REST API for the RyftOne Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
-    "title": "RyftOne REST API",
+    "description": "This is a REST API for the BlackLynx Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
+    "title": "BlackLynx REST API",
     "version": "1.3.0"
   },
   "paths": {
@@ -745,7 +745,7 @@
       "in": "query",
       "name": "query",
       "type": "string",
-      "description": "What to search. Could be simple pain text like `hello` or Ryft search query like `(RECORD.body CONTAINS \"night\")`.",
+      "description": "What to search. Could be simple pain text like `hello` or BlackLynx search query like `(RECORD.body CONTAINS \"night\")`.",
       "required": true
     },
     "SearchFile": {
@@ -753,7 +753,7 @@
       "name": "file",
       "type": "array",
       "items": { "type": "string" },
-      "description": "Set of files or catalogs to search. The path should be designated relative to `/ryftone`. Wildcards are supported, for example: `*.txt`",
+      "description": "Set of files or catalogs to search. The path should be designated relative to `<ryftone-mount>' as defined in /etc/ryft-server.conf. Wildcards are supported, for example: `*.txt`",
       "collectionFormat": "multi",
       "required": true
     },
@@ -1294,12 +1294,12 @@
       "properties": {
         "query": {
           "type": "string",
-          "description": "What to search. Could be simple pain text like `hello` or Ryft search query like `(RECORD.body CONTAINS \"night\")`."
+          "description": "What to search. Could be simple pain text like `hello` or BlackLynx search query like `(RECORD.body CONTAINS \"night\")`."
         },
         "files": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Set of files or catalogs to search. The path should be designated relative to `/ryftone`. Wildcards are supported, for example: `*.txt`"
+          "description": "Set of files or catalogs to search. The path should be designated relative to `<ryftone-mount>` as defined in /etc/ryft-server.conf. Wildcards are supported, for example: `*.txt`"
         },
         "ignore-missing-files": {
           "type": "boolean",
@@ -1426,12 +1426,12 @@
       "properties": {
         "query": {
           "type": "string",
-          "description": "What to search. Could be simple pain text like `hello` or Ryft search query like `(RECORD.body CONTAINS \"night\")`."
+          "description": "What to search. Could be simple pain text like `hello` or BlackLynx search query like `(RECORD.body CONTAINS \"night\")`."
          },
         "files": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Set of files or catalogs to search. The path should be designated relative to `/ryftone`. Wildcards are supported, for example: `*.txt`"
+          "description": "Set of files or catalogs to search. The path should be designated relative to `<ryftone-mount>` as defined in /etc/ryft-server.conf. Wildcards are supported, for example: `*.txt`"
         },
         "ignore-missing-files": {
           "type": "boolean",
@@ -1590,7 +1590,7 @@
           "items": { "type": "string" }
         },
         "home": {
-          "description": "User's home directory inside `/ryftone` partition.",
+          "description": "User's home directory inside `<ryftone-mount>` partition as defined in /etc/ryft-server.conf.",
           "type": "string"
         },
         "cluster-tag": {
