@@ -86,7 +86,7 @@ type SearchParams struct {
 	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 
-	// tweaks
+	// tweaks (includes post processing executable parameters)
 	Tweaks struct {
 		Format  map[string]interface{} `json:"format,omitempty" msgpack:"format,omitempty"`
 		Cluster []interface{}          `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
@@ -101,7 +101,6 @@ type SearchParams struct {
 	// job information for post-processing cmds
 	JobID  		string 			`form:"jobid" json:"jobid,omitempty" msgpack:"jobid,omitempty"`
 	JobType 	string 			`form:"jobtype" json:"jobtype,omitempty" msgpack:"jobtype,omitempty"`
-//	PostExecParams	map[string]interface{} `json:"jobparm,omitempty" msgpack:"jobparm,omitempty"`
 
 	Stats  bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
 	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
@@ -165,7 +164,6 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	// CSV, XML and JSON support additional fields filtration
 	tcode_opts := getFormatOptions(params.Tweaks.Format, params.Fields)
 	tcode, err := format.New(params.Format, tcode_opts)
-	defer log.WithField("opts",tcode_opts).Debugf("MNB[%s]: RECORD", CORE)
 	if err != nil {
 		panic(NewError(http.StatusBadRequest, err.Error()).
 			WithDetails("failed to get transcoder"))
@@ -306,7 +304,6 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	defer server.onSearchStopped(cfg)
 
 	// drain all results
-	defer log.WithField("data", res).Debugf("MNB2[%s]: /search results", CORE)
 	transferStartTime := time.Now() // performance metric
 	server.drain(ctx, enc, tcode, cfg, res, errorPrefix)
 	transferStopTime := time.Now() // performance metric
@@ -324,14 +321,17 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 			results, err := server.runPostCommand(cfg)
 			if err != nil {
 				log.Debugf("[POST EXEC] runPostCommand failure returns: %v\n Skip results", results)
+				res.Stat.Extra["JobStatus"] = "Failed"
 			} else {
-
+				res.Stat.Extra["JobStatus"] = "Passed"
 				log.Debugf("[POST EXEC] runPostCommand success returns: %+v", results)
 				// Now add generated data to return message
 				if cfg.KeepJobOutputAs != "" {
 					res.Stat.Extra["JobResults"] = cfg.KeepJobOutputAs
 				}	
 			}	
+			// Cleanup post-processing job with different timeouts.
+			server.cleanupPostSession(homeDir, cfg)
 		}
 	}	
 
@@ -421,7 +421,6 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 		}
 		now := time.Now()
 		ofileName = fmt.Sprintf("%s/outData-%s-%d.csv", path, cfg.JobID, now.Unix())
-//		log.Debugf("[%s/MNB1]: combined data file: %s", CORE, ofileName)
 		ifile := fmt.Sprintf("%s/outIndex-%s-%d.txt", path, cfg.JobID, now.Unix())
 		FieldNames = strings.Split(cfg.Fields,",")
 		dataF, err = os.OpenFile(ofileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0664)
@@ -442,22 +441,18 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 		}
 		cfg.KeepJobDataAs = ofileName
 		cfg.KeepJobIndexAs = ifile
-//		log.Debugf("[%s/MNB2]: combined data file: %s", CORE, ofileName)
 	}
 	putRec := func(rec *search.Record) {
 		xrec := tcode.FromRecord(rec)
-		log.Debugf("[%s/MNBX]: encoded struct: %v", CORE, xrec)
 		if xrec != nil {
 			err := enc.EncodeRecord(xrec)
 			if err != nil {
 				panic(err)
 			}
 			// ctx.Writer.Flush() // TODO: check performance!!!
-			log.Debugf("[%s/MNBX]: encoded struct: %#v", CORE, xrec)
 		}
 		if len(cfg.JobID) > 0 {
-			s := makeCsvLine(xrec, FieldNames)
-			log.Debugf("[%s/MNB]: csv returned: %s", CORE, s)
+			s := makeCsvLine(xrec, FieldNames, cfg.DataFormat)
 			s = s + "\n"
 			l, err := dataF.WriteString(s)
 			if err != nil {
@@ -473,9 +468,7 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 		    log.WithField("CSV", s).Debugf("MNB[%s]: look", CORE)
 		    log.WithField("INDEX", f).Debugf("MNB[%s]: look", CORE)
 		}
-//		log.WithField("write len",l).Infof("MNB[%s]: DRAIN", CORE)
 		
-//		defer log.WithField("xcsv", reflect.TypeOf(xrec)).Debugf("MNB2[%s]: RECORD", CORE)
 	}
 	if len(cfg.JobID) > 0 {
 		defer dataF.Close()
@@ -738,57 +731,5 @@ func (server *Server) cleanupSession(homeDir string, cfg *search.Config) {
 			filepath.Join(mountPoint, homeDir, cfg.KeepViewAs),
 			now.Add(cfg.Lifetime))
 	}
-	// Cleanup post-processing job with different timeouts.
-	server.cleanupPostSession(homeDir, cfg)
 }
 
-
-//func makeCsvLine(data interface{}, FieldNames []string) string {
-//	
-//	outStr := make([]string, len(FieldNames), len(FieldNames))
-//
-//	v := reflect.ValueOf(data)
-//	if v.Kind() == reflect.Ptr {
-//		v = reflect.Indirect(v)
-//		log.Debugf("[%s/MNB]: In Mapkeys - handle indirect", CORE) 
-//	}
-//	vType := reflect.TypeOf(v)
-//	log.Debugf("[%s/MNB]: In MapKeys: name: %v, kind: %s, fields: %d", CORE, vType.Name(), vType.Kind(), vType.NumField())
-//	for i := 0; i < vType.NumField(); i++ {
-//		log.Debugf("[%s/MNB]: In MapKeys - Field: %d, name: %s, type: %s, kind: %s", CORE, i+1, vType.Field(i).Name, vType.Field(i).Type.Name(), vType.Field(i).Type.Kind())
-//	}
-//	switch v.Kind() {
-//	case reflect.Map:	//format is csv
-//		log.Debugf("[%s/MNB]: In Mapkeys - Map", CORE) 
-//		if vType.Field(0).Type.Kind() == reflect.Ptr {
-//			v = reflect.Indirect(vType.Field(0).Type.Kind())
-//		}
-//		for _, key := range v.MapKeys() {
-//			log.Debugf("[%s/MNB]: In MapKeys: %s", CORE, key.String())
-//			for i, item := range FieldNames {
-//				if item == key.String() {
-//					f := fmt.Sprintf("%s", v.MapIndex(key))
-//					if strings.Index(f, ",") > -1 {
-//						f = strconv.Quote(f)
-//					}
-//					outStr[i] = f
-////					log.Debugf("[%s/MNB]: appended: %s(%d)", CORE, f, i)
-//				}
-//			}	
-////			xStr := fmt.Sprintf("%s:%s\n", key.String(), v.MapIndex(key))
-////			csvStr = csvStr + xStr
-//		}
-//	case reflect.Struct:
-//		log.Debugf("[%s/MNB]: In Mapkeys - Struct kind: %v", CORE, reflect.TypeOf(v)) 
-//		for i := 0; i < vType.NumField(); i++ {
-////		    f := vType.Field(i)
-////			myS := fmt.Sprintf("Mapkeys - Field: %d, name: %s, type: %s, kind: %s", i+1, vType.Field(i).Name, vType.Field(i).Type.Name(), vType.Field(i).Type.Kind())
-//			log.Debugf("[%s/MNB]: In MapKeys - Field: %d, name: %s, type: %s, kind: %s", CORE, i+1, vType.Field(i).Name, vType.Field(i).Type.Name(), vType.Field(i).Type.Kind())
-//		}
-//	default:
-//		log.Debugf("[%s/MNB]: In Mapkeys - default kind: %v", CORE, reflect.TypeOf(v)) 
-//	}	
-//	s := strings.Join(outStr, ",")
-//	return s
-//
-//}

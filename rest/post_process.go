@@ -47,6 +47,8 @@ import (
 	"github.com/getryft/ryft-server/search"
 
 )
+
+// Function to search a directory for the latest version of a wild card string
 func getLatestFile(dir string, prefix string, ext string) (string, bool) {
 	var found = false
 	var FName string
@@ -83,19 +85,27 @@ func getLatestFile(dir string, prefix string, ext string) (string, bool) {
 //   Note: Each program may have different timeout
 func (server *Server) cleanupPostSession(homeDir string, cfg *search.Config) {
 
-	addTime := cfg.Lifetime
-	if info, ok := server.Config.FinalProcessor[cfg.JobType]; ok {
-		if len(info.FileLifetime) > 0 {
-			if newTime, err := time.ParseDuration(info.FileLifetime); err != nil {
-				log.Infof("[CONFIG] Invalid time format in %s FileLifetime(%s)",
+	addTime, _ := time.ParseDuration("0s") 
+	if cfg.Lifetime > 0 {
+		// Specified on command line
+		addTime = cfg.Lifetime
+	} else {
+		// Get value from server config file entry
+		if info, ok := server.Config.FinalProcessor[cfg.JobType]; ok {
+			if len(info.FileLifetime) > 0 {
+				if newTime, err := time.ParseDuration(info.FileLifetime); err != nil {
+					log.Infof("[CONFIG] Invalid time format in %s FileLifetime(%s)",
 				                                cfg.JobType, info.FileLifetime)
-		    } else {
-				addTime = newTime
-			}	
-			
-		}
+		    	} else {
+					addTime = newTime
+				}	
+			}
+		}	
 	} 
 
+	if addTime == 0 {
+		return
+	}	
 	now := time.Now()
 
 	if len(cfg.KeepJobDataAs) != 0 {
@@ -170,15 +180,12 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 					storedConnector = vals[3]
 					myTerms = myTerms + s
 				}
-				log.Debugf("[POST EXEC] Build string: %s", myTerms)
 			}	
-			log.Debugf("[POST EXEC] Checking to add --pip parameter %s", myTerms)
 			myArgs = append(myArgs, "--pip")
 			myArgs = append(myArgs, myTerms)
 		} 
 		
 		// add default config file if not specified on command line
-		log.Debugf("[POST EXEC] Server Config file: %s", ConfigFile)
 		if _, ok := cfg.PostExecParams["--cfg"]; !ok {
 			if _, err := os.Stat(ConfigFile); err == nil {
 				myArgs = append(myArgs, "--cfg")
@@ -196,9 +203,9 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 		log.Debugf("[POST EXEC] Using default parameter settings")
 		break
 	}
-	for i, val := range myArgs {
-		log.Debugf("[POST EXEC] arg: %d |%s| ", i, val)
-	}	
+//	for i, val := range myArgs {
+//		log.Debugf("[POST EXEC] arg: %d |%s| ", i, val)
+//	}	
 		
 	cmd := exec.Command(Executable, myArgs...)
 	log.Debugf("[POST EXEC] command: %s %s", Executable, strings.Join(myArgs, " "))
@@ -232,6 +239,7 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 
 	switch cfg.JobType {
 	case "blgeo":
+		// For blgeo: copy result kml out of /tmp and into jobs directory
 		if oldFile, ok := getLatestFile("/tmp", "blgeo_out", "kml"); ok {
 			newFile := fmt.Sprintf("/ryftone/jobs/blgeo_out_%s.kml", cfg.JobID)
 			tmpFile, err := os.Open(oldFile)
@@ -268,14 +276,15 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 }
 
 // Function to turn results into CSV line
-func makeCsvLine(data interface{}, FieldNames []string) string {
+func makeCsvLine(data interface{}, FieldNames []string, dataType string) string {
 	
+	log.Debugf("[POST EXEC]: makeCsvLine(interface{}, FieldNames, %s)", dataType)
 	outStr := make([]string, len(FieldNames), len(FieldNames))
 
 	v := reflect.ValueOf(data)
 	if v.Kind() == reflect.Ptr {
 		v = reflect.Indirect(v)
-//		log.Debugf("[%s/MNB]: In Mapkeys - handle indirect", CORE) 
+		log.Debugf("[POST EXEC]: In Mapkeys - handle indirect", CORE) 
 	}
 	vType := reflect.TypeOf(v)
 	log.Debugf("[%s/MNB]: In MapKeys: name: %v, kind: %s, fields: %d", CORE, vType.Name(), vType.Kind(), vType.NumField())
