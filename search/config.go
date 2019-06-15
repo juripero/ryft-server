@@ -107,9 +107,10 @@ type Config struct {
 		Aggs   map[string]interface{} // aggregation specific options
 	}
 
-	// passed in parameters for post search executable
+	// passed in parameters for post search executable and CSV file
 
 	PostExecParams	map[string]interface{}
+	CsvFields		map[string]interface{}
 
 	// report performance metrics
 	Performance bool
@@ -221,6 +222,11 @@ func (cfg Config) String() string {
 		props = append(props, fmt.Sprintf("PostExecParams:%q", cfg.PostExecParams))
 	}
 
+	// CsvFields
+	if len(cfg.CsvFields) != 0 {
+		props = append(props, fmt.Sprintf("CsvFields:%q", cfg.CsvFields))
+	}
+
 	// data
 	if len(cfg.KeepDataAs) != 0 {
 		props = append(props, fmt.Sprintf("data:%q", cfg.KeepDataAs))
@@ -319,16 +325,6 @@ func (cfg *Config) CheckRelativeToHome(home string) error {
 	if len(cfg.KeepDataAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepDataAs)) {
 		return fmt.Errorf("data %q is not relative to home", cfg.KeepDataAs)
 	}
-
-	// output blgeo DATA file
-//	if len(cfg.KeepBlgeoDataAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepBlgeoDataAs)) {
-//		return fmt.Errorf("blgeo data %q is not relative to home", cfg.KeepBlgeoDataAs)
-//	}
-
-	// output blgeo INDEX file
-//	if len(cfg.KeepBlgeoIndexAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepBlgeoIndexAs)) {
-//		return fmt.Errorf("blgeo index %q is not relative to home", cfg.KeepBlgeoIndexAs)
-//	}
 
 	// output VIEW file
 	if len(cfg.KeepViewAs) != 0 && !IsRelativeToHome(home, filepath.Join(home, cfg.KeepViewAs)) {

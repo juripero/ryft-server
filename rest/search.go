@@ -41,7 +41,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-//	"reflect"
 
 	"github.com/getryft/ryft-server/rest/codec"
 	"github.com/getryft/ryft-server/rest/format"
@@ -94,6 +93,7 @@ type SearchParams struct {
 		ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 		LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 		PostExecParams  map[string]interface{} `json:"jobparm,omitempty" msgpack:"jobparm,omitempty"`
+		CsvFields	map[string]interface{} 	`json:"CSVFields,omitempty" msgpack:"CSVFields,omitempty"`	
 	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
@@ -217,10 +217,12 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	cfg.JobID = params.JobID
 	cfg.JobType = params.JobType
 	cfg.PostExecParams = params.Tweaks.PostExecParams
+	cfg.CsvFields = params.Tweaks.CsvFields
 	log.WithFields(map[string]interface{}{
 		"JobID":     cfg.JobID,
 		"JobType":	 cfg.JobType,
 		"post-params": cfg.PostExecParams,
+		"csv-fields": cfg.CsvFields,
 	}).Infof("[%s]: Post Exec Job", CORE)
 	cfg.Performance = params.Performance
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
@@ -281,7 +283,6 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 		"user":      userName,
 		"home":      homeDir,
 		"cluster":   userTag,
-		"JobID":     cfg.JobID,
 		"post-proc": cfg.Transforms,
 	}).Infof("[%s]: start GET /search", CORE)
 	searchStartTime := time.Now() // performance metric
@@ -330,9 +331,9 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 					res.Stat.Extra["JobResults"] = cfg.KeepJobOutputAs
 				}	
 			}	
-			// Cleanup post-processing job with different timeouts.
-			server.cleanupPostSession(homeDir, cfg)
 		}
+		// Cleanup post-processing job with different timeouts.
+		server.cleanupPostSession(homeDir, cfg)
 	}	
 
 	if params.Stats && res.Stat != nil {
@@ -396,7 +397,6 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 	var err error
 	var offset int
 	var ofileName string 
-	var FieldNames []string
 
 	// put error to stream
 	putErr := func(err_ error) {
@@ -414,26 +414,26 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 
 	// put record to stream
 	if len(cfg.JobID) > 0 {
-		mountPoint, _ := server.getMountPoint()
-		path := mountPoint + "/jobs"
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-		    os.Mkdir(path, 0775)
-		}
+		path := server.getPostProcessingOutputPath(cfg)
 		now := time.Now()
 		ofileName = fmt.Sprintf("%s/outData-%s-%d.csv", path, cfg.JobID, now.Unix())
 		ifile := fmt.Sprintf("%s/outIndex-%s-%d.txt", path, cfg.JobID, now.Unix())
-		FieldNames = strings.Split(cfg.Fields,",")
 		dataF, err = os.OpenFile(ofileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0664)
 		if err != nil {
 			log.Infof("error opening file for joined output data")
 			panic(err)
 		}
 
-		l, err := dataF.WriteString(cfg.Fields + "\n")
-		if err != nil {
-			panic(err)
-		}
-		offset = l
+		lineLen := 0
+		// Write column headers if available
+		FieldNames := getCsvHeaderNames(cfg, false)
+		if FieldNames != nil {
+			lineLen, err = dataF.WriteString(strings.Join(FieldNames, ",") + "\n")
+			if err != nil {
+				panic(err)
+			}
+		}	
+		offset = lineLen
 		indexF, err = os.OpenFile(ifile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0664)
 		if err != nil {
 			log.Infof("error opening file for joined index data")
@@ -452,15 +452,15 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 			// ctx.Writer.Flush() // TODO: check performance!!!
 		}
 		if len(cfg.JobID) > 0 {
-			s := makeCsvLine(xrec, FieldNames, cfg.DataFormat)
+			s,_ := makeCsvLine(xrec, cfg)
 			s = s + "\n"
-			l, err := dataF.WriteString(s)
+			lineLen, err := dataF.WriteString(s)
 			if err != nil {
 				log.Infof("error writing csv line to file- %s", err)
 				panic(err)
 			}
-			f := fmt.Sprintf("%s,%d,%d,0\n", ofileName, offset, l)
-			offset = offset + l
+			f := fmt.Sprintf("%s,%d,%d,0\n", ofileName, offset, lineLen)
+			offset = offset + lineLen
 			_, err = indexF.WriteString(f)
 			if err != nil {
 				panic(err)

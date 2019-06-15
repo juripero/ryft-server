@@ -4,7 +4,7 @@ DEBUG=0
 #
 # Shell script to return BlackLynx product versions
 #
-scriptVersion="06-07-2019 14:00:00"
+scriptVersion="06-13-2019 16:00"
 
 # Set defaults
 PLATFORM="Undetermined"
@@ -23,6 +23,7 @@ ryftPCAPVersion="Not Installed"
 ryftPCRE2Version="Not Installed"
 ryftBlgeoVersion="Not Installed"
 DO_ELASTIC="False"
+DO_LEGACY="False"
 
 # print usage info
 usage() {
@@ -32,7 +33,7 @@ usage() {
     version: ${scriptVersion}
 
     Options:
-    -e|--elastic       Add ElasticSearch versions
+	-l|--legacy        Add legacy BlackLynx products
     -h|--help          Prints this short help message.
 
 EOF
@@ -41,8 +42,12 @@ EOF
 # parse options
 while [[ $# > 0 ]]; do
     case "$1" in
-	-e|--elastic)
-	 	DO_ELASTIC="True"
+#	-e|--elastic)
+#	 	DO_ELASTIC="True"
+#		shift
+#		;;
+	-l|--legacy)
+	 	DO_LEGACY="True"
 		shift
 		;;
 	-h|--help)
@@ -302,7 +307,7 @@ getLayeredProducts
 getThirdPartyProducts
 
 echo ""
-echo "ryft-versions: ${scriptVersion}"
+echo "blnx-versions: ${scriptVersion}"
 echo "Hostname:      ${hostName}"
 echo "OS Level:      ${OS_TYPE}"
 echo "Platform:      ${PLATFORM}" 
@@ -317,20 +322,24 @@ else
     echo "S/N:           ${serialNo}"
 fi
 echo ""
-echo "Repository:    ${Repository}"
-echo "Firmware:      ${Firmware}"
+if [ "${DO_LEGACY}" == "True" ]; then
+	echo "Repository:    ${Repository}"
+	echo "Firmware:      ${Firmware}"
+fi	
 if [ "${ryftxVersion}" == "Not Installed" ]; then
-    echo "ryftx:         ${ryftxVersion}"
+    echo "searchlynx:    ${ryftxVersion}"
 else
-    echo "ryftx:         ${ryftxVersion} (${ryftxArchitecture})"
+    echo "searchlynx:    ${ryftxVersion} (${ryftxArchitecture})"
 fi
-echo "ryftx_pcap:    ${ryftPCAPVersion}"
-echo "ryftpcre2:     ${ryftPCRE2Version}"
+echo "cyberlynx:     ${ryftPCAPVersion}"
+if [ "${DO_LEGACY}" == "True" ]; then
+	echo "ryftpcre2:     ${ryftPCRE2Version}"
+fi	
 echo "blgeo:         ${ryftBlgeoVersion}"
 echo ""
-echo "ryft-server:   ${serverRev}"
-echo "Ryft ODBC:     ${ODBCVersion}"
-echo "ryft-pcap:     ${ryftPcapVersion}"
+echo "blnx-server:   ${serverRev}"
+echo "blnx ODBC:     ${ODBCVersion}"
+echo "blnx-pcap:     ${ryftPcapVersion}"
 echo "Web API Demo:  ${webApiDemoVersion}"
 echo ""
 echo "Consul:        ${consulVersion}"

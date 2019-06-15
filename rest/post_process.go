@@ -43,6 +43,7 @@ import (
 	"time"
 	"reflect"
 	"errors"
+//	"encoding/json"
 
 	"github.com/getryft/ryft-server/search"
 
@@ -62,7 +63,6 @@ func getLatestFile(dir string, prefix string, ext string) (string, bool) {
 	var modTime time.Time
 	s := "^" + prefix + ".*\\." + ext + "$"
 	var regex = regexp.MustCompile(s)
-	log.Debugf("[POST EXEC] File regex: %s", regex.String())
 	for _, fi := range files {
 	    if fi.Mode().IsRegular() {
 			if regex.MatchString(fi.Name()) {
@@ -70,15 +70,14 @@ func getLatestFile(dir string, prefix string, ext string) (string, bool) {
 					if fi.ModTime().After(modTime) {
 						modTime = fi.ModTime()
 						FName = dir + "/" + fi.Name()
-						log.Debugf("[POST EXEC] file %s is newer", fi.Name())
 						found = true
 					}
 				}	
 			}
 		}
 	}
-	return FName, found
 
+	return FName, found
 }
 
 // mark output post processing files to delete later
@@ -127,7 +126,6 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 	var myArgs 		[]string
 	var Executable	string
 	var	ConfigFile	string
-	log.Debugf("[POST EXEC] enter - type: %s", cfg.JobType)
 
 	// Get ryft-server.conf parameters for target post processing job
 	if info, ok := server.Config.FinalProcessor[cfg.JobType]; ok {
@@ -148,8 +146,7 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 	case "blgeo":
 		// blegeo specific preprocessing to setup args for blgeo call
 		// if append, get previous kml output for appending
-		if val, ok := cfg.PostExecParams["--kml-append"]; ok {
-			log.Debugf("[POST EXEC] Replacing --kml-append %s with kml file", val)
+		if _, ok := cfg.PostExecParams["--kml-append"]; ok {
 			for i, val := range myArgs {
 				if val == "--kml-append" && myArgs[i+1] == "create" {
 					myArgs[i+1] = "/ryftone/jobs/blgeo_out_" + cfg.JobID + ".kml"
@@ -161,12 +158,10 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 		// Add --pip if not on commandline (needed for KML boundaries)
 		if _, ok := cfg.PostExecParams["--pip"]; !ok {
 			re := regexp.MustCompile(`(?i) (?P<inOut>contains|not_contains)\s*pip\(vertex_file=["\\]+.*?polygons\/(?P<vFile>[^"\\]+)[^\)]*\)+\s*(?P<joiner>and|or)?`)
-			log.Debugf("[POST EXEC] regex: %s", re.String())
 			match := re.FindAllStringSubmatch(cfg.Query, -1)
 			myTerms	:= ""
 			storedConnector := ""
 			for i, vals := range match {
-				log.Debugf("[POST EXEC] %d: %q", i, vals)
 				if i < len(match) {
 					s := ""
 					if strings.EqualFold(vals[1], "CONTAINS") {
@@ -223,11 +218,10 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 		resultInfo = append(resultInfo, "Error on command execution")
 		return resultInfo, err
 	}
-	log.Debugf("[POST EXEC] started execution - pid: %d", cmd.Process.Pid)
 	// read the stderr and stdout buffers
 	stderrBuf, _ := ioutil.ReadAll(CmdErr)
 	sError := fmt.Sprintf("%s", stderrBuf)
-	log.Debugf("[POST EXEC] stderr:  %s", sError)
+	log.Debugf("[POST EXEC] stderr: %s", sError)
 
 	stdoutBuf, _ := ioutil.ReadAll(CmdOut)
 	s := fmt.Sprintf("%s", stdoutBuf)
@@ -241,7 +235,7 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 	case "blgeo":
 		// For blgeo: copy result kml out of /tmp and into jobs directory
 		if oldFile, ok := getLatestFile("/tmp", "blgeo_out", "kml"); ok {
-			newFile := fmt.Sprintf("/ryftone/jobs/blgeo_out_%s.kml", cfg.JobID)
+			newFile := server.getPostProcessingOutputPath(cfg) + "/blgeo_out_" + cfg.JobID + ".kml"
 			tmpFile, err := os.Open(oldFile)
 			if err != nil {
 				s := fmt.Sprintf("Unable to open kml file: %s", err.Error())
@@ -276,52 +270,134 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 }
 
 // Function to turn results into CSV line
-func makeCsvLine(data interface{}, FieldNames []string, dataType string) string {
+func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 	
-	log.Debugf("[POST EXEC]: makeCsvLine(interface{}, FieldNames, %s)", dataType)
-	outStr := make([]string, len(FieldNames), len(FieldNames))
+	var outStr []string
+
+	FieldNames := getCsvHeaderNames(cfg, true)
+	log.Debugf("[MNB] in makeCsvLine: Fieldnames: %q", FieldNames)
 
 	v := reflect.ValueOf(data)
 	if v.Kind() == reflect.Ptr {
 		v = reflect.Indirect(v)
-		log.Debugf("[POST EXEC]: In Mapkeys - handle indirect", CORE) 
+		log.Debugf("[POST EXEC]: Following ptr: kind: %s", v.Kind()) 
 	}
-	vType := reflect.TypeOf(v)
-	log.Debugf("[%s/MNB]: In MapKeys: name: %v, kind: %s, fields: %d", CORE, vType.Name(), vType.Kind(), vType.NumField())
-//	for i := 0; i < vType.NumField(); i++ {
-//		log.Debugf("[%s/MNB]: In MapKeys - Field: %d, name: %s, type: %s, kind: %s", CORE, i+1, vType.Field(i).Name, vType.Field(i).Type.Name(), vType.Field(i).Type.Kind())
-//	}
-	switch v.Kind() {
-	case reflect.Map:	//format is csv
-//		log.Debugf("[%s/MNB]: In Mapkeys - Map", CORE) 
-//		if vType.Field(0).Type.Kind() == reflect.Ptr {
-//			v = reflect.Indirect(vType.Field(0).Type.Kind())
-//		}
-		for _, key := range v.MapKeys() {
-			log.Debugf("[%s/MNB]: In MapKeys: %s", CORE, key.String())
-			for i, item := range FieldNames {
-				if item == key.String() {
-					f := fmt.Sprintf("%s", v.MapIndex(key))
-					if strings.Index(f, ",") > -1 {
-						f = strconv.Quote(f)
+	if FieldNames[0] != "" {
+		for _, item := range FieldNames {
+//			NewString := fetchValue(v, item, 0)
+			Hierarchy := strings.Split(item,".")
+			log.Debugf("range FieldNames: %s(%d)", item, len(Hierarchy))
+			not_found := true
+			for i := 0; i < len(Hierarchy) && not_found == true; i++ {
+				NewLoop:
+				for _, key := range v.MapKeys() {
+					log.Debugf("   range MapKeys: %s", key.String())
+					if Hierarchy[i] == key.String() {
+						testVal := i + 1
+						if len(Hierarchy) == testVal {
+							log.Debugf("      matched terminal")
+							f := fmt.Sprintf("%s", v.MapIndex(key))
+							if strings.Index(f, ",") > -1 {
+								f = strconv.Quote(f)
+							}
+							outStr = append(outStr, f)
+							log.Debugf("[MNB] Match: %s %s", item, f)
+							not_found = false
+							break
+						} else {
+							log.Debugf("      matched intermediate(%d): %s", i, key.String())
+							i++
+							v = reflect.ValueOf(v.MapIndex(key))
+							log.Debug("      new value: %s", v.Kind())
+							switch v.Kind() {
+							case reflect.Map:
+								goto NewLoop
+								break
+							case reflect.Struct:
+								for fld := 0; fld < v.NumField(); fld++ {
+									if Hierarchy[i] == v.Type().Field(fld).Name {
+										log.Debugf("         Intermediate struct match: %s", v.Type().Field(fld).Name)
+										testVal := i + 1
+										if len(Hierarchy) == testVal {
+											log.Debugf("      matched terminal")
+											f := fmt.Sprintf("%s", v.Field(fld))
+											if strings.Index(f, ",") > -1 {
+												f = strconv.Quote(f)
+											}
+											outStr = append(outStr, f)
+											log.Debugf("[MNB] Match: %s %s", item, f)
+											not_found = false
+										}	
+										break;
+									}	
+								}
+								break
+							default:
+								log.Debugf("Need to add type: %s", v.Kind().String())
+							}
+						}	
+					} else {
+						log.Debugf("      match failed")
+						not_found = false
 					}
-					outStr[i] = f
-//					log.Debugf("[%s/MNB]: appended: %s(%d)", CORE, f, i)
-				}
+				}	
 			}	
-//			xStr := fmt.Sprintf("%s:%s\n", key.String(), v.MapIndex(key))
-//			csvStr = csvStr + xStr
-		}
-	case reflect.Struct:
-		log.Debugf("[%s/MNB]: In Mapkeys - Struct kind: %v", CORE, reflect.TypeOf(v)) 
-		for i := 0; i < vType.NumField(); i++ {
-//		    f := vType.Field(i)
-//			myS := fmt.Sprintf("Mapkeys - Field: %d, name: %s, type: %s, kind: %s", i+1, vType.Field(i).Name, vType.Field(i).Type.Name(), vType.Field(i).Type.Kind())
-			log.Debugf("[%s/MNB]: In MapKeys - Field: %d, name: %s, type: %s, kind: %s", CORE, i+1, vType.Field(i).Name, vType.Field(i).Type.Name(), vType.Field(i).Type.Kind())
-		}
-	default:
-		log.Debugf("[%s/MNB]: In Mapkeys - default kind: %v", CORE, reflect.TypeOf(v)) 
-	}	
+		}	
+	} else {
+		// No request for particular fields so give all
+		//    (Note: Only returns flat JSON/XML)
+		for _, key := range v.MapKeys() {
+			f := fmt.Sprintf("%s", v.MapIndex(key))
+			if strings.Index(f, ",") > -1 {
+				f = strconv.Quote(f)
+			}
+			outStr = append(outStr, f)
+			log.Debugf("[MNB] Match(1): %s '%s'", key.String(), f)
+		}	
+	}
+	
 	s := strings.Join(outStr, ",")
-	return s
+	return s, nil
 }
+
+// Function build directory path for post processing output files
+func (server *Server) getPostProcessingOutputPath(cfg *search.Config) string {
+	var middlePath string
+
+	mountPoint, _ := server.getMountPoint()
+
+	if info, ok := server.Config.FinalProcessor[cfg.JobType]; ok {
+		// This job specifies its own path
+		middlePath = info.OutDirectory
+	} else {
+		middlePath = server.Config.FinalProcessor["defaults"].OutDirectory
+	}	
+	path := mountPoint + "/" + middlePath
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.MkdirAll(path, 0775)
+	}
+	return  path
+}
+
+// Function to extract post processing csv file column names
+func getCsvHeaderNames(cfg *search.Config, getKeys bool) []string {
+	var Headers	[]string
+
+	// If user specified CSV fields in tweaks, use that
+	if len(cfg.CsvFields) > 0 {
+		v := reflect.ValueOf(cfg.CsvFields)
+		for _, key := range v.MapKeys() {
+			log.Debugf("[POST EXEC] key: %s, val: %s", key.String(), v.MapIndex(key))
+			if getKeys == true {
+				Headers = append(Headers, fmt.Sprintf("%s", key.String()))
+			} else {	
+				Headers = append(Headers, fmt.Sprintf("%s", v.MapIndex(key)))
+			}	
+		}
+	} else if len(cfg.Fields) > 0 {
+		// Use --fields entry
+		Headers = strings.Split(cfg.Fields,",")
+	} 
+
+	return Headers
+}	
