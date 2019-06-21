@@ -22,9 +22,12 @@ fixUIDGID /usr/bin/ryft_rdf
 fixUIDGID /usr/bin/ryft_status
 fixUIDGID /usr/bin/ryft-server
 fixUIDGID /usr/bin/ryft-server-aggs
+# remove ryftrest and ryft-versions in future
 fixUIDGID /usr/bin/ryftrest
+fixUIDGID /usr/bin/blnxrest
 fixUIDGID /usr/bin/ryftutil
 fixUIDGID /usr/bin/ryft-versions
+fixUIDGID /usr/bin/blnx-versions
 fixUIDGID /usr/bin/ryftx_wrapper
 
 # configurations

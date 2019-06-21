@@ -4,7 +4,7 @@ DEBUG=0
 #
 # Shell script to return BlackLynx product versions
 #
-scriptVersion="06-13-2019 16:00"
+scriptVersion="06-21-2019 11:00"
 
 # Set defaults
 PLATFORM="Undetermined"
@@ -117,6 +117,10 @@ determinePlatform(){
                 AFIShell=`echo -e ${fpgaVersion} | cut -d' ' -f8`
             fi
         else
+            serialNo=`sudo dmidecode -s system-serial-number 2>&1`
+			if [ $? -ne 0 ]; then
+				serialNo="Undetermined"
+			fi	
             PLATFORM=`xbsak list 2>&1`
 		    if [ "${DEBUG}" != 0 ]; then
                 echo -e "xbsak: $PLATFORM"
@@ -132,7 +136,6 @@ determinePlatform(){
                 else
                     PLATFORM=`echo "$PLATFORM" | grep -v "^INFO" | cut -d' ' -f2`
                 fi
-                serialNo="Unknown"
             fi
         fi
     fi
