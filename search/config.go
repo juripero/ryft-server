@@ -111,6 +111,8 @@ type Config struct {
 
 	PostExecParams	map[string]interface{}
 	CsvFields		map[string]interface{}
+	CsvColumns		[]string
+	CsvHierarchy	[]string
 
 	// report performance metrics
 	Performance bool
@@ -225,6 +227,16 @@ func (cfg Config) String() string {
 	// CsvFields
 	if len(cfg.CsvFields) != 0 {
 		props = append(props, fmt.Sprintf("CsvFields:%q", cfg.CsvFields))
+	}
+
+	// CsvColumns
+	if len(cfg.CsvColumns) != 0 {
+		props = append(props, fmt.Sprintf("CsvColumns:%q", cfg.CsvColumns))
+	}
+
+	// CsvHierarchy
+	if len(cfg.CsvHierarchy) != 0 {
+		props = append(props, fmt.Sprintf("CsvHierarchy:%q", cfg.CsvHierarchy))
 	}
 
 	// data

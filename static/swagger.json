@@ -39,6 +39,8 @@
           { "$ref": "#/parameters/Performance" },
           { "$ref": "#/parameters/SearchLimit" },
           { "$ref": "#/parameters/JobID" },
+          { "$ref": "#/parameters/JobType" },
+          { "$ref": "#/parameters/body" },
           { "$ref": "#/parameters/Transform" }
         ],
         "responses": {
@@ -1010,6 +1012,26 @@
       "name": "lifetime",
       "description": "The file or catalog lifetime, for example `2h`."
     },
+    "JobID": {
+      "in": "query",
+      "type": "string",
+      "name": "jobid",
+      "description": "Unique string to tag post-processing work."
+    },
+    "JobType": {
+      "in": "query",
+      "type": "string",
+      "name": "jobtype",
+      "description": "Name of post-processing configuration in config file."
+    },
+    "body": { 
+      "in": "body",
+      "type": "object",
+	  "items": { "type" : "string"},
+      "collectionFormat": "multi",
+      "name": "body",
+      "description": "Free form JSON text with parameters for special processing:\n- `Columns` for CSV headers,\n- `CSVFields` for hierarchy and column names,\n- Others as implemented"
+    },
     "UserNames": {
       "in": "query",
       "name": "name",
@@ -1076,6 +1098,26 @@
             },
             "session": {
               "description": "Session identifier",
+              "type": "string"
+            },
+            "JobID": {
+              "description": "Job identifier",
+              "type": "string"
+            },
+            "jobData": {
+              "description": "Path to merged data CSV file",
+              "type": "string"
+            },
+            "jobIndex": {
+              "description": "Path to index file for jobData",
+              "type": "string"
+            },
+            "JobStatus": {
+			  "description": "Path to index file for jobData",
+              "type": "string"
+            },
+            "JobResults": {
+              "description": "Path to results file for post processing",
               "type": "string"
             },
             "aggregations": {
@@ -1406,6 +1448,10 @@
           "format": "uint64",
           "description": "Limit the total number of records reported."
         },
+		"JobID": {
+		  "type": "string",
+		  "description": "Unique string to identify output CSV file."
+		},  
         "transforms": {
           "type": "array",
           "items": { "type": "string" },

@@ -43,7 +43,6 @@ import (
 	"time"
 	"reflect"
 	"errors"
-//	"encoding/json"
 
 	"github.com/getryft/ryft-server/search"
 
@@ -157,6 +156,7 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 
 		// Add --pip if not on commandline (needed for KML boundaries)
 		if _, ok := cfg.PostExecParams["--pip"]; !ok {
+			// Regex parses PIP (or multple PIP) queries to get data for blgeo input
 			re := regexp.MustCompile(`(?i) (?P<inOut>contains|not_contains)\s*pip\(vertex_file=["\\]+.*?polygons\/(?P<vFile>[^"\\]+)[^\)]*\)+\s*(?P<joiner>and|or)?`)
 			match := re.FindAllStringSubmatch(cfg.Query, -1)
 			myTerms	:= ""
@@ -272,7 +272,7 @@ func (server *Server) runPostCommand(cfg *search.Config) ([]string, error) {
 // Function to turn results into CSV line
 func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 	
-	var outStr []string
+	outStr := []string{}
 
 	FieldNames := getCsvHeaderNames(cfg, true)
 //	log.Debugf("[CSV PARSE] record: %+v", data)
@@ -386,14 +386,19 @@ func getCsvHeaderNames(cfg *search.Config, getKeys bool) []string {
 
 	// If user specified CSV fields in tweaks, use that
 	if len(cfg.CsvFields) > 0 {
-		v := reflect.ValueOf(cfg.CsvFields)
-		for _, key := range v.MapKeys() {
-			log.Debugf("[POST EXEC] key: %s, val: %s", key.String(), v.MapIndex(key))
-			if getKeys == true {
-				Headers = append(Headers, fmt.Sprintf("%s", key.String()))
-			} else {	
-				Headers = append(Headers, fmt.Sprintf("%s", v.MapIndex(key)))
-			}	
+		// only go thru map once so order is fixed (go maps are order independent)
+		if len(cfg.CsvHierarchy) == 0 {
+			v := reflect.ValueOf(cfg.CsvFields)
+			for _, key := range v.MapKeys() {
+				log.Debugf("[POST EXEC] key: %s, val: %s", key.String(), v.MapIndex(key))
+				cfg.CsvHierarchy = append(cfg.CsvHierarchy, fmt.Sprintf("%s", key.String()))
+				cfg.CsvColumns = append(cfg.CsvColumns, fmt.Sprintf("%s", v.MapIndex(key)))
+			}
+		}	
+		if getKeys == true {
+			Headers = cfg.CsvHierarchy
+		} else {	
+			Headers = cfg.CsvColumns
 		}
 	} else if len(cfg.Fields) > 0 {
 		// Use --fields entry
