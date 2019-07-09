@@ -33,7 +33,7 @@ usage() {
     version: ${scriptVersion}
 
     Options:
-	-l|--legacy        Add legacy BlackLynx products
+    -l|--legacy        Add legacy BlackLynx products
     -h|--help          Prints this short help message.
 
 EOF
