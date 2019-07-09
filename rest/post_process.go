@@ -275,84 +275,85 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 	var outStr []string
 
 	FieldNames := getCsvHeaderNames(cfg, true)
-	log.Debugf("[MNB] in makeCsvLine: Fieldnames: %q", FieldNames)
+//	log.Debugf("[CSV PARSE] record: %+v", data)
+	log.Debugf("[CSV PARSE] Enter makeCsvLine: Fieldnames: %q", FieldNames)
 
-	v := reflect.ValueOf(data)
-	if v.Kind() == reflect.Ptr {
-		v = reflect.Indirect(v)
-		log.Debugf("[POST EXEC]: Following ptr: kind: %s", v.Kind()) 
-	}
 	if FieldNames[0] != "" {
 		for _, item := range FieldNames {
-//			NewString := fetchValue(v, item, 0)
 			Hierarchy := strings.Split(item,".")
-			log.Debugf("range FieldNames: %s(%d)", item, len(Hierarchy))
+			log.Debugf("[CSV] Find Field Name: %s, depth: %d", item, len(Hierarchy))
 			not_found := true
-			for i := 0; i < len(Hierarchy) && not_found == true; i++ {
-				NewLoop:
-				for _, key := range v.MapKeys() {
-					log.Debugf("   range MapKeys: %s", key.String())
-					if Hierarchy[i] == key.String() {
-						testVal := i + 1
-						if len(Hierarchy) == testVal {
-							log.Debugf("      matched terminal")
-							f := fmt.Sprintf("%s", v.MapIndex(key))
-							if strings.Index(f, ",") > -1 {
-								f = strconv.Quote(f)
-							}
-							outStr = append(outStr, f)
-							log.Debugf("[MNB] Match: %s %s", item, f)
-							not_found = false
-							break
-						} else {
-							log.Debugf("      matched intermediate(%d): %s", i, key.String())
-							i++
-							v = reflect.ValueOf(v.MapIndex(key))
-							log.Debug("      new value: %s", v.Kind())
-							switch v.Kind() {
-							case reflect.Map:
-								goto NewLoop
-								break
-							case reflect.Struct:
-								for fld := 0; fld < v.NumField(); fld++ {
-									if Hierarchy[i] == v.Type().Field(fld).Name {
-										log.Debugf("         Intermediate struct match: %s", v.Type().Field(fld).Name)
-										testVal := i + 1
-										if len(Hierarchy) == testVal {
-											log.Debugf("      matched terminal")
-											f := fmt.Sprintf("%s", v.Field(fld))
-											if strings.Index(f, ",") > -1 {
-												f = strconv.Quote(f)
-											}
-											outStr = append(outStr, f)
-											log.Debugf("[MNB] Match: %s %s", item, f)
-											not_found = false
-										}	
-										break;
-									}	
+			finalVal := ""
+			V := reflect.ValueOf(data)
+			i := 0
+			testVal := len(Hierarchy) - 1
+			for ; i < len(Hierarchy) && not_found == true;  {
+				if V.Kind() == reflect.Ptr {
+					V = V.Elem()
+					log.Debugf("[CSV]: Following ptr: kind: %s", V.Kind()) 
+				}
+				switch V.Kind() {
+				case reflect.Map:
+					log.Debugf("[CSV] processing map")
+					for _, key := range V.MapKeys() {
+//						log.Debugf("[CSV]   range MapKeys: %s", key.String())
+						if Hierarchy[i] == key.String() {
+							if i == testVal {
+								V = V.MapIndex(key).Elem()
+								if V.Kind() == reflect.Ptr {
+									V = V.Elem()
+								}	
+								if V.Kind() == reflect.Slice {
+									log.Debugf("[CSV] slice: %#v, len: %d, type: %T", V, V.Len(), V)
+									tVal := V.Interface()
+//									log.Debugf("[CSV] interface: %#v, type: %T", tVal, tVal)
+									finalVal = fmt.Sprintf("%v", tVal)
+									
+								} else {
+									finalVal = fmt.Sprintf("%s", V.String())
 								}
-								break
-							default:
-								log.Debugf("Need to add type: %s", v.Kind().String())
+								log.Debugf("[CSV] Match: %s %s", item, finalVal)
+								not_found = false
+							} else {
+								log.Debugf("[CSV] map matched intermediate(%d): %s - %+v", i, key.String(), V.MapIndex(key))
+								V = V.MapIndex(key).Elem()
+//								log.Debugf("[CSV]    New Value: %+v", V)
+								log.Debugf("[CSV]    map type: %s, kind: %s", V.Type(), V.Kind())
+								i++
 							}
-						}	
-					} else {
-						log.Debugf("      match failed")
-						not_found = false
+							break
+						}
+					}	
+					break
+				default:
+					log.Debugf("[CSV] Need to add type: %s", V.Kind().String())
+					finalVal = ""
+					not_found = false
+					break
+				} // end switch
+				if not_found == false {
+					if strings.Index(finalVal, ",") > -1 {
+						finalVal = strconv.Quote(finalVal)
 					}
+					outStr = append(outStr, finalVal)
 				}	
-			}	
-		}	
+			}	// end for searching for one field
+		}  // end for list of fields to return	
 	} else {
 		// No request for particular fields so give all
 		//    (Note: Only returns flat JSON/XML)
+		v := reflect.ValueOf(data)
+		if v.Kind() == reflect.Ptr {
+			v = reflect.Indirect(v)
+			log.Debugf("[CSV]: Following ptr(2): kind: %s", v.Kind()) 
+		}
 		for _, key := range v.MapKeys() {
 			f := fmt.Sprintf("%s", v.MapIndex(key))
 			if strings.Index(f, ",") > -1 {
 				f = strconv.Quote(f)
 			}
 			outStr = append(outStr, f)
-			log.Debugf("[MNB] Match(1): %s '%s'", key.String(), f)
+			log.Debugf("[CSV PARSE] Match(1): %s '%s'", key.String(), f)
 		}	
 	}
 	
@@ -381,7 +382,7 @@ func (server *Server) getPostProcessingOutputPath(cfg *search.Config) string {
 
 // Function to extract post processing csv file column names
 func getCsvHeaderNames(cfg *search.Config, getKeys bool) []string {
-	var Headers	[]string
+	Headers	:= []string{}
 
 	// If user specified CSV fields in tweaks, use that
 	if len(cfg.CsvFields) > 0 {
