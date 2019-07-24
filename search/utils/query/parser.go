@@ -401,7 +401,7 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 
 		case lex.IsPir(): // PIR + options
 			expression, res.Options = p.parsePIRExpr(res.Options)
-			res.Options.SetMode("pip")
+			res.Options.SetMode("pir")
 
 		// consume all continous strings and wildcards
 		case lex.token == STRING,
