@@ -296,7 +296,6 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 				case reflect.Map:
 					log.Debugf("[CSV] processing map")
 					for _, key := range V.MapKeys() {
-//						log.Debugf("[CSV]   range MapKeys: %s", key.String())
 						if Hierarchy[i] == key.String() {
 							if i == testVal {
 								V = V.MapIndex(key).Elem()
@@ -304,21 +303,25 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 									V = V.Elem()
 								}	
 								if V.Kind() == reflect.Slice {
-									log.Debugf("[CSV] slice: %#v, len: %d, type: %T", V, V.Len(), V)
-									tVal := V.Interface()
-//									log.Debugf("[CSV] interface: %#v, type: %T", tVal, tVal)
-									finalVal = fmt.Sprintf("%v", tVal)
-									
+									// log.Debugf("[CSV] slice: %#v, len: %d", V, V.Len())
+									var tmp string
+									for indx := 0; indx < V.Len(); indx++ {
+										tmp = fmt.Sprintf("%v", V.Index(indx).Interface())
+										if finalVal == "" {
+											finalVal = tmp
+										} else {
+											finalVal = finalVal + "," + tmp
+										}	
+									}	
 								} else {
 									finalVal = fmt.Sprintf("%s", V.String())
 								}
 								log.Debugf("[CSV] Match: %s %s", item, finalVal)
 								not_found = false
 							} else {
-								log.Debugf("[CSV] map matched intermediate(%d): %s - %+v", i, key.String(), V.MapIndex(key))
+								log.Debugf("[CSV] map match intermediate(%d): %s - %+v", i, key.String(), V.MapIndex(key))
 								V = V.MapIndex(key).Elem()
-//								log.Debugf("[CSV]    New Value: %+v", V)
-								log.Debugf("[CSV]    map type: %s, kind: %s", V.Type(), V.Kind())
+//								log.Debugf("[CSV]    map type: %s, kind: %s", V.Type(), V.Kind())
 								i++
 							}
 							break
@@ -383,16 +386,41 @@ func (server *Server) getPostProcessingOutputPath(cfg *search.Config) string {
 // Function to extract post processing csv file column names
 func getCsvHeaderNames(cfg *search.Config, getKeys bool) []string {
 	Headers	:= []string{}
+	Order := strings.Split(cfg.Fields,",")
 
 	// If user specified CSV fields in tweaks, use that
 	if len(cfg.CsvFields) > 0 {
-		// only go thru map once so order is fixed (go maps are order independent)
+		// Since this is not a map, use -Fields order for fields.  Unlisted fields
+		//   will come last and be unordered since golang maps are order independent
 		if len(cfg.CsvHierarchy) == 0 {
-			v := reflect.ValueOf(cfg.CsvFields)
-			for _, key := range v.MapKeys() {
-				log.Debugf("[POST EXEC] key: %s, val: %s", key.String(), v.MapIndex(key))
-				cfg.CsvHierarchy = append(cfg.CsvHierarchy, fmt.Sprintf("%s", key.String()))
-				cfg.CsvColumns = append(cfg.CsvColumns, fmt.Sprintf("%s", v.MapIndex(key)))
+			log.Debugf("[CSV] First time fields setup - Order len: %d", len(Order))
+			if len(Order) > 0 && Order[0] != "" {
+				for i := 0; i < len(Order); i++ {
+					v := reflect.ValueOf(cfg.CsvFields)
+					found := false
+					for _, key := range v.MapKeys() {
+						log.Debugf("[CSV Setup] checking %s against %s", Order[i], v.MapIndex(key).String())
+						if v.MapIndex(key).String() == Order[i] {
+							cfg.CsvHierarchy = append(cfg.CsvHierarchy, fmt.Sprintf("%s", key.String()))
+							cfg.CsvColumns = append(cfg.CsvColumns, fmt.Sprintf("%s", v.MapIndex(key)))
+							found = true
+						}	
+					}
+					if found == false {
+						log.Infof("[ISSUE?] Fields item: %s not found in tweaks:CsvFields", Order[i])
+						// use Fields column name as hierarchy and CSV column name
+						cfg.CsvHierarchy = append(cfg.CsvHierarchy, Order[i])
+						cfg.CsvColumns = append(cfg.CsvColumns, Order[i])
+					}	
+				}	
+			} else {
+				// random column orders
+				log.Debugf("[CSV Setup] Using only tweaks fields")
+				v := reflect.ValueOf(cfg.CsvFields)
+				for _, key := range v.MapKeys() {
+					cfg.CsvHierarchy = append(cfg.CsvHierarchy, fmt.Sprintf("%s", key.String()))
+					cfg.CsvColumns = append(cfg.CsvColumns, fmt.Sprintf("%s", v.MapIndex(key)))
+				}
 			}
 		}	
 		if getKeys == true {

@@ -37,6 +37,10 @@ chown "$target_uid:$target_gid" -f /etc/ryft-users.yaml
 # other
 chown "$target_uid:$target_gid" -f /var/log/ryft
 chown "$target_uid:$target_gid" -f -R /var/ryft
+chown "$target_uid:$target_gid" -f -R /home/ryftuser/.blacklynx/bl-server.orig
+if [ ! -f /home/ryftuser/.blacklynx/bl-server.cfg ]; then
+	cp /home/ryftuser/.blacklynx/bl-server.orig /home/ryftuser/.blacklynx/bl-server.cfg
+fi
 
 # backward compatibility
 chmod 0755 -f /ryftone/.rest-*
