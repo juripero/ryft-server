@@ -70,7 +70,7 @@ func (engine *Engine) prepare(backend string, task *Task) error {
 	// select search mode
 	genericMode := false
 	switch strings.ToLower(cfg.Mode) {
-	case "", "g", "g/es", "g/pip",
+	case "", "g", "g/es", "g/pip", "g/pir", 
 		"g/fhs", "g/feds", "g/ds", "g/ts",
 		"g/ns", "g/cs", "g/ipv4", "g/ipv6", "g/pcre2":
 		args = append(args, "-p", "g")
@@ -102,6 +102,8 @@ func (engine *Engine) prepare(backend string, task *Task) error {
 	case "pcap":
 		args = args
     case "pip":
+		args = args
+    case "pir":
 		args = args
 	default:
 		return fmt.Errorf("%q is unknown search mode", cfg.Mode)

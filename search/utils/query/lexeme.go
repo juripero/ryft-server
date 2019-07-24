@@ -321,3 +321,12 @@ func (lex Lexeme) IsPip() bool {
 
 	return strings.EqualFold(lex.literal, "PIP")
 }
+
+// IsPir checks "PIR" search type.
+func (lex Lexeme) IsPir() bool {
+	if lex.token != IDENT {
+		return false
+	}
+
+	return strings.EqualFold(lex.literal, "PIR")
+}

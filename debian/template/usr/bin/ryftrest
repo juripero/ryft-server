@@ -22,7 +22,8 @@ Search specific:
                      - ipv6 for IPv6 search
                      - pcre2 for PCRE2 regex search
                      - pcap for PCAP search (required)
-                     - pip for PIP regex search
+                     - pip for PIP (point-in-polygon) search
+                     - pir for PIR (point-in-radius) search
 -f|--file=<path>   Specifies an input filename.
 -c|--catalog=<path> Specifies an input catalog name.
 -i                 Specifies case-insensitive analysis for supported primitives.
