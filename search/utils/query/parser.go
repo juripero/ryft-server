@@ -779,7 +779,7 @@ func (p *Parser) parsePIRExpr(opts Options) (string, Options) {
 		panic(fmt.Errorf("%q found instead of (", beg))
 	}
 
-	// read focal point expression
+	// read lat focal point expression
 	switch lex := p.scanIgnoreSpace(); lex.token {
 	case STRING, WCARD:
 		res = p.parseStringExpr(lex)
@@ -787,6 +787,23 @@ func (p *Parser) parsePIRExpr(opts Options) (string, Options) {
 	default:
 		panic(fmt.Errorf("no string expression found"))
 	}
+
+	// parse options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		res = res + ","
+	default:
+		p.unscan(lex)
+	}
+
+	// read longitude focal point expression
+	switch lex := p.scanIgnoreSpaceComma(); lex.token {
+	case STRING, WCARD:
+		res = res + p.parseStringExpr(lex)
+
+	default:
+		panic(fmt.Errorf("no string expression found"))
+	}	
 
 	// parse options
 	switch lex := p.scanIgnoreSpace(); lex.token {
