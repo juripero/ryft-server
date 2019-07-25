@@ -61,15 +61,15 @@ then
     ryftoneLogPattern="/var/log/ryft/ryftone.log*"
 else
     # f1 && x86 aws
-    ryftoneLog=/var/log/ryft/ryft.log
-    ryftoneLogPattern=/var/log/ryft/ryft.log
+    ryftoneLog=/var/log/blacklynx/ryft.log
+    ryftoneLogPattern=/var/log/blacklynx/ryft.log
 fi
-ryft_server_dLog=/var/log/ryft/server.log
-ryft_server_dLogPattern=/var/log/ryft/server.log
+ryft_server_dLog=/var/log/blacklynx/server.log
+ryft_server_dLogPattern=/var/log/blacklynx/server.log
 ryftwebapidemoLog=/var/log/ryft/ryft-demo.log
 ryftwebapidemoLogPattern=/var/log/ryft/ryft-demo.log
-ryftodbcdLog=/var/log/ryft/ryftone_server.log
-ryftodbcdLogPattern="/var/log/ryft/ryftone_server*.log"
+ryftodbcdLog=/var/log/blacklynx/ryftone_server.log
+ryftodbcdLogPattern="/var/log/blacklynx/ryftone_server*.log"
 consulLog=/var/log/consul
 consulAlertsLog=/var/log/consul-alerts
 
@@ -175,7 +175,7 @@ else
     elasticsearch_bootOffCommand="sudo systemctl disable $x.service"
 fi
 
-test -e /usr/bin/ryft-versions
+test -e /usr/bin/blnx-versions
 if [ $? == 0 ]
 then
     ryftVersionsPresent=1

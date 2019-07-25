@@ -1,2 +1,2 @@
 #!/bin/bash
-. /home/ryftuser/.bashrc; /usr/bin/ryftx "$@"
+. /home/ryftuser/.bashrc; /usr/bin/searchlynx "$@"
