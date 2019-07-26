@@ -3,7 +3,7 @@
   "info": {
     "description": "This is a REST API for the BlackLynx Server and Cluster. It provides methods to list files and folders stored on server or cluster and execute search and count requests. Both RAW_TEXT and RECORD searches supported. Please explore API below for details and examples.",
     "title": "BlackLynx REST API",
-    "version": "1.3.1"
+    "version": "1.4.0"
   },
   "paths": {
     "/search": {

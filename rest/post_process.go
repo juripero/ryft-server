@@ -304,7 +304,6 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 									V = V.Elem()
 								}	
 								if V.Kind() == reflect.Slice {
-									// log.Debugf("[CSV] slice: %#v, len: %d", V, V.Len())
 									var tmp string
 									for indx := 0; indx < V.Len(); indx++ {
 										tmp = fmt.Sprintf("%v", V.Index(indx).Interface())
@@ -336,7 +335,7 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 					}	
 					break
 				default:
-					log.Debugf("[CSV] Need to add type: %s", V.Kind().String())
+					log.Infof("[CSV] Need to add type: %s", V.Kind().String())
 					finalVal = ""
 					not_found = false
 					break
@@ -409,7 +408,6 @@ func getCsvHeaderNames(cfg *search.Config, getKeys bool) []string {
 					found := false
 					for _, key := range v.MapKeys() {
 						log.Debugf("[CSV Setup] checking %s against %s", Order[i], v.MapIndex(key))
-//						if v.MapIndex(key).String() == Order[i] 
 						if fmt.Sprintf("%s", v.MapIndex(key)) == Order[i] {
 							cfg.CsvHierarchy = append(cfg.CsvHierarchy, fmt.Sprintf("%s", key.String()))
 							cfg.CsvColumns = append(cfg.CsvColumns, fmt.Sprintf("%s", v.MapIndex(key)))
