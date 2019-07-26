@@ -113,6 +113,7 @@ type Config struct {
 	CsvFields		map[string]interface{}
 	CsvColumns		[]string
 	CsvHierarchy	[]string
+	CsvOrder		string
 
 	// report performance metrics
 	Performance bool
@@ -237,6 +238,11 @@ func (cfg Config) String() string {
 	// CsvHierarchy
 	if len(cfg.CsvHierarchy) != 0 {
 		props = append(props, fmt.Sprintf("CsvHierarchy:%q", cfg.CsvHierarchy))
+	}
+
+	// CsvOrder
+	if len(cfg.CsvOrder) != 0 {
+		props = append(props, fmt.Sprintf("CsvOrder:%q", cfg.CsvOrder))
 	}
 
 	// data

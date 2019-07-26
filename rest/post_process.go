@@ -275,7 +275,6 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 	outStr := []string{}
 
 	FieldNames := getCsvHeaderNames(cfg, true)
-//	log.Debugf("[CSV PARSE] record: %+v", data)
 	log.Debugf("[CSV PARSE] Enter makeCsvLine: Fieldnames: %q", FieldNames)
 
 	if FieldNames[0] != "" {
@@ -294,10 +293,12 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 				}
 				switch V.Kind() {
 				case reflect.Map:
-					log.Debugf("[CSV] processing map")
+					log.Debugf("[CSV] processing map: %d, %s", V.Len(), Hierarchy[i])
 					for _, key := range V.MapKeys() {
+						log.Debugf("[CSV Line]   checking %s", key.String())
 						if Hierarchy[i] == key.String() {
 							if i == testVal {
+                                // Dealing with final value in data record structure
 								V = V.MapIndex(key).Elem()
 								if V.Kind() == reflect.Ptr {
 									V = V.Elem()
@@ -321,11 +322,17 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 							} else {
 								log.Debugf("[CSV] map match intermediate(%d): %s - %+v", i, key.String(), V.MapIndex(key))
 								V = V.MapIndex(key).Elem()
-//								log.Debugf("[CSV]    map type: %s, kind: %s", V.Type(), V.Kind())
+								log.Debugf("[CSV]    map type: %s, kind: %s", V.Type(), V.Kind())
 								i++
+								goto NextLevel
 							}
 							break
-						}
+						} // end if found label
+					} // end range mapkeys
+					if not_found == true {
+						log.Infof("[CSV] Reached end of map without match")
+						finalVal = ""
+						not_found = false
 					}	
 					break
 				default:
@@ -339,7 +346,8 @@ func makeCsvLine(data interface{}, cfg *search.Config) (string, error) {
 						finalVal = strconv.Quote(finalVal)
 					}
 					outStr = append(outStr, finalVal)
-				}	
+				}
+			    NextLevel:
 			}	// end for searching for one field
 		}  // end for list of fields to return	
 	} else {
@@ -386,24 +394,28 @@ func (server *Server) getPostProcessingOutputPath(cfg *search.Config) string {
 // Function to extract post processing csv file column names
 func getCsvHeaderNames(cfg *search.Config, getKeys bool) []string {
 	Headers	:= []string{}
-	Order := strings.Split(cfg.Fields,",")
+	Order := strings.Split(cfg.CsvOrder,",")
+	log.Debugf("[CSV Setup] First time fields setup - Order len: %d", len(Order))
 
 	// If user specified CSV fields in tweaks, use that
 	if len(cfg.CsvFields) > 0 {
 		// Since this is not a map, use -Fields order for fields.  Unlisted fields
 		//   will come last and be unordered since golang maps are order independent
 		if len(cfg.CsvHierarchy) == 0 {
-			log.Debugf("[CSV] First time fields setup - Order len: %d", len(Order))
+			log.Debugf("[CSV Setup] First time fields setup - Order len: %d", len(Order))
 			if len(Order) > 0 && Order[0] != "" {
 				for i := 0; i < len(Order); i++ {
 					v := reflect.ValueOf(cfg.CsvFields)
 					found := false
 					for _, key := range v.MapKeys() {
-						log.Debugf("[CSV Setup] checking %s against %s", Order[i], v.MapIndex(key).String())
-						if v.MapIndex(key).String() == Order[i] {
+						log.Debugf("[CSV Setup] checking %s against %s", Order[i], v.MapIndex(key))
+//						if v.MapIndex(key).String() == Order[i] 
+						if fmt.Sprintf("%s", v.MapIndex(key)) == Order[i] {
 							cfg.CsvHierarchy = append(cfg.CsvHierarchy, fmt.Sprintf("%s", key.String()))
 							cfg.CsvColumns = append(cfg.CsvColumns, fmt.Sprintf("%s", v.MapIndex(key)))
+							log.Debugf("[CSV Setup] Found Key: %s against %s", key.String(), v.MapIndex(key))
 							found = true
+							break
 						}	
 					}
 					if found == false {
@@ -412,7 +424,8 @@ func getCsvHeaderNames(cfg *search.Config, getKeys bool) []string {
 						cfg.CsvHierarchy = append(cfg.CsvHierarchy, Order[i])
 						cfg.CsvColumns = append(cfg.CsvColumns, Order[i])
 					}	
-				}	
+				}
+
 			} else {
 				// random column orders
 				log.Debugf("[CSV Setup] Using only tweaks fields")
@@ -422,15 +435,17 @@ func getCsvHeaderNames(cfg *search.Config, getKeys bool) []string {
 					cfg.CsvColumns = append(cfg.CsvColumns, fmt.Sprintf("%s", v.MapIndex(key)))
 				}
 			}
+			log.Debugf("[CSV setup] CsvHierarchy: %v", cfg.CsvHierarchy)
+			log.Debugf("[CSV setup] CsvColumns: %v", cfg.CsvColumns)
 		}	
 		if getKeys == true {
 			Headers = cfg.CsvHierarchy
 		} else {	
 			Headers = cfg.CsvColumns
 		}
-	} else if len(cfg.Fields) > 0 {
+	} else if len(cfg.CsvOrder) > 0 {
 		// Use --fields entry
-		Headers = strings.Split(cfg.Fields,",")
+		Headers = Order
 	} 
 
 	return Headers

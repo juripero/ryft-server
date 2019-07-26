@@ -94,6 +94,7 @@ type SearchParams struct {
 		LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 		PostExecParams  map[string]interface{} `json:"jobparm,omitempty" msgpack:"jobparm,omitempty"`
 		CsvFields	map[string]interface{} 	`json:"CSVFields,omitempty" msgpack:"CSVFields,omitempty"`	
+		CsvOrder	string		 	`json:"CSVOrder,omitempty" msgpack:"CSVOrder,omitempty"`	
 	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
@@ -218,11 +219,13 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	cfg.JobType = params.JobType
 	cfg.PostExecParams = params.Tweaks.PostExecParams
 	cfg.CsvFields = params.Tweaks.CsvFields
+	cfg.CsvOrder = params.Tweaks.CsvOrder
 	log.WithFields(map[string]interface{}{
 		"JobID":     cfg.JobID,
 		"JobType":	 cfg.JobType,
 		"post-params": cfg.PostExecParams,
 		"csv-fields": cfg.CsvFields,
+		"Order": cfg.CsvOrder,
 	}).Infof("[%s]: Post Exec Job", CORE)
 	cfg.Performance = params.Performance
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)

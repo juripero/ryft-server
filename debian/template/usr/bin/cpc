@@ -1,0 +1,6 @@
+#!/bin/bash
+#
+# Blacklynx cpc command
+# Script to duplicate old Engineering released cpc command
+#
+sync; echo 3 > /proc/sys/vm/drop_caches
