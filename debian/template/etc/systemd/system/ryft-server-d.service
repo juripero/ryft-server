@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=ryftuser
 Group=ryftuser
-ExecStart=/bin/sh -c '/usr/bin/ryft-server --config=/etc/ryft-server.conf > /var/log/ryft/server.log 2>&1'
+ExecStart=/bin/sh -c '/usr/bin/ryft-server --config=/etc/ryft-server.conf > /var/log/blacklynx/server.log 2>&1'
 
 [Install]
 WantedBy=multi-user.target

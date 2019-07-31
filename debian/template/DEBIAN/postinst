@@ -29,6 +29,7 @@ fixUIDGID /usr/bin/ryftutil
 fixUIDGID /usr/bin/ryft-versions
 fixUIDGID /usr/bin/blnx-versions
 fixUIDGID /usr/bin/ryftx_wrapper
+
 fixUIDGID /usr/bin/cpc
 
 # configurations
@@ -46,7 +47,7 @@ fi
 # backward compatibility
 chmod 0755 -f /ryftone/.rest-*
 chown "$target_uid:$target_gid" -f -R /ryftone/.rest-*
-chown "$target_uid:$target_gid" -f /var/log/ryft/server.log
+chown "$target_uid:$target_gid" -f /var/log/blacklynx/server.log
 
 # pull the Docker images (check the docker.images configuration options)
 [ -z "$RYFT_DO_NOT_PULL_DOCKER_IMAGES" ] && \
