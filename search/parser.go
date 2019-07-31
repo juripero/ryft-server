@@ -44,7 +44,11 @@ func ParseIndex(buf []byte) (*Index, error) {
 	n := len(fields)
 	if n < 4 {
 		return nil, fmt.Errorf("invalid number of fields in '%s'", string(buf))
-	}
+	} else {
+		// new fields added, not defined yet, but math needs this
+		n = 4
+	}	
+	
 
 	// NOTE: filename (first field) may contains ','
 	// so we have to combine some first fields

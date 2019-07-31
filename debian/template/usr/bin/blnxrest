@@ -3,8 +3,9 @@
 # print usage info
 usage() {
     cat <<EOF
-blnxrest is a command line front end to the BlackLynx RESTful server providing an interface to
-the BlackLynx search products searchlynx and cyberlynx.
+
+blnxrest is a command line front end to the BlackLynx RESTful server providing
+an interface to the BlackLynx search products searchlynx and cyberlynx.
 
 Usage: $0 [options]
 
@@ -40,9 +41,11 @@ Search specific:
 -od|--data=<file>  Used to keep a data results file.
 -oi|--index=<file> Used to keep an index results file.
 -ov|--view=<file>  Used to keep a view results file. To speed up /search/show.
---lifetime=<T>     Used to automatically cleanup results files. Examples: 1h, 1m, 20s.
+--lifetime=<T>     Used to automatically cleanup results files.
+                       Examples: 1h, 1m, 20s.
 --backend=<X>      Used to select a specific BlackLynx backend processor.
---backend-mode=<mode> Used to select backend mode defined in `ryft-server.conf`.
+--backend-mode=<mode> Used to select backend mode defined in the RESTful server
+                      configuration file
 --backend-option=<opt> Additional backend option. Depends on selected --backend.
 
 REST specific:
@@ -51,16 +54,19 @@ REST specific:
 -u|--user=<cred> Use user credentials, "username:password".
   |--auth
 --search         Use /search endpoint to print all found items.
---count          Use /count endpoint instead of /search to print just statistics (default).
---dry|--dry-run  Do a "dry-run" (do not call BlackLynx hardware/search software).
---limit=N        Specifies the limit on total number of records printed (used with /search).
+--count          Use /count endpoint instead of /search to print just
+                     statistics (default).
+--dry|--dry-run  Do a "dry-run" (do not call BlackLynx hardware/search software)
+--limit=N        Specifies the limit on total number of records printed
+                     (used with /search).
 --local          Specifies the local search. Opposite to --cluster. (default)
 --cluster        Specifies the cluster search. Opposite to --local.
 --format=<fmt>   Specifies format of the result records, can be:
                      - raw - base-64 encoded data, by default.
                      - xml - decode XML records
                      - json - decode JSON objects
-                     - csv - decode CSV records (column names customized via tweaks)
+                     - csv - decode CSV records (column names customized via
+					     tweaks)
                      - utf8 - for text search get utf-8 string
                               instead of base-64 encoded raw bytes
                      - null|none - ignores all data
@@ -85,11 +91,13 @@ REST specific:
 -v|--verbose     Tells curl to be verbose.
 -vv|--pretty     Get pretty (properly indented) formatting with jq tool.
 --drate          Reformat output to add Data Rate
---details        Reformat output to add Data Rate and details on intermediate results
+--details        Reformat output to add Data Rate and details on intermediate
+                     results
 
 # Post search jobs
 --jobid=<jobid>  Specifies a tag used to sequence BlackLynx geo operations.
-                 Used to tag composite data and index files for further processing.
+                     Used to tag composite data and index files for further
+                     processing.
 --job-type=<job type>  Post processing job (ex. blgeo)
 
 
@@ -101,7 +109,8 @@ $0 -q 'Joe' -f '*.txt' -vv --search
 $0 -q 'Joe' -f '*.txt' -vv --count
   will just print the number of matches and some performance numbers.
 
-$0 -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --format=xml --fields=ID,Date -vv
+$0 -q '(RECORD.id CONTAINS "100310")' -f '*.pcrime' --format=xml
+   --fields=ID,Date -vv
   will launch a structured search in pcrime files.
 EOF
 }

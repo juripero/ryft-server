@@ -52,6 +52,8 @@ type Config struct {
 	Nodes  uint     // number of hardware nodes to use (0..4)
 	Limit  int64    // limit the number of records (-1 - no limit)
 	Offset int64    // first record index (/show feature)
+	JobID  string   // Job ID to link blgeo work
+	JobType string	// type of post processing (blgeo for now)
 
 	// if not empty keep the INDEX and/or DATA file
 	// delimiter is used between records in DATA file
@@ -59,8 +61,12 @@ type Config struct {
 	KeepDataAs  string
 	KeepIndexAs string
 	KeepViewAs  string
+	KeepJobDataAs  string
+	KeepJobIndexAs  string
+	KeepJobOutputAs  string
 	Delimiter   string
 	Lifetime    time.Duration
+	Fields		string
 
 	// post-processing transformations
 	Transforms []Transform
@@ -100,6 +106,14 @@ type Config struct {
 		Format map[string]interface{} // format specific options (column names for CSV, etc)
 		Aggs   map[string]interface{} // aggregation specific options
 	}
+
+	// passed in parameters for post search executable and CSV file
+
+	PostExecParams	map[string]interface{}
+	CsvFields		map[string]interface{}
+	CsvColumns		[]string
+	CsvHierarchy	[]string
+	CsvOrder		string
 
 	// report performance metrics
 	Performance bool
@@ -196,6 +210,41 @@ func (cfg Config) String() string {
 		props = append(props, fmt.Sprintf("limit:%d", cfg.Limit))
 	}
 
+	// JobID
+	if len(cfg.JobID) != 0 {
+		props = append(props, fmt.Sprintf("JobID:%q", cfg.JobID))
+	}
+
+	// JobType
+	if len(cfg.JobType) != 0 {
+		props = append(props, fmt.Sprintf("JobType:%q", cfg.JobType))
+	}
+
+	// PostExecParams
+	if len(cfg.PostExecParams) != 0 {
+		props = append(props, fmt.Sprintf("PostExecParams:%q", cfg.PostExecParams))
+	}
+
+	// CsvFields
+	if len(cfg.CsvFields) != 0 {
+		props = append(props, fmt.Sprintf("CsvFields:%q", cfg.CsvFields))
+	}
+
+	// CsvColumns
+	if len(cfg.CsvColumns) != 0 {
+		props = append(props, fmt.Sprintf("CsvColumns:%q", cfg.CsvColumns))
+	}
+
+	// CsvHierarchy
+	if len(cfg.CsvHierarchy) != 0 {
+		props = append(props, fmt.Sprintf("CsvHierarchy:%q", cfg.CsvHierarchy))
+	}
+
+	// CsvOrder
+	if len(cfg.CsvOrder) != 0 {
+		props = append(props, fmt.Sprintf("CsvOrder:%q", cfg.CsvOrder))
+	}
+
 	// data
 	if len(cfg.KeepDataAs) != 0 {
 		props = append(props, fmt.Sprintf("data:%q", cfg.KeepDataAs))
@@ -209,6 +258,21 @@ func (cfg Config) String() string {
 	// view
 	if len(cfg.KeepViewAs) != 0 {
 		props = append(props, fmt.Sprintf("view:%q", cfg.KeepViewAs))
+	}
+
+	// Post processing data
+	if len(cfg.KeepJobDataAs) != 0 {
+		props = append(props, fmt.Sprintf("jobData:%q", cfg.KeepJobDataAs))
+	}
+
+	// Post processing index
+	if len(cfg.KeepJobIndexAs) != 0 {
+		props = append(props, fmt.Sprintf("jobIndex:%q", cfg.KeepJobIndexAs))
+	}
+
+	// Post processing output
+	if len(cfg.KeepJobOutputAs) != 0 {
+		props = append(props, fmt.Sprintf("jobOutput:%q", cfg.KeepJobOutputAs))
 	}
 
 	// delimiter

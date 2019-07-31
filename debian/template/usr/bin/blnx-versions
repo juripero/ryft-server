@@ -4,7 +4,8 @@ DEBUG=0
 #
 # Shell script to return BlackLynx product versions
 #
-scriptVersion="06-13-2019 16:00"
+scriptVersion="07-24-2019 12:00"
+
 
 # Set defaults
 PLATFORM="Undetermined"
@@ -25,6 +26,10 @@ ryftBlgeoVersion="Not Installed"
 DO_ELASTIC="False"
 DO_LEGACY="False"
 
+SEARCH_EXE="searchlynx"
+CYBER_EXE="cyberlynx"
+
+
 # print usage info
 usage() {
     cat <<EOF
@@ -33,7 +38,7 @@ usage() {
     version: ${scriptVersion}
 
     Options:
-	-l|--legacy        Add legacy BlackLynx products
+    -l|--legacy        Add legacy BlackLynx products
     -h|--help          Prints this short help message.
 
 EOF
@@ -117,6 +122,12 @@ determinePlatform(){
                 AFIShell=`echo -e ${fpgaVersion} | cut -d' ' -f8`
             fi
         else
+
+            serialNo=`sudo dmidecode -s system-serial-number 2>&1`
+			if [ $? -ne 0 ]; then
+				serialNo="Undetermined"
+			fi	
+
             PLATFORM=`xbsak list 2>&1`
 		    if [ "${DEBUG}" != 0 ]; then
                 echo -e "xbsak: $PLATFORM"
@@ -132,7 +143,6 @@ determinePlatform(){
                 else
                     PLATFORM=`echo "$PLATFORM" | grep -v "^INFO" | cut -d' ' -f2`
                 fi
-                serialNo="Unknown"
             fi
         fi
     fi
@@ -169,21 +179,28 @@ setEngineeringProducts() {
         fi
     fi
 
-    tmpRyftxVersion=`searchlynx --version 2>/dev/null`
-    if [ ${#tmpRyftxVersion} -gt 0 ]; then
-        ryftxVersion=`echo -e ${tmpRyftxVersion} | \
+    if [ ! -f /usr/bin/searchlynx ]; then
+        SEARCH_EXE="ryftx"
+        CYBER_EXE="ryftx_pcap"
+    fi	
+    tmpSearchVersion=`${SEARCH_EXE} --version 2>/dev/null`
+    if [ ${#tmpSearchVersion} -gt 0 ]; then
+        ryftxVersion=`echo -e ${tmpSearchVersion} | \
                       sed -e "s/.*\(Systems, Inc[^_0-9]*\)\([_0-9]*\).*/\2/"`
-        ryftxVersion=`echo -e ${ryftxVersion} | sed -e "s/.*\(version: \)\([_0-9]*\).*/\2/"`
-        ryftxArchitecture=`echo -e ${tmpRyftxVersion} | \
-                           sed -e "s/.*\(architecture: \)\([^[:space:]]*\).*/\2/"`
+##        ryftxVersion=`echo -e ${ryftxVersion} | sed -e "s/.*\([Vv]ersion: \)\([_0-9]*\).*/\2/"`
+        ryftxVersion=`echo -e ${ryftxVersion} | sed -e "s/.*\([Vv]ersion: \)\(.*\)$/\2/"`
+        ryftxArchitecture=`echo -e ${ryftxVersion} | \
+                           sed -e "s/.*\([Aa]rchitecture: \)\([^[:space:]]*\).*/\2/"`
     fi
 
-    tmpRyftPCAPVersion=`cyberlynx --version 2>/dev/null`
+    tmpRyftPCAPVersion=`${CYBER_EXE} --version 2>/dev/null`
     if [ ${#tmpRyftPCAPVersion} -gt 0 ]; then
-        ryftPCAPVersion=`echo -e ${tmpRyftPCAPVersion} | sed -e "s/.*\(version: \)\([_0-9]*\).*/\2/"`
+##        ryftPCAPVersion=`echo -e ${tmpRyftPCAPVersion} | sed -e "s/.*\([Vv]ersion: \)\([_0-9]*\).*/\2/"`
+        ryftPCAPVersion=`echo -e ${tmpRyftPCAPVersion} | sed -e "s/.*\([Vv]ersion: \)\(.*\)$/\2/"`
     fi
 
-    tmpRyftPCRE2Version=`searchlynx --version 2>/dev/null`
+    tmpRyftPCRE2Version=`ryftpcre2 --version 2>/dev/null`
+
     if [ ${#tmpRyftPCRE2Version} -gt 0 ]; then
         ryftPCRE2Version=`echo -e ${tmpRyftPCRE2Version} | sed -e "s/.*\(version: \)\([_0-9]*\).*/\2/"`
     fi
@@ -231,6 +248,7 @@ getLayeredProducts(){
 	    tempWebApiDemoVersion=`ls -al /var/www | grep -e "html.*blacklynxWebUI" | \
 		                       sed -e "s/.*blacklynxWebUI[-_]\([0-9.]*\).*/\1/"`
     fi
+    
     test -d /usr/share/nginx/html
     if [ $? == 0 ]
     then

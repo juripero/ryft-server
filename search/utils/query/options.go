@@ -367,6 +367,19 @@ func (o *Options) SetMode(mode string) *Options {
 		o.DecimalPoint = ""
 		//o.FileFilter = ""
 
+	// PIR
+	case "pir":
+		o.Dist = 0
+		//o.Width = 0
+		//o.Line = false
+		o.Case = false
+		o.Reduce = false
+		o.Octal = false
+		o.CurrencySymbol = ""
+		o.DigitSeparator = ""
+		o.DecimalPoint = ""
+		//o.FileFilter = ""
+
 	default:
 		panic(fmt.Errorf("%q is unknown search mode", mode))
 	}

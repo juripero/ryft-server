@@ -201,6 +201,10 @@ func main() {
 		"scripts": server.Config.PostProcScripts,
 	}).Debug("post-processing configuration")
 
+	log.WithFields(map[string]interface{}{
+	    "programs":	server.Config.FinalProcessor,
+	}).Debug("Post executable commands")	
+
 	// Create a router
 	router := gin.New()
 

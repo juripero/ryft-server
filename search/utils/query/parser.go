@@ -128,6 +128,18 @@ func (p *Parser) scanIgnoreSpace() Lexeme {
 	}
 }
 
+
+// scanIgnoreSpace scans the next non-whitespace or EOF token.
+func (p *Parser) scanIgnoreSpaceComma() Lexeme {
+	for {
+		lex := p.scan()
+		if lex.token != WS && lex.token != COMMA {
+			return lex
+		}
+		// whitespaces are ignored
+	}
+}
+
 // EOF checks if no more data to parse
 func (p *Parser) EOF() bool {
 	if lex := p.scanIgnoreSpace(); lex.token == EOF {
@@ -387,6 +399,10 @@ func (p *Parser) parseSimpleQuery() *SimpleQuery {
 			expression, res.Options = p.parsePIPExpr(res.Options)
 			res.Options.SetMode("pip")
 
+		case lex.IsPir(): // PIR + options
+			expression, res.Options = p.parsePIRExpr(res.Options)
+			res.Options.SetMode("pir")
+
 		// consume all continous strings and wildcards
 		case lex.token == STRING,
 			lex.token == WCARD:
@@ -467,6 +483,10 @@ func getExprOld(expr string, opts Options) string {
 
 	// PIP search
 	case "pip":
+		return expr // "as is"
+
+	// PIR search
+	case "pir":
 		return expr // "as is"
 	}
 
@@ -635,6 +655,12 @@ func getExprNew(expr string, opts Options) string {
 		// PIP uses all passed parameters and no globals
 		
 		return fmt.Sprintf("PIP(%s)", strings.Join(args, ", "))
+
+	// PIR
+	case "pir":
+		// PIR uses all passed parameters and no globals
+		
+		return fmt.Sprintf("PIR(%s)", strings.Join(args, ", "))
 	}
 
 	// panic(fmt.Errorf("%q is unknown search mode", opts.Mode))
@@ -721,6 +747,80 @@ func (p *Parser) parseSearchExpr(opts Options) (string, Options) {
 	default:
 		panic(fmt.Errorf("no string expression found"))
 	}
+
+	// parse options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		opts = p.parseSearchOptions(opts)
+	default:
+		p.unscan(lex)
+	}
+
+	// right paren last
+	switch end := p.scanIgnoreSpace(); end.token {
+	case RPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of )", end))
+	}
+
+	return res, opts
+}
+
+// parse PIR search expression (Focus, Radius, [options])
+func (p *Parser) parsePIRExpr(opts Options) (string, Options) {
+	var res string
+
+	// left paren first
+	switch beg := p.scanIgnoreSpace(); beg.token {
+	case LPAREN:
+		break // OK
+	default:
+		panic(fmt.Errorf("%q found instead of (", beg))
+	}
+
+	// read lat focal point expression
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case STRING, WCARD:
+		res = p.parseStringExpr(lex)
+
+	default:
+		panic(fmt.Errorf("no string expression found"))
+	}
+
+	// parse options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		res = res + ","
+	default:
+		p.unscan(lex)
+	}
+
+	// read longitude focal point expression
+	switch lex := p.scanIgnoreSpaceComma(); lex.token {
+	case STRING, WCARD:
+		res = res + p.parseStringExpr(lex)
+
+	default:
+		panic(fmt.Errorf("no string expression found"))
+	}	
+
+	// parse options
+	switch lex := p.scanIgnoreSpace(); lex.token {
+	case COMMA:
+		res = res + ","
+	default:
+		p.unscan(lex)
+	}
+
+	// read radius expression
+	switch lex := p.scanIgnoreSpaceComma(); lex.token {
+	case STRING, WCARD:
+		res = res + p.parseStringExpr(lex)
+
+	default:
+		panic(fmt.Errorf("no string expression found"))
+	}	
 
 	// parse options
 	switch lex := p.scanIgnoreSpace(); lex.token {

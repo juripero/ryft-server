@@ -31,6 +31,7 @@
 package rest
 
 import (
+	"os"
 	"bytes"
 	"encoding/csv"
 	"fmt"
@@ -67,7 +68,7 @@ type SearchParams struct {
 	Reduce bool   `form:"reduce" json:"reduce,omitempty" msgpack:"reduce,omitempty"`                // FEDS only
 	Nodes  uint8  `form:"nodes" json:"nodes,omitempty" msgpack:"nodes,omitempty"`
 
-	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`                        // "" | "ryftprim" | "ryftx"
+	Backend     string   `form:"backend" json:"backend,omitempty" msgpack:"backend,omitempty"`      // "" | "ryftprim" | "ryftx"
 	BackendOpts []string `form:"backend-option" json:"backend-options,omitempty" msgpack:"backend-options,omitempty"` // search engine parameters (useless without "backend")
 	BackendMode string   `form:"backend-mode" json:"backend-mode,omitempty" msgpack:"backend-mode,omitempty"`
 	KeepDataAs  string   `form:"data" json:"data,omitempty" msgpack:"data,omitempty"`
@@ -84,17 +85,24 @@ type SearchParams struct {
 	ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 	LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
 
-	// tweaks
+	// tweaks (includes post processing executable parameters)
 	Tweaks struct {
 		Format  map[string]interface{} `json:"format,omitempty" msgpack:"format,omitempty"`
 		Cluster []interface{}          `json:"cluster,omitempty" msgpack:"cluster,omitempty"`
 
 		ShortAggs map[string]interface{} `form:"-" json:"aggs,omitempty" msgpack:"aggs,omitempty"`
 		LongAggs  map[string]interface{} `form:"-" json:"aggregations,omitempty" msgpack:"aggregations,omitempty"`
+		PostExecParams  map[string]interface{} `json:"jobparm,omitempty" msgpack:"jobparm,omitempty"`
+		CsvFields	map[string]interface{} 	`json:"CSVFields,omitempty" msgpack:"CSVFields,omitempty"`	
+		CsvOrder	string		 	`json:"CSVOrder,omitempty" msgpack:"CSVOrder,omitempty"`	
 	} `form:"-" json:"tweaks,omitempty" msgpack:"tweaks,omitempty"`
 
 	Format string `form:"format" json:"format,omitempty" msgpack:"format,omitempty"`
 	Fields string `form:"fields" json:"fields,omitempty" msgpack:"fields,omitempty"` // for XML and JSON formats
+	// job information for post-processing cmds
+	JobID  		string 			`form:"jobid" json:"jobid,omitempty" msgpack:"jobid,omitempty"`
+	JobType 	string 			`form:"jobtype" json:"jobtype,omitempty" msgpack:"jobtype,omitempty"`
+
 	Stats  bool   `form:"stats" json:"stats,omitempty" msgpack:"stats,omitempty"`    // include statistics
 	Stream bool   `form:"stream" json:"stream,omitempty" msgpack:"stream,omitempty"`
 
@@ -195,6 +203,7 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	cfg.KeepIndexAs = randomizePath(params.KeepIndexAs)
 	cfg.KeepViewAs = randomizePath(params.KeepViewAs)
 	cfg.Delimiter = mustParseDelim(params.Delimiter)
+	cfg.Fields = params.Fields
 	if len(params.Lifetime) > 0 {
 		if cfg.Lifetime, err = time.ParseDuration(params.Lifetime); err != nil {
 			panic(NewError(http.StatusBadRequest, err.Error()).
@@ -206,6 +215,18 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	cfg.SkipMissing = params.IgnoreMissingFiles
 	cfg.Offset = 0
 	cfg.Limit = params.Limit
+	cfg.JobID = params.JobID
+	cfg.JobType = params.JobType
+	cfg.PostExecParams = params.Tweaks.PostExecParams
+	cfg.CsvFields = params.Tweaks.CsvFields
+	cfg.CsvOrder = params.Tweaks.CsvOrder
+	log.WithFields(map[string]interface{}{
+		"JobID":     cfg.JobID,
+		"JobType":	 cfg.JobType,
+		"post-params": cfg.PostExecParams,
+		"csv-fields": cfg.CsvFields,
+		"Order": cfg.CsvOrder,
+	}).Infof("[%s]: Post Exec Job", CORE)
 	cfg.Performance = params.Performance
 	cfg.ShareMode, err = utils.SafeParseMode(params.ShareMode)
 	if err != nil {
@@ -291,6 +312,33 @@ func (server *Server) doSearch(ctx *gin.Context, params SearchParams) {
 	server.drain(ctx, enc, tcode, cfg, res, errorPrefix)
 	transferStopTime := time.Now() // performance metric
 
+	// If post processing executable, do now
+	if len(cfg.JobID) > 0  {
+		res.Stat.Extra["JobID"] = cfg.JobID
+		if cfg.KeepJobDataAs != "" {
+			res.Stat.Extra["JobData"] = cfg.KeepJobDataAs
+		}	
+		if cfg.KeepJobIndexAs != "" {
+			res.Stat.Extra["JobIndex"] = cfg.KeepJobIndexAs
+		}
+		if len(cfg.JobType) > 0 {
+			results, err := server.runPostCommand(cfg)
+			if err != nil {
+				log.Debugf("[POST EXEC] runPostCommand failure returns: %v\n Skip results", results)
+				res.Stat.Extra["JobStatus"] = "Failed"
+			} else {
+				res.Stat.Extra["JobStatus"] = "Passed"
+				log.Debugf("[POST EXEC] runPostCommand success returns: %+v", results)
+				// Now add generated data to return message
+				if cfg.KeepJobOutputAs != "" {
+					res.Stat.Extra["JobResults"] = cfg.KeepJobOutputAs
+				}	
+			}	
+		}
+		// Cleanup post-processing job with different timeouts.
+		server.cleanupPostSession(homeDir, cfg)
+	}	
+
 	if params.Stats && res.Stat != nil {
 		if server.Config.ExtraRequest {
 			res.Stat.Extra["request"] = &params
@@ -347,6 +395,11 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 	cfg *search.Config, res *search.Result, errorPrefix string) {
 	// ctx.Stream() logic
 	var lastError error
+	var dataF	*os.File
+	var indexF	*os.File
+	var err error
+	var offset int
+	var ofileName string 
 
 	// put error to stream
 	putErr := func(err_ error) {
@@ -363,6 +416,35 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 	}
 
 	// put record to stream
+	if len(cfg.JobID) > 0 {
+		path := server.getPostProcessingOutputPath(cfg)
+		now := time.Now()
+		ofileName = fmt.Sprintf("%s/outData-%s-%d.csv", path, cfg.JobID, now.Unix())
+		ifile := fmt.Sprintf("%s/outIndex-%s-%d.txt", path, cfg.JobID, now.Unix())
+		dataF, err = os.OpenFile(ofileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0664)
+		if err != nil {
+			log.Infof("error opening file for joined output data")
+			panic(err)
+		}
+
+		lineLen := 0
+		// Write column headers if available
+		FieldNames := getCsvHeaderNames(cfg, false)
+		if FieldNames != nil {
+			lineLen, err = dataF.WriteString(strings.Join(FieldNames, ",") + "\n")
+			if err != nil {
+				panic(err)
+			}
+		}	
+		offset = lineLen
+		indexF, err = os.OpenFile(ifile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0664)
+		if err != nil {
+			log.Infof("error opening file for joined index data")
+			panic(err)
+		}
+		cfg.KeepJobDataAs = ofileName
+		cfg.KeepJobIndexAs = ifile
+	}
 	putRec := func(rec *search.Record) {
 		xrec := tcode.FromRecord(rec)
 		if xrec != nil {
@@ -372,8 +454,29 @@ func (server *Server) drain(ctx *gin.Context, enc codec.Encoder, tcode format.Fo
 			}
 			// ctx.Writer.Flush() // TODO: check performance!!!
 		}
+		if len(cfg.JobID) > 0 {
+			s,_ := makeCsvLine(xrec, cfg)
+			s = s + "\n"
+			lineLen, err := dataF.WriteString(s)
+			if err != nil {
+				log.Infof("error writing csv line to file- %s", err)
+				panic(err)
+			}
+			f := fmt.Sprintf("%s,%d,%d,0\n", ofileName, offset, lineLen)
+			offset = offset + lineLen
+			_, err = indexF.WriteString(f)
+			if err != nil {
+				panic(err)
+			}
+		    log.WithField("CSV", s).Debugf("MNB[%s]: look", CORE)
+		    log.WithField("INDEX", f).Debugf("MNB[%s]: look", CORE)
+		}
+		
 	}
-
+	if len(cfg.JobID) > 0 {
+		defer dataF.Close()
+		defer indexF.Close()
+	}	
 	// process results!
 	for {
 		select {
@@ -632,3 +735,4 @@ func (server *Server) cleanupSession(homeDir string, cfg *search.Config) {
 			now.Add(cfg.Lifetime))
 	}
 }
+
