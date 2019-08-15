@@ -560,6 +560,7 @@ if [[ "$PRETTY" = "true" ]]; then
 #
 # individual pieces jq formatting to add units of measurment for demo displays
 #
+HIDE_HOSTNAME=true
 UNITS1=' if .duration >= 1000 then
              {"Duration(sec)         ": ((.duration / 1000)|.*10+0.5|floor|./10)}
         else {"Duration(msec)        ": .duration}

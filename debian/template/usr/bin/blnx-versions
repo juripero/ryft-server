@@ -208,8 +208,8 @@ setEngineeringProducts() {
 	tmpBlgeoVersion=`blgeo --version 2>/dev/null`
 	if [ "${#tmpBlgeoVersion}" -gt 0 ]; then
 	     ryftBlgeoVersion=`echo "${tmpBlgeoVersion}" | \
-		                   grep "blgeo r[0-9][0-9]*[[:space:]]*BlackLynx, Inc." | \
-						   sed -e "s/.*blgeo r\([0-9][0-9]*\).*/\1/"` 
+		                   grep "blgeo r[0-9][0-9+]*[[:space:]]*BlackLynx, Inc." | \
+						   sed -e "s/.*blgeo r\([0-9][0-9+]*\).*/\1/"` 
 	fi
 }
 
@@ -353,7 +353,11 @@ fi
 if [ "${ryftxVersion}" == "Not Installed" ]; then
     echo "searchlynx:    ${ryftxVersion}"
 else
-    echo "searchlynx:    ${ryftxVersion} (${ryftxArchitecture})"
+    if [ "${ryftxVersion}" == "${ryftxArchitecture}" ]; then
+        echo "searchlynx:    ${ryftxVersion}"
+    else
+        echo "searchlynx:    ${ryftxVersion} (${ryftxArchitecture})"
+    fi
 fi
 echo "cyberlynx:     ${ryftPCAPVersion}"
 if [ "${DO_LEGACY}" == "True" ]; then

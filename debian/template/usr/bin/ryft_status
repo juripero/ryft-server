@@ -897,7 +897,7 @@ function ryft_ryftone_maintenance_menu
     menu_select=`menu_select_next $menu_select`
     if [ $ryftVersionsPresent == 1 ]
     then
-        MAINTENANCE_MENU_TEXT[$menu_select]="Ryft Versions            (ryft-versions)"
+        MAINTENANCE_MENU_TEXT[$menu_select]="BlackLynx Versions       (blnx-versions)"
         menu_select=`menu_select_next $menu_select`
     fi            
     MAINTENANCE_MENU_TEXT[$menu_select]="Reboot                   (sudo shutdown -rf now)"
@@ -929,7 +929,7 @@ function ryft_ryftone_maintenance_menu
     menu_select=`menu_select_next $menu_select`
     if [ $ryftVersionsPresent == 1 ]
     then
-        MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_separator; ryft-versions; ryft_separator"
+        MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_separator; blnx-versions; ryft_separator"
         menu_select=`menu_select_next $menu_select`
     fi            
     MAINTENANCE_MENU_ACTIONS[$menu_select]="ryft_ays 'Requested action will reboot the ryftone.' && sudo shutdown -rf now || echo 'not sure'"
@@ -1260,7 +1260,7 @@ function ryft_main_menu
     menu_select=`menu_select_next $menu_select`
     if [ $ryftVersionsPresent == 1 ]
     then
-        MAIN_MENU_TEXT[$menu_select]="Ryft Versions"
+        MAIN_MENU_TEXT[$menu_select]="BlackLynx Versions"
         menu_select=`menu_select_next $menu_select`
     fi
 
@@ -1284,7 +1284,7 @@ function ryft_main_menu
     menu_select=`menu_select_next $menu_select`
     if [ $ryftVersionsPresent == 1 ]
     then
-        MAIN_MENU_ACTIONS[$menu_select]="ryft_separator; ryft-versions; ryft_separator;"
+        MAIN_MENU_ACTIONS[$menu_select]="ryft_separator; blnx-versions; ryft_separator;"
         menu_select=`menu_select_next $menu_select`
     fi
 
