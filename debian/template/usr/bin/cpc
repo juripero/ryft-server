@@ -3,4 +3,4 @@
 # Blacklynx cpc command
 # Script to duplicate old Engineering released cpc command
 #
-sync; echo 3 > sudo /proc/sys/vm/drop_caches
+sudo bash -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
