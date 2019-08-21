@@ -1,0 +1,243 @@
+#!/bin/bash
+
+# Copyright, 2019, BlackLynx, Inc.
+# Script to demonstrate BlackLynx Geo.  This script evaluates the request,
+# sends the query to the BlackLynx RESTful server, then passes to results
+# to the BlackLynx KML formater.  Lastly, the KML file is optionally used
+# to invoke a KML viewer like Google Earth.
+#
+LASTMOD_DATE=2019-08-20
+# Terminal escape sequences
+REEN='\033[1;32m'
+RED='\033[1;31m'
+NC='\033[0m'
+
+# Script Defaults
+USERNAME="ryftuser"
+SERVER_DEFAULTS="./geoDefaults.cfg"
+
+function usage {
+   cat <<EOF
+
+    BlackLynx Geo Demo control script
+    BlackLynx, Inc., ${LASTMOD_DATE}
+
+    Abstract: Intended for users that need to connect to a remote licensed BlackLynx
+              system to run the BlackLynx Geo operations and then retrieve the output
+              KML file from that server for local visualization on the user's system.
+
+    Usage: $0 [options]
+
+    --ip <ip address>       IP Address of the BlackLynx RESTful server (port 8765)
+    --auth <Authorization>	RESTful server authization ("<user>:<password>")
+    --viz <command>         (Optional) specifies the local KML visuzliation tool to use.
+                            By default the script will attempt to use the default KML
+                            viewer for your system (or will eventually error if no such
+                            default is configured).
+    --skip-vis              (Optional) Skips local visualization
+    --ci-list <list>        (Optional) Comma separated list of configuration indexes
+                            that will be run in the specified order.
+    --append-list           (Optional) Ignored unless --ci-list is also specified. This
+                            append mode causes the first entry in the --ci-list to create
+                            a new KML output file, but all other entries in the list will
+                            be appended to that same file.
+    --last-vis | --vis-last (Optional) ignored unless --ci-list is also specified. This
+                            causes only the final list entry to be potentially visualized.
+    -v                      (Optional) Turns on verbose mode.
+    -h | --help             Displays usage and exits.
+
+EOF
+}
+
+#-------------------------------------------------
+# Functions:
+#-------------------------------------------------
+#
+# Function to read target machine defaults
+#
+function readDefaults {
+    if [ -f ${SERVER_DEFAULTS} ]; then
+        . <(sed -r '/[^=]+=[^=]+/!d;s/\s+=\s/=/g' "${SERVER_DEFAULTS}")
+    fi
+}
+
+# Display message if debugging mode
+function verbose(){
+    if [ "${VERBOSE}" == "true" ]; then
+	    echo -e "${1}"
+	fi
+}
+
+
+function loadCommandInfo() {
+    local retVal=0
+    TARGET_INDEX=${1}
+	verbose "loadCommandInfo looking for ${TARGET_INDEX}"
+	FOUND_INDEX="False"
+	while IFS='' read -r line; do
+	    if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
+			continue
+		fi
+		set ${line}
+		COMMAND=`echo $1 | tr 'A-Z' 'a-z'`
+        case $COMMAND in
+            \#*) #skip commented out lines
+				:
+				;;
+            start)
+			    # Cleanup
+				DEMO_CMD=
+				DEMO_INDEX=
+                DEMO_COMMENT=
+                DEMO_NAME=
+                DEMO_VERSION_NUM=
+				;;
+			comment:)	
+                DEMO_COMMENT=`echo ${line} | sed -e "s/$1 \(.*\)/\1/"`
+				;;
+			version:)
+				DEMO_VERION_NUM=`echo ${line} | sed -e "s/$1 \(.*\)/\1/"`
+        		verbose "${DEMO_LIST_FILE} Command: ${COMMAND} ${DEMO_VERION_NUM}" 
+				;;
+			index:)
+				DEMO_INDEX=`echo ${line} | sed -e "s/$1 \(.*\)/\1/"`
+        		verbose "${DEMO_LIST_FILE} Command: ${COMMAND} ${DEMO_INDEX}" 
+				;;
+			name:)	
+				DEMO_NAME=`echo ${line} | sed -e "s/$1 \(.*\)/\1/"`
+        		verbose "${DEMO_LIST_FILE} Command: ${COMMAND} ${DEMO_NAME}" 
+				;;
+			command:)
+				DEMO_CMD=`echo $line | sed -e "s/$1 \(.*\)/\1/"`
+				;;
+			end)	
+				# do stuff
+				if [ "${TARGET_INDEX}" == "${DEMO_INDEX}" ]; then
+				    FOUND_INDEX="True"
+					break
+				fi	
+				;;
+			*)
+			    # verbose "${RED}Got $line${NO_COLOR}"
+				;;
+		esac
+		if [ "${FOUND_INDEX}" == "True" ]; then
+		    break
+		fi	
+	done < "$DEMO_LIST_FILE"	
+	if [ "${FOUND_INDEX}" == "True" ]; then
+		return 0
+	else	
+		return 1
+	fi	
+}
+
+
+#---- End of functions --------------------------
+# setup to check visualization launching later
+checkxdg=$(which xdg-open 2>/dev/null)
+checkgn=$(which gnome-open 2>/dev/null)
+checkmac=$(which open 2>/dev/null)
+checkwin=$(which cmd 2>/dev/null)
+
+# Command line defaults
+readDefaults
+VERBOSE=
+viscmd=
+skipvis=
+DEMO_LIST=
+lastvis=
+appendlist=
+
+# Parse Command line
+while [[ $# > 0 ]]; do
+	case "${1}" in
+		--ip)
+			SERVER_IP=${2}
+			shift 2
+			;;
+		--user)
+			SERVER_AUTH="${2}"
+			shift 2
+			;;
+		--vis)
+			viscmd=${2}
+			shift 2
+			;;
+        --skip-vis)
+            skipvis=true
+			shift
+			;;
+		--help|-h)
+		    usage
+			exit 0
+			;;
+		--ci-list|-ci-list)
+		    DEMO_LIST=${2}
+			shift 2
+			;;
+        --append-list)
+		    appendlist=true
+			shift
+			;;
+		--last-vis|--vis-last)
+			lastvis=true
+			shift
+			;;
+		-v)
+		    VERBOSE=true
+			shift
+			;;
+        *)
+			echo -e "${RED}#\n# Unknown arg: ${1}\n#\n${NC}"
+			exit 1
+			;;
+	esac
+done
+
+#
+# Validate required fields
+#
+if [ "${SERVER_IP}" == "" ]; then
+	usage
+    echo -e "${RED}At a minimum, this script requires that you specify a --ip parameter.${NC}\n"
+	exit 1
+fi
+echo "DEMO_LIST: ${DEMO_LIST}"
+if [ "${DEMO_LIST}" == "" ]; then
+    echo -e "${RED}\nUse --ci-list to specify one or more configurations!${NC}\n"
+	exit 1
+fi	
+#
+# Setup loop for command lists
+#
+DEMO_CMD=
+DEMO_INDEX=
+DEMO_COMMENT=
+DEMO_NAME=
+DEMO_VERSION_NUM=
+#
+# Loop thru list
+#
+JOB_ID=$$
+for DEMO_NUM in $(echo $DEMO_LIST | sed "s/,/ /g")
+do
+	verbose "Doing configuration ${DEMO_NUM}"
+	loadCommandInfo ${DEMO_NUM}
+	verbose "load returned $?"
+	FOUND_CMD_ENTRY=$?
+	if [ "${FOUND_CMD_ENTRY}" == "0" ]; then
+    	verbose "Executing demo #{DEMO_INDEX}"
+		DEMO_CMD="${DEMO_CMD} -a ${SERVER_IP} --jobid=${JOB_ID} --job-type=blgeo"
+		RESULT=`eval "$DEMO_CMD" 2>/dev/null | jq .`
+		echo -e "$RESULT"
+	else
+		echo -e "${RED}\nDemo Configuration #${DEMO_NUM} not found!${NC}\n"
+	fi	
+done	
+
+if [ "${VERBOSE}" ]; then
+	echo -e "SERVER IP: ${SERVER_IP}"
+fi	
+
+echo -e "\nFinished\n"

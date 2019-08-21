@@ -1,0 +1,449 @@
+#!/bin/bash
+
+# BlackLynx Geo client-side control script
+# BlackLynx, Inc.
+# This code was last modified:
+lastmoddate=20190223
+
+targetip=
+username=ryftuser
+
+# set this to true to enable local debug
+debugmode=
+
+tmpfile=/tmp/blgeoremote_$$_tmp
+
+# these are terminal/escape code sequences used for potential colored text output later in this script
+GREEN='\033[1;32m'
+RED='\033[1;31m'
+NC='\033[0m'
+
+function usage {
+	echo
+	echo "BlackLynx Geo client-side control script"
+	echo "BlackLynx, Inc., $lastmoddate"
+
+	echo
+	echo "Script: $0"
+	echo
+	echo "Abstract: intended for users that need to connect to a remote licensed BlackLynx system to run the BlackLynx Geo operations and then retrieve the output KML file from that server for local visualization on the user's system."
+
+	echo
+	echo "--ip: (Required) target system IP address (can be localhost if the local system has a licensed BlackLynx installation)."
+	echo "--username: (Optional) username to use on target system (default: ryftuser)"
+	echo "--vis: (Optional) specifies the local KML visuzliation tool to use. By default the script will attempt to use the default KML viewer for your system (or will eventually error if no such default is configured)."
+	echo "--skip-vis: (Optional) skips local visualization, regardless of passed blgeo parms."
+	echo "--show-config: (Optional) shows a specific remote configuration by name and then exits."
+	echo "-s | --show-configs: (Optional) shows a list of remote configurations and exits."
+	echo "-sa | --show-configs-all: (Optional) shows details of all remote configuraitons and exits."
+	echo "--sample: (Optional) shows a sampling of the remote input data corpus for a selected configuration and exits."
+	echo "--total: (Optional) shows the total size of the remote input data corpus for a selectec coniguration and exits."
+	echo "--demo: (Optional) invokes the demonstration mode where each configuration is executed in order, with a keystroke pause between each run."
+	echo "--ci-list: (Optional) invokes the demonstration mode that takes a csv list of configuration index numbers to run in the order specifed, with a keystroke pause between each run."
+	echo "--append-list: (Optional) ignored unless --ci-list is also specified. This append mode causes the first entry in the --ci-list to create a new KML output file, but all other entries in the list will be appended to that same file."
+	echo "--last-vis | --vis-last: (Optional) ignored unless --ci-list is also specified. This causes only the final list entry to be potentially visualized. No implicit pause requests will occur in this mode."
+
+	echo
+	echo " ... remaining parameters are fed through directly to the remote blgeo executable."
+
+	echo
+}
+
+function cleanUp {
+	rm -f $tmpfile
+}
+
+function targetipMissing { 
+	cleanUp
+
+	usage
+
+    echo -e "${RED}At a minimum, this script requires that you specify a --ip parameter.${NC}"
+	echo
+
+    exit 1
+}
+
+function visMayHaveFailed {
+	cleanUp
+
+    echo
+    echo -e "Couldn't determine how to automatically launch a local KML visualization on your client system. The output file ${GREEN}/tmp/blgeo_out.kml${NC} is available for you to manually open with whatever KML visualization tool you have installed." 
+    exit 1
+}
+
+function failExit {
+	cleanUp
+
+    echo
+    echo -e "The blgeo remote command on target system $targetip ${RED}failed${NC}. See information above. No results file was therefore retrieved, so no visualization can be launched. Please correct the error and retry the operation."
+    exit 2
+}
+
+function haltExit {
+	cleanUp
+
+    # add a trailing blank line and note that we were halted.
+    echo
+    echo "$0 has been halted. Exiting."
+    exit 0
+}
+
+function successExit {
+	cleanUp
+    exit 0
+}
+
+function pause {
+	read -n1 -rsp $'Press any key to continue (or Ctrl-C to halt) ...\n'
+	if [ "$?" != "0" ]
+	then
+		haltExit
+	fi
+}
+
+function doDemoMode {
+	# first get the target machine's configuration list and store it in our tempfile
+    ssh $username@$targetip "blgeo --show-configs | grep '^ - '" > $tmpfile
+	cat $tmpfile
+
+	configs=$(cat $tmpfile | cut -d '"' -f2 | cut -d '"' -f1)
+	for i in $configs
+	do
+        # run the remote configuration
+		$0 --username $username --ip $targetip -c "\"$i\"" $userparms
+	
+		pause
+	done
+
+	successExit
+}
+
+function doModeList {
+	didfirst=
+	if [ "$lastvis" == "true" ]
+	then
+		visintermediate="--skip-vis"
+	else
+		visintermediate=
+	fi
+
+	total=0
+	for i in $(echo $listmode | sed "s/,/ /g")
+	do
+		((total++))
+	done
+
+	localcount=0
+	for i in $(echo $listmode | sed "s/,/ /g")
+	do
+		((localcount++))
+		if [ "$localcount" == "$total" ]
+		then
+			visintermediate=
+		fi
+		
+        # run the remote configuration
+		if [ "$didfirst" == "true" ]
+		then
+			if [ "$debugmode" == "true" ]
+			then
+				echo -e "*\n* respawn: $0 --username $username --ip $targetip --no-header -ci $i $visintermediate --kml-append $forceappend\n*\n"
+			fi
+			
+        	$0 --username $username --ip $targetip --no-header -ci $i $visintermediate --kml-append $forceappend
+		else
+			didfirst=true
+        	$0 --username $username --ip $targetip -ci $i $visintermediate
+		fi
+
+		if [[ "$localcount" != "$total" && "$lastvis" != "true" ]]
+		then
+			pause
+		fi
+	done
+
+	successExit
+}
+
+# setup to check visualization launching later
+checkxdg=$(which xdg-open 2>/dev/null)
+checkgn=$(which gnome-open 2>/dev/null)
+checkmac=$(which open 2>/dev/null)
+checkwin=$(which cmd 2>/dev/null)
+
+# invoke the remote blgeo operation sending all passed in parameters
+targcmd="blgeo --no-help --no-vis "
+viscmd=
+skipvis=
+exitearly=
+demomode=
+listmode=
+lastvis=
+appendlist=
+forceappend=
+userparms=
+haveparm=
+while [ $# -ne 0 ]
+do
+    arg="$1"
+    case "$arg" in
+		--ip)
+			targetip=$2
+			shift
+			;;
+		--username)
+			username=$2
+			shift
+			;;
+        --vis)
+            viscmd=$2
+			haveparm=true
+            shift
+            ;;
+        --skip-vis)
+            skipvis=true
+            ;;
+        --help)
+            exitearly=true
+            targcmd="blgeo --help --no-vis "
+			haveparm=true
+            ;;
+        -si)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        --show-config)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        --show-config-i)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        -s)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        --show-configs)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        -sa)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        --show-configs-all)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        --sample)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        --total)
+            exitearly=true
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+        --demo)
+			demomode=true
+			haveparm=true
+            ;;
+        --ci-list)
+			listmode=$2
+			haveparm=true
+			shift
+            ;;
+        -ci-list)
+			listmode=$2
+			haveparm=true
+			shift
+            ;;
+        --append-list)
+			appendlist="--append-list"
+			forceappend=/tmp/blgeo_out.kml
+            ;;
+        --last-vis)
+			lastvis=true
+            ;;
+        --vis-last)
+			lastvis=true
+            ;;
+
+         *\ * )
+         targcmd="$targcmd \"$arg\""
+         userparms="$userparms "$arg
+         haveparm=true
+         ;;
+
+        *)
+			if [ "$debugmode" == "true" ]
+			then
+	        	echo -e "#\n# wild arg: $arg\n#\n"
+	        fi
+        	
+            targcmd="$targcmd "$arg
+			userparms="$userparms "$arg
+			haveparm=true
+            ;;
+    esac
+    shift
+done
+
+# we require a targetip
+if [ "$targetip" == "" ]
+then
+	targetipMissing
+fi
+
+# with no parameter, we will show the remote systems possible configurations and exit. These can subsequently be invoked
+# with the -c parameter
+if [ "$haveparm" != "true" ]
+then
+    ssh $username@$targetip "blgeo --show-configs"
+
+	successExit
+fi
+
+# check demo mode
+if [ "$demomode" == "true" ]
+then
+	doDemoMode
+elif [ "$listmode" != "" ]
+then
+	doModeList
+fi
+
+if [ "$debugmode" == "true" ]
+then
+	echo -e "__\n__remote cmd: $targcmd\n__"
+fi
+
+ssh $username@$targetip "$targcmd"
+retcode=$?
+echo "Return code: $retcode"
+
+# see if we're to leave early
+if [ "$exitearly" == "true" ]
+then
+    successExit
+fi
+
+# if things exited successfully, pull back the result file and attempt to launch it
+locallaunch=false
+if [ "$retcode" == "0" ]
+then
+	if [ "$skipvis" != "true" ]
+	then
+	    # fetch the remote result file and stick it in /tmp
+	    echo
+	    echo "Fetching remote ($username@$targetip) output files (/tmp/blgeo_out.kml, /tmp/blgeo_out.csv, etc.) and storing locally in /tmp ..."
+	    scp $username@$targetip:/tmp/blgeo_out.* /tmp
+	    scp $username@$targetip:/tmp/bl-icon-*.png /tmp &>/dev/null && echo "... also fetched remote placemark icon files found in remote /tmp."
+
+		# generally Google Earth running on linux systems only supports one instance at a time.
+		# this script line will automatically kill any existing Google Earth instance before attempting
+		# to launch the KML visualization. You may or may not need this on your system, so if you
+		# know what you are doing you can potentially comment this line out if you want, but if
+		# you do and you run into Google Earth issues, then you'll likely know why!
+		bash -c 'gepid=$(ps -ef | grep "[0-9] \\./googleearth" | tr -s " " | cut -d " " -f2); [ "$gepid" != "" ] && kill $gepid '
+
+		chmod 775 /tmp/blgeo_out.kml
+
+		# figure out how we should launch it
+		if [ "$checkxdg" != "" ]
+		then
+			locallaunch=true
+			echo
+
+			if [ "$viscmd" != "" ]
+			then
+				echo "Launching visualization with $viscmd."
+				bash -c "$viscmd /tmp/blgeo_out.kml &>/dev/null"
+			else
+				echo "Launching visualization with xdg-open."
+				xdg-open /tmp/blgeo_out.kml
+			fi
+		elif [ "$checkgn" != "" ]
+		then
+			locallaunch=true
+			echo
+
+			if [ "$viscmd" != "" ]
+			then
+				echo "Launching visualization with $viscmd."
+				bash -c "$viscmd /tmp/blgeo_out.kml &>/dev/null"
+			else
+				echo "Launching visualization with gnome-open."
+				gnome-open /tmp/blgeo_out.kml
+			fi
+		elif [ "$checkmac" != "" ]
+		then
+			locallaunch=true
+			echo
+
+			if [ "$viscmd" != "" ]
+			then
+				if [ "$viscmd" == "marble" ]
+				then
+					viscmd=/Applications/Marble.app/Contents/MacOS/marble-qt
+				fi
+				echo "Launching visualization with $viscmd."
+				bash -c "$viscmd /tmp/blgeo_out.kml &>/dev/null"
+			else
+				echo "Launching visualization with open."
+				open /tmp/blgeo_out.kml
+			fi
+		elif [ "$checkwin" != "" ]
+		then
+			locallaunch=true
+			echo
+			cd /tmp
+			chmod 775 blgeo_out.kml
+
+			if [ "$viscmd" != "" ]
+			then
+				echo "Launching visualization with cmd / $viscmd."
+				cmd -c "$viscmd /tmp/blgeo_out.kml"
+			else
+				echo "Launching visualization with cmd / start."
+				cmd /c "start blgeo_out.kml"
+			fi
+		else
+			visMayHaveFailed
+		fi
+	else
+		echo "Skipping visualization per request."
+	fi
+else
+	failExit
+fi
+
+# see if the launch program complained about anything
+if [ "$?" != "0" ]
+then
+    echo
+    echo "The launch program used may have failed."
+    visMayHaveFailed
+fi
+
+successExit
+
